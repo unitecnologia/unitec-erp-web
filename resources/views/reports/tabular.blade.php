@@ -147,6 +147,12 @@
             .tabular-doc__frame { border: none; padding: 0; }
             .viewer__pdv-resumo { border: none; }
             .viewer__pdv-resumo iframe { min-height: 100vh; }
+            .tabular-doc__detail-row { display: none !important; }
+            .tabular-doc__qtd-toggle {
+                color: inherit !important;
+                font-weight: inherit !important;
+                text-decoration: none !important;
+            }
         }
     </style>
     @include('reports.partials.tabular-document-styles')
@@ -394,6 +400,18 @@
                 chartJsUrl: @json(asset('js/vendor/chart.umd.min.js')),
                 chartType: @json(($chartConfig['type'] ?? null) ?: 'line'),
                 defaultGranularity: @json(($chartConfig['default_granularity'] ?? null) ?: 'month'),
+            });
+        </script>
+    @endif
+    @if (! empty($supportsRowExpand) && filled($detailsUrl ?? null))
+        @php
+            $expandFilters = collect($filters ?? [])->except(['pdv_resumo_url'])->all();
+        @endphp
+        <script src="{{ asset('js/erp-report-vendedor-expand.js') }}?v=1"></script>
+        <script>
+            window.ErpReportVendedorExpand.init({
+                detailsUrl: @json($detailsUrl),
+                filters: @json($expandFilters),
             });
         </script>
     @endif

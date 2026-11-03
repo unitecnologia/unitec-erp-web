@@ -52,6 +52,7 @@ class NfeDanfeReportService
         $totalNota = $xmlMoney['v_nf']
             ?? (float) ($nfe->total > 0 ? $nfe->total : $subtotalProdutos);
         $descontoXml = $xmlMoney['v_desc'] ?? null;
+        // DIFAL do XML autorizado (quando houver) — não recalcular nem somar em vNF.
         $movimento = (string) ($nfe->movimento ?? '1');
         $isSaida = $movimento !== '0';
         $logoDataUri = $this->danfe->logoDataUri($empresa);
@@ -76,7 +77,7 @@ class NfeDanfeReportService
             'dataEntrada' => $nfe->data_saida?->format('d/m/Y') ?? ($nfe->data_emissao?->format('d/m/Y') ?? ''),
             'horaEntrada' => filled($nfe->hora_saida) ? substr((string) $nfe->hora_saida, 0, 5) : '',
             'itens' => $this->buildItens($nfe, $xmlMoney['itens'] ?? null),
-            'totais' => $this->buildTotais($nfe, $subtotalProdutos, $totalNota, $descontoXml),
+            'totais' => $this->buildTotais($nfe, $subtotalProdutos, $totalNota, $descontoXml, $xmlMoney),
             'transportador' => $this->buildTransportador($nfe),
             'volumes' => $this->buildVolumes($nfe),
             'duplicatas' => $this->buildDuplicatas($nfe),
@@ -348,9 +349,10 @@ class NfeDanfeReportService
     }
 
     /**
-     * @return array<string, string>
+     * @param  array<string, mixed>|null  $xmlMoney
+     * @return array<string, mixed>
      */
-    protected function buildTotais(Nfe $nfe, float $subtotalProdutos, float $totalNota, ?float $descontoXml = null): array
+    protected function buildTotais(Nfe $nfe, float $subtotalProdutos, float $totalNota, ?float $descontoXml = null, ?array $xmlMoney = null): array
     {
         // Cabeçalho: ICMSTot/vDesc (XML) ou desconto persistido — nunca reconstruir.
         $desconto = $descontoXml ?? (float) ($nfe->desconto ?? 0);
@@ -364,6 +366,9 @@ class NfeDanfeReportService
         $totalIpi = (float) ($nfe->total_ipi ?? 0);
         $totalPis = (float) ($nfe->total_icms_pis ?? 0);
         $totalCofins = (float) ($nfe->total_icms_cofins ?? 0);
+        $vicmsUfDest = (float) ($xmlMoney['v_icms_uf_dest'] ?? $nfe->vicms_uf_dest ?? 0);
+        $vfcpUfDest = (float) ($xmlMoney['v_fcp_uf_dest'] ?? $nfe->vfcp_uf_dest ?? 0);
+        $vicmsUfRemet = (float) ($xmlMoney['v_icms_uf_remet'] ?? $nfe->vicms_uf_remet ?? 0);
 
         if ($nfe->itens->isNotEmpty()) {
             if ($frete <= 0) {
@@ -401,10 +406,19 @@ class NfeDanfeReportService
             if ($valorSt <= 0) {
                 $valorSt = (float) $nfe->itens->sum(fn (NfeItem $item): float => (float) ($item->valor_icms_st ?? 0));
             }
+
+            if ($vicmsUfDest <= 0) {
+                $vicmsUfDest = (float) $nfe->itens->sum(fn (NfeItem $item): float => (float) ($item->vicmsufdest ?? 0));
+            }
+
+            if ($vicmsUfRemet <= 0) {
+                $vicmsUfRemet = (float) $nfe->itens->sum(fn (NfeItem $item): float => (float) ($item->vicmsufremet ?? 0));
+            }
         }
 
         // Cabeçalho Valor Total dos Produtos = ICMSTot/vProd (já em $subtotalProdutos).
         // NUNCA somar desconto (bug antigo: 45 + 22,10 = 67,10).
+        // DIFAL (ICMSUFDest) é informativo — não soma em total_nota / vNF.
         return [
             'base_icms' => number_format($baseIcms, 2, ',', '.'),
             'valor_icms' => number_format($valorIcms, 2, ',', '.'),
@@ -418,6 +432,10 @@ class NfeDanfeReportService
             'total_ipi' => number_format($totalIpi, 2, ',', '.'),
             'total_pis' => number_format($totalPis, 2, ',', '.'),
             'total_cofins' => number_format($totalCofins, 2, ',', '.'),
+            'vicms_uf_dest' => number_format($vicmsUfDest, 2, ',', '.'),
+            'vfcp_uf_dest' => number_format($vfcpUfDest, 2, ',', '.'),
+            'vicms_uf_remet' => number_format($vicmsUfRemet, 2, ',', '.'),
+            'tem_difal' => ($vicmsUfDest > 0 || $vfcpUfDest > 0 || $vicmsUfRemet > 0),
             'total_nota' => number_format($totalNota, 2, ',', '.'),
         ];
     }
@@ -429,6 +447,9 @@ class NfeDanfeReportService
      *     v_prod: float,
      *     v_desc: float,
      *     v_nf: float,
+     *     v_icms_uf_dest?: float,
+     *     v_fcp_uf_dest?: float,
+     *     v_icms_uf_remet?: float,
      *     itens: array<int, array{v_prod: float, v_desc: float, v_un_com: float|null}>
      * }|null
      */
@@ -478,6 +499,9 @@ class NfeDanfeReportService
             'v_prod' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vProd')),
             'v_desc' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vDesc')),
             'v_nf' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vNF')),
+            'v_icms_uf_dest' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vICMSUFDest')),
+            'v_fcp_uf_dest' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vFCPUFDest')),
+            'v_icms_uf_remet' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vICMSUFRemet')),
             'itens' => $itens,
         ];
     }
@@ -646,13 +670,10 @@ class NfeDanfeReportService
             $textoIbpt = app(\App\Support\Erp\Fiscal\IbptLookupService::class)->formatarTextoLei12741($totais);
         }
 
-        $crt = match (strtolower((string) ($empresa?->regime_tributario ?? 'simples'))) {
-            'simples' => 1,
-            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
-            'mei', 'simei' => 4,
-            'presumido', 'real', 'normal' => 3,
-            default => 1,
-        };
+        $crt = \App\Support\Fiscal\RegimeCrtMapper::toCrt(
+            $empresa?->regime_tributario ?? 'simples',
+            strict: false,
+        );
 
         $mensagensLegais = app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class);
         $creditoSn = $mensagensLegais->resumirCreditoSnDosItens($nfe->itens ?? []);

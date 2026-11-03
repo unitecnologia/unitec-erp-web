@@ -39,7 +39,7 @@
             <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="emp-cnae">CNAE</label>
             <input id="emp-cnae" type="text" wire:model="data.cnae" class="erp-pcad-form__input erp-pcad-form__input--sm">
             <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="emp-regime">Regime Tributário</label>
-            <select id="emp-regime" wire:model="data.regime_tributario" class="erp-pcad-form__select erp-pcad-form__select--md">
+            <select id="emp-regime" wire:model.live="data.regime_tributario" class="erp-pcad-form__select erp-pcad-form__select--md" title="Ao alterar o regime em empresa já salva, será pedida revisão do Imposto Padrão">
                 @foreach (Empresa::regimesTributarios() as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
                 @endforeach

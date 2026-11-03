@@ -36,6 +36,7 @@ class FormaPagamentoSeedPadraoTest extends TestCase
                 'conta_destino_id' => null,
                 'gerar_qrcode_pdv' => false,
                 'nfce' => false,
+                'nao_pagar_comissao' => false,
                 'usa_tef' => false,
                 'usa_super_tef' => false,
                 'max_parcelas' => 1,

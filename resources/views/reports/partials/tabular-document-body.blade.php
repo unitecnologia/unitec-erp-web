@@ -57,11 +57,39 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse ($rows as $row)
-                    <tr>
+                @forelse ($rows as $rowIndex => $row)
+                    @php
+                        $expandMeta = (! empty($supportsRowExpand) && is_array($row['_expand'] ?? null))
+                            ? $row['_expand']
+                            : null;
+                    @endphp
+                    <tr
+                        @if ($expandMeta)
+                            class="tabular-doc__data-row"
+                            data-expand-row="{{ $rowIndex }}"
+                        @endif
+                    >
                         @foreach ($columns as $column)
-                            <td class="{{ trim((in_array($column, $numericColumns ?? [], true) ? 'num' : '').' '.(in_array($column, $nowrapColumns ?? [], true) ? 'col-nowrap' : '')) }}">
-                                {{ $row[$column] ?? '' }}
+                            @php
+                                $cellClass = trim(
+                                    (in_array($column, $numericColumns ?? [], true) ? 'num' : '')
+                                    .' '
+                                    .(in_array($column, $nowrapColumns ?? [], true) ? 'col-nowrap' : '')
+                                );
+                            @endphp
+                            <td class="{{ $cellClass }}">
+                                @if ($expandMeta && $column === 'qtd')
+                                    <button
+                                        type="button"
+                                        class="tabular-doc__qtd-toggle"
+                                        data-expand-toggle
+                                        data-expand='@json($expandMeta)'
+                                        aria-expanded="false"
+                                        title="Ver vendas deste vendedor"
+                                    >{{ $row[$column] ?? '' }}</button>
+                                @else
+                                    {{ $row[$column] ?? '' }}
+                                @endif
                             </td>
                         @endforeach
                     </tr>

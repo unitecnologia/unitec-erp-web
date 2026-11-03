@@ -7,6 +7,7 @@ use App\Models\ForcaVendasOrder;
 use App\Models\Nfe;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,12 +38,41 @@ class ForcaVendasMonitorResource extends Resource
     }
 
     /**
+     * Isola pedidos à empresa ativa da sessão (`ErpContext`).
+     * Sem empresa selecionada → nenhum registro (não vaza cross-empresa).
+     * `empresa_id` nulo/0 fica oculto por padrão (sem vínculo comprovado).
+     *
+     * Usa `forca_vendas_orders.empresa_id` (pedidos não tem essa coluna).
+     */
+    public static function constrainEmpresaAtiva(Builder $query): Builder
+    {
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if ($empresaId === null || $empresaId <= 0) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        $table = $query->getModel()->getTable();
+
+        return $query->where("{$table}.empresa_id", $empresaId);
+    }
+
+    /**
+     * Query para ações/lookups do Monitor (respeita empresa ativa).
+     */
+    public static function ordersQuery(): Builder
+    {
+        return self::constrainEmpresaAtiva(static::getModel()::query());
+    }
+
+    /**
      * O Monitor de Vendas mostra apenas os documentos do tipo "pedido"
-     * (os do tipo "orcamento" vão para a tela "Orçamentos recebidos").
+     * (os do tipo "orcamento" vão para a tela "Orçamentos recebidos"),
+     * da empresa em que o usuário está logado.
      */
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        return self::constrainEmpresaAtiva(parent::getEloquentQuery())
             ->where('tipo', 'pedido')
             ->with([
                 'pedido',
@@ -204,13 +234,19 @@ class ForcaVendasMonitorResource extends Resource
                     ->label('Meio Pgto')
                     ->state(fn (ForcaVendasOrder $record): string => self::meioPagamentoLabel($record))
                     ->formatStateUsing(function (string $state, ForcaVendasOrder $record): string {
-                        $label = e($state);
+                        // Misto: "Dinheiro +" na grade; title com todos os meios.
+                        $completo = $state;
+                        $visivel = self::meioPagamentoLabelCompacto($completo);
+                        $title = ($visivel !== $completo && $completo !== '—')
+                            ? ' title="'.e($completo).'"'
+                            : '';
+                        $inner = e($visivel);
 
-                        if (! self::meioPagamentoEhPix($record)) {
-                            return $label;
+                        if (self::meioPagamentoEhPix($record)) {
+                            return '<span class="erp-fv-mon-meio--pix"'.$title.'>'.$inner.'</span>';
                         }
 
-                        return '<span class="erp-fv-mon-meio--pix">'.$label.'</span>';
+                        return $title !== '' ? '<span'.$title.'>'.$inner.'</span>' : $inner;
                     })
                     ->html()
                     ->placeholder('—')
@@ -289,6 +325,11 @@ class ForcaVendasMonitorResource extends Resource
             return 'Vendas Internas';
         }
 
+        // Histórico SCV (desktop): exibe ERP; origem interna permanece payload.origem=scv.
+        if (self::isScvMigrado($record)) {
+            return 'ERP';
+        }
+
         return self::isTelaVenda($record) ? 'Tela de Vendas' : 'Força de Vendas';
     }
 
@@ -300,6 +341,10 @@ class ForcaVendasMonitorResource extends Resource
 
         if (self::isVendasInternas($record)) {
             return 'info';
+        }
+
+        if (self::isScvMigrado($record)) {
+            return 'success';
         }
 
         return self::isTelaVenda($record) ? 'primary' : 'gray';
@@ -321,6 +366,14 @@ class ForcaVendasMonitorResource extends Resource
         $payload = is_array($record->payload) ? $record->payload : [];
 
         return ($payload['origem'] ?? '') === 'vendas_internas';
+    }
+
+    /** Venda histórica importada do SCV (rastreio: payload.origem = scv). */
+    public static function isScvMigrado(ForcaVendasOrder $record): bool
+    {
+        $payload = is_array($record->payload) ? $record->payload : [];
+
+        return ($payload['origem'] ?? '') === 'scv';
     }
 
     /** Pedido gerado na Tela de Venda do ERP (não no app mobile). */
@@ -516,6 +569,25 @@ class ForcaVendasMonitorResource extends Resource
             'CREDIARIO' => 'Crediário',
             default => $forma,
         };
+    }
+
+    /**
+     * Exibição compacta na grade: um meio só; mistos → "Dinheiro +" (tooltip com a lista completa).
+     */
+    public static function meioPagamentoLabelCompacto(string $labelCompleto): string
+    {
+        $label = trim($labelCompleto);
+        if ($label === '' || $label === '—') {
+            return $label === '' ? '—' : $label;
+        }
+
+        if (! str_contains($label, ' + ')) {
+            return $label;
+        }
+
+        $primeiro = trim(explode(' + ', $label, 2)[0]);
+
+        return $primeiro === '' ? $label : $primeiro.' +';
     }
 
     public static function meioPagamentoEhPix(ForcaVendasOrder $record): bool

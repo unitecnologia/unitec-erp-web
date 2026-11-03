@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\UnitecOs\ProdutoController as UnitecOsProdutoContro
 use App\Http\Controllers\Api\UnitecOs\SyncController as UnitecOsSyncController;
 use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
 use App\Http\Controllers\Api\VendasInternas\DeviceController as ViDeviceController;
+use App\Http\Controllers\Api\VendasInternas\EquipamentoController as ViEquipamentoController;
 use App\Http\Controllers\Api\VendasInternas\InfoController as ViInfoController;
 use App\Http\Controllers\Api\VendasInternas\SyncController as ViSyncController;
 use App\Http\Controllers\Api\MeliHubPairController;
@@ -185,6 +186,12 @@ Route::prefix('v1/vendas-internas')->group(function (): void {
             Route::post('auth/logout', [ViAuthController::class, 'logout']);
             Route::get('sync/pull', [ViSyncController::class, 'pull']);
             Route::post('sync/push', [ViSyncController::class, 'push']);
+
+            Route::get('equipamentos', [ViEquipamentoController::class, 'index']);
+            Route::get('equipamentos/{id}', [ViEquipamentoController::class, 'show'])->whereNumber('id');
+            Route::post('equipamentos', [ViEquipamentoController::class, 'store']);
+            Route::post('equipamentos/consulta-placa', [ViEquipamentoController::class, 'consultarPlaca']);
+            Route::post('equipamentos/confirmar-consulta', [ViEquipamentoController::class, 'confirmarConsulta']);
         });
     });
 });

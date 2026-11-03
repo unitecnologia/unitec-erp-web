@@ -36,6 +36,12 @@ class NfeResource extends Resource
         return ErpAccess::currentCan('nfe.access');
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['venda' => static fn ($q) => $q->select(['id', 'numero'])]);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -57,8 +63,8 @@ class NfeResource extends Resource
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('npedido')
-                    ->label('OS/DAV')
-                    ->state(fn (Nfe $record): string => self::formatOsDav($record))
+                    ->label('Ped/OS')
+                    ->state(fn (Nfe $record): string => self::formatNumeroPedido($record))
                     ->html()
                     ->placeholder('—')
                     ->alignStart(),
@@ -135,50 +141,54 @@ class NfeResource extends Resource
     }
 
     /**
-     * Prefixo O- (ordem de serviço) ou D- (DAV) + número, letra à esquerda.
+     * Coluna "Nº Pedido": número comercial da venda vinculada.
+     * OS permanece com prefixo O- (não usa DAV.NUMERO_DAV).
      */
-    public static function formatOsDav(Nfe $nfe): string
+    public static function formatNumeroPedido(Nfe $nfe): string
     {
-        $raw = trim((string) ($nfe->npedido ?? ''));
+        if (self::isOrigemOrdemServico($nfe)) {
+            $raw = trim((string) ($nfe->npedido ?? ''));
 
-        if ($raw === '') {
+            if ($raw === '') {
+                return '—';
+            }
+
+            $digits = preg_replace('/\D/', '', $raw) ?? '';
+            $num = $digits !== '' ? (string) (int) $digits : $raw;
+
+            return '<span class="erp-doc-pref"><span class="erp-doc-pref__letra">O-</span><span class="erp-doc-pref__num">'.e($num).'</span></span>';
+        }
+
+        $vendaNumero = trim((string) ($nfe->venda?->numero ?? ''));
+
+        if ($vendaNumero === '') {
             return '—';
         }
 
-        $digits = preg_replace('/\D/', '', $raw) ?? '';
-        $num = $digits !== '' ? (string) (int) $digits : $raw;
-        $prefix = self::osDavPrefix($nfe);
+        $digits = preg_replace('/\D/', '', $vendaNumero) ?? '';
+        $num = $digits !== '' ? (string) (int) $digits : $vendaNumero;
 
-        if ($prefix === '') {
-            return e($num);
-        }
-
-        return '<span class="erp-doc-pref"><span class="erp-doc-pref__letra">'.e($prefix).'-</span><span class="erp-doc-pref__num">'.e($num).'</span></span>';
+        return e($num);
     }
 
-    protected static function osDavPrefix(Nfe $nfe): string
+    /** @deprecated Use formatNumeroPedido() */
+    public static function formatOsDav(Nfe $nfe): string
     {
+        return self::formatNumeroPedido($nfe);
+    }
+
+    protected static function isOrigemOrdemServico(Nfe $nfe): bool
+    {
+        if ((int) ($nfe->ordem_servico_id ?? 0) > 0) {
+            return true;
+        }
+
         $obs = mb_strtoupper(trim((string) ($nfe->obs_contribuinte ?? '')), 'UTF-8');
 
-        if ($obs !== '' && (
+        return $obs !== '' && (
             str_contains($obs, 'ORIGINADA DA OS')
             || (bool) preg_match('/\bOS\s*N[º°O.]/u', $obs)
-        )) {
-            return 'O';
-        }
-
-        if ((int) ($nfe->venda_id ?? 0) > 0) {
-            return 'D';
-        }
-
-        if ($obs !== '' && (
-            str_contains($obs, 'DAV')
-            || str_contains($obs, 'PEDIDO FV')
-        )) {
-            return 'D';
-        }
-
-        return '';
+        );
     }
 
     public static function getPages(): array

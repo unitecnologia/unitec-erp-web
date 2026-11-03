@@ -337,6 +337,7 @@
                         @if ($ui['nfce'])
                             <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.nfce"> NFC-e</label>
                         @endif
+                        <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.nao_pagar_comissao"> Não pagar comissão</label>
                         @if ($ui['gerar_qrcode_pdv'])
                             <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.gerar_qrcode_pdv"> Gerar QR Code na tela do PDV</label>
                         @endif

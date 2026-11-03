@@ -180,18 +180,26 @@ class Login extends BaseLogin
         try {
             $remembered = $this->readRememberedLogin();
 
-            $empresaId = (int) ($remembered['empresa_id'] ?? 0);
+            // "Lembrar usuário" restaura só o usuário — nunca a última empresa acessada.
             $userId = (int) ($remembered['user_id'] ?? 0);
             $remember = $remembered !== null;
+            $empresaId = 0;
 
-            if ($empresaId <= 0 || ! Empresa::query()->whereKey($empresaId)->where('ativo', true)->exists()) {
-                $empresaId = (int) (Empresa::query()->where('ativo', true)->orderBy('nome')->value('id') ?? 0);
+            $user = $userId > 0 ? User::query()->find($userId) : null;
+            if (! $user || ! $user->ativo) {
+                $userId = 0;
+                $user = null;
             }
 
-            if ($userId > 0) {
-                $user = User::query()->find($userId);
-                if (! $user || ! $user->ativo || ($empresaId > 0 && ! $user->canAccessEmpresa($empresaId))) {
-                    $userId = 0;
+            // Pré-seleciona empresa somente se o cadastro tiver padrão válido.
+            if ($user) {
+                $padrao = (int) ($user->empresa_id ?? 0);
+                if (
+                    $padrao > 0
+                    && $user->canAccessEmpresa($padrao)
+                    && Empresa::query()->whereKey($padrao)->where('ativo', true)->exists()
+                ) {
+                    $empresaId = $padrao;
                 }
             }
 
@@ -233,9 +241,9 @@ class Login extends BaseLogin
                 'data-bwignore' => 'true',
             ])
             ->components([
-                $this->getEmpresaFormComponent(),
                 $this->getLoginFormComponent(),
                 $this->getPasswordFormComponent(),
+                $this->getEmpresaFormComponent(),
                 $this->getRememberUserFormComponent(),
             ]);
     }
@@ -244,23 +252,18 @@ class Login extends BaseLogin
     {
         return Select::make('empresa_id')
             ->label('EMPRESA')
+            ->placeholder('SELECIONE A EMPRESA')
             ->options(fn (): array => $this->empresaOptions())
             ->live()
-            ->afterStateUpdated(function (): void {
-                $empresaId = (int) ($this->data['empresa_id'] ?? 0);
-                $userId = (int) ($this->data['user_id'] ?? 0);
-                $users = $this->userOptionsForEmpresa($empresaId);
-
-                if ($userId > 0 && ! array_key_exists($userId, $users)) {
-                    $this->data['user_id'] = null;
-                }
-            })
             ->visible(fn (): bool => $this->temEmpresaCadastrada())
-            ->selectablePlaceholder(false)
+            ->selectablePlaceholder(true)
             ->required(fn (): bool => $this->temEmpresaCadastrada())
+            ->validationMessages([
+                'required' => 'Selecione a empresa para continuar.',
+            ])
             ->native()
             ->extraInputAttributes([
-                'tabindex' => 1,
+                'tabindex' => 3,
                 'autocomplete' => 'off',
                 'data-lpignore' => 'true',
                 'data-1p-ignore' => 'true',
@@ -273,19 +276,24 @@ class Login extends BaseLogin
     {
         $userCount = User::query()->where('ativo', true)->count();
 
+        $onUserUpdated = function ($state): void {
+            $this->aplicarEmpresaPadraoAoSelecionarUsuario((int) ($state ?? 0));
+        };
+
         // Select nativo com poucos usuários: mais confiável após update
         // (searchable do Filament às vezes mostra "sem opções" mesmo com dados).
         if ($userCount > 0 && $userCount <= 100) {
             return Select::make('user_id')
                 ->label('USUÁRIO')
                 ->placeholder('SELECIONE O USUÁRIO')
-                ->options(fn (): array => $this->userOptionsForEmpresa((int) ($this->data['empresa_id'] ?? 0)))
+                ->options(fn (): array => $this->userOptionsForLogin())
                 ->native()
                 ->live()
+                ->afterStateUpdated($onUserUpdated)
                 ->selectablePlaceholder(true)
                 ->required()
                 ->extraInputAttributes([
-                    'tabindex' => 2,
+                    'tabindex' => 1,
                     'autocomplete' => 'off',
                     'autocapitalize' => 'characters',
                     'style' => 'text-transform: uppercase;',
@@ -299,16 +307,17 @@ class Login extends BaseLogin
         return Select::make('user_id')
             ->label('USUÁRIO')
             ->placeholder('DIGITE O NOME DO USUÁRIO')
-            ->options(fn (): array => $this->userOptionsForEmpresa((int) ($this->data['empresa_id'] ?? 0)))
+            ->options(fn (): array => $this->userOptionsForLogin())
             ->searchable()
             ->native(false)
             ->live()
+            ->afterStateUpdated($onUserUpdated)
             ->selectablePlaceholder(true)
             ->required()
             ->noOptionsMessage('Nenhum usuário cadastrado.')
             ->noSearchResultsMessage('Nenhum usuário encontrado.')
             ->extraInputAttributes([
-                'tabindex' => 2,
+                'tabindex' => 1,
                 'autocomplete' => 'off',
                 'autocapitalize' => 'characters',
                 'style' => 'text-transform: uppercase;',
@@ -335,7 +344,7 @@ class Login extends BaseLogin
             ])
             ->extraInputAttributes([
                 'id' => 'unitec-login-senha',
-                'tabindex' => 3,
+                'tabindex' => 2,
                 'autocomplete' => 'off',
                 'autocapitalize' => 'off',
                 'autocorrect' => 'off',
@@ -363,12 +372,30 @@ class Login extends BaseLogin
     }
 
     /**
+     * Empresas autorizadas do usuário selecionado (vazio até escolher o usuário).
+     *
      * @return array<int|string, string>
      */
     protected function empresaOptions(): array
     {
+        $userId = (int) ($this->data['user_id'] ?? 0);
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $user = User::query()->find($userId);
+        if (! $user || ! $user->ativo) {
+            return [];
+        }
+
+        $ids = $user->accessibleEmpresaIds();
+        if ($ids === []) {
+            return [];
+        }
+
         return Empresa::query()
             ->where('ativo', true)
+            ->whereIn('id', $ids)
             ->orderByRaw('COALESCE(NULLIF(fantasia, ""), NULLIF(nome, ""), razao_social) ASC')
             ->get(['id', 'nome', 'fantasia', 'razao_social'])
             ->mapWithKeys(fn (Empresa $e): array => [
@@ -378,25 +405,50 @@ class Login extends BaseLogin
     }
 
     /**
-     * Usuários ativos com acesso à empresa (digite o nome para filtrar na lista).
+     * Lista de usuários no login (usuário vem antes da empresa).
      *
      * @return array<int|string, string>
      */
-    protected function userOptionsForEmpresa(int $empresaId): array
+    protected function userOptionsForLogin(): array
     {
-        $query = User::query()
+        return User::query()
             ->where('ativo', true)
-            ->orderBy('name');
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
 
-        if ($empresaId > 0) {
-            $query->where(function ($q) use ($empresaId): void {
-                $q->where('is_admin', true)
-                    ->orWhere('empresa_id', $empresaId)
-                    ->orWhereHas('empresas', fn ($eq) => $eq->where('empresas.id', $empresaId));
-            });
+    /**
+     * Ao escolher o usuário: aplica somente a empresa padrão do cadastro.
+     * Sem padrão → campo vazio (exige seleção explícita). Não reusa última empresa.
+     */
+    protected function aplicarEmpresaPadraoAoSelecionarUsuario(int $userId): void
+    {
+        if ($userId <= 0) {
+            $this->data['empresa_id'] = null;
+
+            return;
         }
 
-        return $query->pluck('name', 'id')->all();
+        $user = User::query()->find($userId);
+        if (! $user || ! $user->ativo) {
+            $this->data['empresa_id'] = null;
+
+            return;
+        }
+
+        $padrao = (int) ($user->empresa_id ?? 0);
+        if (
+            $padrao > 0
+            && $user->canAccessEmpresa($padrao)
+            && Empresa::query()->whereKey($padrao)->where('ativo', true)->exists()
+        ) {
+            $this->data['empresa_id'] = $padrao;
+
+            return;
+        }
+
+        $this->data['empresa_id'] = null;
     }
 
     public function authenticate(): ?LoginResponse
@@ -435,11 +487,20 @@ class Login extends BaseLogin
                     'data.login_senha' => 'Primeiro acesso: use o usuário administrador para cadastrar a empresa.',
                 ]);
             }
-        } elseif ($empresaId <= 0 || ! $user->canAccessEmpresa($empresaId)) {
+        } elseif ($empresaId <= 0) {
+            GestorLoginDiag::log('recusado', [
+                'reason' => 'empresa_vazia',
+                'user_id' => $userId,
+                'empresa_id' => null,
+            ]);
+            throw ValidationException::withMessages([
+                'data.empresa_id' => 'Selecione a empresa para continuar.',
+            ]);
+        } elseif (! $user->canAccessEmpresa($empresaId)) {
             GestorLoginDiag::log('recusado', [
                 'reason' => 'empresa',
                 'user_id' => $userId,
-                'empresa_id' => $empresaId > 0 ? $empresaId : null,
+                'empresa_id' => $empresaId,
             ]);
             throw ValidationException::withMessages([
                 'data.empresa_id' => 'Selecione uma empresa liberada para este usuário.',
@@ -794,7 +855,7 @@ class Login extends BaseLogin
     }
 
     /**
-     * @return array{user_id: int, empresa_id: int}|null
+     * @return array{user_id: int}|null
      */
     protected function readRememberedLogin(): ?array
     {
@@ -812,7 +873,6 @@ class Login extends BaseLogin
         }
 
         $userId = (int) ($data['user_id'] ?? 0);
-        $empresaId = (int) ($data['empresa_id'] ?? 0);
 
         if ($userId <= 0) {
             return null;
@@ -820,17 +880,16 @@ class Login extends BaseLogin
 
         return [
             'user_id' => $userId,
-            'empresa_id' => $empresaId,
         ];
     }
 
-    protected function writeRememberedLogin(int $userId, int $empresaId): void
+    protected function writeRememberedLogin(int $userId, int $empresaId = 0): void
     {
+        // $empresaId ignorado de propósito: "Lembrar usuário" não fixa empresa.
         Cookie::queue(
             self::REMEMBER_COOKIE,
             json_encode([
                 'user_id' => $userId,
-                'empresa_id' => $empresaId,
             ], JSON_THROW_ON_ERROR),
             60 * 24 * 90,
         );

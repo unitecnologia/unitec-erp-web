@@ -341,7 +341,10 @@ final class ComissaoPeriodoService
             ->orderBy('id')
             ->get(['id', 'data', 'total', 'forma_pagamento']);
 
-        $adicionais = ProdutoComissaoAdicional::porVendaIds($vendas->pluck('id')->all());
+        $vendaIds = $vendas->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        $adicionais = ProdutoComissaoAdicional::porVendaIds($vendaIds);
+        $formasSemComissao = ComissaoBasePagamento::formasSemComissao();
+        $pagamentosPorVenda = ComissaoBasePagamento::pagamentosPorVendaIds($vendaIds);
 
         $baseAv = 0.0;
         $baseAp = 0.0;
@@ -351,11 +354,26 @@ final class ComissaoPeriodoService
         $linhas = [];
 
         foreach ($vendas as $venda) {
-            $base = round((float) $venda->total, 2);
+            $totalVenda = round((float) $venda->total, 2);
+            $base = ComissaoBasePagamento::baseComissionavel(
+                $totalVenda,
+                $venda->forma_pagamento,
+                $pagamentosPorVenda[(int) $venda->id] ?? null,
+                $formasSemComissao,
+            );
+            $adicional = ComissaoBasePagamento::adicionalProporcional(
+                (float) ($adicionais[(int) $venda->id] ?? 0),
+                $base,
+                $totalVenda,
+            );
+
+            if ($base <= 0.0 && $adicional <= 0.0) {
+                continue;
+            }
+
             $aPrazo = ComissaoVendedoresReport::isAPrazo($venda->forma_pagamento);
             $pct = $aPrazo ? $pctAp : $pctAv;
             $tipo = $aPrazo ? 'ap' : 'av';
-            $adicional = (float) ($adicionais[(int) $venda->id] ?? 0);
 
             if ($aPrazo) {
                 $baseAp += $base;

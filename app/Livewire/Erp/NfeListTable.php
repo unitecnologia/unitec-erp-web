@@ -300,6 +300,7 @@ class NfeListTable extends Component
                 "{$table}.empresa_id",
                 "{$table}.cliente_id",
                 "{$table}.venda_id",
+                "{$table}.ordem_servico_id",
                 "{$table}.numero",
                 "{$table}.npedido",
                 "{$table}.data_emissao",

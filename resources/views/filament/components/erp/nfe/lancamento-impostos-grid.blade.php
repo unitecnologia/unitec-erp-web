@@ -1,7 +1,23 @@
 @php
-
     $rows = $this->nfeModalRows ?? [];
-
+    $crtNfe = method_exists($this, 'nfeEmissaoCrt') ? (int) $this->nfeEmissaoCrt() : 1;
+    $anyStCob = false;
+    $anyStRet = false;
+    $anyFcp = false;
+    foreach ($rows as $rScan) {
+        $cstScan = (string) ($rScan['cst'] ?? '');
+        $csosnScan = (string) ($rScan['csosn'] ?? '');
+        $csosnOrCst = $csosnScan !== '' ? $csosnScan : $cstScan;
+        if (\App\Support\Fiscal\IcmsStFcp::uiStCobrada($crtNfe, $cstScan, $csosnOrCst)) {
+            $anyStCob = true;
+        }
+        if (\App\Support\Fiscal\IcmsStFcp::uiStRetida($crtNfe, $cstScan, $csosnOrCst)) {
+            $anyStRet = true;
+        }
+        if (\App\Support\Fiscal\IcmsStFcp::uiFcpProprio($crtNfe, $cstScan, $csosnOrCst)) {
+            $anyFcp = true;
+        }
+    }
 @endphp
 
 
@@ -164,6 +180,26 @@
 
                         <th class="erp-nfe-lancamento-modal__num">Valor ICMS</th>
 
+                        @if ($anyStCob)
+                            <th class="erp-nfe-lancamento-modal__num" title="ST cobrada na operação — informar base/%/valor; não calculamos por CEST">Base ST</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="ST cobrada na operação">% ST</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="ST cobrada na operação">Valor ST</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="% MVA do produto (sugestão editável)">% MVA</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="pFCPST da operação — informar se houver vFCPST (não presume = % FCP do produto)">% FCP-ST</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="FCP sobre ST cobrada">vFCP-ST</th>
+                        @endif
+                        @if ($anyFcp)
+                            <th class="erp-nfe-lancamento-modal__num" title="% FCP do produto (sugestão editável)">% FCP</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="FCP próprio — entra em ICMSTot/vFCP, não soma extra no vNF">vFCP</th>
+                        @endif
+                        @if ($anyStRet)
+                            <th class="erp-nfe-lancamento-modal__num" title="ST retida anteriormente (informativo — não entra em vST)">BC ST Ret</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="ST retida anteriormente">% ST Ret</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="ST retida anteriormente">vST Ret</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="ICMS próprio do substituto">vICMS Subst.</th>
+                            <th class="erp-nfe-lancamento-modal__num" title="FCP-ST retido">vFCP-ST Ret</th>
+                        @endif
+
                         <th class="erp-nfe-lancamento-modal__num">Aliq. PIS</th>
 
                         <th class="erp-nfe-lancamento-modal__num">Valor PIS</th>
@@ -179,6 +215,7 @@
                         <th class="erp-nfe-lancamento-modal__num">Desc. deson.</th>
 
                         <th class="erp-nfe-lancamento-modal__num">Valor deson.</th>
+                        <th class="erp-nfe-lancamento-modal__center" title="NT 2023.004: 1=deduz do vNF; 0 ou vazio=não deduz">indDeduzDeson</th>
 
                         <th class="erp-nfe-lancamento-modal__center">Class. trib.</th>
 
@@ -205,6 +242,14 @@
                 <tbody>
 
                     @foreach ($rows as $index => $row)
+                        @php
+                            $cstRow = (string) ($row['cst'] ?? '');
+                            $csosnRow = (string) ($row['csosn'] ?? '');
+                            // Na UI Simples a coluna CST exibe CSOSN; modo fiscal usa os dois.
+                            $showStCob = \App\Support\Fiscal\IcmsStFcp::uiStCobrada($crtNfe, $cstRow, $csosnRow ?: $cstRow);
+                            $showStRet = \App\Support\Fiscal\IcmsStFcp::uiStRetida($crtNfe, $cstRow, $csosnRow ?: $cstRow);
+                            $showFcp = \App\Support\Fiscal\IcmsStFcp::uiFcpProprio($crtNfe, $cstRow, $csosnRow ?: $cstRow);
+                        @endphp
 
                         <tr
 
@@ -263,6 +308,26 @@
 
                             <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.valor_icms" wire:click.stop data-erp-nfe-impostos-enter x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--num" autocomplete="off"></td>
 
+                            @if ($anyStCob)
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStCob, 'field' => 'base_icms_st'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStCob, 'field' => 'aliq_icms_st'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStCob, 'field' => 'valor_icms_st'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStCob, 'field' => 'p_mva_st'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStCob, 'field' => 'p_fcp_st'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStCob, 'field' => 'v_fcp_st'])
+                            @endif
+                            @if ($anyFcp)
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showFcp, 'field' => 'p_fcp'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showFcp, 'field' => 'vfcp'])
+                            @endif
+                            @if ($anyStRet)
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStRet, 'field' => 'base_icms_st_ret'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStRet, 'field' => 'p_st_ret'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStRet, 'field' => 'valor_icms_st_ret'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStRet, 'field' => 'v_icms_substituto'])
+                                @include('filament.components.erp.nfe.partials.imposto-st-cell', ['index' => $index, 'enabled' => $showStRet, 'field' => 'v_fcp_st_ret'])
+                            @endif
+
                             <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.aliq_pis_icms" wire:click.stop data-erp-nfe-impostos-enter x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--num" autocomplete="off"></td>
 
                             <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.valor_pis_icms" wire:click.stop data-erp-nfe-impostos-enter x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--num" autocomplete="off"></td>
@@ -278,6 +343,7 @@
                             <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.desc_desoneracao" wire:click.stop data-erp-nfe-impostos-enter x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--num" autocomplete="off"></td>
 
                             <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.valor_desoneracao" wire:click.stop data-erp-nfe-impostos-enter x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--num" autocomplete="off"></td>
+                            <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.ind_deduz_deson" wire:click.stop data-erp-nfe-impostos-enter maxlength="1" title="1=deduz vNF; 0/vazio=não deduz" x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--center" autocomplete="off" placeholder="0"></td>
 
                             <td><input type="text" wire:model.blur="nfeModalRows.{{ $index }}.class_trib" wire:click.stop data-erp-nfe-impostos-enter x-on:focus="$el.removeAttribute('readonly'); $el.select()" x-on:click.stop="$el.removeAttribute('readonly'); $el.select()" @mouseup.prevent class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--center" autocomplete="off"></td>
 

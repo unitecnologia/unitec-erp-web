@@ -388,6 +388,13 @@ abstract class AbstractTabularReport implements TabularReportDefinition
                 }
             }
 
+            // Metadados internos (ex.: _expand) — não entram em CSV/colunas, só na prévia.
+            foreach ($row as $key => $value) {
+                if (is_string($key) && str_starts_with($key, '_')) {
+                    $stringRow[$key] = $value;
+                }
+            }
+
             $stringRows[] = $stringRow;
         }
 

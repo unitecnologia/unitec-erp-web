@@ -577,6 +577,19 @@ trait ManagesPdvCaixa
         }
 
         $empresaId = $this->resolveEmpresaId();
+
+        try {
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)
+                ->assertEmpresaOperacional($empresaId > 0 ? (int) $empresaId : null);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         $terminal = TerminalResolver::make()->resolveOrCreateDefault($empresaId);
 
         if (! $user->podeOperarPdvNoTerminal($terminal)) {
@@ -905,6 +918,16 @@ trait ManagesPdvCaixa
             return;
         }
 
+        try {
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)->assertEmpresaOperacional(
+                ($eid = (int) $this->resolveEmpresaId()) > 0 ? $eid : null
+            );
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            return;
+        }
+
         $valor = ErpMoney::parseBr($this->sangriaForm['valor'] ?? '0');
 
         if ($valor <= 0) {
@@ -1003,6 +1026,16 @@ trait ManagesPdvCaixa
                 ->title('Caixa fechado.')
                 ->warning()
                 ->send();
+
+            return;
+        }
+
+        try {
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)->assertEmpresaOperacional(
+                ($eid = (int) $this->resolveEmpresaId()) > 0 ? $eid : null
+            );
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
 
             return;
         }

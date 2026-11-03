@@ -51,6 +51,8 @@ final class NfeFiscalPayloadBuilder
             throw new FiscalEngineException('NF-e sem itens para transmissão.');
         }
 
+        NfeOperacoesNaoSuportadas::assertParaEmissaoNfe55($nfe);
+
         $finNFe = $this->mapFinNFe((string) ($nfe->finalidade ?? 'normal'));
         $chavesReferenciadas = $this->resolveChavesReferenciadas($nfe);
 
@@ -63,6 +65,8 @@ final class NfeFiscalPayloadBuilder
         $empresaUf = FiscalEmitenteUf::resolve($empresa, $parametros);
         $clienteUf = strtoupper(trim((string) ($cliente->uf ?? ''))) ?: $empresaUf;
         $idDest = $this->resolveIdDest($empresaUf, $clienteUf);
+        $indFinal = $this->resolveIndFinal($nfe, $cliente);
+        [$indIeDest] = $this->resolveIndIeDest($cliente);
 
         if (! $nfe->data_emissao) {
             throw new FiscalEngineException('Data de emissão da NF-e não informada.');
@@ -118,7 +122,22 @@ final class NfeFiscalPayloadBuilder
             }
         }
 
-        $crt = $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples'));
+        $crt = RegimeCrtMapper::toCrt($empresa->regime_tributario ?? 'simples');
+
+        // DIFAL / ICMSUFDest: valida, calcula (CRT 3) e persiste só em NF-e aberta (não altera vNF).
+        $difal = IcmsUfDest::calcularParaEmissao(
+            $nfe,
+            $empresa,
+            $cliente,
+            $idDest,
+            $indFinal,
+            $indIeDest,
+            $crt,
+            $empresaUf,
+        );
+        IcmsUfDest::persistir($nfe, $difal);
+        $nfe->load(['itens.product']);
+
         $itens = $nfe->itens
             ->sortBy('item')
             ->values()
@@ -128,6 +147,7 @@ final class NfeFiscalPayloadBuilder
                 $crt,
                 $emissao,
                 $clienteUf,
+                $difal['por_item'][(int) $item->id] ?? null,
             ))
             ->all();
 
@@ -188,14 +208,26 @@ final class NfeFiscalPayloadBuilder
 
         $mensagensLegais = app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class);
         $creditoSn = $mensagensLegais->resumirCreditoSnDosItens($nfe->itens);
+        $msgsLegais = $mensagensLegais->mensagens([
+            'modelo' => \App\Support\Erp\Fiscal\FiscalMensagensLegais::MODELO_NFE,
+            'crt' => $crt,
+            'p_cred_sn' => $creditoSn['p_cred_sn'],
+            'v_cred_icms_sn' => $creditoSn['v_cred_icms_sn'],
+        ]);
+        // Destacar DIFAL na infCpl quando parametrizado (valores já calculados; não altera vNF).
+        if (filter_var($empresa->param_difal_destacar_nfe ?? false, FILTER_VALIDATE_BOOLEAN)
+            && (($difal['totais']['vicms_uf_dest'] ?? 0) > 0 || ($difal['totais']['vfcp_uf_dest'] ?? 0) > 0)) {
+            $msgsLegais[] = sprintf(
+                'DIFAL/ICMS UF DESTINO: R$ %s%s',
+                number_format((float) $difal['totais']['vicms_uf_dest'], 2, ',', '.'),
+                ($difal['totais']['vfcp_uf_dest'] ?? 0) > 0
+                    ? ' | FCP UF DESTINO: R$ '.number_format((float) $difal['totais']['vfcp_uf_dest'], 2, ',', '.')
+                    : '',
+            );
+        }
         $informacoesContribuinte = $mensagensLegais->comporInfCpl(
             $informacoesContribuinte,
-            $mensagensLegais->mensagens([
-                'modelo' => \App\Support\Erp\Fiscal\FiscalMensagensLegais::MODELO_NFE,
-                'crt' => $crt,
-                'p_cred_sn' => $creditoSn['p_cred_sn'],
-                'v_cred_icms_sn' => $creditoSn['v_cred_icms_sn'],
-            ]),
+            $msgsLegais,
             $textoIbpt,
         );
 
@@ -217,7 +249,7 @@ final class NfeFiscalPayloadBuilder
             valorProdutos: $valorProdutos,
             valorNota: round((float) $nfe->total, 2),
             idDest: $idDest,
-            indFinal: $this->resolveIndFinal($nfe, $cliente),
+            indFinal: $indFinal,
             finNFe: $finNFe,
             modFrete: $this->resolveModFrete($nfe),
             valorDesconto: $valorDesconto,
@@ -234,7 +266,24 @@ final class NfeFiscalPayloadBuilder
             respTecnico: NfeFiscalConfig::respTecnicoFromParametros($parametros),
             transporte: $this->buildTransporte($nfe),
             chavesReferenciadas: $chavesReferenciadas,
+            tpNF: $this->mapTpNf($nfe),
         );
+    }
+
+    /**
+     * tpNF SEFAZ a partir de nfes.movimento.
+     * Banco/UI: '0' = entrada; '1' (e legado 'S'/saida/null) = saída.
+     * Aceita int 0 e string "entrada" defensivamente; demais valores = saída.
+     */
+    private function mapTpNf(Nfe $nfe): int
+    {
+        $movimento = strtolower(trim((string) ($nfe->movimento ?? '1')));
+
+        if ($movimento === '0' || $movimento === 'entrada') {
+            return 0;
+        }
+
+        return 1;
     }
 
     public function podeEmitirReal(VendasParametro $parametros, Empresa $empresa): bool
@@ -293,7 +342,7 @@ final class NfeFiscalPayloadBuilder
             razaoSocial: (string) ($empresa->razao_social ?: $empresa->nome),
             nomeFantasia: (string) ($empresa->fantasia ?: $empresa->nome),
             ie: (string) $empresa->ie,
-            crt: $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples')),
+            crt: RegimeCrtMapper::toCrt($empresa->regime_tributario ?? 'simples'),
             logradouro: (string) ($empresa->endereco ?? 'NAO INFORMADO'),
             numero: (string) ($empresa->numero ?: 'S/N'),
             bairro: (string) ($empresa->bairro ?? 'CENTRO'),
@@ -362,12 +411,16 @@ final class NfeFiscalPayloadBuilder
         return (int) ($nfe->consumidor_final === '1' ? 1 : 0);
     }
 
+    /**
+     * @param  array<string, float>|null  $difalCalc
+     */
     private function mapItem(
         NfeItem $item,
         int $numero,
         int $crt = 1,
         ?\DateTimeInterface $dataEmissao = null,
         string $ufCons = 'SC',
+        ?array $difalCalc = null,
     ): ItemDto {
         $origem = $item->origem !== null
             ? (int) $item->origem
@@ -387,13 +440,34 @@ final class NfeFiscalPayloadBuilder
             $vTotTrib = (float) $ibpt['v_tot_trib'];
         }
 
+        $descricao = (string) $item->descricao;
+        $prefixoItem = 'Item '.$numero.' ('.$descricao.'): ';
+        $cstPisEmissao = filled($item->cst_pis)
+            ? (string) $item->cst_pis
+            : (string) ($item->product?->cst_saida ?? '');
+        $cstCofinsEmissao = filled($item->cst_cofins)
+            ? (string) $item->cst_cofins
+            : (string) ($item->product?->cst_cofins ?: $item->product?->cst_saida ?? '');
+
+        // CRT × CST/CSOSN × PIS/COFINS — bloqueia emissão inválida; não altera cadastros.
+        ImpostoPadraoCompatibilidade::assertItemParaEmissao(
+            $crt,
+            $item->cst !== null ? (string) $item->cst : null,
+            $item->csosn !== null ? (string) $item->csosn : null,
+            $cstPisEmissao,
+            $cstCofinsEmissao,
+            $prefixoItem,
+        );
+
         $csosn = trim((string) ($item->csosn ?? ''));
-        if ($csosn === '' && ! in_array($crt, [1, 4], true) && filled($item->cst)) {
+        if ($csosn === '' && ! RegimeCrtMapper::usaIcmsCsosn($crt) && filled($item->cst)) {
+            // CRT 2/3: CSOSN no DTO pode espelhar CST só para campos legados do motor; ICMS usa CST.
             $csosn = trim((string) $item->cst);
         }
 
         $cfop = (string) ($item->cfop ?: '5102');
-        if ($csosn === '') {
+        // Fallback CSOSN 102 apenas para CRT 1/4 (Simples/MEI) — não inventar para CRT 2/3.
+        if ($csosn === '' && RegimeCrtMapper::usaIcmsCsosn($crt)) {
             $csosn = '102';
         }
 
@@ -410,12 +484,52 @@ final class NfeFiscalPayloadBuilder
 
         [$valorUnitario, $valorBruto, $desconto] = $this->valoresComerciaisItem($item);
 
-        $descricao = (string) $item->descricao;
         $combustivel = ProdutoCombustivelFiscal::fromProduct(
             $item->product,
             $ufCons,
             $descricao,
         );
+
+        $cestRaw = filled($item->cest)
+            ? (string) $item->cest
+            : ($item->product?->cest !== null ? (string) $item->product->cest : null);
+
+        $imposto = IbscbsImpostoFactory::fromNfeItem(
+            item: $item,
+            origem: $origem,
+            csosn: $csosn,
+            vIcms: (float) ($item->valor_icms ?? 0),
+            vTotTrib: $vTotTrib,
+            crt: $crt,
+            dataEmissao: $dataEmissao,
+        );
+
+        if (is_array($difalCalc) && $difalCalc !== []) {
+            $imposto = IcmsUfDest::comCalculo($imposto, $difalCalc);
+        }
+
+        $modoSt = IcmsStFcp::modo(
+            $crt,
+            $imposto->cstIcms,
+            $imposto->csosn,
+            $imposto->hasStCobrada(),
+        );
+        IcmsStFcp::assertParaEmissao($modoSt, $imposto->cstIcms, $imposto->csosn, [
+            'v_bc_st' => $imposto->vBcSt,
+            'p_icms_st' => $imposto->pIcmsSt,
+            'v_icms_st' => $imposto->vIcmsSt,
+            'v_bc_st_ret' => $imposto->vBcStRet,
+            'v_icms_st_ret' => $imposto->vIcmsStRet,
+            'v_fcp' => $imposto->vFcp,
+            'p_fcp' => $imposto->pFcp,
+            'v_bc_fcp' => $imposto->vBcFcp,
+            'v_fcp_st' => $imposto->vFcpSt,
+            'p_fcp_st' => $imposto->pFcpSt,
+            'v_bc_fcp_st' => $imposto->vBcFcpSt,
+            'v_fcp_st_ret' => $imposto->vFcpStRet,
+            'p_fcp_st_ret' => $imposto->pFcpStRet,
+            'v_bc_fcp_st_ret' => $imposto->vBcFcpStRet,
+        ], $prefixoItem);
 
         return new ItemDto(
             numero: $numero,
@@ -427,21 +541,14 @@ final class NfeFiscalPayloadBuilder
             quantidade: (float) $item->quantidade,
             valorUnitario: $valorUnitario,
             valorTotal: $valorBruto,
-            imposto: IbscbsImpostoFactory::fromNfeItem(
-                item: $item,
-                origem: $origem,
-                csosn: $csosn,
-                vIcms: (float) ($item->valor_icms ?? 0),
-                vTotTrib: $vTotTrib,
-                crt: $crt,
-                dataEmissao: $dataEmissao,
-            ),
+            imposto: $imposto,
             desconto: $desconto,
             frete: (float) ($item->frete ?? 0),
             seguro: (float) ($item->seguro ?? 0),
             acrescimo: (float) ($item->outros ?? 0),
             infoAdicionais: filled($item->info_adicionais) ? (string) $item->info_adicionais : null,
             combustivel: $combustivel,
+            cest: CestCodigo::normalizar($cestRaw, 'item '.$numero.' ('.$descricao.')'),
         );
     }
 
@@ -509,21 +616,23 @@ final class NfeFiscalPayloadBuilder
 
     private function resolveNatOp(Nfe $nfe, int $finNFe): string
     {
+        $stored = trim((string) ($nfe->natureza_operacao ?? ''));
+
+        // Preferir a natureza gravada no lançamento (entrada ou saída).
+        // Formato típico: "1102 - COMPRA PARA COMERCIALIZAÇÃO" → só o texto (natOp SEFAZ ≤ 60).
+        if ($stored !== '') {
+            if (preg_match('/^\d{4}\b\s*[-–]\s*(.+)$/u', $stored, $matches)) {
+                return mb_substr(mb_strtoupper(trim((string) $matches[1]), 'UTF-8'), 0, 60);
+            }
+
+            return mb_substr(mb_strtoupper($stored, 'UTF-8'), 0, 60);
+        }
+
         if ($finNFe === 4) {
             return 'DEVOLUCAO DE MERCADORIA';
         }
 
         if ($this->isTrocaEmGarantia($nfe)) {
-            $stored = trim((string) ($nfe->natureza_operacao ?? ''));
-
-            if (preg_match('/^\d{4}\b\s*[-–]\s*(.+)$/u', $stored, $matches)) {
-                return mb_substr(mb_strtoupper(trim((string) $matches[1]), 'UTF-8'), 0, 60);
-            }
-
-            if ($stored !== '') {
-                return mb_substr(mb_strtoupper($stored, 'UTF-8'), 0, 60);
-            }
-
             return 'TROCA EM GARANTIA';
         }
 
@@ -602,17 +711,6 @@ final class NfeFiscalPayloadBuilder
         );
 
         return $parcelas;
-    }
-
-    private function mapCrt(string $regime): int
-    {
-        return match (strtolower($regime)) {
-            'simples' => 1,
-            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
-            'mei', 'simei' => 4,
-            'presumido', 'real', 'normal' => 3,
-            default => 1,
-        };
     }
 
     private function mapTpAmb(int $ambienteParametro): int

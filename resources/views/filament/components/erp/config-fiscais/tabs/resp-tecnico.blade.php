@@ -6,9 +6,9 @@
             @php
                 $ufRespTec = strtoupper((string) ($this->form['uf'] ?? 'SC'));
             @endphp
-            Dados fixos do software UniTecnologia. Obrigatório para autorização de NFC-e/NF-e
+            Padrão UniTecnologia — altere somente se necessário. Obrigatório para autorização de NFC-e/NF-e
             {{ $ufRespTec === 'PR' ? 'no Paraná' : 'em Santa Catarina' }}
-            (rejeição 972 quando ausente).
+            (rejeição 972 quando ausente). Campo vazio volta ao padrão ao gravar.
         </p>
 
         <div class="erp-pcad-form__row">
@@ -20,8 +20,6 @@
                 class="erp-pcad-form__input erp-pcad-form__input--grow"
                 inputmode="numeric"
                 maxlength="18"
-                readonly
-                tabindex="-1"
             >
         </div>
 
@@ -33,8 +31,6 @@
                 wire:model="form.resp_tecnico_contato"
                 class="erp-pcad-form__input erp-pcad-form__input--grow"
                 maxlength="60"
-                readonly
-                tabindex="-1"
             >
         </div>
 
@@ -46,8 +42,6 @@
                 wire:model="form.resp_tecnico_email"
                 class="erp-pcad-form__input erp-pcad-form__input--grow"
                 maxlength="60"
-                readonly
-                tabindex="-1"
             >
         </div>
 
@@ -60,8 +54,6 @@
                 class="erp-pcad-form__input erp-pcad-form__input--grow"
                 inputmode="tel"
                 maxlength="20"
-                readonly
-                tabindex="-1"
             >
         </div>
     </fieldset>

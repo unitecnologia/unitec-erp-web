@@ -26,6 +26,7 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\CaixaAbertoGuard;
 use App\Support\Erp\Financeiro\ComissaoPeriodoService;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
@@ -84,6 +85,15 @@ class ForcaVendasFaturamentoService
 
         if (! $order instanceof ForcaVendasOrder) {
             throw new \RuntimeException('Pedido não encontrado.');
+        }
+
+        $empresaGuard = $order->empresa_id
+            ? (int) $order->empresa_id
+            : (int) (ErpContext::currentEmpresaId() ?? 0);
+        try {
+            app(CaixaAbertoGuard::class)->assertPodeFinalizarVenda($empresaGuard > 0 ? $empresaGuard : null);
+        } catch (\InvalidArgumentException $e) {
+            throw new \RuntimeException($e->getMessage(), 0, $e);
         }
 
         if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {

@@ -19,6 +19,31 @@
         <span class="erp-caixa-actions__icon">🖨</span>
         <span class="erp-caixa-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>
+    <button type="button" wire:click="openCaixaTransferencia" class="erp-caixa-actions__btn" data-erp-key="F7" title="Transferir valor entre contas financeiras">
+        <span class="erp-caixa-actions__icon">⇄</span>
+        <span class="erp-caixa-actions__label"><kbd>F7</kbd> | Transferir</span>
+    </button>
+    @if ($this->caixaF8PodeUsar)
+        <button
+            type="button"
+            wire:click="openCaixaF8"
+            class="erp-caixa-actions__btn"
+            data-erp-key="F8"
+            title="{{ $this->caixaMovimentoAberto ? 'Fechar movimento do Livro Caixa' : 'Abrir movimento do Livro Caixa' }}"
+        >
+            <span class="erp-caixa-actions__icon">{{ $this->caixaMovimentoAberto ? '▣' : '▢' }}</span>
+            <span class="erp-caixa-actions__label"><kbd>F8</kbd> | {{ $this->caixaF8Label }}</span>
+        </button>
+        <button
+            type="button"
+            wire:click="openCaixaFechamentoHistorico"
+            class="erp-caixa-actions__btn"
+            title="Reimprimir fechamentos anteriores desta conta"
+        >
+            <span class="erp-caixa-actions__icon">📋</span>
+            <span class="erp-caixa-actions__label">Hist. Fech.</span>
+        </button>
+    @endif
     <button type="button" wire:click="closeScreen" class="erp-caixa-actions__btn erp-caixa-actions__btn--close">
         <span class="erp-caixa-actions__icon erp-caixa-actions__icon--close">✕</span>
         <span class="erp-caixa-actions__label">Fechar</span>

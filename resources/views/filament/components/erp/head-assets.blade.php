@@ -43,7 +43,11 @@
     <script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $version }}-v38-local-enter"></script>
 @endif
 
-@if (ErpPageAssets::routeKind() === 'dashboard' && \App\Support\Erp\ErpAccess::currentCan('dashboard.access'))
+@if (
+    ErpPageAssets::routeKind() === 'dashboard'
+    && \App\Support\Erp\ErpAccess::currentCan('dashboard.access')
+    && \App\Support\Erp\EmpresaParametros::mostrarDashboardInicial()
+)
     <script src="{{ asset('js/vendor/chart.umd.min.js') }}?v={{ $version }}"></script>
     <script src="{{ asset('js/erp-home-charts.js') }}?v={{ $version }}" defer></script>
     <script src="{{ asset('js/erp-warm-prefetch.js') }}?v={{ $version }}" defer></script>

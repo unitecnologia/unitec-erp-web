@@ -70,6 +70,25 @@ class CaixaContaResource extends Resource
 
                         return '<span class="erp-contas-caixa-badge '.$class.'">'.e($label).'</span>';
                     }),
+                TextColumn::make('banco_nome')
+                    ->label('Banco')
+                    ->placeholder('—')
+                    ->wrap(false)
+                    ->formatStateUsing(function (?string $state, CaixaConta $record): string {
+                        $nome = trim((string) ($state ?? ''));
+                        $codigo = trim((string) ($record->banco_codigo ?? ''));
+
+                        if ($nome === '' && $codigo === '') {
+                            return '—';
+                        }
+
+                        if ($codigo !== '' && $nome !== '') {
+                            return mb_strtoupper($codigo.' — '.$nome, 'UTF-8');
+                        }
+
+                        return mb_strtoupper($nome !== '' ? $nome : $codigo, 'UTF-8');
+                    })
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('ultimoUsuario.name')
                     ->label('Último usuário')
                     ->placeholder('—')

@@ -3,17 +3,20 @@
 namespace App\Support\Erp\Reports;
 
 use App\Models\Venda;
+use App\Support\Erp\Financeiro\ComissaoBasePagamento;
 use App\Support\Erp\Financeiro\ProdutoComissaoAdicional;
 
 /**
  * Calcula a comissão dos vendedores a partir das vendas faturadas.
  *
  * Regra de negócio (definida pelo cliente):
- *   - base = valor faturado da venda (pela data da venda);
+ *   - base = valor faturado da venda (pela data da venda), excluindo parcelas
+ *     de meios marcados com "Não pagar comissão";
  *   - "a prazo" = boleto ou crediário (usa a alíquota comissao_ap);
  *   - todas as demais formas = "à vista" (usa a alíquota comissao_av);
  *   - produtos com "Paga Comissão" somam adicional (comissao_pct da Precificação)
- *     sobre o total do item, sem substituir a comissão padrão do vendedor.
+ *     sobre o total do item, sem substituir a comissão padrão do vendedor
+ *     (proporcional à base comissionável quando há exclusão por meio).
  */
 class ComissaoVendedoresReport
 {
@@ -37,13 +40,27 @@ class ComissaoVendedoresReport
             $lista[] = $venda;
         }
 
-        $adicionais = ProdutoComissaoAdicional::porVendaIds(
-            array_map(static fn (Venda $v): int => (int) $v->id, $lista),
-        );
+        $vendaIds = array_map(static fn (Venda $v): int => (int) $v->id, $lista);
+        $adicionais = ProdutoComissaoAdicional::porVendaIds($vendaIds);
+        $formasSemComissao = ComissaoBasePagamento::formasSemComissao();
+        $pagamentosPorVenda = ComissaoBasePagamento::pagamentosPorVendaIds($vendaIds);
 
         $grupos = [];
 
         foreach ($lista as $venda) {
+            $totalVenda = round((float) $venda->total, 2);
+            $base = ComissaoBasePagamento::baseComissionavel(
+                $totalVenda,
+                $venda->forma_pagamento,
+                $pagamentosPorVenda[(int) $venda->id] ?? null,
+                $formasSemComissao,
+            );
+            $adicional = ComissaoBasePagamento::adicionalProporcional(
+                (float) ($adicionais[(int) $venda->id] ?? 0),
+                $base,
+                $totalVenda,
+            );
+
             $vid = $venda->vendedor_id ? (int) $venda->vendedor_id : 0;
 
             if (! isset($grupos[$vid])) {
@@ -61,21 +78,26 @@ class ComissaoVendedoresReport
                     'comissao_av' => (float) ($venda->vendedor?->comissao_av ?? 0),
                     'comissao_ap' => (float) ($venda->vendedor?->comissao_ap ?? 0),
                     'qtd' => 0,
+                    // Totais exibidos = valor faturado da venda (inclui meios sem comissão).
                     'total_avista' => 0.0,
                     'total_aprazo' => 0.0,
+                    // Bases usadas só no cálculo da comissão.
+                    'base_avista' => 0.0,
+                    'base_aprazo' => 0.0,
                     'adicional_avista' => 0.0,
                     'adicional_aprazo' => 0.0,
                 ];
             }
 
             $grupos[$vid]['qtd']++;
-            $adicional = (float) ($adicionais[(int) $venda->id] ?? 0);
 
             if (self::isAPrazo($venda->forma_pagamento)) {
-                $grupos[$vid]['total_aprazo'] += (float) $venda->total;
+                $grupos[$vid]['total_aprazo'] += $totalVenda;
+                $grupos[$vid]['base_aprazo'] += $base;
                 $grupos[$vid]['adicional_aprazo'] += $adicional;
             } else {
-                $grupos[$vid]['total_avista'] += (float) $venda->total;
+                $grupos[$vid]['total_avista'] += $totalVenda;
+                $grupos[$vid]['base_avista'] += $base;
                 $grupos[$vid]['adicional_avista'] += $adicional;
             }
         }
@@ -92,8 +114,8 @@ class ComissaoVendedoresReport
         ];
 
         foreach ($grupos as $g) {
-            $comAv = round($g['total_avista'] * $g['comissao_av'] / 100 + $g['adicional_avista'], 2);
-            $comAp = round($g['total_aprazo'] * $g['comissao_ap'] / 100 + $g['adicional_aprazo'], 2);
+            $comAv = round($g['base_avista'] * $g['comissao_av'] / 100 + $g['adicional_avista'], 2);
+            $comAp = round($g['base_aprazo'] * $g['comissao_ap'] / 100 + $g['adicional_aprazo'], 2);
             $totalGeral = round($g['total_avista'] + $g['total_aprazo'], 2);
             $comTotal = round($comAv + $comAp, 2);
 

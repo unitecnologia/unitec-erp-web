@@ -5,7 +5,12 @@ namespace App\Filament\Resources\CaixaResource\Pages;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\CaixaResource;
+use App\Filament\Resources\CaixaResource\Pages\Concerns\ManagesCaixaLivroMovimentoModal;
+use App\Filament\Resources\CaixaResource\Pages\Concerns\ManagesCaixaTransferenciaModal;
 use App\Filament\Resources\CaixaResource\Pages\Concerns\ManagesCaixaViewModal;
+use App\Support\Erp\Financeiro\CaixaLivroAberturaDisplay;
+use App\Support\Erp\Financeiro\CaixaLivroMovimentoService;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use App\Livewire\Erp\CaixaListTable;
 use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
@@ -14,6 +19,7 @@ use App\Models\PlanoConta;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Financeiro\CaixaTransferencia;
 use App\Support\Erp\Pdv\PdvCaixaFechamentoService;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use Filament\Notifications\Notification;
@@ -30,6 +36,8 @@ class ListCaixa extends ListRecords
 {
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
+    use ManagesCaixaLivroMovimentoModal;
+    use ManagesCaixaTransferenciaModal;
     use ManagesCaixaViewModal;
 
     protected static string $resource = CaixaResource::class;
@@ -123,6 +131,8 @@ class ListCaixa extends ListRecords
             'delete' => 'deleteLancamento',
             'extraKeys' => [
                 'F6' => ['method' => 'imprimirMovimentoCaixa'],
+                'F7' => ['method' => 'openCaixaTransferencia'],
+                'F8' => ['method' => 'openCaixaF8'],
             ],
         ];
     }
@@ -159,6 +169,7 @@ class ListCaixa extends ListRecords
     public function contasOptions(): array
     {
         return CaixaConta::query()
+            ->visiveisNaEmpresa()
             ->where('ativo', true)
             ->orderBy('nome')
             ->pluck('nome', 'id')
@@ -189,6 +200,65 @@ class ListCaixa extends ListRecords
         return $this->saldoAnterior + $this->totalEntrada - $this->totalSaida;
     }
 
+    /**
+     * @return array<string, float|bool>
+     */
+    #[Computed]
+    public function caixaStatusBanner(): array
+    {
+        $contaId = is_numeric($this->contaFilter) ? (int) $this->contaFilter : 0;
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+
+        return CaixaLivroAberturaDisplay::statusBanner(
+            $contaId,
+            $empresaId > 0 ? $empresaId : null,
+        );
+    }
+
+    #[Computed]
+    public function caixaRodape(): array
+    {
+        $contaId = is_numeric($this->contaFilter) ? (int) $this->contaFilter : 0;
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        $saldoFin = $contaId > 0
+            ? ErpFinanceiroMetricas::saldoCaixa($contaId, $empresaId > 0 ? $empresaId : null)
+            : $this->saldoAtual;
+
+        $mov = CaixaLivroAberturaDisplay::movimentoReferenciaNaConta(
+            $contaId,
+            $empresaId > 0 ? $empresaId : null,
+        );
+
+        if ($mov && $mov->isAberto() && $empresaId > 0) {
+            $totais = app(CaixaLivroMovimentoService::class)->totaisDoMovimento($mov);
+
+            return [
+                'tem_movimento' => true,
+                'status_aberto' => true,
+                'troco_inicial' => round((float) $mov->troco_inicial, 2),
+                'entradas' => $totais['entradas'],
+                'saidas' => $totais['saidas'],
+                'saldo_movimento' => $totais['saldo_movimento'],
+                'saldo_financeiro' => $saldoFin,
+                'saldo_abertura_financeiro' => round((float) $mov->saldo_abertura, 2),
+                'valor_contado' => null,
+                'diferenca' => null,
+                'diferenca_conferencia' => round(
+                    $saldoFin - $totais['saldo_financeiro'],
+                    2
+                ),
+            ];
+        }
+
+        return CaixaLivroAberturaDisplay::metricasRodape(
+            $contaId,
+            $this->totalEntrada,
+            $this->totalSaida,
+            $saldoFin,
+            $empresaId > 0 ? $empresaId : null,
+        );
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema
@@ -201,6 +271,9 @@ class ListCaixa extends ListRecords
                 View::make('filament.components.erp.caixa.action-bar'),
                 View::make('filament.components.erp.caixa.view-modal'),
                 View::make('filament.components.erp.caixa.form-modal'),
+                View::make('filament.components.erp.caixa.transfer-modal'),
+                View::make('filament.components.erp.caixa.movimento-modal'),
+                View::make('filament.components.erp.caixa.fechamento-preview-overlay'),
             ]);
     }
 
@@ -408,7 +481,15 @@ class ListCaixa extends ListRecords
 
         $contaId = is_numeric($this->contaFilter)
             ? (int) $this->contaFilter
-            : (int) (CaixaConta::query()->where('ativo', true)->orderBy('nome')->value('id') ?? 0);
+            : (int) (CaixaConta::query()->visiveisNaEmpresa()->where('ativo', true)->orderBy('nome')->value('id') ?? 0);
+
+        try {
+            app(CaixaLivroMovimentoService::class)->assertPodeOperarConta($contaId);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title('Caixa fechado')->body($e->getMessage())->warning()->send();
+
+            return;
+        }
 
         $this->caixaForm = [
             'emissao' => now()->format('Y-m-d'),
@@ -487,11 +568,30 @@ class ListCaixa extends ListRecords
             return;
         }
 
+        $documentoInformado = mb_substr(trim((string) ($this->caixaForm['documento'] ?? '')), 0, 40);
+        if (CaixaTransferencia::isDocumentoTransferencia($documentoInformado)) {
+            $this->caixaFormAlert = 'O prefixo TRF- é reservado para transferências entre contas. Use F7 — Transferir.';
+
+            return;
+        }
+
+        try {
+            app(CaixaLivroMovimentoService::class)->assertPodeOperarConta($contaId);
+            app(CaixaLivroMovimentoService::class)->assertPodeMutarLancamento(
+                $contaId,
+                (string) ($this->caixaForm['emissao'] ?? now()->toDateString()),
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->caixaFormAlert = $e->getMessage();
+
+            return;
+        }
+
         $plano = $planoId ? PlanoConta::query()->whereKey($planoId)->where('ativo', true)->first() : null;
 
         $dados = [
             'emissao' => $this->caixaForm['emissao'] ?? now()->toDateString(),
-            'documento' => mb_substr(trim((string) ($this->caixaForm['documento'] ?? '')), 0, 40) ?: null,
+            'documento' => $documentoInformado !== '' ? $documentoInformado : null,
             'historico' => mb_substr(
                 str_starts_with(mb_strtoupper($historico, 'UTF-8'), '[MANUAL] ')
                     ? mb_strtoupper($historico, 'UTF-8')
@@ -515,7 +615,6 @@ class ListCaixa extends ListRecords
         } else {
             CaixaLancamento::query()->create([
                 'codigo' => CaixaLancamento::nextCodigo(),
-                'documento' => mb_substr(trim((string) ($this->caixaForm['documento'] ?? '')), 0, 40) ?: null,
                 ...$dados,
             ]);
         }
@@ -540,7 +639,27 @@ class ListCaixa extends ListRecords
             return;
         }
 
+        if (CaixaLivroAberturaDisplay::isLinhaVirtual($resolvedId)) {
+            Notification::make()
+                ->title('Linha de abertura')
+                ->body('A abertura/troco é só conferência e não pode ser alterada como lançamento.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $lancamento = CaixaLancamento::query()->find($resolvedId);
+        if ($lancamento && CaixaTransferencia::isLancamentoTransferencia($lancamento)) {
+            Notification::make()
+                ->title('Transferência não editável')
+                ->body($this->mensagemBloqueioTransferenciaEdicao())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         if (! $lancamento || ! str_starts_with(mb_strtoupper((string) $lancamento->historico, 'UTF-8'), '[MANUAL] ')) {
             Notification::make()
                 ->title('Lançamento não editável')
@@ -568,6 +687,13 @@ class ListCaixa extends ListRecords
 
     public function imprimirMovimentoCaixa(): void
     {
+        // Com a janela de fechamento concluída aberta, F6 abre as opções do fechamento.
+        if ($this->caixaFecharOpen && $this->caixaFecharConcluido) {
+            $this->openCaixaFechamentoPrint();
+
+            return;
+        }
+
         if (! $this->erpAuthorizeOrNotify('caixa.print')) {
             return;
         }
@@ -602,6 +728,12 @@ class ListCaixa extends ListRecords
             return;
         }
 
+        if (CaixaLivroAberturaDisplay::isLinhaVirtual((int) $recordId)) {
+            $this->caixaAttentionMessage = 'A linha de abertura/troco é apenas conferência do movimento e não pode ser excluída. Feche o caixa (F8) se precisar encerrar o turno.';
+
+            return;
+        }
+
         if ((int) $recordId < 0) {
             $this->caixaAttentionMessage = 'Este movimento pertence à sessão do caixa PDV e não pode ser excluído por aqui. Cancele a venda, sangria ou suprimento pelo próprio PDV.';
 
@@ -609,8 +741,36 @@ class ListCaixa extends ListRecords
         }
 
         $lancamento = CaixaLancamento::query()->find($recordId);
+        if ($lancamento && CaixaTransferencia::isLancamentoTransferencia($lancamento)) {
+            try {
+                app(CaixaLivroMovimentoService::class)->assertPodeMutarLancamento(
+                    (int) $lancamento->caixa_conta_id,
+                    optional($lancamento->emissao)?->toDateString() ?? now()->toDateString(),
+                );
+            } catch (\InvalidArgumentException $e) {
+                $this->caixaAttentionMessage = $e->getMessage();
+
+                return;
+            }
+
+            $this->openDeleteTransferenciaPar((string) $lancamento->documento);
+
+            return;
+        }
+
         if (! $lancamento || ! str_starts_with(mb_strtoupper((string) $lancamento->historico, 'UTF-8'), '[MANUAL] ')) {
             $this->caixaAttentionMessage = $this->caixaAutomaticoEstornoMessage($lancamento);
+
+            return;
+        }
+
+        try {
+            app(CaixaLivroMovimentoService::class)->assertPodeMutarLancamento(
+                (int) $lancamento->caixa_conta_id,
+                optional($lancamento->emissao)?->toDateString() ?? now()->toDateString(),
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->caixaAttentionMessage = $e->getMessage();
 
             return;
         }
@@ -686,6 +846,12 @@ class ListCaixa extends ListRecords
         $this->openCaixaView($lancamentoId);
     }
 
+    #[On('erp-caixa-open-fechamento')]
+    public function onErpCaixaOpenFechamento(int $movimentoId): void
+    {
+        $this->selecionarHistoricoFechamento($movimentoId);
+    }
+
     public function refreshTable(): void
     {
         $this->pushCaixaListRefresh();
@@ -709,6 +875,7 @@ class ListCaixa extends ListRecords
         $totalEntrada = $builder->sumEntradaFiltered();
         $totalSaida = $builder->sumSaidaFiltered();
         $saldoAtual = $saldoAnterior + $totalEntrada - $totalSaida;
+        unset($this->caixaRodape, $this->caixaStatusBanner, $this->caixaMovimentoAberto, $this->caixaF8Label);
 
         $this->dispatch(
             'erp-caixa-list-refresh',
@@ -727,15 +894,41 @@ class ListCaixa extends ListRecords
             $this->skipRender();
         }
 
-        $this->patchCaixaFooterTotals($saldoAnterior, $totalEntrada, $totalSaida, $saldoAtual);
+        $rodape = $this->caixaRodape;
+
+        $this->patchCaixaFooterTotals($saldoAnterior, $totalEntrada, $totalSaida, $saldoAtual, $rodape);
     }
 
+    /**
+     * @param  array<string, float|bool>  $rodape
+     */
     protected function patchCaixaFooterTotals(
         float $saldoAnterior,
         float $totalEntrada,
         float $totalSaida,
         float $saldoAtual,
+        array $rodape = [],
     ): void {
+        if (! empty($rodape['tem_movimento'])) {
+            $this->js(sprintf(
+                '(() => {
+                    const items = document.querySelectorAll(".erp-caixa__summary-value");
+                    if (items[0]) items[0].textContent = %s;
+                    if (items[1]) items[1].textContent = %s;
+                    if (items[2]) items[2].textContent = %s;
+                    if (items[3]) items[3].textContent = %s;
+                    if (items[4]) items[4].textContent = %s;
+                })()',
+                json_encode(number_format((float) $rodape['troco_inicial'], 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+                json_encode(number_format((float) $rodape['entradas'], 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+                json_encode(number_format((float) $rodape['saidas'], 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+                json_encode(number_format((float) $rodape['saldo_movimento'], 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+                json_encode(number_format((float) $rodape['saldo_financeiro'], 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            ));
+
+            return;
+        }
+
         $this->js(sprintf(
             '(() => {
                 const items = document.querySelectorAll(".erp-caixa__summary-value");

@@ -12,6 +12,7 @@ use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\EmpresaParametros;
+use App\Support\Fiscal\ImpostoPadraoSugestoes;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\EmbeddedSchema;
@@ -29,6 +30,7 @@ trait ErpEmpresaFormPage
     use ManagesEmpresaEmailConfig;
     use ManagesEmpresaFormUi;
     use ManagesEmpresaImpostoPadraoApply;
+    use ManagesEmpresaImpostoPadraoRegime;
     use ManagesEmpresaImpostoTabelasImport;
     use ManagesEmpresaIpbtaxModal;
     use ManagesEmpresaLogo;
@@ -495,6 +497,11 @@ trait ErpEmpresaFormPage
             $data[$modoDescontoReais] = EmpresaParametros::normalizarDescontoReaisItemModo($data[$modoDescontoReais]);
         }
 
+        $tiposVendaVi = 'param_vendas_internas_tipos_venda';
+        if (array_key_exists($tiposVendaVi, $data)) {
+            $data[$tiposVendaVi] = EmpresaParametros::normalizarVendasInternasTiposVenda($data[$tiposVendaVi]);
+        }
+
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true || ! array_key_exists($field, $data)) {
                 continue;
@@ -659,10 +666,9 @@ trait ErpEmpresaFormPage
 
             // Colunas string de imposto são NOT NULL no MySQL (default '').
             // Não converter vazio para null — isso quebra o INSERT.
-            $value = trim((string) ($data[$field] ?? ''));
-            $data[$field] = $value !== ''
-                ? $value
-                : (string) ($meta['default'] ?? '');
+            // Não forçar defaults Simples (CSOSN 102 / CST 000 / PIS 99) no save:
+            // CRT 2 limpa CSOSN e CRT 3 (Presumido/Real/Normal) deixa CST/PIS vazios de propósito.
+            $data[$field] = trim((string) ($data[$field] ?? ''));
         }
 
         return $data;
@@ -689,6 +695,14 @@ trait ErpEmpresaFormPage
     {
         $this->loadEmpresaEmailConfig();
         $this->hydrateEmpresaNfeEmitentes();
+
+        $this->data['param_vendas_internas_tipos_venda'] = EmpresaParametros::normalizarVendasInternasTiposVenda(
+            $this->data['param_vendas_internas_tipos_venda'] ?? null,
+        );
+
+        $this->data['param_monitor_vendas_desconto_reais_item_modo'] = EmpresaParametros::normalizarDescontoReaisItemModo(
+            $this->data['param_monitor_vendas_desconto_reais_item_modo'] ?? null,
+        );
 
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true) {
@@ -870,7 +884,8 @@ trait ErpEmpresaFormPage
             'ie' => '',
             'im' => '',
             'cnae' => '',
-            'regime_tributario' => 'normal',
+            // Compatível com Imposto Padrão histórico (CSOSN 102 / PIS-COFINS 99).
+            'regime_tributario' => 'simples',
             'cep' => '',
             'endereco' => '',
             'numero' => '',
@@ -895,6 +910,7 @@ trait ErpEmpresaFormPage
             'logo_path' => '',
             'ativo' => true,
             ...EmpresaParametros::defaultFormValues(),
+            ...ImpostoPadraoSugestoes::paraRegime('simples'),
             // Contas Ailos/Sicredi já nascem prontas; a API só liga quando marcar a flag.
             'param_boleto_habilitar' => false,
         ];

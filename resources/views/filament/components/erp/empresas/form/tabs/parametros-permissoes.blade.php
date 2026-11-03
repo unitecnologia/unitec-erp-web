@@ -15,6 +15,37 @@
     @foreach ($groups as $groupKey => $groupTitle)
         <fieldset class="erp-pcad__group erp-empresas-parametros__perm-group">
             <legend class="erp-pcad__group-title">{{ $groupTitle }}</legend>
+            @if ($groupKey === 'vendas_internas')
+                @php
+                    $tiposVendaVi = EmpresaParametros::vendasInternasTiposVendaField();
+                @endphp
+                <div class="erp-empresas-parametros__desconto-reais">
+                    <label class="erp-pcad-form__label" for="param-param_vendas_internas_tipos_venda">
+                        {{ $tiposVendaVi['label'] }}
+                        <span
+                            class="erp-produtos-impostos__label--hint"
+                            title="{{ $tiposVendaVi['hint'] }}"
+                            role="img"
+                            aria-label="{{ $tiposVendaVi['hint'] }}"
+                        ></span>
+                    </label>
+                    <select
+                        id="param-param_vendas_internas_tipos_venda"
+                        wire:key="emp-vi-tipos-venda"
+                        wire:model.live="data.param_vendas_internas_tipos_venda"
+                        class="erp-pcad-form__select"
+                    >
+                        @php
+                            $tiposVendaSelecionado = EmpresaParametros::normalizarVendasInternasTiposVenda(
+                                $this->data['param_vendas_internas_tipos_venda'] ?? null,
+                            );
+                        @endphp
+                        @foreach ($tiposVendaVi['options'] as $value => $label)
+                            <option value="{{ $value }}" @selected($tiposVendaSelecionado === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
             <div class="erp-empresas-parametros__checks">
                 @foreach ($grouped[$groupKey] ?? [] as $field => $meta)
                     @if ($meta['tri'] ?? false)
@@ -56,6 +87,27 @@
                             </span>
                         </label>
                         @include('filament.components.erp.empresas.form.partials.nfe-emitentes-config')
+                    @elseif ($field === 'param_vendas_internas_fechar_orcamento_auto')
+                        @php
+                            $tiposVendaAtual = EmpresaParametros::normalizarVendasInternasTiposVenda(
+                                $this->data['param_vendas_internas_tipos_venda'] ?? null,
+                            );
+                            $fecharOrcamentoDesabilitado = $tiposVendaAtual === EmpresaParametros::VI_TIPOS_VENDA_SOMENTE_PEDIDO;
+                            $fecharOrcamentoCheckClass = $fecharOrcamentoDesabilitado
+                                ? 'erp-pcad__check erp-pcad__check--disabled'
+                                : 'erp-pcad__check';
+                        @endphp
+                        <label
+                            class="{{ $fecharOrcamentoCheckClass }}"
+                            @if (filled($meta['hint'] ?? null)) title="{{ $meta['hint'] }}" @endif
+                        >
+                            <input
+                                type="checkbox"
+                                wire:model="data.{{ $field }}"
+                                @disabled($fecharOrcamentoDesabilitado)
+                            >
+                            <span>{{ $meta['label'] }}</span>
+                        </label>
                     @else
                         <label class="erp-pcad__check" @if (filled($meta['hint'] ?? null)) title="{{ $meta['hint'] }}" @endif>
                             <input type="checkbox" wire:model="data.{{ $field }}">
@@ -65,7 +117,9 @@
                 @endforeach
             </div>
             @if ($groupKey === 'monitor_vendas')
-                @php($modoDescontoReais = EmpresaParametros::monitorVendasDescontoReaisItemModoField())
+                @php
+                    $modoDescontoReais = EmpresaParametros::monitorVendasDescontoReaisItemModoField();
+                @endphp
                 <div class="erp-empresas-parametros__desconto-reais">
                     <label class="erp-pcad-form__label" for="param-param_monitor_vendas_desconto_reais_item_modo">
                         {{ $modoDescontoReais['label'] }}

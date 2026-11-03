@@ -35,7 +35,7 @@ trait ManagesNfceBulkTransmit
 
         $this->nfceSelecionadosTransmitir[] = $key;
         $this->highlightedRecordId = $id;
-        unset($this->highlightedChave, $this->highlightedNfceAvisoRodape);
+        unset($this->highlightedNfceAvisoRodape);
         $this->nfceTransmitSelecaoChanged();
     }
 

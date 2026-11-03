@@ -848,6 +848,9 @@ class ErpPermissionCatalog
               ['label' => 'Alterar', 'key' => 'caixa.update'],
               ['label' => 'Excluir', 'key' => 'caixa.delete'],
               ['label' => 'Imprimir', 'key' => 'caixa.print'],
+              ['label' => 'Abrir Caixa', 'key' => 'caixa.abrir'],
+              ['label' => 'Fechar Caixa', 'key' => 'caixa.fechar'],
+              ['label' => 'Reabrir Fechamento', 'key' => 'caixa.reabrir'],
             ],
           ],
           [

@@ -38,5 +38,7 @@ final class EmitirNfeRequest
         public readonly ?NfeTransporteDto $transporte = null,
         /** @var list<string> Chaves NF-e referenciadas (44 dígitos) — obrigatório quando finNFe = 4. */
         public readonly array $chavesReferenciadas = [],
+        /** 0 = entrada, 1 = saída (padrão SEFAZ / NF-e de saída). */
+        public readonly int $tpNF = 1,
     ) {}
 }

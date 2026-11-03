@@ -8,7 +8,6 @@ use App\Models\Nfse;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -80,8 +79,7 @@ final class ErpDashboardFiscalDocsChart
             $fim = $hoje;
 
             [$nfeAut, $nfePend] = static::countNfeBuckets($empresaScope, $inicio, $fim);
-            $nfceAut = static::countNfce($empresaScope, $inicio, $fim, autorizadas: true);
-            $nfcePend = static::countNfce($empresaScope, $inicio, $fim, autorizadas: false);
+            [$nfceAut, $nfcePend] = static::countNfceBuckets($empresaScope, $inicio, $fim);
             [$nfseAut, $nfsePend] = static::countNfseBuckets($empresaScope, $inicio, $fim);
 
             $empty = ($nfeAut + $nfePend + $nfceAut + $nfcePend + $nfseAut + $nfsePend) <= 0;
@@ -196,64 +194,85 @@ final class ErpDashboardFiscalDocsChart
     }
 
     /**
+     * NFC-e autorizadas + pendentes em uma consulta, partindo de pdv_vendas
+     * com intervalo datetime (sem DATE() na coluna) para usar o índice de fechamento.
+     *
+     * Critérios preservados:
+     * - período por fechado_em (mesmo efeito de whereDate >= / <=);
+     * - empresa_id no documento OU (empresa_id nulo + sessão PDV);
+     * - status aut = autorizada/simulada; pend = pendente/contingencia.
+     *
      * @param  int|list<int>|null  $empresaScope
+     * @return array{0: int, 1: int}
      */
-    private static function countNfce(int|array|null $empresaScope, Carbon $inicio, Carbon $fim, bool $autorizadas): int
+    private static function countNfceBuckets(int|array|null $empresaScope, Carbon $inicio, Carbon $fim): array
     {
         if (! ErpSchema::hasTable((new PdvVendaNfce)->getTable())) {
-            return 0;
+            return [0, 0];
         }
 
-        $query = PdvVendaNfce::query()
-            ->whereHas('pdvVenda', function (Builder $venda) use ($inicio, $fim): void {
-                $venda->whereDate('fechado_em', '>=', $inicio->toDateString())
-                    ->whereDate('fechado_em', '<=', $fim->toDateString());
-            });
-
-        static::applyNfceEmpresaScope($query, $empresaScope);
-
-        if ($autorizadas) {
-            $query->whereIn('status', [
-                PdvVendaNfce::STATUS_AUTORIZADA,
-                PdvVendaNfce::STATUS_SIMULADA,
-            ]);
-        } else {
-            $query->whereIn('status', [
-                PdvVendaNfce::STATUS_PENDENTE,
-                PdvVendaNfce::STATUS_CONTINGENCIA,
-            ]);
+        if (! ErpSchema::hasTable('pdv_vendas')) {
+            return [0, 0];
         }
 
-        return (int) $query->count();
+        $ids = static::normalizeEmpresaIds($empresaScope);
+        $from = $inicio->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $toExclusive = $fim->copy()->startOfDay()->addDay()->format('Y-m-d H:i:s');
+
+        $v = static::sqlTable('pdv_vendas');
+        $n = static::sqlTable((new PdvVendaNfce)->getTable());
+        $s = static::sqlTable('pdv_caixa_sessoes');
+
+        $bindings = [
+            PdvVendaNfce::STATUS_AUTORIZADA,
+            PdvVendaNfce::STATUS_SIMULADA,
+            PdvVendaNfce::STATUS_PENDENTE,
+            PdvVendaNfce::STATUS_CONTINGENCIA,
+            $from,
+            $toExclusive,
+        ];
+
+        // STRAIGHT_JOIN: força partir de pdv_vendas (faixa de fechado_em) em vez de
+        // full scan em pdv_venda_nfce — vantagem comprovada no EXPLAIN da DEV.
+        $sql = "SELECT "
+            .'SUM(CASE WHEN n.status IN (?, ?) THEN 1 ELSE 0 END) as aut, '
+            .'SUM(CASE WHEN n.status IN (?, ?) THEN 1 ELSE 0 END) as pend '
+            ."FROM {$v} v "
+            ."STRAIGHT_JOIN {$n} n ON n.pdv_venda_id = v.id "
+            ."LEFT JOIN {$s} s ON s.id = v.pdv_caixa_sessao_id "
+            .'WHERE v.fechado_em >= ? AND v.fechado_em < ?';
+
+        if ($ids !== []) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sql .= " AND (n.empresa_id IN ({$placeholders})"
+                ." OR (n.empresa_id IS NULL AND s.empresa_id IN ({$placeholders})))";
+            foreach ($ids as $id) {
+                $bindings[] = $id;
+            }
+            foreach ($ids as $id) {
+                $bindings[] = $id;
+            }
+        }
+
+        $row = DB::selectOne($sql, $bindings);
+
+        return [(int) ($row->aut ?? 0), (int) ($row->pend ?? 0)];
     }
 
     /**
-     * Mesmo critério da tela NFC-e: empresa_id no scope OU (nulo + sessão PDV).
-     *
      * @param  int|list<int>|null  $empresaScope
+     * @return list<int>
      */
-    private static function applyNfceEmpresaScope(Builder $query, int|array|null $empresaScope): void
+    private static function normalizeEmpresaIds(int|array|null $empresaScope): array
     {
         if ($empresaScope === null) {
-            return;
+            return [];
         }
 
         $ids = is_array($empresaScope)
             ? array_values(array_filter(array_map('intval', $empresaScope)))
             : [(int) $empresaScope];
-        $ids = array_values(array_filter($ids, fn (int $id): bool => $id > 0));
 
-        if ($ids === []) {
-            return;
-        }
-
-        $query->where(function (Builder $outer) use ($ids): void {
-            $outer->whereIn('empresa_id', $ids)
-                ->orWhere(function (Builder $inner) use ($ids): void {
-                    $inner->whereNull('empresa_id')
-                        ->whereHas('pdvVenda.sessao', fn (Builder $sessao): Builder => $sessao
-                            ->whereIn('empresa_id', $ids));
-                });
-        });
+        return array_values(array_filter($ids, static fn (int $id): bool => $id > 0));
     }
 }

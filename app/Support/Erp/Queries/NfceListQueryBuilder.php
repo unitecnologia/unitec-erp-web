@@ -4,6 +4,7 @@ namespace App\Support\Erp\Queries;
 
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\Nfce\NfceEmpresaEscopo;
+use App\Support\Erp\Nfce\NfceListPeriodo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -47,24 +48,18 @@ class NfceListQueryBuilder
                 'pdvVenda.person',
             ]);
 
-        NfceEmpresaEscopo::aplicar($query, $this->empresaId);
+        $table = $query->getModel()->getTable();
 
-        $query->whereIn('status', PdvVendaNfce::statusesForTab($this->statusFilter));
+        // Período primeiro: FROM parte de pdv_vendas (STRAIGHT_JOIN) + fechado_em sargável.
+        NfceListPeriodo::aplicar($query, $table, $this->periodoDe, $this->periodoAte);
+        NfceEmpresaEscopo::aplicarNaListagem($query, $this->empresaId);
+
+        $query->whereIn("{$table}.status", PdvVendaNfce::statusesForTab($this->statusFilter));
         PdvVendaNfce::excluirSimuladasForaTransmitidos($query, $this->statusFilter);
-
-        if (filled($this->periodoDe)) {
-            $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda
-                ->whereDate('fechado_em', '>=', $this->periodoDe));
-        }
-
-        if (filled($this->periodoAte)) {
-            $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda
-                ->whereDate('fechado_em', '<=', $this->periodoAte));
-        }
 
         if (filled($this->chaveFilter)) {
             $digits = preg_replace('/\D/', '', $this->chaveFilter) ?? '';
-            $query->where('chave', 'like', '%'.$digits.'%');
+            $query->where("{$table}.chave", 'like', '%'.$digits.'%');
         }
 
         if (filled($this->localSearch)) {
@@ -89,12 +84,13 @@ class NfceListQueryBuilder
         ], true) ? $this->searchColumn : 'serie';
 
         $like = '%'.$term.'%';
+        $table = $query->getModel()->getTable();
 
         match ($column) {
-            'serie' => $query->where('serie', 'like', $like),
-            'numero' => $query->where('numero', 'like', $like),
-            'chave' => $query->where('chave', 'like', $like),
-            'protocolo' => $query->where('protocolo', 'like', $like),
+            'serie' => $query->where("{$table}.serie", 'like', $like),
+            'numero' => $query->where("{$table}.numero", 'like', $like),
+            'chave' => $query->where("{$table}.chave", 'like', $like),
+            'protocolo' => $query->where("{$table}.protocolo", 'like', $like),
             'cpf' => $query->where(function (Builder $outer) use ($like): void {
                 $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
                     ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));

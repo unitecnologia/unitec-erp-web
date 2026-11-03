@@ -128,13 +128,10 @@ final class PdvNfceSimuladaService
 
     private function mapCrtEmpresa(?Empresa $empresa): int
     {
-        return match (strtolower((string) ($empresa?->regime_tributario ?? 'simples'))) {
-            'simples' => 1,
-            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
-            'mei', 'simei' => 4,
-            'presumido', 'real', 'normal' => 3,
-            default => 1,
-        };
+        return \App\Support\Fiscal\RegimeCrtMapper::toCrt(
+            $empresa?->regime_tributario ?? 'simples',
+            strict: false,
+        );
     }
 
     /**

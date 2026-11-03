@@ -116,6 +116,7 @@
                 wire:click="pedirConfirmacaoEnviarMesPortalContador"
                 wire:loading.attr="disabled"
                 wire:target="pedirConfirmacaoEnviarMesPortalContador,confirmarEnviarMesPortalContador,enviarMesAtualPortalContador"
+                title="Envia/reenvia o histórico marcado em “O que enviar”. Se a nota já existir na nuvem (mesma chave), atualiza sem duplicar."
             >
                 <span wire:loading.remove wire:target="pedirConfirmacaoEnviarMesPortalContador,confirmarEnviarMesPortalContador,enviarMesAtualPortalContador">Enviar mês atual e anterior</span>
                 <span wire:loading wire:target="pedirConfirmacaoEnviarMesPortalContador,confirmarEnviarMesPortalContador,enviarMesAtualPortalContador">Enviando documentos…</span>
@@ -148,45 +149,46 @@
 </div>
 
 @if ($this->portalContadorEnviarMesConfirmOpen)
-    @teleport('body')
+    {{-- Sem @teleport: o Livewire remove o overlay ao fechar; teleport no body deixava a mensagem órfã. --}}
+    <div
+        wire:key="portal-contador-enviar-mes-confirm"
+        class="erp-empresas-atencao-overlay"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="erp-portal-enviar-mes-title"
+        wire:keydown.escape.window="cancelarEnviarMesPortalContador"
+    >
         <div
-            class="erp-empresas-atencao-overlay"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="erp-portal-enviar-mes-title"
-            wire:keydown.escape.window="cancelarEnviarMesPortalContador"
-        >
-            <div
-                class="erp-empresas-atencao-overlay__backdrop"
-                wire:click="cancelarEnviarMesPortalContador"
-            ></div>
-            <div class="erp-empresas-atencao-overlay__box">
-                <div class="erp-empresas-atencao-overlay__icon" aria-hidden="true">!</div>
-                <h2 id="erp-portal-enviar-mes-title" class="erp-empresas-atencao-overlay__title">ATENÇÃO</h2>
-                <p class="erp-empresas-atencao-overlay__msg">
-                    Enviar ao portal NF-e, NFC-e (incl. contingência), NFS-e e XMLs de compra do mês atual e do mês anterior?
-                </p>
-                <div class="erp-empresas-atencao-overlay__actions">
-                    <button
-                        type="button"
-                        class="erp-empresas-atencao-overlay__btn erp-empresas-atencao-overlay__btn--primary"
-                        wire:click="confirmarEnviarMesPortalContador"
-                        wire:loading.attr="disabled"
-                        wire:target="confirmarEnviarMesPortalContador"
-                    >
-                        <span wire:loading.remove wire:target="confirmarEnviarMesPortalContador">Sim</span>
-                        <span wire:loading wire:target="confirmarEnviarMesPortalContador">Enviando…</span>
-                    </button>
-                    <button
-                        type="button"
-                        class="erp-empresas-atencao-overlay__btn"
-                        wire:click="cancelarEnviarMesPortalContador"
-                        wire:loading.attr="disabled"
-                        wire:target="confirmarEnviarMesPortalContador"
-                    >Não</button>
-                </div>
-                <p class="erp-empresas-atencao-overlay__hint">Confirme para preparar e enviar os documentos fiscais.</p>
+            class="erp-empresas-atencao-overlay__backdrop"
+            wire:click="cancelarEnviarMesPortalContador"
+        ></div>
+        <div class="erp-empresas-atencao-overlay__box">
+            <div class="erp-empresas-atencao-overlay__icon" aria-hidden="true">!</div>
+            <h2 id="erp-portal-enviar-mes-title" class="erp-empresas-atencao-overlay__title">ATENÇÃO</h2>
+            <p class="erp-empresas-atencao-overlay__msg">
+                Enviar ao portal NF-e, NFC-e (incl. contingência), NFS-e e XMLs de compra
+                (conforme “O que enviar”)? Se a nota já existir na nuvem (mesma chave), atualiza sem duplicar.
+            </p>
+            <div class="erp-empresas-atencao-overlay__actions">
+                <button
+                    type="button"
+                    class="erp-empresas-atencao-overlay__btn erp-empresas-atencao-overlay__btn--primary"
+                    wire:click="confirmarEnviarMesPortalContador"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmarEnviarMesPortalContador"
+                >
+                    <span wire:loading.remove wire:target="confirmarEnviarMesPortalContador">Sim</span>
+                    <span wire:loading wire:target="confirmarEnviarMesPortalContador">Enviando…</span>
+                </button>
+                <button
+                    type="button"
+                    class="erp-empresas-atencao-overlay__btn"
+                    wire:click="cancelarEnviarMesPortalContador"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmarEnviarMesPortalContador"
+                >Não</button>
             </div>
+            <p class="erp-empresas-atencao-overlay__hint">Confirme para preparar e enviar os documentos fiscais. Volume grande pode continuar em segundo plano.</p>
         </div>
-    @endteleport
+    </div>
 @endif

@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Support\Erp\Dashboard\ErpDashboardData;
 use App\Support\Erp\Dashboard\ErpDashboardScope;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
@@ -114,9 +115,19 @@ class Dashboard extends BaseDashboard
      *
      * @return array<string, mixed>
      */
+    public function dashboardInicialAtivo(): bool
+    {
+        return ErpAccess::currentCan('dashboard.access')
+            && EmpresaParametros::mostrarDashboardInicial();
+    }
+
     #[Computed]
     public function dashboardShell(): array
     {
+        if (! $this->dashboardInicialAtivo()) {
+            return [];
+        }
+
         return ErpDashboardData::shell(
             empresaId: ErpContext::currentEmpresaId(),
             visao: $this->dashboardVisao,
@@ -131,6 +142,10 @@ class Dashboard extends BaseDashboard
     #[Computed]
     public function dashboardHeavy(): array
     {
+        if (! $this->dashboardInicialAtivo()) {
+            return [];
+        }
+
         return ErpDashboardData::heavy(
             empresaId: ErpContext::currentEmpresaId(),
             visao: $this->dashboardVisao,
@@ -145,6 +160,10 @@ class Dashboard extends BaseDashboard
     #[Computed]
     public function dashboardData(): array
     {
+        if (! $this->dashboardInicialAtivo()) {
+            return [];
+        }
+
         $shell = $this->dashboardShell;
 
         if (! $this->dashboardHeavyReady) {
@@ -159,7 +178,7 @@ class Dashboard extends BaseDashboard
 
     public function loadDashboardHeavy(): void
     {
-        if (! ErpAccess::currentCan('dashboard.access')) {
+        if (! $this->dashboardInicialAtivo()) {
             return;
         }
 
@@ -323,7 +342,7 @@ class Dashboard extends BaseDashboard
             ->gap(false)
             ->components([
                 View::make(
-                    ErpAccess::currentCan('dashboard.access')
+                    $this->dashboardInicialAtivo()
                         ? 'filament.components.erp.home.screen'
                         : 'filament.components.erp.home.logo'
                 ),

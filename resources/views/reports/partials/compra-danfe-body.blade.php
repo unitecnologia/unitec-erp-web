@@ -229,6 +229,14 @@
         <td colspan="2">&nbsp;</td>
         <td><span class="danfe__label">VALOR TOTAL DA NOTA</span><span class="danfe__value danfe__value--right">{{ $totais['total_nota'] }}</span></td>
     </tr>
+    @if (! empty($totais['tem_difal']))
+    <tr>
+        <td><span class="danfe__label">ICMS UF DESTINO (DIFAL)</span><span class="danfe__value danfe__value--right">{{ $totais['vicms_uf_dest'] ?? '0,00' }}</span></td>
+        <td><span class="danfe__label">FCP UF DESTINO</span><span class="danfe__value danfe__value--right">{{ $totais['vfcp_uf_dest'] ?? '0,00' }}</span></td>
+        <td><span class="danfe__label">ICMS UF REMETENTE</span><span class="danfe__value danfe__value--right">{{ $totais['vicms_uf_remet'] ?? '0,00' }}</span></td>
+        <td colspan="2"><span class="danfe__label">DIFAL informativo — não compõe o valor total da nota</span></td>
+    </tr>
+    @endif
 </table>
 
 <table class="danfe" cellspacing="0" cellpadding="0" style="margin-top: -1px;">

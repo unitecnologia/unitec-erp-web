@@ -11,9 +11,10 @@ use App\Support\Erp\ErpTimezone;
 final class NfceListRowFormatter
 {
     /**
+     * @param  array<int, string>|null  $davComercialPorPdvVendaId  mapa SCV (pdv_venda_id → pedidos.numero)
      * @return array<string, string>
      */
-    public function format(PdvVendaNfce $record, bool $showSituacao = false): array
+    public function format(PdvVendaNfce $record, bool $showSituacao = false, ?array $davComercialPorPdvVendaId = null): array
     {
         $venda = $record->pdvVenda;
 
@@ -26,15 +27,24 @@ final class NfceListRowFormatter
         $chave = filled($record->chave) ? (string) $record->chave : '—';
         $protocolo = filled($record->protocolo) ? (string) $record->protocolo : '—';
 
+        $bruto = number_format((float) ($venda?->subtotal ?? 0), 2, ',', '.');
+        $brutoHtml = '<span class="erp-list-total-cell">'
+            .'<span class="erp-list-total-cell__currency">R$</span>'
+            .'<span class="erp-list-total-cell__amount" title="R$ '.e($bruto).'">'.e($bruto).'</span>'
+            .'</span>';
+
         $descAcres = round((float) ($venda?->acrescimo ?? 0) - (float) ($venda?->desconto ?? 0), 2);
-        $descAcresText = $descAcres == 0.0
-            ? '0,00'
-            : (($descAcres > 0 ? '+' : '-').number_format(abs($descAcres), 2, ',', '.'));
-        $descAcresHtml = match (true) {
-            $descAcres < 0 => '<span class="text-danger-600 dark:text-danger-400">'.e($descAcresText).'</span>',
-            $descAcres > 0 => '<span class="text-success-600 dark:text-success-400">'.e($descAcresText).'</span>',
-            default => e($descAcresText),
+        $descAcresAmount = ($descAcres < 0 ? '-' : ($descAcres > 0 ? '+' : ''))
+            .number_format(abs($descAcres), 2, ',', '.');
+        $descAcresAmountClass = match (true) {
+            $descAcres < 0 => 'erp-list-total-cell__amount text-danger-600 dark:text-danger-400',
+            $descAcres > 0 => 'erp-list-total-cell__amount text-success-600 dark:text-success-400',
+            default => 'erp-list-total-cell__amount',
         };
+        $descAcresHtml = '<span class="erp-list-total-cell">'
+            .'<span class="erp-list-total-cell__currency">R$</span>'
+            .'<span class="'.e($descAcresAmountClass).'" title="R$ '.e($descAcresAmount).'">'.e($descAcresAmount).'</span>'
+            .'</span>';
 
         $total = number_format((float) ($venda?->total ?? 0), 2, ',', '.');
         $totalHtml = '<span class="erp-list-total-cell">'
@@ -49,9 +59,7 @@ final class NfceListRowFormatter
             $pedidoText = $trimmed !== '' ? $trimmed : '0';
         }
 
-        $dav = $venda?->numero !== null
-            ? str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT)
-            : '—';
+        $dav = NfceListDavNumero::texto($record, $davComercialPorPdvVendaId);
 
         $fechado = filled($venda?->fechado_em)
             ? ErpTimezone::toLocal($venda->fechado_em)->format('d/m/Y H:i')
@@ -69,8 +77,12 @@ final class NfceListRowFormatter
             'protocolo' => '<span title="'.e($protocolo === '—' ? '' : $protocolo).'">'.e($protocolo).'</span>',
             'cpf' => e($cpf),
             'cliente' => '<span title="'.e($cliente === '—' ? '' : $cliente).'">'.e($cliente).'</span>',
-            'caixa' => e((string) ($venda?->sessao?->terminal?->nome ?: '—')),
+            // Histórico SCV: rótulo do CAIXA GERAL do UNI (conta sistema; vínculo na sessão de migração).
+            'caixa' => e((string) $record->operacao === NfceListDavNumero::OPERACAO_SCV_HIST
+                ? 'CAIXA GERAL'
+                : (string) ($venda?->sessao?->terminal?->nome ?: '—')),
             'vendedor' => e($vendedor !== '' ? $vendedor : '—'),
+            'bruto' => $brutoHtml,
             'desc_acres' => $descAcresHtml,
             'total' => $totalHtml,
             'pedido' => e($pedidoText),

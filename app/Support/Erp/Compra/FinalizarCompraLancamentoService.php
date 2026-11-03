@@ -70,6 +70,14 @@ final class FinalizarCompraLancamentoService
 
         $compra->loadMissing(['itens.product', 'fornecedor']);
         $empresaId = $compra->empresa_id ? (int) $compra->empresa_id : null;
+        if ($gerarFinanceiro) {
+            try {
+                app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)
+                    ->assertEmpresaOperacional($empresaId);
+            } catch (\InvalidArgumentException $e) {
+                throw new DomainException($e->getMessage(), 0, $e);
+            }
+        }
         $estoqueId = $this->resolveEstoqueId($empresaId);
 
         $lotesFinalizados = [];
@@ -393,6 +401,10 @@ final class FinalizarCompraLancamentoService
                 $caixaId = CaixaConta::resolverDestinoLivroCaixa(
                     $selecionada > 0 ? $selecionada : null,
                     (int) ($forma->conta_destino_id ?? 0) ?: null,
+                );
+                app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)->assertPodeLancarNaConta(
+                    $caixaId,
+                    $empresaId > 0 ? $empresaId : null,
                 );
             } catch (\InvalidArgumentException $e) {
                 throw new DomainException($e->getMessage(), 0, $e);

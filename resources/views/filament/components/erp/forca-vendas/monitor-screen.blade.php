@@ -273,6 +273,19 @@
                 ])
             </label>
             </div>
+
+            @php
+                $lojaRotulo = $this->empresaLojaRotulo;
+            @endphp
+            <div
+                class="erp-fv-mon__loja"
+                wire:key="fv-mon-loja-{{ \App\Support\Erp\ErpContext::currentEmpresaId() ?? 0 }}"
+                role="status"
+                aria-label="Empresa ativa: {{ $lojaRotulo }}"
+                title="{{ $lojaRotulo }}"
+            >
+                <span class="erp-fv-mon__loja-text">{{ $lojaRotulo }}</span>
+            </div>
         </div>
     </fieldset>
 

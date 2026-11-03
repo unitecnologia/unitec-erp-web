@@ -625,6 +625,7 @@ trait ManagesContaPagarBaixaModal
         CaixaConta::ensureCaixaGeral();
 
         return CaixaConta::query()
+            ->visiveisNaEmpresa()
             ->where('ativo', true)
             ->orderBy('codigo')
             ->orderBy('nome')

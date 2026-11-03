@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\CaixaLancamento;
+use App\Support\Erp\Financeiro\CaixaTransferencia;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,9 +56,12 @@ class PlanoContasReport extends AbstractTabularReport
         [$de, $ate] = $this->periodFromRequest($request);
         $columns = $this->resolveColumns($request->query('cols'));
 
-        $rows = CaixaLancamento::query()
+        $query = CaixaLancamento::query()
             ->leftJoin('planos_contas', 'planos_contas.id', '=', 'caixa_lancamentos.plano_conta_id')
-            ->whereBetween('caixa_lancamentos.emissao', [$de->toDateString(), $ate->toDateString()])
+            ->whereBetween('caixa_lancamentos.emissao', [$de->toDateString(), $ate->toDateString()]);
+        CaixaTransferencia::excluirDoQuery($query, 'caixa_lancamentos.documento');
+
+        $rows = $query
             ->groupBy(
                 'caixa_lancamentos.plano_conta_id',
                 'planos_contas.codigo',

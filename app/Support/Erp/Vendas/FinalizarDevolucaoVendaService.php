@@ -76,6 +76,16 @@ final class FinalizarDevolucaoVendaService
             throw new DomainException('Devolução sem itens.');
         }
 
+        $empresaGuard = $devolucao->empresa_id
+            ? (int) $devolucao->empresa_id
+            : (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0);
+        try {
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)
+                ->assertEmpresaOperacional($empresaGuard > 0 ? $empresaGuard : null);
+        } catch (\InvalidArgumentException $e) {
+            throw new DomainException($e->getMessage(), 0, $e);
+        }
+
         $this->validarQuantidades($devolucao, $venda);
 
         $total = round((float) $devolucao->total, 2);
@@ -507,6 +517,8 @@ final class FinalizarDevolucaoVendaService
         $plano = EmpresaParametros::planoVendaLancamento($empresaId);
 
         $caixaContaId = (int) CaixaConta::ensureCaixaGeral()->id;
+        app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)
+            ->assertPodeLancarNaConta($caixaContaId > 0 ? $caixaContaId : null, $empresaId ? (int) $empresaId : null);
 
         $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),

@@ -142,6 +142,7 @@ class Empresa extends Model
         $casts['param_ui_zoom'] = 'integer';
         $casts['param_ui_density'] = 'string';
         $casts['param_monitor_vendas_desconto_reais_item_modo'] = 'string';
+        $casts['param_vendas_internas_tipos_venda'] = 'string';
 
         return $casts;
     }
@@ -228,11 +229,12 @@ class Empresa extends Model
     public static function regimesTributarios(): array
     {
         return [
-            'normal' => 'NORMAL',
-            'simples' => 'SIMPLES',
+            'simples' => 'SIMPLES NACIONAL',
             'mei' => 'MEI (SIMEI)',
-            'presumido' => 'PRESUMIDO',
-            'real' => 'REAL',
+            'excesso_sublimite' => 'SIMPLES — EXCESSO SUBLIMITE',
+            'presumido' => 'LUCRO PRESUMIDO',
+            'real' => 'LUCRO REAL',
+            'normal' => 'NORMAL (CRT 3)',
         ];
     }
 

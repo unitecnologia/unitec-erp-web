@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ForcaVendasMonitorResource\Pages\Concerns;
 
+use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Models\ContaReceber;
 use App\Models\ForcaVendasOrder;
 use App\Models\Nfe;
@@ -34,7 +35,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             return null;
         }
 
-        return ForcaVendasOrder::query()
+        return ForcaVendasMonitorResource::ordersQuery()
             ->with(['pedido.itens.product', 'pedido.itens.grade', 'cliente', 'user', 'vendedor', 'venda'])
             ->find($this->highlightedRecordId);
     }
@@ -255,7 +256,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             return collect();
         }
 
-        return ForcaVendasOrder::query()
+        return ForcaVendasMonitorResource::ordersQuery()
             ->whereIn('id', $ids)
             ->with(['pedido', 'venda.cliente', 'venda.itens'])
             ->get();
@@ -294,7 +295,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         $orders = $this->pedidosSelecionados();
 
         if ($orders->isEmpty() && $this->highlightedRecordId) {
-            $orders = ForcaVendasOrder::query()
+            $orders = ForcaVendasMonitorResource::ordersQuery()
                 ->whereKey((int) $this->highlightedRecordId)
                 ->with(['venda.cliente', 'venda.itens', 'pedido'])
                 ->get();
@@ -447,7 +448,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         $orders = $this->pedidosSelecionados();
 
         if ($orders->isEmpty() && $this->highlightedRecordId) {
-            $orders = ForcaVendasOrder::query()
+            $orders = ForcaVendasMonitorResource::ordersQuery()
                 ->whereKey((int) $this->highlightedRecordId)
                 ->with(['venda'])
                 ->get();
@@ -803,7 +804,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             return $this->situacoesSelecaoBarraMemo = [];
         }
 
-        return $this->situacoesSelecaoBarraMemo = ForcaVendasOrder::query()
+        return $this->situacoesSelecaoBarraMemo = ForcaVendasMonitorResource::ordersQuery()
             ->whereIn('id', $ids->all())
             ->pluck('situacao', 'id')
             ->all();

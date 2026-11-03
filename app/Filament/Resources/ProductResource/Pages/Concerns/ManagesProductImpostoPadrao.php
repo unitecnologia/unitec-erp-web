@@ -9,9 +9,40 @@ use Filament\Notifications\Notification;
 
 trait ManagesProductImpostoPadrao
 {
+    public bool $produtoImpostoPadraoRestoreConfirmOpen = false;
+
+    /**
+     * Pedido explícito do botão "Restaurar padrão" (substitui a aba Impostos).
+     */
+    public function pedirRestaurarImpostoPadraoProduto(): void
+    {
+        if ($this->resolveProductFormEmpresa() === null) {
+            Notification::make()
+                ->title('Empresa não encontrada.')
+                ->body('Selecione a empresa ativa antes de carregar o imposto padrão.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->produtoImpostoPadraoRestoreConfirmOpen = true;
+    }
+
+    public function cancelarRestaurarImpostoPadraoProduto(): void
+    {
+        $this->produtoImpostoPadraoRestoreConfirmOpen = false;
+    }
+
+    public function confirmarRestaurarImpostoPadraoProduto(): void
+    {
+        $this->produtoImpostoPadraoRestoreConfirmOpen = false;
+        $this->applyEmpresaImpostoPadraoToProductForm(notify: true);
+    }
+
     /**
      * Aplica o Imposto Padrão da empresa no formulário do produto.
-     * Usado no cadastro novo (automático) e no botão "Restaurar padrão".
+     * Usado no cadastro novo (automático) e após confirmação de "Restaurar padrão".
      */
     public function applyEmpresaImpostoPadraoToProductForm(bool $notify = true): void
     {

@@ -11,6 +11,16 @@
         <span class="erp-nfe-actions__icon">✎</span>
         <span class="erp-nfe-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>
+    <button
+        type="button"
+        wire:click="duplicarNfe"
+        class="erp-nfe-actions__btn"
+        title="Duplicar NF-e selecionada"
+        x-bind:disabled="! $wire.highlightedRecordId"
+    >
+        <span class="erp-nfe-actions__icon">⧉</span>
+        <span class="erp-nfe-actions__label">Duplicar</span>
+    </button>
     <button type="button" wire:click="cancelarNfe" class="erp-nfe-actions__btn" data-erp-key="F4">
         <span class="erp-nfe-actions__icon erp-nfe-actions__icon--cancel">✕</span>
         <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Cancelar</span>

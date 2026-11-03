@@ -7,7 +7,7 @@
  * Opt-out pontual: data-erp-allow-browser-hints="1" no campo ou ancestral.
  */
 (function initErpNoBrowserHints() {
-    const VERSION = 'v6-pessoas-text';
+    const VERSION = 'v7-date-no-readonly';
 
     if (window.__erpNoBrowserHintsVersion === VERSION) {
         return;
@@ -100,6 +100,26 @@
         }
 
         if (element instanceof HTMLInputElement && IGNORE_INPUT_TYPES.has(element.type)) {
+            return;
+        }
+
+        // Datepicker ERP (dd/mm/aaaa): não travar com readonly — senão fica YYYY-MM-DD.
+        if (
+            element instanceof HTMLInputElement
+            && (
+                element.hasAttribute('data-erp-date')
+                || element.dataset?.mask === 'date-br'
+                || element.classList.contains('erp-date-input')
+                || element.hasAttribute('data-erp-date-wire')
+            )
+        ) {
+            element.setAttribute('autocomplete', 'off');
+            element.setAttribute('data-erp-no-autofill', '1');
+            element.setAttribute('data-lpignore', 'true');
+            element.setAttribute('data-1p-ignore', 'true');
+            element.setAttribute('data-bwignore', 'true');
+            element.removeAttribute('readonly');
+
             return;
         }
 

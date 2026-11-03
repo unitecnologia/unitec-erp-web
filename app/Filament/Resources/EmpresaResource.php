@@ -85,6 +85,14 @@ class EmpresaResource extends Resource
             }
         }
 
+        $fields[] = TextInput::make('param_vendas_internas_tipos_venda')
+            ->hidden()
+            ->dehydratedWhenHidden();
+
+        $fields[] = TextInput::make('param_monitor_vendas_desconto_reais_item_modo')
+            ->hidden()
+            ->dehydratedWhenHidden();
+
         foreach (EmpresaParametros::impostoFields() as $field => $meta) {
             $fields[] = TextInput::make($field)
                 ->hidden()

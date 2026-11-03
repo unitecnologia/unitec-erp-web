@@ -10,6 +10,7 @@ use App\Models\Vendedor;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
+use App\Support\Erp\Orcamento\OrcamentoPdvEmpresaGuard;
 use App\Support\Erp\Pdv\PdvImportarPedidoQuery;
 use App\Support\Erp\Pdv\PdvImportReserva;
 use App\Support\VendasInternas\VendasInternasPdvHookService;
@@ -34,8 +35,8 @@ trait ManagesPdvImportar
     public const IMPORTAR_ORDEM_SERVICO = 'ordem_servico';
 
     /**
-     * Orçamento é exceção ao filtro "somente aberto" (pedido/OS): qualquer status vale,
-     * exceto já faturado (importado) ou cancelado. Ver orcamentosImportaveisQuery().
+     * Status que nunca entram no F3: importado ou cancelado (ver OrcamentoFaturamentoGuard).
+     * Além disso, a listagem/importação exige status nativo FECHADO.
      */
     public const ORCAMENTO_STATUS_BLOQUEADOS = OrcamentoFaturamentoGuard::STATUS_BLOQUEADOS;
 
@@ -462,6 +463,34 @@ trait ManagesPdvImportar
         }
 
         $orcamentoId = (int) ($this->importarResults[$index]['orcamento_id'] ?? 0);
+        $orcamentoAtual = Orcamento::query()
+            ->with(['vendasInternasOrder:id,orcamento_id,empresa_id', 'forcaVendasOrder:id,orcamento_id,empresa_id'])
+            ->whereKey($orcamentoId)
+            ->first();
+
+        if ($orcamentoAtual !== null && $orcamentoAtual->status === Orcamento::STATUS_ABERTO) {
+            $this->notifyPdvError(
+                'Este orçamento ainda está aberto. Feche o orçamento antes de importar para venda.',
+            );
+            $this->refreshImportarResults();
+
+            return;
+        }
+
+        if ($orcamentoAtual !== null) {
+            $bloqueioEmpresa = OrcamentoPdvEmpresaGuard::motivoBloqueioEmpresa(
+                $orcamentoAtual,
+                $this->empresaIdPdvAutenticada(),
+            );
+
+            if ($bloqueioEmpresa !== null) {
+                $this->notifyPdvError($bloqueioEmpresa);
+                $this->refreshImportarResults();
+
+                return;
+            }
+        }
+
         $orcamento = $this->orcamentosImportaveisQuery()
             ->with(['itens.product', 'itens.grade', 'cliente', 'vendedor'])
             ->whereKey($orcamentoId)
@@ -470,7 +499,7 @@ trait ManagesPdvImportar
         if (! $orcamento) {
             $this->notifyPdvError(
                 'Orçamento indisponível para importação.',
-                'Já faturado (PDV, OS ou importado em outra venda) ou cancelado.',
+                'Já faturado (PDV, OS ou importado em outra venda), cancelado, sem status fechado ou de outra empresa.',
             );
             $this->refreshImportarResults();
 
@@ -757,12 +786,26 @@ trait ManagesPdvImportar
     protected function travarOrcamentoImportado(int $orcamentoId): Orcamento
     {
         $orcamento = Orcamento::query()->whereKey($orcamentoId)->lockForUpdate()->first();
+
+        if ($orcamento !== null && $orcamento->status === Orcamento::STATUS_ABERTO) {
+            throw new \RuntimeException(
+                'Este orçamento ainda está aberto. Feche o orçamento antes de importar para venda. Cancele o cupom (F6).'
+            );
+        }
+
+        if ($orcamento !== null) {
+            OrcamentoPdvEmpresaGuard::assertImportavelParaEmpresa(
+                $orcamento,
+                $this->empresaIdPdvAutenticada(),
+            );
+        }
+
         $importavel = $orcamento !== null
             && $this->orcamentosImportaveisQuery()->whereKey($orcamentoId)->exists();
 
         if (! $importavel) {
             $motivo = OrcamentoFaturamentoGuard::motivoFaturado($orcamentoId)
-                ?? 'O orçamento importado já foi faturado ou cancelado em outra venda.';
+                ?? 'O orçamento importado já foi faturado, cancelado, não está fechado ou não pertence à empresa logada.';
 
             throw new \RuntimeException($motivo.' Cancele o cupom (F6).');
         }
@@ -771,16 +814,31 @@ trait ManagesPdvImportar
     }
 
     /**
-     * Orçamentos que ainda podem virar venda no PDV, sem filtro de status aberto,
-     * mas bloqueando faturamento duplicado (PDV, OS ou NF-e válida — ver OrcamentoFaturamentoGuard).
+     * Orçamentos elegíveis ao F3: somente status FECHADO, da empresa da sessão,
+     * ainda não faturados (PDV, OS ou NF-e válida) e sem pedido FV legado.
      *
      * @return Builder<Orcamento>
      */
     protected function orcamentosImportaveisQuery(): Builder
     {
-        return OrcamentoFaturamentoGuard::aplicarNaoFaturados(
-            Orcamento::query()->visivelNaListaOrcamentos(),
+        $query = OrcamentoFaturamentoGuard::aplicarNaoFaturados(
+            Orcamento::query()
+                ->visivelNaListaOrcamentos()
+                ->where('orcamentos.status', Orcamento::STATUS_FECHADO),
         );
+
+        return OrcamentoPdvEmpresaGuard::aplicarEscopoEmpresa(
+            $query,
+            $this->empresaIdPdvAutenticada(),
+        );
+    }
+
+    /**
+     * Empresa autenticada do PDV (sessão/contexto). Nunca lê identificador do request.
+     */
+    protected function empresaIdPdvAutenticada(): ?int
+    {
+        return OrcamentoPdvEmpresaGuard::empresaIdSessao();
     }
 
     /**

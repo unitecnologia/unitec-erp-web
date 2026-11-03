@@ -2747,7 +2747,23 @@ trait ManagesPdvVenda
         }
 
         try {
+            $empresaPdv = (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0);
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)
+                ->assertPodeFinalizarVenda($empresaPdv > 0 ? $empresaPdv : null);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
             DB::transaction(function () use ($fiscal, $nfceOperacao, $formaPagamento, $total, $subtotal, $desconto, $acrescimo, $observacoes, $cpfNota, $troco, $dinheiro, &$vendaId, &$contasReceberCriadas): void {
+            $empresaPdvTx = (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0);
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)
+                ->assertPodeFinalizarVenda($empresaPdvTx > 0 ? $empresaPdvTx : null);
             $numero = PdvVenda::nextNumero($this->caixaSessaoId);
             $docSaida = 'PDV-' . str_pad((string) $numero, 6, '0', STR_PAD_LEFT);
             $stockService = new \App\Support\Erp\Pdv\PdvStockService();

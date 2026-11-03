@@ -5,6 +5,7 @@ namespace App\Support\ForcaVendas;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\Financeiro\ComissaoBasePagamento;
 use App\Support\Erp\Financeiro\ProdutoComissaoAdicional;
 use App\Support\Erp\Reports\ComissaoVendedoresReport;
 use Carbon\Carbon;
@@ -36,6 +37,8 @@ final class ForcaVendasComissaoService
 
         $totalAvista = 0.0;
         $totalAprazo = 0.0;
+        $baseAvista = 0.0;
+        $baseAprazo = 0.0;
         $adicionalAvista = 0.0;
         $adicionalAprazo = 0.0;
         $qtd = 0;
@@ -44,23 +47,38 @@ final class ForcaVendasComissaoService
 
         if ($vendedorId > 0) {
             $vendas = $this->coletarVendas($vendedorId, $de, $ate);
-            $adicionais = ProdutoComissaoAdicional::porVendaIds(
-                array_map(static fn (array $row): int => (int) ($row['venda_id'] ?? 0), $vendas),
-            );
+            $vendaIds = array_map(static fn (array $row): int => (int) ($row['venda_id'] ?? 0), $vendas);
+            $adicionais = ProdutoComissaoAdicional::porVendaIds($vendaIds);
+            $formasSemComissao = ComissaoBasePagamento::formasSemComissao();
+            $pagamentosPorVenda = ComissaoBasePagamento::pagamentosPorVendaIds($vendaIds);
 
             foreach ($vendas as $row) {
+                $vendaId = (int) ($row['venda_id'] ?? 0);
+                $totalVenda = (float) $row['total'];
+                $base = ComissaoBasePagamento::baseComissionavel(
+                    $totalVenda,
+                    $row['forma'] ?? null,
+                    $pagamentosPorVenda[$vendaId] ?? null,
+                    $formasSemComissao,
+                );
+                $adicional = ComissaoBasePagamento::adicionalProporcional(
+                    (float) ($adicionais[$vendaId] ?? 0),
+                    $base,
+                    $totalVenda,
+                );
+
                 $qtd++;
-                $total = (float) $row['total'];
                 $aPrazo = ComissaoVendedoresReport::isAPrazo($row['forma'] ?? null);
                 $pct = $aPrazo ? $pctAp : $pctAv;
                 $tipo = $aPrazo ? 'aprazo' : 'avista';
-                $adicional = (float) ($adicionais[(int) ($row['venda_id'] ?? 0)] ?? 0);
 
                 if ($aPrazo) {
-                    $totalAprazo += $total;
+                    $totalAprazo += $totalVenda;
+                    $baseAprazo += $base;
                     $adicionalAprazo += $adicional;
                 } else {
-                    $totalAvista += $total;
+                    $totalAvista += $totalVenda;
+                    $baseAvista += $base;
                     $adicionalAvista += $adicional;
                 }
 
@@ -70,15 +88,15 @@ final class ForcaVendasComissaoService
                     'cliente' => $row['cliente'],
                     'forma' => $row['forma'] ?: '—',
                     'tipo' => $tipo,
-                    'total' => round($total, 2),
-                    'comissao_exata' => $total * $pct / 100 + $adicional,
+                    'total' => round($totalVenda, 2),
+                    'comissao_exata' => $base * $pct / 100 + $adicional,
                 ];
             }
         }
 
         // Oficial ERP: comissão padrão do vendedor + adicional dos produtos (Paga Comissão).
-        $comissaoAvista = round($totalAvista * $pctAv / 100 + $adicionalAvista, 2);
-        $comissaoAprazo = round($totalAprazo * $pctAp / 100 + $adicionalAprazo, 2);
+        $comissaoAvista = round($baseAvista * $pctAv / 100 + $adicionalAvista, 2);
+        $comissaoAprazo = round($baseAprazo * $pctAp / 100 + $adicionalAprazo, 2);
         $totalGeral = round($totalAvista + $totalAprazo, 2);
         $comissaoTotal = round($comissaoAvista + $comissaoAprazo, 2);
 

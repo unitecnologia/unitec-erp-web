@@ -366,6 +366,11 @@ final class ReabrirCompraLancamentoService
             ->get();
 
         foreach ($lancamentos as $lancamento) {
+            app(\App\Support\Erp\Financeiro\CaixaAbertoGuard::class)->assertPodeLancarNaConta(
+                $lancamento->caixa_conta_id ? (int) $lancamento->caixa_conta_id : null,
+                $lancamento->empresa_id ? (int) $lancamento->empresa_id : null,
+            );
+
             $payload = [
                 'codigo' => CaixaLancamento::nextCodigo(),
                 'emissao' => $hoje,

@@ -168,6 +168,10 @@ final class ContaReceberBaixaService
                 $selecionada > 0 ? $selecionada : null,
                 (int) ($forma->conta_destino_id ?? 0) ?: null,
             );
+            app(CaixaAbertoGuard::class)->assertPodeLancarNaConta($caixaContaId);
+        } else {
+            // Baixa sem livro ainda é operação financeira: exige CAIXA GERAL aberto.
+            app(CaixaAbertoGuard::class)->assertEmpresaOperacional();
         }
 
         $recebidoEm = trim((string) ($opcoes['recebido_em'] ?? ''));
@@ -587,6 +591,12 @@ final class ContaReceberBaixaService
             return;
         }
 
+        $empresaId = $empresaId ?? \App\Support\Erp\ErpContext::currentEmpresaId();
+        app(CaixaAbertoGuard::class)->assertPodeLancarNaConta(
+            $caixaContaId ? (int) $caixaContaId : null,
+            $empresaId ? (int) $empresaId : null,
+        );
+
         $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),
             'emissao' => $data,
@@ -600,7 +610,7 @@ final class ContaReceberBaixaService
         ];
 
         if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
-            $payload['empresa_id'] = $empresaId ?? \App\Support\Erp\ErpContext::currentEmpresaId();
+            $payload['empresa_id'] = $empresaId;
         }
 
         CaixaLancamento::query()->create($payload);

@@ -6,11 +6,13 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\InteractsWithLocalClienteSearchLookup;
 use App\Filament\Resources\NfeResource;
+use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeAjusteModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeCancelamento;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeCartaCorrecao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeCceDispatch;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeContadorEmail;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeDanfeEmail;
+use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeDuplicacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeEmissaoModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeEspelhoModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeHistoricoModal;
@@ -30,6 +32,7 @@ use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
+use App\Support\Erp\Nfe\NfeListStatusCounts;
 use App\Support\Erp\Nfe\NfeOrdemServicoService;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use App\Support\Erp\Os\OrdemServicoRetorno;
@@ -51,10 +54,12 @@ class ListNfes extends ListRecords
         InteractsWithLocalClienteSearchLookup::updatedLocalSearch as protected updatedLocalSearchFromClienteLookup;
     }
     use ManagesNfeEmissaoModal;
+    use ManagesNfeAjusteModal;
     use ManagesNfeDanfeEmail;
     use ManagesNfeEspelhoModal;
     use ManagesNfeImportacao;
     use ManagesNfeCancelamento;
+    use ManagesNfeDuplicacao;
     use ManagesNfeCartaCorrecao;
     use ManagesNfeCceDispatch;
     use ManagesNfeInutilizacao;
@@ -698,16 +703,28 @@ class ListNfes extends ListRecords
      */
     protected function buildListQuery(): Builder
     {
+        $query = $this->buildCountsBaseQuery();
+
+        if ($this->statusFilter !== 'todas') {
+            $query->where('status', $this->statusFilter);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Empresa + pesquisa (sem status da aba) — base dos contadores e da listagem.
+     *
+     * @return Builder<Nfe>
+     */
+    protected function buildCountsBaseQuery(): Builder
+    {
         $query = parent::getTableQuery();
 
         $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
 
         if ($empresaId !== null) {
             $query->where('empresa_id', $empresaId);
-        }
-
-        if ($this->statusFilter !== 'todas') {
-            $query->where('status', $this->statusFilter);
         }
 
         foreach ($this->normalizedSearchFieldsActive() as $column) {
@@ -741,6 +758,28 @@ class ListNfes extends ListRecords
         return $query;
     }
 
+    /**
+     * Contadores das abas: 1× GROUP BY status (total da pesquisa, não da página).
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function statusTabCounts(): array
+    {
+        return NfeListStatusCounts::paraAbas($this->buildCountsBaseQuery());
+    }
+
+    /** Sync DOM das abas (wire:ignore) após mudança de filtro. */
+    protected function syncStatusTabCountsDom(): void
+    {
+        unset($this->statusTabCounts);
+
+        $this->js(sprintf(
+            'window.ErpNfeTabCounts && window.ErpNfeTabCounts.applyNfe(%s);',
+            json_encode($this->statusTabCounts, JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
     protected function pushNfeListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
     {
         $this->dispatch(
@@ -765,12 +804,16 @@ class ListNfes extends ListRecords
 
     public function resetTable(): void
     {
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
     }
 
     public function refreshTable(): void
     {
-        $this->pushNfeListRefresh();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
 
         Notification::make()
             ->title('Lista atualizada.')
@@ -976,6 +1019,7 @@ class ListNfes extends ListRecords
             'espelho' => 'uma NF-e aberta para visualizar o espelho',
             'cancelar' => 'uma NF-e transmitida para cancelar',
             'cce' => 'uma NF-e transmitida para Carta de Correção',
+            'duplicar' => 'uma NF-e para duplicar',
             default => parent::erpListSelectPrompt($action),
         };
     }
@@ -996,6 +1040,7 @@ class ListNfes extends ListRecords
                 View::make('filament.components.erp.nfe.fiscal-danfe-email-modal'),
                 View::make('filament.components.erp.nfe.fiscal-cancel-modal'),
                 View::make('filament.components.erp.nfe.fiscal-cancel-aberta-modal'),
+                View::make('filament.components.erp.nfe.fiscal-duplicar-modal'),
                 View::make('filament.components.erp.nfe.fiscal-inutilizar-modal'),
                 View::make('filament.components.erp.nfe.fiscal-inutilizar-sucesso-overlay'),
                 View::make('filament.components.erp.nfe.fiscal-erro-overlay'),
@@ -1024,6 +1069,7 @@ class ListNfes extends ListRecords
 
         $this->statusFilter = $normalized;
         $this->clearListSelection();
+        // Contadores das abas não dependem da aba ativa — não invalidar aqui.
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
     }
@@ -1201,6 +1247,7 @@ class ListNfes extends ListRecords
         $this->clearListSelection();
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
     }
 
     public function updatedLocalSearch(): void
@@ -1208,6 +1255,7 @@ class ListNfes extends ListRecords
         $this->clearListSelection();
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
     }
 
     public function updatedLocalSearchDe(): void
@@ -1215,6 +1263,7 @@ class ListNfes extends ListRecords
         $this->clearListSelection();
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
     }
 
     public function updatedLocalSearchAte(): void
@@ -1222,6 +1271,7 @@ class ListNfes extends ListRecords
         $this->clearListSelection();
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
     }
 
     public function updatedTableRecordsPerPage(): void
@@ -1235,6 +1285,7 @@ class ListNfes extends ListRecords
         $this->clearListSelection();
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
         $this->pushNfeListRefresh(skipParentRender: false);
+        $this->syncStatusTabCountsDom();
     }
 
     public function modulePending(string $module): void

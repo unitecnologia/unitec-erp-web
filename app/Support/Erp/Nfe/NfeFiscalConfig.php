@@ -166,22 +166,12 @@ final class NfeFiscalConfig
 
         $dirty = false;
         $pathFields = array_keys(self::defaultStoragePaths($empresaId));
-        $forcedRespFields = [
-            'resp_tecnico_cnpj',
-            'resp_tecnico_contato',
-            'resp_tecnico_email',
-            'resp_tecnico_fone',
-        ];
 
         foreach ($defaults as $field => $value) {
             $current = $params->{$field};
             $shouldUpdate = $current === null || $current === '';
 
             if (in_array($field, $pathFields, true) && self::isInvalidStoragePath($current)) {
-                $shouldUpdate = true;
-            }
-
-            if (in_array($field, $forcedRespFields, true) && (string) $current !== (string) $value) {
                 $shouldUpdate = true;
             }
 
@@ -728,17 +718,12 @@ final class NfeFiscalConfig
             'email_api_provedor' => (string) ($params->email_api_provedor ?? 'brevo'),
             'email_api_key' => (string) ($params->email_api_key ?? ''),
             'caminho_certificado' => $params->caminho_certificado ?? '',
-            'resp_tecnico_cnpj' => self::defaultRespTecnico()['cnpj'],
-            'resp_tecnico_contato' => self::defaultRespTecnico()['contato'],
-            'resp_tecnico_email' => self::defaultRespTecnico()['email'],
-            'resp_tecnico_fone' => self::defaultRespTecnico()['fone'],
-            'resp_tecnico_id_csrt' => $params->resp_tecnico_id_csrt ?? '',
-            'resp_tecnico_csrt' => $params->resp_tecnico_csrt ?? '',
+            ...self::respTecnicoFormValues($params),
         ];
     }
 
     /**
-     * Dados fixos do software (UniTecnologia) — não editáveis pelo cliente.
+     * Padrão UniTecnologia (infRespTec). Usado na instalação e quando o campo está vazio.
      *
      * @return array{cnpj: string, contato: string, email: string, fone: string}
      */
@@ -752,18 +737,37 @@ final class NfeFiscalConfig
         ];
     }
 
+    /**
+     * Valores da aba Técnico Responsável (DB com fallback ao padrão).
+     *
+     * @return array{resp_tecnico_cnpj: string, resp_tecnico_contato: string, resp_tecnico_email: string, resp_tecnico_fone: string, resp_tecnico_id_csrt: string, resp_tecnico_csrt: string}
+     */
+    public static function respTecnicoFormValues(VendasParametro $params): array
+    {
+        $default = self::defaultRespTecnico();
+
+        return [
+            'resp_tecnico_cnpj' => filled($params->resp_tecnico_cnpj) ? (string) $params->resp_tecnico_cnpj : $default['cnpj'],
+            'resp_tecnico_contato' => filled($params->resp_tecnico_contato) ? (string) $params->resp_tecnico_contato : $default['contato'],
+            'resp_tecnico_email' => filled($params->resp_tecnico_email) ? (string) $params->resp_tecnico_email : $default['email'],
+            'resp_tecnico_fone' => filled($params->resp_tecnico_fone) ? (string) $params->resp_tecnico_fone : $default['fone'],
+            'resp_tecnico_id_csrt' => $params->resp_tecnico_id_csrt ?? '',
+            'resp_tecnico_csrt' => $params->resp_tecnico_csrt ?? '',
+        ];
+    }
+
     public static function respTecnicoFromParametros(VendasParametro $params): ?\Unitec\FiscalEngine\Dto\RespTecnicoDto
     {
-        $fixed = self::defaultRespTecnico();
+        $values = self::respTecnicoFormValues($params);
 
         return new \Unitec\FiscalEngine\Dto\RespTecnicoDto(
-            cnpj: $fixed['cnpj'],
-            contato: $fixed['contato'],
-            email: $fixed['email'],
-            fone: $fixed['fone'],
-            idCsrt: filled($params->resp_tecnico_id_csrt) ? (string) $params->resp_tecnico_id_csrt : null,
+            cnpj: $values['resp_tecnico_cnpj'],
+            contato: $values['resp_tecnico_contato'],
+            email: $values['resp_tecnico_email'],
+            fone: $values['resp_tecnico_fone'],
+            idCsrt: filled($values['resp_tecnico_id_csrt']) ? (string) $values['resp_tecnico_id_csrt'] : null,
             hashCsrt: null,
-            csrtToken: filled($params->resp_tecnico_csrt) ? trim((string) $params->resp_tecnico_csrt) : null,
+            csrtToken: filled($values['resp_tecnico_csrt']) ? trim((string) $values['resp_tecnico_csrt']) : null,
         );
     }
 

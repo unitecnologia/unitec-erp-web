@@ -49,7 +49,7 @@ final class NfeListRowFormatter
 
         return [
             'numero' => e($numero),
-            'npedido' => NfeResource::formatOsDav($record),
+            'npedido' => NfeResource::formatNumeroPedido($record),
             'data_emissao' => e($dataEmissao),
             'data_saida' => e($dataSaida),
             'cliente' => '<span title="'.e($cliente === '—' ? '' : $cliente).'">'.e($cliente).'</span>',

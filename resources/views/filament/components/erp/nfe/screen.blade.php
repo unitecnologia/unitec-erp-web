@@ -32,4 +32,6 @@
     ])
 
     @include('filament.components.erp.form-scripts')
+
+    <script src="{{ asset('js/erp-nfe-tab-counts.js') }}?v=1"></script>
 </div>

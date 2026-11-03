@@ -15,6 +15,7 @@ use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
+use App\Support\Erp\Financeiro\CaixaAbertoGuard;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
 use App\Support\Erp\Financeiro\FormaPagamentoDestino;
@@ -52,6 +53,13 @@ final class OsFaturamentoService
             throw new \RuntimeException('A OS não tem valor para faturar.');
         }
 
+        $empresaIdPre = $os->empresa_id ? (int) $os->empresa_id : (int) (ErpContext::currentEmpresaId() ?? 0);
+        try {
+            app(CaixaAbertoGuard::class)->assertPodeFinalizarVenda($empresaIdPre > 0 ? $empresaIdPre : null);
+        } catch (\InvalidArgumentException $e) {
+            throw new \RuntimeException($e->getMessage(), 0, $e);
+        }
+
         $linhas = $this->linhas($pagamentos, $total);
         $contasCriadas = [];
 
@@ -59,6 +67,7 @@ final class OsFaturamentoService
             $documento = 'OS-'.preg_replace('/\D/', '', (string) $os->numero);
             $hoje = ErpTimezone::toLocal()->toDateString();
             $empresaId = $os->empresa_id ? (int) $os->empresa_id : ErpContext::currentEmpresaId();
+            app(CaixaAbertoGuard::class)->assertPodeFinalizarVenda($empresaId ? (int) $empresaId : null);
             $baixa = app(ContaReceberBaixaService::class);
             $caixaGeral = (int) CaixaConta::ensureCaixaGeral()->id;
 

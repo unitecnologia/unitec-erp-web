@@ -1,5 +1,16 @@
 {{-- Imposto padrão — mesmo layout da aba Impostos do produto --}}
+@php
+    $regimeEmp = (string) ($this->data['regime_tributario'] ?? 'simples');
+    $orientacaoImp = \App\Support\Fiscal\ImpostoPadraoSugestoes::orientacao($regimeEmp);
+@endphp
 <div class="erp-produtos-impostos erp-empresas-impostos">
+    <div class="erp-produtos-impostos__toolbar" style="margin-bottom: 0.5rem;">
+        <span class="erp-produtos-impostos__toolbar-hint" title="{{ $orientacaoImp }}">
+            Padrão para <strong>{{ \App\Support\Fiscal\ImpostoPadraoSugestoes::rotulo($regimeEmp) }}</strong>.
+            Novos produtos herdam estes valores; produtos existentes só mudam com “Aplicar” (confirmação).
+            {{ $orientacaoImp }}
+        </span>
+    </div>
     <div class="erp-produtos-impostos__row">
         <fieldset class="erp-produtos-impostos__group" title="Tributação ICMS para operações dentro do estado">
             <legend class="erp-produtos-impostos__legend">ICMS Interno</legend>
@@ -13,8 +24,9 @@
                 </div>
                 <div class="erp-produtos-impostos__field">
                     <label for="emp-icms-int-origem">Origem</label>
-                    <div class="erp-empresas-impostos__input-row">
+                    <div class="erp-empresas-impostos__input-row erp-produtos-impostos__origem-row">
                         <input id="emp-icms-int-origem" type="text" wire:model="data.param_imp_origem" data-mask="integer" maxlength="1" class="erp-pcad-form__input erp-pcad-form__input--tax-xs">
+                        @include('filament.components.erp.shared.origem-mercadoria-help')
                         @include('filament.components.erp.empresas.form.partials.imposto-apply-btn', ['field' => 'param_imp_origem', 'label' => 'Origem'])
                     </div>
                 </div>

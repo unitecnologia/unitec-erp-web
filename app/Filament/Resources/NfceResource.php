@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfce\NfceConsumidorIdentificado;
+use App\Support\Erp\Nfce\NfceListDavNumero;
 use App\Filament\Resources\NfceResource\Pages;
 use App\Models\PdvVendaNfce;
 use BackedEnum;
@@ -131,6 +132,11 @@ class NfceResource extends Resource
                         ? (string) $state
                         : (string) ($record->pdvVenda?->vendedor_nome ?: '—'))
                     ->weight(FontWeight::SemiBold),
+                ViewColumn::make('bruto')
+                    ->label('Bruto')
+                    ->view('filament.components.erp.nfce.columns.bruto')
+                    ->alignEnd()
+                    ->disabledClick(),
                 TextColumn::make('desc_acres')
                     ->label('Desc/Acrés')
                     ->alignEnd()
@@ -169,7 +175,14 @@ class NfceResource extends Resource
                 TextColumn::make('pdvVenda.numero')
                     ->label('Nº Dav')
                     ->alignCenter()
-                    ->formatStateUsing(fn ($state): string => $state !== null ? str_pad((string) $state, 6, '0', STR_PAD_LEFT) : '—')
+                    ->getStateUsing(function (PdvVendaNfce $record): string {
+                        // UI principal é NfceListTable (lote). Aqui só fallback pontual.
+                        if ((string) $record->operacao === NfceListDavNumero::OPERACAO_SCV_HIST) {
+                            NfceListDavNumero::aquecer([$record]);
+                        }
+
+                        return NfceListDavNumero::texto($record);
+                    })
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('motivo_rejeicao')
                     ->label('Situação SEFAZ')

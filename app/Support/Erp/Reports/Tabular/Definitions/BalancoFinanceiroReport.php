@@ -5,6 +5,7 @@ namespace App\Support\Erp\Reports\Tabular\Definitions;
 use App\Models\CaixaLancamento;
 use App\Models\ContaPagar;
 use App\Models\ContaReceber;
+use App\Support\Erp\Financeiro\CaixaTransferencia;
 use App\Support\Erp\Reports\ReportEmpresaScope;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
@@ -118,12 +119,15 @@ class BalancoFinanceiroReport extends AbstractTabularReport
         $pagarAberto = (float) $pagarAbertoQ->sum('saldo');
         $pagarPago = (float) $pagarPagoQ->sum('valor_pago');
 
-        $entradas = (float) CaixaLancamento::query()
-            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()])
-            ->sum('entrada');
-        $saidas = (float) CaixaLancamento::query()
-            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()])
-            ->sum('saida');
+        $entradasQ = CaixaLancamento::query()
+            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()]);
+        CaixaTransferencia::excluirDoQuery($entradasQ);
+        $entradas = (float) $entradasQ->sum('entrada');
+
+        $saidasQ = CaixaLancamento::query()
+            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()]);
+        CaixaTransferencia::excluirDoQuery($saidasQ);
+        $saidas = (float) $saidasQ->sum('saida');
 
         return [
             ['grupo' => 'RECEBER', 'descricao' => 'Títulos em aberto (vencimento no período)', 'valor' => static::formatMoney($receberAberto)],
@@ -196,12 +200,15 @@ class BalancoFinanceiroReport extends AbstractTabularReport
             $rows[] = ['grupo' => $label, 'descricao' => 'Recebidos − Pagos', 'valor' => static::formatMoney($receberRecebido - $pagarPago)];
         }
 
-        $entradas = (float) CaixaLancamento::query()
-            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()])
-            ->sum('entrada');
-        $saidas = (float) CaixaLancamento::query()
-            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()])
-            ->sum('saida');
+        $entradasQ = CaixaLancamento::query()
+            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()]);
+        CaixaTransferencia::excluirDoQuery($entradasQ);
+        $entradas = (float) $entradasQ->sum('entrada');
+
+        $saidasQ = CaixaLancamento::query()
+            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()]);
+        CaixaTransferencia::excluirDoQuery($saidasQ);
+        $saidas = (float) $saidasQ->sum('saida');
 
         $rows[] = ['grupo' => 'TOTAL GERAL', 'descricao' => 'Receber em aberto', 'valor' => static::formatMoney($totalReceberAberto)];
         $rows[] = ['grupo' => 'TOTAL GERAL', 'descricao' => 'Recebido no período', 'valor' => static::formatMoney($totalReceberRecebido)];

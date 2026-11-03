@@ -215,6 +215,12 @@ final class NfeEstoqueService
             return false;
         }
 
+        // Ajuste/estorno fiscal (finNFe=3): documento sem movimentação de estoque nesta versão.
+        $finalidade = strtolower(trim((string) ($nfe->finalidade ?? '')));
+        if (in_array($finalidade, ['3', 'ajuste'], true)) {
+            return false;
+        }
+
         if (filled($nfe->venda_id) || filled($nfe->pdv_venda_id)) {
             return false;
         }

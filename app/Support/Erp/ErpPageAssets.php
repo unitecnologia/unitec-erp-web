@@ -121,7 +121,10 @@ class ErpPageAssets
             'cardex' => ['css/erp-form-ui.css'],
             'pdv' => [],
             'list' => ['css/erp-grid.css', 'css/erp-list-ui.css'],
-            'dashboard' => ErpAccess::currentCan('dashboard.access')
+            'dashboard' => (
+                ErpAccess::currentCan('dashboard.access')
+                && EmpresaParametros::mostrarDashboardInicial()
+            )
                 ? ['css/erp-home.css', 'css/erp-form-ui.css']
                 : [],
             default => [],

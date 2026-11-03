@@ -31,6 +31,18 @@
 @endphp
 
 <div class="erp-caixa" wire:ignore.self>
+    @php $status = $this->caixaStatusBanner; @endphp
+    @if (! empty($status['visivel']))
+        <div
+            class="erp-caixa__status-banner {{ ! empty($status['aberto']) ? 'is-aberto' : 'is-fechado' }}"
+            role="status"
+            aria-live="polite"
+        >
+            <strong>{{ $status['titulo'] }}</strong>
+            <span>{{ $status['detalhe'] }}</span>
+        </div>
+    @endif
+
     <div class="erp-caixa__filter-block">
         <label class="erp-caixa__account-label">
             Selecione Conta

@@ -102,6 +102,43 @@ window.ErpDatepicker = {
         input.style.cursor = 'text';
     },
 
+    /**
+     * Visual UNI: classe no painel + botão "Hoje" (sem plugins extras).
+     */
+    decorateCalendar(instance) {
+        const cal = instance?.calendarContainer;
+
+        if (! cal || cal.dataset.erpDecorated === '1') {
+            return;
+        }
+
+        cal.classList.add('erp-flatpickr');
+        cal.dataset.erpDecorated = '1';
+
+        const footer = document.createElement('div');
+        footer.className = 'flatpickr-erp-footer';
+
+        const hoje = document.createElement('button');
+        hoje.type = 'button';
+        hoje.className = 'flatpickr-erp-hoje';
+        hoje.textContent = 'Hoje';
+        hoje.setAttribute('aria-label', 'Selecionar data de hoje');
+        hoje.addEventListener('mousedown', (event) => {
+            // Evita o Flatpickr fechar/reabrir antes do click.
+            event.preventDefault();
+            event.stopPropagation();
+        });
+        hoje.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            instance.setDate(new Date(), true);
+            instance.close();
+        });
+
+        footer.appendChild(hoje);
+        cal.appendChild(footer);
+    },
+
     parseValue(value, wireFormat) {
         if (! value || ! window.flatpickr) {
             return null;
@@ -265,14 +302,14 @@ window.ErpDatepicker = {
         }
     },
 
-    syncEmpty(input) {
+    syncEmpty(input, live = true) {
         input.value = '';
         input.dataset.erpDateSynced = '';
-        this.syncLivewire(input, '', true);
+        this.syncLivewire(input, '', true, live);
     },
 
-    clearValue(input, picker) {
-        this.syncEmpty(input);
+    clearValue(input, picker, live = true) {
+        this.syncEmpty(input, live);
         this.clearLocal(input, picker);
     },
 
@@ -287,10 +324,10 @@ window.ErpDatepicker = {
         input.value = this.formatDisplay(date);
     },
 
-    applySelectedDate(input, picker, date, wireFormat, syncWire = false) {
+    applySelectedDate(input, picker, date, wireFormat, syncWire = false, live = true) {
         if (! date) {
             if (syncWire) {
-                this.clearValue(input, picker);
+                this.clearValue(input, picker, live);
             } else {
                 this.clearLocal(input, picker);
             }
@@ -301,7 +338,7 @@ window.ErpDatepicker = {
         this.applyLocalDate(input, picker, date);
 
         if (syncWire) {
-            this.syncLivewire(input, this.formatForWire(date, wireFormat));
+            this.syncLivewire(input, this.formatForWire(date, wireFormat), false, live);
         }
     },
 
@@ -371,7 +408,7 @@ window.ErpDatepicker = {
         }
     },
 
-    syncLivewire(input, wireValue, force = false) {
+    syncLivewire(input, wireValue, force = false, live = true) {
         if (! window.ErpMasks) {
             return;
         }
@@ -381,7 +418,8 @@ window.ErpDatepicker = {
         }
 
         input.dataset.erpDateSynced = wireValue;
-        window.ErpMasks.syncLivewire(input, wireValue, true);
+        // live=false: enfileira set no mesmo request do call seguinte (ex.: applyPeriodFilterAuto).
+        window.ErpMasks.syncLivewire(input, wireValue, live);
     },
 
     readCommittedWireValue(input, picker, wireFormat) {
@@ -390,11 +428,11 @@ window.ErpDatepicker = {
         return parsed ? this.formatForWire(parsed, wireFormat) : '';
     },
 
-    commitPeriodGroupInput(el) {
+    commitPeriodGroupInput(el, live = true) {
         const format = this.getWireFormat(el);
 
         if (el._flatpickr) {
-            this.commitValue(el, el._flatpickr, format);
+            this.commitValue(el, el._flatpickr, format, live);
 
             return;
         }
@@ -402,7 +440,7 @@ window.ErpDatepicker = {
         const typed = String(el.value ?? '').trim();
 
         if (typed === '' || this.digitsOnly(typed) === '') {
-            this.syncLivewire(el, '', true);
+            this.syncLivewire(el, '', true, live);
 
             return;
         }
@@ -410,13 +448,13 @@ window.ErpDatepicker = {
         const parsed = this.parseValue(typed, format);
 
         if (parsed) {
-            this.syncLivewire(el, this.formatForWire(parsed, format), true);
+            this.syncLivewire(el, this.formatForWire(parsed, format), true, live);
 
             return;
         }
 
         if (this.isCompleteDisplayDate(typed)) {
-            this.syncLivewire(el, typed, true);
+            this.syncLivewire(el, typed, true, live);
         }
     },
 
@@ -427,8 +465,9 @@ window.ErpDatepicker = {
             return false;
         }
 
+        // set(live=false) + call no mesmo turno: evita corrida em que apply roda com período antigo.
         group.querySelectorAll('input[data-wire-field]').forEach((el) => {
-            this.commitPeriodGroupInput(el);
+            this.commitPeriodGroupInput(el, false);
         });
 
         const applyMethod = group.dataset.erpDateApplyMethod;
@@ -437,7 +476,6 @@ window.ErpDatepicker = {
             const component = window.ErpMasks.getLivewireComponent(input);
 
             if (component && typeof component.call === 'function') {
-                // Sincroniza periodoDe/periodoAte via set() e aplica no mesmo request.
                 component.call(applyMethod);
             }
         }
@@ -485,15 +523,15 @@ window.ErpDatepicker = {
         return this.commitPeriodGroup(input);
     },
 
-    commitValue(input, picker, wireFormat) {
+    commitValue(input, picker, wireFormat, live = true) {
         const typed = input.value.trim();
         const digits = this.digitsOnly(typed);
 
         if (typed === '' || digits === '') {
             if (picker.selectedDates?.length > 0 || input.dataset.erpDateSynced) {
-                this.clearValue(input, picker);
+                this.clearValue(input, picker, live);
             } else {
-                this.syncEmpty(input);
+                this.syncEmpty(input, live);
             }
 
             return;
@@ -503,13 +541,13 @@ window.ErpDatepicker = {
 
         if (! parsed) {
             if (this.isCompleteDisplayDate(typed)) {
-                this.syncLivewire(input, typed, true);
+                this.syncLivewire(input, typed, true, live);
             }
 
             return;
         }
 
-        this.applySelectedDate(input, picker, parsed, wireFormat, true);
+        this.applySelectedDate(input, picker, parsed, wireFormat, true, live);
     },
 
     bindTypingMask(input, picker, wireFormat) {
@@ -722,7 +760,7 @@ window.ErpDatepicker = {
     },
 
     prepInput(input) {
-        if (! input || input.disabled || input.readOnly) {
+        if (! input || input.disabled) {
             return;
         }
 
@@ -730,8 +768,17 @@ window.ErpDatepicker = {
             return;
         }
 
+        // Anti-autofill usa readonly até o foco; datas precisam bindar mesmo assim.
+        if (input.readOnly) {
+            input.removeAttribute('readonly');
+        }
+
         if (input.type === 'date') {
             input.type = 'text';
+        }
+
+        if (this.isIsoDateString(input.value)) {
+            input.value = this.formatDisplayValue(input.value, this.getWireFormat(input));
         }
 
         input.setAttribute('inputmode', 'numeric');
@@ -763,8 +810,12 @@ window.ErpDatepicker = {
 
         this.prepInput(input);
 
-        if (! window.flatpickr || input.disabled || input.readOnly) {
+        if (! window.flatpickr || input.disabled) {
             return;
+        }
+
+        if (input.readOnly) {
+            input.removeAttribute('readonly');
         }
 
         const wireFormat = this.getWireFormat(input);
@@ -815,8 +866,20 @@ window.ErpDatepicker = {
                 disableMobile: true,
                 clickOpens: ! openOnlyViaIcon,
                 appendTo: document.body,
+                position: 'auto',
                 ignoredFocusElements: toggle ? [toggle] : [],
                 defaultDate: parsedInitial ?? undefined,
+                onReady(_selectedDates, _dateStr, instance) {
+                    self.decorateCalendar(instance);
+                },
+                onOpen(_selectedDates, _dateStr, instance) {
+                    // Reposiciona após abrir (grades / modais perto da borda).
+                    window.requestAnimationFrame(() => {
+                        if (typeof instance._positionCalendar === 'function') {
+                            instance._positionCalendar();
+                        }
+                    });
+                },
                 onChange(selectedDates) {
                     if (picker._erpSkipClearOnChange) {
                         return;
@@ -948,7 +1011,7 @@ window.ErpDatepicker = {
         const self = this;
 
         const warmInput = (input) => {
-            if (input && ! input.disabled && ! input.readOnly) {
+            if (input && ! input.disabled) {
                 self.bindInput(input);
             }
         };
@@ -1003,7 +1066,7 @@ window.ErpDatepicker = {
 
                 const input = self.resolveDateInputFromEvent(event);
 
-                if (! input || input.disabled || input.readOnly) {
+                if (! input || input.disabled) {
                     return;
                 }
 

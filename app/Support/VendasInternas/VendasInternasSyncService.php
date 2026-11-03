@@ -2,10 +2,12 @@
 
 namespace App\Support\VendasInternas;
 
+use App\Models\CaixaConta;
 use App\Models\EstoqueReserva;
 use App\Models\ForcaVendasOrder;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
+use App\Models\OsVeiculo;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\Person;
@@ -15,8 +17,10 @@ use App\Models\ProductPriceTableItem;
 use App\Models\User;
 use App\Models\VendasInternasOrder;
 use App\Models\Vendedor;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\VendaCaixaDestinoResolver;
 use App\Support\Erp\ProductAppCatalog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +38,7 @@ class VendasInternasSyncService
         return [
             'server_time' => now()->toIso8601String(),
             'since' => $since?->toIso8601String(),
+            'config' => EmpresaParametros::vendasInternasAppConfig($empresaId),
             'products' => $this->products($since),
             'price_tables' => $this->priceTables($since),
             'price_table_items' => $this->priceTableItems($since),
@@ -45,9 +50,11 @@ class VendasInternasSyncService
 
     public function pullSignature(?int $vendedorId = null, ?int $empresaId = null): string
     {
+        $viConfig = EmpresaParametros::vendasInternasAppConfig($empresaId);
         $parts = [
             'vendedor:'.($vendedorId ?? 0),
             'empresa:'.($empresaId ?? 0),
+            'vi_config:'.$viConfig['tipos_venda'].':'.((int) $viConfig['fechar_orcamento_auto']),
         ];
 
         foreach ([
@@ -98,10 +105,51 @@ class VendasInternasSyncService
                 continue;
             }
 
-            $results[] = $this->createOrder($uuid, $order, $user);
+            $results[] = $this->createOrder(
+                $uuid,
+                $this->normalizeCaixaNoPayload($order, $user),
+                $user,
+            );
         }
 
         return $results;
+    }
+
+    /**
+     * Garante caixa_id autorizado (usuário/empresa). Identificador inválido ou
+     * de outra empresa cai na resolução segura (vínculo → CAIXA GERAL).
+     * Metadado de origem; não lança financeiro aqui.
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function normalizeCaixaNoPayload(array $order, User $user): array
+    {
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+        $enviadoId = (int) ($order['caixa_id'] ?? $order['caixa_conta_id'] ?? 0) ?: null;
+
+        $usuario = $user;
+        if ($user->vendedor_id) {
+            $vendedor = Vendedor::query()->with('usuario')->find($user->vendedor_id);
+            if ($vendedor?->usuario instanceof User) {
+                $usuario = $vendedor->usuario;
+            }
+        }
+
+        $destino = app(VendaCaixaDestinoResolver::class)->resolver(
+            null,
+            $enviadoId,
+            $usuario,
+            $empresaId,
+        );
+
+        $caixa = CaixaConta::query()->find($destino['caixa_conta_id'])
+            ?? CaixaConta::ensureCaixaGeral();
+
+        $order['caixa_id'] = (int) $caixa->id;
+        $order['caixa_nome'] = (string) ($caixa->nome ?? '');
+
+        return $order;
     }
 
     /**
@@ -417,6 +465,28 @@ class VendasInternasSyncService
             $tipo = VendasInternasOrder::TIPO_ORCAMENTO;
         }
 
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+
+        if ($tipo === VendasInternasOrder::TIPO_PEDIDO
+            && ! EmpresaParametros::vendasInternasPermitePedido($empresaId)) {
+            return [
+                'uuid' => $uuid,
+                'tipo' => $tipo,
+                'status' => VendasInternasOrder::STATUS_ERRO,
+                'erro' => 'Esta empresa permite somente orçamentos. Não é possível enviar pedido.',
+            ];
+        }
+
+        if ($tipo === VendasInternasOrder::TIPO_ORCAMENTO
+            && ! EmpresaParametros::vendasInternasPermiteOrcamento($empresaId)) {
+            return [
+                'uuid' => $uuid,
+                'tipo' => $tipo,
+                'status' => VendasInternasOrder::STATUS_ERRO,
+                'erro' => 'Esta empresa permite somente pedidos. Não é possível enviar orçamento.',
+            ];
+        }
+
         try {
             return DB::transaction(function () use ($uuid, $order, $user, $tipo): array {
                 if ($tipo === VendasInternasOrder::TIPO_PEDIDO) {
@@ -483,6 +553,10 @@ class VendasInternasSyncService
             : ErpTimezone::toLocal();
         $dataPedido = $momentoLocal->toDateString();
 
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+        $fecharAuto = EmpresaParametros::vendasInternasFecharOrcamentoAuto($empresaId);
+        $equipamento = $this->atributosEquipamentoOrcamento($order, $empresaId);
+
         $orcamento = Orcamento::query()->create([
             'numero' => Orcamento::nextNumero(),
             'data' => $dataPedido,
@@ -495,8 +569,10 @@ class VendasInternasSyncService
             'forma_pagamento' => $order['forma_pagamento'] ?? null,
             'validade_dias' => (int) ($order['validade_dias'] ?? 0),
             'observacoes' => $order['observacoes'] ?? null,
+            ...$equipamento,
             'total' => 0,
-            'status' => Orcamento::STATUS_ABERTO,
+            // Só status nativo: Fechado = pronto para importar no PDV (sem faturar).
+            'status' => $fecharAuto ? Orcamento::STATUS_FECHADO : Orcamento::STATUS_ABERTO,
             'plataforma' => Orcamento::PLATAFORMA_VI,
         ]);
 
@@ -539,7 +615,9 @@ class VendasInternasSyncService
             'total' => $total,
         ]);
 
-        return [$orcamento, $total, $clientCreatedAt];
+        // DATETIME sem fuso: persistir America/Sao_Paulo (mesmo $momentoLocal de data/hora).
+        // Sem created_at no payload → null e a grade usa received_at via dataAberturaAt().
+        return [$orcamento, $total, $clientCreatedAt ? $momentoLocal : null];
     }
 
     /**
@@ -624,7 +702,9 @@ class VendasInternasSyncService
             'total' => $total,
         ]);
 
-        return [$pedido, $total, $clientCreatedAt];
+        // DATETIME sem fuso: persistir America/Sao_Paulo (mesmo $momentoLocal de data/hora).
+        // Sem created_at no payload → null e a grade usa received_at via dataAberturaAt().
+        return [$pedido, $total, $clientCreatedAt ? $momentoLocal : null];
     }
 
     /**
@@ -675,6 +755,7 @@ class VendasInternasSyncService
             'status' => VendasInternasOrder::STATUS_IMPORTADO,
             'situacao' => VendasInternasOrder::SITUACAO_AGUARDANDO,
             'payload' => $order,
+            // Já normalizado em America/Sao_Paulo (ou null → fallback received_at).
             'client_created_at' => $clientCreatedAt,
             'received_at' => now(),
         ]);
@@ -714,6 +795,7 @@ class VendasInternasSyncService
             'status' => ForcaVendasOrder::STATUS_IMPORTADO,
             'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
             'payload' => array_merge($order, ['origem' => 'vendas_internas']),
+            // Já normalizado em America/Sao_Paulo (mesmo padrão da Força de Vendas).
             'client_created_at' => $clientCreatedAt,
             'received_at' => now(),
         ]);
@@ -735,6 +817,7 @@ class VendasInternasSyncService
             'status' => VendasInternasOrder::STATUS_IMPORTADO,
             'situacao' => VendasInternasOrder::SITUACAO_PENDENTE,
             'payload' => $order,
+            // Já normalizado em America/Sao_Paulo (ou null → fallback received_at).
             'client_created_at' => $clientCreatedAt,
             'received_at' => now(),
         ]);
@@ -746,6 +829,87 @@ class VendasInternasSyncService
                 'forca_vendas_order_id' => $fvOrder->id,
             ],
         );
+    }
+
+    /**
+     * Campos nativos de equipamento do orçamento (os_veiculos + snapshot).
+     * Só aplica quando o push traz os_veiculo_id ou placa/dados de equipamento.
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function atributosEquipamentoOrcamento(array $order, ?int $empresaId): array
+    {
+        if ($empresaId === null || $empresaId <= 0) {
+            return [];
+        }
+
+        // Parametro da empresa: não aceitar vínculo novo pelo app quando desabilitado.
+        if (! EmpresaParametros::vendasInternasHabilitarEquipamento($empresaId)) {
+            return [];
+        }
+
+        $veiculoId = (int) ($order['os_veiculo_id'] ?? 0);
+        $veiculo = null;
+        if ($veiculoId > 0) {
+            $veiculo = OsVeiculo::query()
+                ->where('empresa_id', $empresaId)
+                ->whereKey($veiculoId)
+                ->first();
+            if ($veiculo === null) {
+                throw new \RuntimeException('Equipamento inválido ou de outra empresa.');
+            }
+        }
+
+        $texto = static function (mixed $valor, int $max): ?string {
+            $v = mb_strtoupper(trim((string) ($valor ?? '')), 'UTF-8');
+            if ($v === '') {
+                return null;
+            }
+
+            return mb_strlen($v, 'UTF-8') > $max ? mb_substr($v, 0, $max, 'UTF-8') : $v;
+        };
+
+        $placa = $texto($order['placa'] ?? $veiculo?->placa, 15);
+        $descricao = $texto($order['equipamento_descricao'] ?? $order['descricao_equipamento'] ?? $veiculo?->descricao, 150);
+        $modelo = $texto($order['modelo'] ?? $veiculo?->modelo, 80);
+        $ano = trim((string) ($order['ano'] ?? $veiculo?->anoLista() ?? ''));
+        $cor = $texto($order['cor_veiculo'] ?? $order['cor'] ?? $veiculo?->cor, 40);
+        $chassi = $texto($order['chassi_veiculo'] ?? $order['chassi'] ?? $veiculo?->chassi, 40);
+
+        $temAlgo = $veiculo !== null
+            || $placa !== null
+            || $descricao !== null
+            || $modelo !== null
+            || $ano !== ''
+            || $cor !== null
+            || $chassi !== null
+            || trim((string) ($order['numero_serie'] ?? '')) !== ''
+            || trim((string) ($order['descricao2'] ?? '')) !== ''
+            || trim((string) ($order['km'] ?? '')) !== '';
+
+        if (! $temAlgo) {
+            return [];
+        }
+
+        $kmRaw = $order['km'] ?? null;
+        $km = null;
+        if ($kmRaw !== null && $kmRaw !== '') {
+            $km = is_numeric($kmRaw) ? (int) $kmRaw : null;
+        }
+
+        return [
+            'os_veiculo_id' => $veiculo?->id,
+            'numero_serie' => $texto($order['numero_serie'] ?? null, 60),
+            'descricao' => $descricao,
+            'descricao2' => $texto($order['descricao2'] ?? null, 150),
+            'modelo' => $modelo,
+            'ano' => $ano !== '' ? mb_substr($ano, 0, 10, 'UTF-8') : null,
+            'placa' => $placa,
+            'km' => $km,
+            'cor_veiculo' => $cor,
+            'chassi_veiculo' => $chassi,
+        ];
     }
 
     /**

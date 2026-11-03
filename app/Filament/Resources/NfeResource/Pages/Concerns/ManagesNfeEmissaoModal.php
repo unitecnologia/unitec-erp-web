@@ -35,6 +35,7 @@ use App\Support\Erp\WhatsApp\WhatsAppPhone;
 use App\Support\Erp\WhatsApp\WhatsAppSender;
 use App\Support\Fiscal\FormaPagamentoTPagMap;
 use App\Support\Fiscal\NfeEmissionService;
+use App\Support\Fiscal\RegimeCrtMapper;
 use Filament\Notifications\Notification;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Illuminate\Database\QueryException;
@@ -227,6 +228,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalFaturas = [];
         $this->nfeModalReferencias = [];
         $this->nfeModalTotais = $this->defaultNfeModalTotais();
+        $this->syncNfeAjusteFinalidadeTrackedFromForm();
         $this->nfeModalOpen = true;
         $this->dispatch('erp-nfe-focus-cliente');
     }
@@ -264,6 +266,7 @@ trait ManagesNfeEmissaoModal
         $this->closeNfeCceSucessoOverlay();
         $this->closeNfeCceDispatchModals();
         $this->closeNfeImportModals();
+        $this->closeNfeAjusteModals(revertFinalidade: false);
         $this->nfeItemDeleteConfirmIndex = null;
         $this->fecharNfeModalDescontoItem();
         $this->fecharNfeInfoAdicionaisModal();
@@ -622,6 +625,12 @@ trait ManagesNfeEmissaoModal
                     'total_icms_cofins' => $totais['valor_cofins'],
                     'base_icms_st' => $totais['base_st'],
                     'valor_icms_st' => $totais['valor_st'],
+                    'vfcp' => $totais['valor_fcp'] ?? 0,
+                    'vfcp_st' => $totais['valor_fcp_st'] ?? 0,
+                    'vfcp_st_ret' => $totais['valor_fcp_st_ret'] ?? 0,
+                    'vfcp_uf_dest' => $totais['vfcp_uf_dest'] ?? 0,
+                    'vicms_uf_dest' => $totais['vicms_uf_dest'] ?? 0,
+                    'vicms_uf_remet' => $totais['vicms_uf_remet'] ?? 0,
                     'frete' => $totais['frete'],
                     'seguro' => $totais['seguro'],
                     'outros' => $totais['outras'],
@@ -687,10 +696,32 @@ trait ManagesNfeEmissaoModal
                     'p_red_bc_icms' => $row['p_red_bc_icms'] ?? 0,
                     'mod_bc_icms' => filled($row['mod_bc_icms'] ?? null) ? $row['mod_bc_icms'] : null,
                     'valor_icms' => $row['valor_icms'] ?? 0,
+                    'base_icms_st' => $row['base_icms_st'] ?? 0,
+                    'aliq_icms_st' => $row['aliq_icms_st'] ?? 0,
+                    'valor_icms_st' => $row['valor_icms_st'] ?? 0,
+                    'mod_bc_st' => filled($row['mod_bc_st'] ?? null) ? $row['mod_bc_st'] : null,
+                    'p_mva_st' => $row['p_mva_st'] ?? 0,
+                    'p_red_bc_st' => $row['p_red_bc_st'] ?? 0,
+                    'vfcp' => $row['vfcp'] ?? 0,
+                    'p_fcp' => $row['p_fcp'] ?? 0,
+                    'v_bc_fcp' => $row['v_bc_fcp'] ?? 0,
+                    'v_bc_fcp_st' => $row['v_bc_fcp_st'] ?? 0,
+                    'p_fcp_st' => $row['p_fcp_st'] ?? 0,
+                    'v_fcp_st' => $row['v_fcp_st'] ?? 0,
+                    'base_icms_st_ret' => $row['base_icms_st_ret'] ?? 0,
+                    'p_st_ret' => $row['p_st_ret'] ?? 0,
+                    'valor_icms_st_ret' => $row['valor_icms_st_ret'] ?? 0,
+                    'v_bc_fcp_st_ret' => $row['v_bc_fcp_st_ret'] ?? 0,
+                    'p_fcp_st_ret' => $row['p_fcp_st_ret'] ?? 0,
+                    'v_fcp_st_ret' => $row['v_fcp_st_ret'] ?? 0,
+                    'v_icms_substituto' => $row['v_icms_substituto'] ?? 0,
                     'motivo_desoneracao' => filled($row['motivo_desoneracao'] ?? null) ? $row['motivo_desoneracao'] : null,
                     'base_desoneracao' => $row['base_desoneracao'] ?? 0,
                     'desc_desoneracao' => $row['desc_desoneracao'] ?? 0,
                     'valor_desoneracao' => $row['valor_desoneracao'] ?? 0,
+                    'ind_deduz_deson' => array_key_exists('ind_deduz_deson', $row) && $row['ind_deduz_deson'] !== '' && $row['ind_deduz_deson'] !== null
+                        ? (int) $row['ind_deduz_deson']
+                        : null,
                     'base_ipi' => $row['base_ipi'] ?? 0,
                     'aliq_ipi' => $row['aliq_ipi'] ?? 0,
                     'valor_ipi' => $row['valor_ipi'] ?? 0,
@@ -718,6 +749,10 @@ trait ManagesNfeEmissaoModal
                     'trib_est' => $row['trib_est'] ?? 0,
                     'trib_mun' => $row['trib_mun'] ?? 0,
                     'trib_imp' => $row['trib_imp'] ?? 0,
+                    // DIFAL: preenchido na transmissão (IcmsUfDest::persistir).
+                    'vbcufdest' => $row['vbcufdest'] ?? 0,
+                    'vicmsufdest' => $row['vicmsufdest'] ?? 0,
+                    'vicmsufremet' => $row['vicmsufremet'] ?? 0,
                 ]);
             }
 
@@ -2138,6 +2173,10 @@ trait ManagesNfeEmissaoModal
 
     public function updatedNfeFormMovimento(): void
     {
+        if ($this->nfeAjusteApplyingEstorno ?? false) {
+            return;
+        }
+
         unset($this->naturezaOperacaoOptions);
 
         $options = $this->naturezaOperacaoOptions;
@@ -2283,10 +2322,32 @@ trait ManagesNfeEmissaoModal
             'p_red_bc_icms' => (float) ($item->p_red_bc_icms ?? 0),
             'mod_bc_icms' => $item->mod_bc_icms ?? null,
             'valor_icms' => ErpMoney::formatBr((float) $item->valor_icms, 2),
+            'base_icms_st' => ErpMoney::formatBr((float) ($item->base_icms_st ?? 0), 2),
+            'aliq_icms_st' => ErpMoney::formatBr((float) ($item->aliq_icms_st ?? 0), 2),
+            'valor_icms_st' => ErpMoney::formatBr((float) ($item->valor_icms_st ?? 0), 2),
+            'mod_bc_st' => $item->mod_bc_st ?? null,
+            'p_mva_st' => ErpMoney::formatBr((float) ($item->p_mva_st ?? 0), 4),
+            'p_red_bc_st' => ErpMoney::formatBr((float) ($item->p_red_bc_st ?? 0), 4),
+            'p_fcp' => ErpMoney::formatBr((float) ($item->p_fcp ?? 0), 4),
+            'vfcp' => ErpMoney::formatBr((float) ($item->vfcp ?? 0), 2),
+            'v_bc_fcp' => ErpMoney::formatBr((float) ($item->v_bc_fcp ?? 0), 2),
+            'v_bc_fcp_st' => ErpMoney::formatBr((float) ($item->v_bc_fcp_st ?? 0), 2),
+            'p_fcp_st' => ErpMoney::formatBr((float) ($item->p_fcp_st ?? 0), 4),
+            'v_fcp_st' => ErpMoney::formatBr((float) ($item->v_fcp_st ?? 0), 2),
+            'base_icms_st_ret' => ErpMoney::formatBr((float) ($item->base_icms_st_ret ?? 0), 2),
+            'p_st_ret' => ErpMoney::formatBr((float) ($item->p_st_ret ?? 0), 4),
+            'valor_icms_st_ret' => ErpMoney::formatBr((float) ($item->valor_icms_st_ret ?? 0), 2),
+            'v_icms_substituto' => ErpMoney::formatBr((float) ($item->v_icms_substituto ?? 0), 2),
+            'v_bc_fcp_st_ret' => ErpMoney::formatBr((float) ($item->v_bc_fcp_st_ret ?? 0), 2),
+            'p_fcp_st_ret' => ErpMoney::formatBr((float) ($item->p_fcp_st_ret ?? 0), 4),
+            'v_fcp_st_ret' => ErpMoney::formatBr((float) ($item->v_fcp_st_ret ?? 0), 2),
             'motivo_desoneracao' => $item->motivo_desoneracao ?? '',
             'base_desoneracao' => ErpMoney::formatBr((float) ($item->base_desoneracao ?? 0), 2),
             'desc_desoneracao' => ErpMoney::formatBr((float) ($item->desc_desoneracao ?? 0), 2),
             'valor_desoneracao' => ErpMoney::formatBr((float) ($item->valor_desoneracao ?? 0), 2),
+            'ind_deduz_deson' => $item->ind_deduz_deson === null || $item->ind_deduz_deson === ''
+                ? ''
+                : (string) (int) $item->ind_deduz_deson,
             'aliq_ipi' => ErpMoney::formatBr((float) $item->aliq_ipi, 2),
             'valor_ipi' => ErpMoney::formatBr((float) $item->valor_ipi, 2),
             'aliq_pis_icms' => ErpMoney::formatBr((float) $item->aliq_pis_icms, 2),
@@ -2318,6 +2379,7 @@ trait ManagesNfeEmissaoModal
 
         $this->recalculateNfeTotais();
         $this->syncNfeSelectedRowFotoFromGrid();
+        $this->syncNfeAjusteFinalidadeTrackedFromForm();
         $this->nfeModalOpen = true;
     }
 
@@ -2474,6 +2536,15 @@ trait ManagesNfeEmissaoModal
 
             $this->nfeModalRows[$index][$rowField] = ErpMoney::formatBr(max(0.0, $parte), 2);
         }
+    }
+
+    /** CRT do emitente para exibir campos ST/FCP na grade de impostos. */
+    public function nfeEmissaoCrt(): int
+    {
+        $empresaId = $this->resolveEmpresaId();
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+
+        return RegimeCrtMapper::toCrt($empresa?->regime_tributario ?? 'simples', false);
     }
 
     protected function recalculateNfeTotais(): void

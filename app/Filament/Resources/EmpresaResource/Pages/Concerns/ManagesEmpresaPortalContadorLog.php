@@ -124,9 +124,12 @@ trait ManagesEmpresaPortalContadorLog
 
     public function confirmarEnviarMesPortalContador(): void
     {
-        // Mantém o modal aberto com "Enviando…" até terminar; fecha depois.
-        $this->enviarMesAtualPortalContador();
-        $this->portalContadorEnviarMesConfirmOpen = false;
+        try {
+            $this->enviarMesAtualPortalContador();
+        } finally {
+            // Sempre fecha — inclusive se o envio falhar no meio.
+            $this->portalContadorEnviarMesConfirmOpen = false;
+        }
     }
 
     public function enviarMesAtualPortalContador(): void
@@ -146,7 +149,8 @@ trait ManagesEmpresaPortalContadorLog
         $empresa->refresh();
         $this->reloadPortalContadorFormData($empresa);
 
-        $resultado = app(ContadorCloudMesAtualBackfillService::class)->enviarMesAtual($empresa);
+        // Histórico completo com force: preenche lacunas na nuvem; mesma chave não duplica.
+        $resultado = app(ContadorCloudMesAtualBackfillService::class)->enviarHistoricoCompleto($empresa);
 
         if ($this->portalContadorLogModalOpen) {
             $this->refreshPortalContadorLog();

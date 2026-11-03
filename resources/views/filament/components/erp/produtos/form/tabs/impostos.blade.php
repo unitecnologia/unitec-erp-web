@@ -6,8 +6,8 @@
         <button
             type="button"
             class="erp-pcad-form__btn erp-produtos-impostos__reload-btn"
-            wire:click="applyEmpresaImpostoPadraoToProductForm"
-            title="Restaurar o Imposto Padrão da empresa (substitui os valores atuais desta aba)"
+            wire:click="pedirRestaurarImpostoPadraoProduto"
+            title="Restaurar o Imposto Padrão da empresa (pede confirmação; substitui os valores desta aba)"
         >
             Restaurar padrão
         </button>
@@ -22,7 +22,10 @@
             </div>
             <div class="erp-produtos-impostos__field">
                 <label for="pprod-icms-int-origem">Origem</label>
-                <input id="pprod-icms-int-origem" type="text" wire:model="data.origem" data-mask="integer" maxlength="1" class="erp-pcad-form__input erp-pcad-form__input--tax-xs">
+                <div class="erp-produtos-impostos__origem-row">
+                    <input id="pprod-icms-int-origem" type="text" wire:model="data.origem" data-mask="integer" maxlength="1" class="erp-pcad-form__input erp-pcad-form__input--tax-xs">
+                    @include('filament.components.erp.shared.origem-mercadoria-help')
+                </div>
             </div>
             <div class="erp-produtos-impostos__field">
                 <label for="pprod-icms-int-cst">CST</label>

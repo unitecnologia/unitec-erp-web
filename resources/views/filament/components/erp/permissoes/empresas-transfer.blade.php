@@ -115,13 +115,13 @@
                             <span class="erp-permissoes__transfer-code">{{ $empresa['codigo'] }}</span>
                             <span class="erp-permissoes__transfer-name">{{ $empresa['nome'] }}</span>
                         </button>
-                        <label class="erp-permissoes__transfer-padrao" title="Definir como empresa padrão">
+                        <label class="erp-permissoes__transfer-padrao" title="{{ $empresa['padrao'] ? 'Clique novamente para remover o padrão' : 'Definir como empresa padrão' }}">
                             <input
-                                type="radio"
-                                name="empresa_padrao"
+                                type="checkbox"
                                 value="{{ $empresa['id'] }}"
                                 @checked($empresa['padrao'])
-                                wire:click="definirEmpresaPadrao({{ $empresa['id'] }})"
+                                wire:key="empresa-padrao-{{ $empresa['id'] }}-{{ $empresa['padrao'] ? '1' : '0' }}"
+                                wire:click.prevent="definirEmpresaPadrao({{ $empresa['id'] }})"
                             >
                             <span>{{ $empresa['padrao'] ? 'Padrão' : 'Tornar padrão' }}</span>
                         </label>
@@ -137,6 +137,6 @@
     </div>
 
     <p class="erp-permissoes__empresas-foot">
-        Dica: duplo clique move a empresa. Depois clique em <strong>Salvar empresas</strong>.
+        Dica: duplo clique move a empresa. Clique em <strong>Padrão</strong> para marcar; clique de novo para remover. Depois <strong>Salvar empresas</strong>.
     </p>
 </div>

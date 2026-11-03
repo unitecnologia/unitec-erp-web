@@ -47,7 +47,7 @@
                         <span>Conta</span>
                         <select wire:model="caixaForm.caixa_conta_id">
                             <option value="">Selecione…</option>
-                            @foreach (\App\Models\CaixaConta::query()->where('ativo', true)->orderBy('nome')->get() as $conta)
+                            @foreach (\App\Models\CaixaConta::query()->visiveisNaEmpresa()->where('ativo', true)->orderBy('nome')->get() as $conta)
                                 <option value="{{ $conta->id }}">{{ $conta->nome }}</option>
                             @endforeach
                         </select>

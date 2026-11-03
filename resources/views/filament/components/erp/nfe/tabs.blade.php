@@ -13,12 +13,14 @@
     ];
 
     $statusAtual = filled($this->statusFilter) ? (string) $this->statusFilter : 'todas';
+    $statusCounts = $this->statusTabCounts;
 @endphp
 
 <div
     class="erp-nfe__tabs-wrap erp-list-tabs"
     wire:ignore
     x-data="{ statusAtivo: @js($statusAtual) }"
+    x-on:erp-nfe-status.window="statusAtivo = $event.detail || 'todas'"
 >
     <div class="erp-nfe__tabs">
         @foreach ($statusTabs as $value => $label)
@@ -29,8 +31,11 @@
                     'erp-nfe__tab--' . $value,
                 ])
                 :class="{ 'erp-nfe__tab--active': statusAtivo === @js($value) }"
-                @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.nfe-list-table') || [])[0]; if (t) t.call('setStatusFilter', @js($value))"
-            >{{ $label }}</button>
+                @click="statusAtivo = @js($value); window.dispatchEvent(new CustomEvent('erp-nfe-status', { detail: @js($value) })); const t = (window.Livewire?.getByName?.('erp.nfe-list-table') || [])[0]; if (t) t.call('setStatusFilter', @js($value))"
+            >
+                <span>{{ $label }}</span>
+                <span class="erp-nfe__tab-count" data-erp-nfe-tab-count="{{ $value }}">{{ $statusCounts[$value] ?? '(0)' }}</span>
+            </button>
         @endforeach
     </div>
 </div>

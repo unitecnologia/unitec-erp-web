@@ -90,8 +90,11 @@
 
 .erp-fv-mon__consulta-row {
     display: flex;
-    flex-direction: column;
-    gap: calc(0.4rem - 1mm);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: calc(0.4rem - 1mm) 0.75rem;
     margin-top: 0;
 }
 
@@ -100,6 +103,30 @@
     flex-wrap: nowrap;
     align-items: flex-end;
     gap: 0.15rem 0.55rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Identificação da empresa ativa (somente leitura) — canto direito da barra */
+.erp-fv-mon__loja {
+    flex: 0 1 auto;
+    margin-left: auto;
+    max-width: min(28rem, 42vw);
+    padding: 0.2rem 0 0.35rem 0.5rem;
+    text-align: right;
+    min-width: 0;
+}
+
+.erp-fv-mon__loja-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--erp-font-size-sm, 0.875rem);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--erp-text, #0f172a);
+    line-height: 1.25;
 }
 
 .erp-fv-mon__toggles {
@@ -895,6 +922,22 @@
    Como há muitas colunas, liberamos rolagem horizontal. ---- */
 .erp-list-page.erp-fv-monitor-page .fi-ta-content-ctn {
     overflow-x: auto !important;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.erp-list-page.erp-fv-monitor-page .fi-ta-content-ctn::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+}
+
+.erp-list-page.erp-fv-monitor-page .fi-ta-content-ctn::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+.erp-list-page.erp-fv-monitor-page .fi-ta-content-ctn::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .erp-list-page.erp-fv-monitor-page .fi-ta-table {
@@ -1072,9 +1115,13 @@
     min-height: 0 !important;
 }
 
-/* Rodapé de paginação 1mm mais baixo */
+/* Rodapé de paginação compacto */
 .erp-list-page.erp-fv-monitor-page .fi-pagination {
     padding: calc(0.35rem - 0.5mm) 0.5rem !important;
+}
+
+.erp-list-page.erp-fv-monitor-page .fi-pagination-item-label {
+    font-size: 0.95rem !important;
 }
 
 /* ---- Barra de ações (mesmo padrão compacto do Orçamento/NF-e) ---- */
@@ -1330,6 +1377,80 @@
 .erp-fv-monitor-page .erp-fv-mon-money-cell--bold .erp-fv-mon-money,
 .erp-fv-monitor-page .fi-ta-cell-total .erp-fv-mon-money {
     font-weight: 700;
+}
+
+/* Totais discretos na barra de paginação (sem mudar cor da linha), alinhados às colunas. */
+.erp-fv-monitor-page .erp-fv-mon-totais-src {
+    display: none !important;
+}
+
+.erp-list-page.erp-fv-monitor-page .fi-pagination {
+    position: relative !important;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.12rem;
+    min-height: 1.1rem;
+    max-height: 1.25rem;
+    padding: 0.02rem 0.28rem;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid #b7c7d9;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: auto;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box .erp-fv-mon-money {
+    width: 100%;
+    gap: 0.12rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--desc {
+    border-color: #e8b4b4;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--desc .erp-fv-mon-money,
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--desc .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--desc .erp-fv-mon-money__amount {
+    color: #b91c1c !important;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--acre {
+    border-color: #a7e3bf;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--acre .erp-fv-mon-money,
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--acre .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--acre .erp-fv-mon-money__amount {
+    color: #15803d !important;
+}
+
+.erp-fv-monitor-page .fi-pagination .erp-fv-mon-totais__box--liq {
+    font-weight: 800;
 }
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__currency,

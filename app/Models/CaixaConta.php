@@ -2,19 +2,32 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpContext;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 #[Fillable([
+    'empresa_id',
     'codigo',
     'nome',
     'tipo',
     'situacao',
     'ativo',
     'sistema',
+    'banco_codigo',
+    'banco_nome',
+    'agencia',
+    'agencia_dv',
+    'conta_numero',
+    'conta_dv',
+    'conta_tipo_bancaria',
+    'titular_nome',
+    'titular_documento',
     'ultimo_usuario_id',
 ])]
 class CaixaConta extends Model
@@ -39,36 +52,113 @@ class CaixaConta extends Model
 
     public const SITUACAO_FECHADO = 'fechado';
 
+    public const CONTA_CORRENTE = 'CORRENTE';
+
+    public const CONTA_POUPANCA = 'POUPANCA';
+
     protected $table = 'caixa_contas';
 
     /**
+     * Contas visíveis na empresa: compartilhadas (empresa_id nulo) + exclusivas da empresa.
+     */
+    public function scopeVisiveisNaEmpresa(Builder $query, ?int $empresaId = null): Builder
+    {
+        if (! Schema::hasColumn($this->getTable(), 'empresa_id')) {
+            return $query;
+        }
+
+        $empresaId = $empresaId ?: (int) (ErpContext::currentEmpresaId() ?? 0);
+
+        if ($empresaId <= 0) {
+            return $query->whereNull($this->getTable().'.empresa_id');
+        }
+
+        return $query->where(function (Builder $builder) use ($empresaId): void {
+            $builder
+                ->whereNull($this->getTable().'.empresa_id')
+                ->orWhere($this->getTable().'.empresa_id', $empresaId);
+        });
+    }
+
+    public function pertenceOuCompartilhadaCom(?int $empresaId): bool
+    {
+        if (! Schema::hasColumn($this->getTable(), 'empresa_id')) {
+            return true;
+        }
+
+        $contaEmpresa = $this->empresa_id !== null ? (int) $this->empresa_id : null;
+        if ($contaEmpresa === null) {
+            return true;
+        }
+
+        $empresaId = $empresaId ?: (int) (ErpContext::currentEmpresaId() ?? 0);
+
+        return $empresaId > 0 && $contaEmpresa === $empresaId;
+    }
+
+    public function isContaBancaria(): bool
+    {
+        return (string) $this->tipo === self::TIPO_BANCO;
+    }
+
+    public function temDadosBancarios(): bool
+    {
+        foreach ([
+            'banco_codigo',
+            'banco_nome',
+            'agencia',
+            'agencia_dv',
+            'conta_numero',
+            'conta_dv',
+            'conta_tipo_bancaria',
+            'titular_nome',
+            'titular_documento',
+        ] as $campo) {
+            if (trim((string) ($this->{$campo} ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Destino do Livro Caixa (regra global):
-     * 1) conta selecionada válida e ativa
-     * 2) conta de destino da forma, se ativa
+     * 1) conta selecionada válida, ativa e visível na empresa
+     * 2) conta de destino da forma, se ativa e visível
      * 3) CAIXA GERAL padrão
-     *
-     * Conta explicitamente selecionada e inválida/inativa → erro (não redireciona em silêncio).
      *
      * @throws \InvalidArgumentException
      */
     public static function resolverDestinoLivroCaixa(?int $selecionadaId = null, ?int $contaDestinoFormaId = null): int
     {
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
         $selecionadaId = (int) ($selecionadaId ?? 0);
 
         if ($selecionadaId > 0) {
-            if (! self::query()->whereKey($selecionadaId)->where('ativo', true)->exists()) {
+            $conta = self::query()
+                ->visiveisNaEmpresa($empresaId > 0 ? $empresaId : null)
+                ->whereKey($selecionadaId)
+                ->where('ativo', true)
+                ->first();
+
+            if (! $conta) {
                 throw new \InvalidArgumentException(
-                    'A conta de caixa selecionada é inválida ou está inativa.'
+                    'A conta de caixa selecionada é inválida, inativa ou de outra empresa.'
                 );
             }
 
-            return $selecionadaId;
+            return (int) $conta->id;
         }
 
         $destinoId = (int) ($contaDestinoFormaId ?? 0);
 
         if ($destinoId > 0) {
-            $destino = self::query()->whereKey($destinoId)->where('ativo', true)->first();
+            $destino = self::query()
+                ->visiveisNaEmpresa($empresaId > 0 ? $empresaId : null)
+                ->whereKey($destinoId)
+                ->where('ativo', true)
+                ->first();
 
             if ($destino) {
                 return (int) $destino->id;
@@ -94,6 +184,7 @@ class CaixaConta extends Model
                 'ativo' => true,
                 'sistema' => true,
                 'nome' => self::NOME_CAIXA_GERAL,
+                'empresa_id' => null,
             ]);
 
             if ($conta->isDirty()) {
@@ -116,6 +207,7 @@ class CaixaConta extends Model
             'situacao' => self::SITUACAO_ABERTO,
             'ativo' => true,
             'sistema' => true,
+            'empresa_id' => null,
         ]);
     }
 
@@ -135,6 +227,31 @@ class CaixaConta extends Model
             self::TIPO_PDV => 'PDV',
             self::TIPO_SUBCAIXA => 'SUBCAIXA',
             self::TIPO_COFRE => 'COFRE',
+        ];
+    }
+
+    /**
+     * Tipos selecionáveis na UI quando NÃO é conta bancária.
+     *
+     * @return array<string, string>
+     */
+    public static function tipoLabelsOperacionais(): array
+    {
+        return [
+            self::TIPO_PDV => 'PDV',
+            self::TIPO_SUBCAIXA => 'SUBCAIXA',
+            self::TIPO_COFRE => 'COFRE',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function contaTipoBancariaLabels(): array
+    {
+        return [
+            self::CONTA_CORRENTE => 'CORRENTE',
+            self::CONTA_POUPANCA => 'POUPANÇA',
         ];
     }
 
@@ -170,6 +287,11 @@ class CaixaConta extends Model
     public function situacaoLabel(): string
     {
         return self::situacaoLabels()[$this->situacao] ?? mb_strtoupper((string) $this->situacao, 'UTF-8');
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
     }
 
     public function lancamentos(): HasMany
@@ -269,6 +391,7 @@ class CaixaConta extends Model
             'situacao' => self::SITUACAO_ABERTO,
             'ativo' => true,
             'sistema' => false,
+            'empresa_id' => null,
         ]);
     }
 
@@ -277,6 +400,7 @@ class CaixaConta extends Model
         return [
             'ativo' => 'boolean',
             'sistema' => 'boolean',
+            'empresa_id' => 'integer',
         ];
     }
 }

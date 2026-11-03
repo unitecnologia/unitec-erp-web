@@ -134,6 +134,7 @@ class ListFormasPagamento extends ListRecords
     public function contaDestinoOptions(): array
     {
         return CaixaConta::query()
+            ->visiveisNaEmpresa()
             ->where('ativo', true)
             ->orderBy('nome')
             ->pluck('nome', 'id')
@@ -194,6 +195,7 @@ class ListFormasPagamento extends ListRecords
             'aparece_venda' => $record->aparece_venda,
             'aparece_contas_receber' => $record->aparece_contas_receber,
             'nfce' => $record->nfce,
+            'nao_pagar_comissao' => (bool) ($record->nao_pagar_comissao ?? false),
             'disponivel_mobile' => $record->disponivel_mobile,
             'gerar_qrcode_pdv' => (bool) ($record->gerar_qrcode_pdv ?? false),
             'parcelas' => $this->normalizeParcelas($record->parcelas ?? []),
@@ -261,10 +263,15 @@ class ListFormasPagamento extends ListRecords
             'aparece_venda' => (bool) ($this->form['aparece_venda'] ?? false),
             'aparece_contas_receber' => (bool) ($this->form['aparece_contas_receber'] ?? false),
             'nfce' => (bool) ($this->form['nfce'] ?? false),
+            'nao_pagar_comissao' => (bool) ($this->form['nao_pagar_comissao'] ?? false),
             'disponivel_mobile' => (bool) ($this->form['disponivel_mobile'] ?? false),
             'gerar_qrcode_pdv' => (bool) ($this->form['gerar_qrcode_pdv'] ?? false),
             'parcelas' => $this->normalizeParcelas($this->form['parcelas'] ?? []),
         ];
+
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'nao_pagar_comissao')) {
+            unset($payload['nao_pagar_comissao']);
+        }
 
         if (\Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'modo_prazo')) {
             $payload['modo_prazo'] = FormaPagamento::normalizeModoPrazo(
@@ -394,6 +401,7 @@ class ListFormasPagamento extends ListRecords
             'aparece_venda' => true,
             'aparece_contas_receber' => false,
             'nfce' => false,
+            'nao_pagar_comissao' => false,
             'disponivel_mobile' => false,
             'gerar_qrcode_pdv' => false,
             'parcelas' => [],

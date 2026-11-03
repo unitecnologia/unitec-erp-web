@@ -5,11 +5,14 @@ namespace App\Livewire\Erp;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\Nfce\NfceEmpresaEscopo;
+use App\Support\Erp\Nfce\NfceListDavNumero;
+use App\Support\Erp\Nfce\NfceListPeriodo;
 use App\Support\Erp\Nfce\NfceListRowFormatter;
 use App\Support\Fiscal\NfceNumeracao;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DbSchema;
 use Livewire\Attributes\On;
@@ -46,7 +49,8 @@ class NfceListTable extends Component
     public ?int $highlightedRecordId = null;
 
     /**
-     * Troca de aba: 1 request só na grade (+ total via JS). Sem re-render do Filament pai.
+     * Troca de aba: 1 request só na grade. Sem re-render do Filament pai.
+     * Rodapé (totais do período) é responsabilidade exclusiva do ListNfces — não sobrescrever via JS.
      */
     public function setStatusFilter(string $filter): void
     {
@@ -63,12 +67,9 @@ class NfceListTable extends Component
         $this->highlightedRecordId = null;
         $this->resetPage();
 
-        $total = $this->computeFilteredTotal();
-
         $this->js(sprintf(
             '(() => {
                 const status = %s;
-                const totalLabel = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
@@ -86,10 +87,6 @@ class NfceListTable extends Component
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
                 window.dispatchEvent(new CustomEvent("erp-nfce-status", { detail: status }));
-                const totalEl = document.querySelector(".erp-nfce-page .erp-nfe__total-value");
-                if (totalEl) totalEl.textContent = totalLabel;
-                const chave = document.querySelector(".erp-nfce-page .erp-nfe__chave-input--readonly");
-                if (chave) chave.value = "";
                 document.querySelectorAll(".erp-nfce-page .fi-ta-row.erp-row-selected").forEach((row) => {
                     row.classList.remove("erp-row-selected");
                 });
@@ -97,7 +94,6 @@ class NfceListTable extends Component
                 if (aviso) aviso.remove();
             })()',
             json_encode($normalized, JSON_UNESCAPED_UNICODE),
-            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode(self::PARENT_NAME, JSON_UNESCAPED_UNICODE),
         ));
     }
@@ -160,6 +156,11 @@ class NfceListTable extends Component
         $this->dispatch('erp-nfce-toggle-transmit', id: $id);
     }
 
+    public function openHistorico(int $id): void
+    {
+        $this->dispatch('erp-nfce-open-historico', id: $id);
+    }
+
     public function baixarXmlInutilizacao(int $id): void
     {
         $this->js(sprintf(
@@ -175,9 +176,12 @@ class NfceListTable extends Component
 
     public function render(): View
     {
+        $records = $this->records();
+
         return view('livewire.erp.nfce-list-table', [
-            'records' => $this->records(),
+            'records' => $records,
             'formatter' => app(NfceListRowFormatter::class),
+            'davComercialPorPdvVendaId' => NfceListDavNumero::aquecer($records->items()),
             'showSituacao' => $this->showsSituacaoColumn(),
             'isContingenciaTab' => $this->statusFilter === PdvVendaNfce::TAB_CONTINGENCIA,
             'inutilizacoesFaixas' => $this->inutilizacoesFaixas(),
@@ -189,16 +193,25 @@ class NfceListTable extends Component
         $query = $this->buildListQuery();
         $this->applySort($query);
 
-        return $query->paginate($this->perPage);
-    }
+        // Um único COUNT: se zerado, não dispara o SELECT ordenado do período vazio.
+        $total = (clone $query)->toBase()->getCountForPagination();
+        $page = max(1, (int) $this->getPage());
 
-    protected function computeFilteredTotal(): float
-    {
-        $table = (new PdvVendaNfce)->getTable();
+        if ($total === 0) {
+            return new Paginator([], 0, $this->perPage, $page, [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ]);
+        }
 
-        return (float) $this->buildFilterQuery()
-            ->join('pdv_vendas as pv_total', 'pv_total.id', '=', "{$table}.pdv_venda_id")
-            ->sum('pv_total.total');
+        $items = $query
+            ->forPage($page, $this->perPage)
+            ->get();
+
+        return new Paginator($items, $total, $this->perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+            'pageName' => 'page',
+        ]);
     }
 
     /**
@@ -250,20 +263,17 @@ class NfceListTable extends Component
         $table = (new PdvVendaNfce)->getTable();
         $query = PdvVendaNfce::query();
 
-        NfceEmpresaEscopo::aplicar($query, NfceEmpresaEscopo::empresaIdAtiva());
+        // Período primeiro: FROM parte de pdv_vendas (STRAIGHT_JOIN) + fechado_em sargável.
+        NfceListPeriodo::aplicar(
+            $query,
+            $table,
+            $this->periodoDeApplied,
+            $this->periodoAteApplied,
+        );
+        NfceEmpresaEscopo::aplicarNaListagem($query, NfceEmpresaEscopo::empresaIdAtiva());
 
         $query->whereIn("{$table}.status", PdvVendaNfce::statusesForTab($this->statusFilter));
         PdvVendaNfce::excluirSimuladasForaTransmitidos($query, $this->statusFilter);
-
-        if (filled($this->periodoDeApplied)) {
-            $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda
-                ->whereDate('fechado_em', '>=', $this->periodoDeApplied));
-        }
-
-        if (filled($this->periodoAteApplied)) {
-            $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda
-                ->whereDate('fechado_em', '<=', $this->periodoAteApplied));
-        }
 
         if (filled($this->chaveFilterApplied)) {
             $digits = preg_replace('/\D/', '', $this->chaveFilterApplied) ?? '';
@@ -295,6 +305,7 @@ class NfceListTable extends Component
                 "{$table}.protocolo",
                 "{$table}.status",
                 "{$table}.simulada",
+                "{$table}.operacao",
                 "{$table}.motivo_rejeicao",
                 "{$table}.motivo_contingencia",
             ])
@@ -310,6 +321,7 @@ class NfceListTable extends Component
                         'fechado_em',
                         'cpf_nota',
                         'nome_nota',
+                        'subtotal',
                         'acrescimo',
                         'desconto',
                         'numero',
@@ -350,7 +362,13 @@ class NfceListTable extends Component
                 $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
                     ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));
             }),
-            'caixa' => $query->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like)),
+            'caixa' => $query->where(function (Builder $outer) use ($like, $table): void {
+                $termCaixa = mb_strtoupper(trim($like, '%'), 'UTF-8');
+                $outer->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like));
+                if ($termCaixa !== '' && str_contains('CAIXA GERAL', $termCaixa)) {
+                    $outer->orWhere("{$table}.operacao", NfceListDavNumero::OPERACAO_SCV_HIST);
+                }
+            }),
             'usuario' => $query->whereHas('pdvVenda.user', fn (Builder $user): Builder => $user->where('name', 'like', $like)),
             'vendedor' => $query->where(function (Builder $outer) use ($like): void {
                 $outer->whereHas('pdvVenda.vendedor', fn (Builder $vendedor): Builder => $vendedor->where('nome', 'like', $like))

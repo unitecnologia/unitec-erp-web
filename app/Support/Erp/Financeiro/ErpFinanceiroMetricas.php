@@ -8,6 +8,7 @@ use App\Models\CaixaLancamento;
 use App\Models\ContaPagar;
 use App\Models\ContaReceber;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Financeiro\CaixaTransferencia;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -249,6 +250,7 @@ final class ErpFinanceiroMetricas
                 ->whereDate('emissao', $day->toDateString());
 
             self::applyCaixaEscopo($q, null, $empresaScope);
+            CaixaTransferencia::excluirDoQuery($q);
 
             $row = $q
                 ->selectRaw('COALESCE(SUM(entrada), 0) as entradas, COALESCE(SUM(saida), 0) as saidas')
@@ -287,6 +289,7 @@ final class ErpFinanceiroMetricas
                 ->groupByRaw('DATE(emissao)');
 
             self::applyCaixaEscopo($q, null, $empresaScope);
+            CaixaTransferencia::excluirDoQuery($q);
 
             $out = [];
             foreach ($q->get() as $row) {
@@ -339,6 +342,7 @@ final class ErpFinanceiroMetricas
                 ->whereDate('emissao', '<=', $globalFim->toDateString());
 
             self::applyCaixaEscopo($q, null, $empresaScope);
+            CaixaTransferencia::excluirDoQuery($q);
 
             $row = $q->selectRaw(implode(', ', $selectParts))->first();
 
@@ -371,6 +375,7 @@ final class ErpFinanceiroMetricas
                 ->whereDate('emissao', '<=', $to->toDateString());
 
             self::applyCaixaEscopo($q, null, $empresaScope);
+            CaixaTransferencia::excluirDoQuery($q);
 
             return round((float) $q->sum($campo), 2);
         } catch (Throwable) {
@@ -414,6 +419,7 @@ final class ErpFinanceiroMetricas
                 ->whereDate('emissao', '<=', $mesAte);
 
             self::applyCaixaEscopo($q, null, $empresaScope);
+            CaixaTransferencia::excluirDoQuery($q);
 
             $row = $q
                 ->selectRaw(

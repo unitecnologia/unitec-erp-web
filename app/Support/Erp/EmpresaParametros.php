@@ -117,6 +117,11 @@ final class EmpresaParametros
                 'hint' => 'Marcado: PDV disponível na retaguarda. Desmarcado: ícone some; use o PDV offline.',
                 'default' => true,
             ],
+            'param_geral_mostrar_dashboard_inicial' => [
+                'label' => 'Mostrar Dashboard na tela inicial',
+                'hint' => 'Marcado: exibe indicadores e gráficos na tela inicial. Desmarcado: exibe a logomarca da empresa, sem carregar o Dashboard.',
+                'default' => true,
+            ],
 
             'param_fiscal_puxar_cfop_produto' => ['label' => 'Puxar CFOP do Produto', 'default' => false],
             'param_fiscal_bloquear_cancelamento_doc' => ['label' => 'Bloquear Cancelamento Venda com Documento Fiscal Emitido', 'default' => true],
@@ -131,6 +136,24 @@ final class EmpresaParametros
                 'label' => 'Permitir visualizar todos os clientes',
                 'hint' => 'Marcado: no Força de Vendas cada vendedor sincroniza todos os clientes e pode vender para qualquer um. Desmarcado: só a carteira (Vendedor Força de Vendas na Pessoa).',
                 'default' => false,
+            ],
+
+            'param_vendas_internas_fechar_orcamento_auto' => [
+                'label' => 'Fechar automaticamente os orçamentos enviados pelo aplicativo',
+                'hint' => 'Marcado: orçamentos do App Vendas Internas chegam com status Fechado (prontos para importar no PDV). Desmarcado: chegam Abertos (comportamento atual). Não fatura nem movimenta estoque/financeiro.',
+                'default' => false,
+            ],
+
+            'param_vendas_internas_permitir_compartilhar' => [
+                'label' => 'Permitir compartilhar por WhatsApp e e-mail',
+                'hint' => 'Marcado: o App Vendas Internas oferece a opção de compartilhar pedidos e orçamentos por WhatsApp e e-mail (após o envio e no histórico). Desmarcado: oculta o compartilhamento e não gera PDF para envio.',
+                'default' => true,
+            ],
+
+            'param_vendas_internas_habilitar_equipamento' => [
+                'label' => 'Habilitar equipamento no aplicativo',
+                'hint' => 'Marcado: o App Vendas Internas exibe o botão Equipamento na Nova Venda (pesquisa, cadastro e consulta de placa). Desmarcado: oculta o botão e bloqueia novos vínculos de equipamento pelo aplicativo.',
+                'default' => true,
             ],
 
             'param_monitor_vendas_escolher_empresa_emitente_nfe' => [
@@ -162,6 +185,12 @@ final class EmpresaParametros
 
     public const DESCONTO_REAIS_ITEM_LINHA = 'linha';
 
+    public const VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO = 'orcamento_e_pedido';
+
+    public const VI_TIPOS_VENDA_SOMENTE_ORCAMENTO = 'somente_orcamento';
+
+    public const VI_TIPOS_VENDA_SOMENTE_PEDIDO = 'somente_pedido';
+
     /**
      * Como o app Força de Vendas interpreta o desconto em R$ do item.
      * Não altera o modo %.
@@ -186,6 +215,136 @@ final class EmpresaParametros
         return $valor === self::DESCONTO_REAIS_ITEM_LINHA
             ? self::DESCONTO_REAIS_ITEM_LINHA
             : self::DESCONTO_REAIS_ITEM_UNITARIO;
+    }
+
+    /**
+     * Tipos de venda permitidos no App Vendas Internas (seleção exclusiva).
+     *
+     * @return array{label: string, hint: string, default: string, options: array<string, string>}
+     */
+    public static function vendasInternasTiposVendaField(): array
+    {
+        return [
+            'label' => 'Tipos de venda permitidos no aplicativo',
+            'hint' => 'Define quais botões de envio aparecem no App Vendas Internas. O backend rejeita o tipo não permitido mesmo em versões antigas do app.',
+            'default' => self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO,
+            'options' => [
+                self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO => 'ORÇAMENTO E PEDIDO',
+                self::VI_TIPOS_VENDA_SOMENTE_ORCAMENTO => 'SOMENTE ORÇAMENTO',
+                self::VI_TIPOS_VENDA_SOMENTE_PEDIDO => 'SOMENTE PEDIDO',
+            ],
+        ];
+    }
+
+    public static function normalizarVendasInternasTiposVenda(mixed $valor): string
+    {
+        $valor = is_string($valor) ? mb_strtolower(trim($valor), 'UTF-8') : '';
+
+        return match ($valor) {
+            self::VI_TIPOS_VENDA_SOMENTE_ORCAMENTO,
+            self::VI_TIPOS_VENDA_SOMENTE_PEDIDO => $valor,
+            default => self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO,
+        };
+    }
+
+    public static function vendasInternasTiposVenda(?int $empresaId): string
+    {
+        $default = self::vendasInternasTiposVendaField()['default'];
+
+        if (! $empresaId || $empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_vendas_internas_tipos_venda')) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_vendas_internas_tipos_venda');
+
+        return self::normalizarVendasInternasTiposVenda($valor);
+    }
+
+    public static function vendasInternasPermiteOrcamento(?int $empresaId): bool
+    {
+        $tipos = self::vendasInternasTiposVenda($empresaId);
+
+        return $tipos === self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO
+            || $tipos === self::VI_TIPOS_VENDA_SOMENTE_ORCAMENTO;
+    }
+
+    public static function vendasInternasPermitePedido(?int $empresaId): bool
+    {
+        $tipos = self::vendasInternasTiposVenda($empresaId);
+
+        return $tipos === self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO
+            || $tipos === self::VI_TIPOS_VENDA_SOMENTE_PEDIDO;
+    }
+
+    /**
+     * Payload de configuração do App Vendas Internas (login/me/pull).
+     *
+     * @return array{tipos_venda: string, permite_orcamento: bool, permite_pedido: bool, fechar_orcamento_auto: bool, permitir_compartilhar: bool, habilitar_equipamento: bool}
+     */
+    public static function vendasInternasAppConfig(?int $empresaId): array
+    {
+        $tipos = self::vendasInternasTiposVenda($empresaId);
+
+        return [
+            'tipos_venda' => $tipos,
+            'permite_orcamento' => $tipos === self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO
+                || $tipos === self::VI_TIPOS_VENDA_SOMENTE_ORCAMENTO,
+            'permite_pedido' => $tipos === self::VI_TIPOS_VENDA_ORCAMENTO_E_PEDIDO
+                || $tipos === self::VI_TIPOS_VENDA_SOMENTE_PEDIDO,
+            'fechar_orcamento_auto' => self::vendasInternasFecharOrcamentoAuto($empresaId),
+            'permitir_compartilhar' => self::vendasInternasPermitirCompartilhar($empresaId),
+            'habilitar_equipamento' => self::vendasInternasHabilitarEquipamento($empresaId),
+        ];
+    }
+
+    /**
+     * App Vendas Internas pode oferecer compartilhamento por WhatsApp/e-mail.
+     */
+    public static function vendasInternasPermitirCompartilhar(?int $empresaId): bool
+    {
+        $default = (bool) (self::permissionFields()['param_vendas_internas_permitir_compartilhar']['default'] ?? true);
+
+        if (! $empresaId || $empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_vendas_internas_permitir_compartilhar')) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_vendas_internas_permitir_compartilhar');
+
+        return $valor === null ? $default : (bool) $valor;
+    }
+
+    /**
+     * App Vendas Internas exibe Equipamento na Nova Venda.
+     */
+    public static function vendasInternasHabilitarEquipamento(?int $empresaId): bool
+    {
+        $default = (bool) (self::permissionFields()['param_vendas_internas_habilitar_equipamento']['default'] ?? true);
+
+        if (! $empresaId || $empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_vendas_internas_habilitar_equipamento')) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_vendas_internas_habilitar_equipamento');
+
+        return $valor === null ? $default : (bool) $valor;
     }
 
     /**
@@ -1403,6 +1562,7 @@ final class EmpresaParametros
             'geral' => 'Ajustes Gerais',
             'fiscal' => 'Ajustes Fiscais',
             'forca_vendas' => 'Força de Vendas',
+            'vendas_internas' => 'Vendas Internas',
             'monitor_vendas' => 'Monitor de vendas',
         ];
     }
@@ -1424,11 +1584,37 @@ final class EmpresaParametros
             return 'forca_vendas';
         }
 
+        if (str_starts_with($field, 'param_vendas_internas_')) {
+            return 'vendas_internas';
+        }
+
         if (str_starts_with($field, 'param_monitor_vendas_')) {
             return 'monitor_vendas';
         }
 
         return 'fiscal';
+    }
+
+    /**
+     * Orçamentos do App Vendas Internas já nascem Fechados (importáveis no PDV).
+     */
+    public static function vendasInternasFecharOrcamentoAuto(?int $empresaId): bool
+    {
+        $default = (bool) (self::permissionFields()['param_vendas_internas_fechar_orcamento_auto']['default'] ?? false);
+
+        if (! $empresaId || $empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_vendas_internas_fechar_orcamento_auto')) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_vendas_internas_fechar_orcamento_auto');
+
+        return $valor === null ? $default : (bool) $valor;
     }
 
     /**
@@ -1501,6 +1687,7 @@ final class EmpresaParametros
         }
 
         $defaults['param_monitor_vendas_desconto_reais_item_modo'] = self::monitorVendasDescontoReaisItemModoField()['default'];
+        $defaults['param_vendas_internas_tipos_venda'] = self::vendasInternasTiposVendaField()['default'];
 
         foreach (self::moduleEnableFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
@@ -1921,5 +2108,31 @@ final class EmpresaParametros
             'estoques' => 'Cadastro de Estoque',
             'sistema' => 'Atualização e Backup',
         ];
+    }
+
+    /**
+     * Exibe o Dashboard na tela inicial (por empresa).
+     * Null / coluna ausente → default do catálogo (true).
+     */
+    public static function mostrarDashboardInicial(?Empresa $empresa = null): bool
+    {
+        $empresa ??= ErpContext::currentEmpresa();
+        $default = (bool) (self::permissionFields()['param_geral_mostrar_dashboard_inicial']['default'] ?? true);
+
+        if ($empresa === null) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_geral_mostrar_dashboard_inicial')) {
+            return $default;
+        }
+
+        $raw = $empresa->getRawOriginal('param_geral_mostrar_dashboard_inicial');
+
+        if ($raw === null) {
+            return $default;
+        }
+
+        return (bool) $raw;
     }
 }

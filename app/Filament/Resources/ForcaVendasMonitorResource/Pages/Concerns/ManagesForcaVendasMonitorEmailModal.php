@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ForcaVendasMonitorResource\Pages\Concerns;
 
+use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Models\ForcaVendasOrder;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\ErpContext;
@@ -57,7 +58,7 @@ trait ManagesForcaVendasMonitorEmailModal
             return;
         }
 
-        $order = ForcaVendasOrder::query()
+        $order = ForcaVendasMonitorResource::ordersQuery()
             ->with(['cliente', 'pedido'])
             ->find($orderId);
 
@@ -103,7 +104,7 @@ trait ManagesForcaVendasMonitorEmailModal
             return;
         }
 
-        $order = ForcaVendasOrder::query()
+        $order = ForcaVendasMonitorResource::ordersQuery()
             ->with(['cliente', 'pedido', 'venda.nfes', 'venda.pdvVenda.nfce'])
             ->find($this->emailOrderId);
 
@@ -319,7 +320,7 @@ trait ManagesForcaVendasMonitorEmailModal
             ->send();
 
         $order = $this->emailOrderId
-            ? ForcaVendasOrder::query()->find($this->emailOrderId)
+            ? ForcaVendasMonitorResource::ordersQuery()->find($this->emailOrderId)
             : null;
 
         if ($order instanceof ForcaVendasOrder) {
@@ -422,7 +423,7 @@ trait ManagesForcaVendasMonitorEmailModal
             ->send();
 
         $order = $this->emailOrderId
-            ? ForcaVendasOrder::query()->find($this->emailOrderId)
+            ? ForcaVendasMonitorResource::ordersQuery()->find($this->emailOrderId)
             : null;
 
         if ($order instanceof ForcaVendasOrder) {

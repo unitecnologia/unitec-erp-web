@@ -53,6 +53,7 @@ class MovimentoCaixaReport extends AbstractTabularReport
     public function filterFields(): array
     {
         $contas = ['todos' => 'Todas'] + CaixaConta::query()
+            ->visiveisNaEmpresa()
             ->orderBy('nome')
             ->pluck('nome', 'id')
             ->mapWithKeys(fn ($nome, $id): array => [(string) $id => (string) $nome])

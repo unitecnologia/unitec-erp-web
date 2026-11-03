@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Empresa;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\Reports\Tabular\ChartableTabularReport;
+use App\Support\Erp\Reports\Tabular\ExpandableTabularReport;
 use App\Support\Erp\Reports\Tabular\ReportRegistry;
 use App\Support\Erp\Reports\Tabular\TabularReportDefinition;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -62,6 +63,10 @@ class TabularReportController extends Controller
             'supportsChart' => $supportsChart,
             'chartConfig' => $supportsChart ? $report->chartConfig() : null,
             'chartDataUrl' => $supportsChart ? route('erp.reports.tabular.chart', ['slug' => $slug]) : null,
+            'supportsRowExpand' => $report instanceof ExpandableTabularReport,
+            'detailsUrl' => $report instanceof ExpandableTabularReport
+                ? route('erp.reports.tabular.details', ['slug' => $slug])
+                : null,
         ];
 
         if ($request->boolean('pdf')) {
@@ -86,6 +91,17 @@ class TabularReportController extends Controller
         abort_unless($report instanceof ChartableTabularReport, 404);
 
         return response()->json($report->chartData($request));
+    }
+
+    public function details(Request $request, string $slug): JsonResponse
+    {
+        abort_unless(ReportRegistry::has($slug), 404);
+
+        $report = ReportRegistry::make($slug);
+        abort_unless(ErpAccess::currentCan($report->permission()), 403);
+        abort_unless($report instanceof ExpandableTabularReport, 404);
+
+        return response()->json($report->expandDetails($request));
     }
 
     /**

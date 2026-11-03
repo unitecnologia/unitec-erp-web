@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Financeiro\CaixaAbertoGuard;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
@@ -279,6 +280,11 @@ final class PdvCaixaFechamentoService
         if (CaixaLancamento::query()->where('documento', $documento)->exists()) {
             return null;
         }
+
+        app(CaixaAbertoGuard::class)->assertPodeLancarNaConta(
+            $contaId,
+            $empresaId ? (int) $empresaId : null,
+        );
 
         $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),

@@ -57,6 +57,7 @@
 
 @include('filament.components.erp.empresas.form.zerar-estoque-negativo-modal')
 @include('filament.components.erp.empresas.form.imposto-padrao-apply-modal')
+@include('filament.components.erp.empresas.form.imposto-padrao-regime-modal')
 @include('filament.components.erp.empresas.form.portal-contador-log-modal')
 @include('filament.components.erp.empresas.form.cclass-trib-modal')
 @include('filament.components.erp.empresas.form.ipbtax-modal')

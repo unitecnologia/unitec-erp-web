@@ -5,10 +5,12 @@ namespace App\Livewire\Erp;
 use App\Support\Erp\CaixaListRowFormatter;
 use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\ErpTableSort;
+use App\Support\Erp\Financeiro\CaixaLivroAberturaDisplay;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -110,7 +112,34 @@ class CaixaListTable extends Component
 
         $this->applySort($query, $builder);
 
-        return $query->paginate($this->perPage);
+        $paginator = $query->paginate($this->perPage);
+
+        return $this->comLinhasVirtuaisLivro($paginator);
+    }
+
+    protected function comLinhasVirtuaisLivro(LengthAwarePaginator $paginator): LengthAwarePaginator
+    {
+        if ((int) $paginator->currentPage() !== 1 || ! is_numeric($this->contaFilter)) {
+            return $paginator;
+        }
+
+        $virtuais = CaixaLivroAberturaDisplay::linhasVirtuaisNoPeriodo(
+            (int) $this->contaFilter,
+            $this->periodoDeApplied !== '' ? $this->periodoDeApplied : null,
+            $this->periodoAteApplied !== '' ? $this->periodoAteApplied : null,
+        );
+
+        if ($virtuais === []) {
+            return $paginator;
+        }
+
+        /** @var Collection $items */
+        $items = $paginator->getCollection();
+        $paginator->setCollection(
+            CaixaLivroAberturaDisplay::mesclarVirtuaisNaGrade($items, $virtuais)
+        );
+
+        return $paginator;
     }
 
     protected function applySort(Builder $query, CaixaListQueryBuilder $builder): void

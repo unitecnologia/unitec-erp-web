@@ -950,6 +950,15 @@
     margin-top: 0.45rem;
 }
 
+.erp-empresas-parametros__checks .erp-pcad__check--disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-empresas-parametros__checks .erp-pcad__check--disabled input {
+    cursor: not-allowed;
+}
+
 .erp-empresas-form-page .erp-empresas-parametros__desconto-reais .erp-pcad-form__label {
     font-size: 0.72rem;
     font-weight: 600;

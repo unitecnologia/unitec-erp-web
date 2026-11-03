@@ -67,9 +67,18 @@ final class NfeXmlBuilder
             'vBc' => 0.0,
             'vIcms' => 0.0,
             'vIcmsDeson' => 0.0,
+            'vIcmsDesonDeduzivel' => 0.0,
             'vIpi' => 0.0,
             'vPis' => 0.0,
             'vCofins' => 0.0,
+            'vFcp' => 0.0,
+            'vBcSt' => 0.0,
+            'vSt' => 0.0,
+            'vFcpSt' => 0.0,
+            'vFcpStRet' => 0.0,
+            'vFcpUfDest' => 0.0,
+            'vIcmsUfDest' => 0.0,
+            'vIcmsUfRemet' => 0.0,
         ];
 
         foreach ($request->itens as $item) {
@@ -140,7 +149,8 @@ final class NfeXmlBuilder
             XmlHelper::append($ideEl, 'dhSaiEnt', $request->dataSaida->format('Y-m-d\TH:i:sP'));
         }
 
-        XmlHelper::append($ideEl, 'tpNF', '1');
+        // SEFAZ: 0=entrada, 1=saída. Qualquer valor ≠ 0 permanece saída (compatível com o padrão anterior).
+        XmlHelper::append($ideEl, 'tpNF', $request->tpNF === 0 ? '0' : '1');
         XmlHelper::append($ideEl, 'idDest', (string) $request->idDest);
         XmlHelper::append($ideEl, 'cMunFG', $ide->codigoMunicipioFg);
         XmlHelper::append($ideEl, 'tpImp', '1');
@@ -292,6 +302,20 @@ final class NfeXmlBuilder
         XmlHelper::append($prod, 'cEAN', 'SEM GTIN');
         XmlHelper::append($prod, 'xProd', XmlHelper::sanitizeText($descricao, 120));
         XmlHelper::append($prod, 'NCM', str_pad(NumberFormatter::onlyDigits($item->ncm), 8, '0', STR_PAD_LEFT));
+        $cestRaw = trim((string) ($item->cest ?? ''));
+        if ($cestRaw !== '') {
+            $cest = NumberFormatter::onlyDigits($cestRaw);
+            if (strlen($cest) > 0 && strlen($cest) < 7) {
+                $cest = str_pad($cest, 7, '0', STR_PAD_LEFT);
+            }
+            if (strlen($cest) !== 7) {
+                throw new FiscalEngineException(
+                    'CEST inválido no item '.$item->numero.': deve ter 7 dígitos (zeros à esquerda). '
+                    .'Não omitir CEST cadastrado inválido.',
+                );
+            }
+            XmlHelper::append($prod, 'CEST', $cest);
+        }
         XmlHelper::append($prod, 'CFOP', NumberFormatter::onlyDigits($item->cfop));
         XmlHelper::append($prod, 'uCom', XmlHelper::sanitizeText($item->unidade, 6));
         XmlHelper::append($prod, 'qCom', NumberFormatter::decimal($item->quantidade, 4));
@@ -335,6 +359,8 @@ final class NfeXmlBuilder
         NfeImpostoXmlBuilder::appendIpi($imposto, $item->imposto);
         NfeImpostoXmlBuilder::appendPis($imposto, $item->imposto);
         NfeImpostoXmlBuilder::appendCofins($imposto, $item->imposto);
+        // ICMSUFDest após PIS/COFINS (XSD); não emitir em NFC-e.
+        NfeImpostoXmlBuilder::appendIcmsUfDest($imposto, $item->imposto);
 
         IbscbsXmlBuilder::appendItem($imposto, $item->imposto);
 
@@ -385,6 +411,7 @@ final class NfeXmlBuilder
             chaveDfeReferenciado: $chave,
             nItemDfeReferenciado: $item->nItemDfeReferenciado ?? $item->numero,
             combustivel: $item->combustivel,
+            cest: $item->cest,
         );
     }
 
@@ -406,7 +433,10 @@ final class NfeXmlBuilder
     }
 
     /**
-     * @param  array{vBc: float, vIcms: float, vIcmsDeson: float, vIpi: float, vPis: float, vCofins: float}  $totaisImposto
+     * @param  array{
+     *   vBc: float, vIcms: float, vIcmsDeson: float, vIpi: float, vPis: float, vCofins: float,
+     *   vFcp?: float, vBcSt?: float, vSt?: float, vFcpSt?: float, vFcpStRet?: float
+     * }  $totaisImposto
      */
     private function appendTotais(DOMElement $infNFe, EmitirNfeRequest $request, array $totaisImposto): void
     {
@@ -416,25 +446,71 @@ final class NfeXmlBuilder
         $icmsTot = $total->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'ICMSTot');
         $total->appendChild($icmsTot);
 
+        $vFcp = round((float) ($totaisImposto['vFcp'] ?? 0), 2);
+        $vBcSt = round((float) ($totaisImposto['vBcSt'] ?? 0), 2);
+        $vSt = round((float) ($totaisImposto['vSt'] ?? 0), 2);
+        $vFcpSt = round((float) ($totaisImposto['vFcpSt'] ?? 0), 2);
+        $vFcpStRet = round((float) ($totaisImposto['vFcpStRet'] ?? 0), 2);
+        $vFcpUfDest = round((float) ($totaisImposto['vFcpUfDest'] ?? 0), 2);
+        $vIcmsUfDest = round((float) ($totaisImposto['vIcmsUfDest'] ?? 0), 2);
+        $vIcmsUfRemet = round((float) ($totaisImposto['vIcmsUfRemet'] ?? 0), 2);
+
+        // W16-10 + NT 2023.004 v1.11:
+        // vNF = vProd - vDesc - vICMSDeson(só indDeduzDeson=1) + vST + vFCPST
+        //     + vFrete + vSeg + vOutro + vII + vIPI + vIPIDevol
+        // vFCP próprio e DIFAL (vFCPUFDest/vICMSUFDest/vICMSUFRemet) NÃO entram em vNF.
+        $vIcmsDeson = round((float) ($totaisImposto['vIcmsDeson'] ?? 0), 2);
+        $vIcmsDesonDeduzivel = round((float) ($totaisImposto['vIcmsDesonDeduzivel'] ?? 0), 2);
+        $vIpi = round((float) ($totaisImposto['vIpi'] ?? 0), 2);
+        $vIi = 0.0;
+        $vIpiDevol = 0.0;
+        $vNfCalculado = round(
+            $request->valorProdutos
+            - $request->valorDesconto
+            - $vIcmsDesonDeduzivel
+            + $vSt
+            + $vFcpSt
+            + $request->valorFrete
+            + $request->valorSeguro
+            + $request->valorOutros
+            + $vIi
+            + $vIpi
+            + $vIpiDevol,
+            2,
+        );
+        $vNfErp = round((float) $request->valorNota, 2);
+        // FCP próprio / DIFAL isolados NÃO disparam. Preferência ao ERP se já bater (±0,02).
+        if ($vSt > 0 || $vFcpSt > 0 || $vIcmsDesonDeduzivel > 0 || $vIpi > 0) {
+            $vNf = abs($vNfErp - $vNfCalculado) <= 0.02 ? $vNfErp : $vNfCalculado;
+        } else {
+            $vNf = $vNfErp;
+        }
+
         XmlHelper::append($icmsTot, 'vBC', NumberFormatter::decimal($totaisImposto['vBc']));
         XmlHelper::append($icmsTot, 'vICMS', NumberFormatter::decimal($totaisImposto['vIcms']));
-        XmlHelper::append($icmsTot, 'vICMSDeson', NumberFormatter::decimal($totaisImposto['vIcmsDeson']));
-        XmlHelper::append($icmsTot, 'vFCP', '0.00');
-        XmlHelper::append($icmsTot, 'vBCST', '0.00');
-        XmlHelper::append($icmsTot, 'vST', '0.00');
-        XmlHelper::append($icmsTot, 'vFCPST', '0.00');
-        XmlHelper::append($icmsTot, 'vFCPSTRet', '0.00');
+        XmlHelper::append($icmsTot, 'vICMSDeson', NumberFormatter::decimal($vIcmsDeson));
+        // Ordem XSD: vFCPUFDest / vICMSUFDest / vICMSUFRemet antes de vFCP (opcionais).
+        if ($vFcpUfDest > 0 || $vIcmsUfDest > 0 || $vIcmsUfRemet > 0) {
+            XmlHelper::append($icmsTot, 'vFCPUFDest', NumberFormatter::decimal($vFcpUfDest));
+            XmlHelper::append($icmsTot, 'vICMSUFDest', NumberFormatter::decimal($vIcmsUfDest));
+            XmlHelper::append($icmsTot, 'vICMSUFRemet', NumberFormatter::decimal($vIcmsUfRemet));
+        }
+        XmlHelper::append($icmsTot, 'vFCP', NumberFormatter::decimal($vFcp));
+        XmlHelper::append($icmsTot, 'vBCST', NumberFormatter::decimal($vBcSt));
+        XmlHelper::append($icmsTot, 'vST', NumberFormatter::decimal($vSt));
+        XmlHelper::append($icmsTot, 'vFCPST', NumberFormatter::decimal($vFcpSt));
+        XmlHelper::append($icmsTot, 'vFCPSTRet', NumberFormatter::decimal($vFcpStRet));
         XmlHelper::append($icmsTot, 'vProd', NumberFormatter::decimal($request->valorProdutos));
         XmlHelper::append($icmsTot, 'vFrete', NumberFormatter::decimal($request->valorFrete));
         XmlHelper::append($icmsTot, 'vSeg', NumberFormatter::decimal($request->valorSeguro));
         XmlHelper::append($icmsTot, 'vDesc', NumberFormatter::decimal($request->valorDesconto));
-        XmlHelper::append($icmsTot, 'vII', '0.00');
-        XmlHelper::append($icmsTot, 'vIPI', NumberFormatter::decimal($totaisImposto['vIpi']));
-        XmlHelper::append($icmsTot, 'vIPIDevol', '0.00');
+        XmlHelper::append($icmsTot, 'vII', NumberFormatter::decimal($vIi));
+        XmlHelper::append($icmsTot, 'vIPI', NumberFormatter::decimal($vIpi));
+        XmlHelper::append($icmsTot, 'vIPIDevol', NumberFormatter::decimal($vIpiDevol));
         XmlHelper::append($icmsTot, 'vPIS', NumberFormatter::decimal($totaisImposto['vPis']));
         XmlHelper::append($icmsTot, 'vCOFINS', NumberFormatter::decimal($totaisImposto['vCofins']));
         XmlHelper::append($icmsTot, 'vOutro', NumberFormatter::decimal($request->valorOutros));
-        XmlHelper::append($icmsTot, 'vNF', NumberFormatter::decimal($request->valorNota));
+        XmlHelper::append($icmsTot, 'vNF', NumberFormatter::decimal($vNf));
         XmlHelper::append($icmsTot, 'vTotTrib', NumberFormatter::decimal($request->valorTotTrib));
 
         IbscbsXmlBuilder::appendTotais($total, $request->itens);

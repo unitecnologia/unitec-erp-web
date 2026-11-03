@@ -388,7 +388,8 @@ class PermissoesPage extends Page
         }
 
         $this->userEmpresaIds = array_values(array_unique($ids));
-        $this->userForm['empresa_id'] = (string) ($user->empresa_id ?? ($this->userEmpresaIds[0] ?? ''));
+        // Sem auto-seleção: ausência de padrão permanece vazia.
+        $this->userForm['empresa_id'] = filled($user->empresa_id) ? (string) $user->empresa_id : '';
     }
 
     /**
@@ -444,7 +445,7 @@ class PermissoesPage extends Page
 
         $rules = [
             'userForm.name' => ['required', 'string', 'max:80', Rule::unique('users', 'name')->ignore($this->selectedUserId)],
-            'userForm.empresa_id' => ['required', 'integer', 'exists:empresas,id'],
+            'userForm.empresa_id' => ['nullable', 'integer', 'exists:empresas,id'],
             'userForm.erp_profile_id' => ['nullable', 'integer', 'exists:erp_profiles,id'],
             'userForm.is_admin' => ['required', 'in:S,N'],
             'userForm.ativo' => ['required', 'in:S,N'],
@@ -459,10 +460,12 @@ class PermissoesPage extends Page
 
         $this->validate($rules);
 
+        $empresaPadraoId = (int) ($this->userForm['empresa_id'] ?? 0);
+
         // vendedor_id não é editável aqui — único escritor: RH → Funcionários (aba Operador).
         $data = [
             'name' => mb_strtoupper(trim((string) $this->userForm['name']), 'UTF-8'),
-            'empresa_id' => (int) $this->userForm['empresa_id'],
+            'empresa_id' => $empresaPadraoId > 0 ? $empresaPadraoId : null,
             'erp_profile_id' => filled($this->userForm['erp_profile_id'] ?? null) ? (int) $this->userForm['erp_profile_id'] : null,
             'is_admin' => ($this->userForm['is_admin'] ?? 'N') === 'S',
             'ativo' => ($this->userForm['ativo'] ?? 'S') === 'S',
@@ -492,11 +495,8 @@ class PermissoesPage extends Page
             : tap(User::query()->findOrFail($this->selectedUserId), fn (User $record) => $record->update($data));
 
         $liberadas = array_values(array_unique(array_map('intval', $this->userEmpresaIds)));
-        if (! in_array((int) $data['empresa_id'], $liberadas, true)) {
+        if ($data['empresa_id'] && ! in_array((int) $data['empresa_id'], $liberadas, true)) {
             $liberadas[] = (int) $data['empresa_id'];
-        }
-        if ($liberadas === []) {
-            $liberadas = [(int) $data['empresa_id']];
         }
         $user->empresas()->sync($liberadas);
         $this->userEmpresaIds = $liberadas;
@@ -666,10 +666,6 @@ class PermissoesPage extends Page
             ...array_map('intval', $ids),
         ]));
         $this->userEmpresaIds = $merged;
-
-        if (! filled($this->userForm['empresa_id'] ?? null) && $merged !== []) {
-            $this->userForm['empresa_id'] = (string) $merged[0];
-        }
     }
 
     /**
@@ -687,13 +683,22 @@ class PermissoesPage extends Page
 
         $padrao = (int) ($this->userForm['empresa_id'] ?? 0);
         if ($padrao > 0 && in_array($padrao, $bloquear, true)) {
-            $this->userForm['empresa_id'] = $restantes !== [] ? (string) $restantes[0] : '';
+            // Remove o padrão sem escolher outra automaticamente.
+            $this->userForm['empresa_id'] = '';
         }
     }
 
     public function definirEmpresaPadrao(int $empresaId): void
     {
         if (! in_array($empresaId, array_map('intval', $this->userEmpresaIds), true)) {
+            return;
+        }
+
+        $atual = (int) ($this->userForm['empresa_id'] ?? 0);
+        if ($atual === $empresaId) {
+            // Segundo clique na mesma empresa remove o padrão.
+            $this->userForm['empresa_id'] = '';
+
             return;
         }
 
@@ -736,12 +741,14 @@ class PermissoesPage extends Page
             return;
         }
 
-        if ($padrao <= 0 || ! in_array($padrao, $liberadas, true)) {
-            $padrao = $liberadas[0];
-            $this->userForm['empresa_id'] = (string) $padrao;
+        if ($padrao > 0 && ! in_array($padrao, $liberadas, true)) {
+            $padrao = 0;
+            $this->userForm['empresa_id'] = '';
         }
 
-        $user->forceFill(['empresa_id' => $padrao])->save();
+        $user->forceFill([
+            'empresa_id' => $padrao > 0 ? $padrao : null,
+        ])->save();
         $user->empresas()->sync($liberadas);
         $this->userEmpresaIds = $liberadas;
         $this->loadUserForm();

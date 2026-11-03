@@ -994,3 +994,129 @@
     border-color: #c7d5e8;
     color: #475569;
 }
+
+/* Ajuda Origem da mercadoria (0–8) — produto Impostos / Imposto Padrão */
+.erp-produtos-impostos__field:has(.erp-produtos-impostos__origem-row) {
+    grid-template-columns: var(--erp-impostos-label-col) auto;
+}
+
+.erp-produtos-impostos__origem-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    position: relative;
+}
+
+.erp-origem-help {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.erp-origem-help__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.erp-origem-help__btn:hover,
+.erp-origem-help__btn:focus-visible {
+    background: #1d4ed8;
+    outline: 2px solid #93c5fd;
+    outline-offset: 1px;
+}
+
+.erp-origem-help__panel {
+    position: fixed;
+    z-index: 12000;
+    width: min(28rem, 92vw);
+    max-height: none;
+    overflow: visible;
+    padding: 0.4rem 0.5rem 0.45rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.4rem;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+    text-align: left;
+    color: #0f172a;
+}
+
+.erp-origem-help__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    margin-bottom: 0.1rem;
+}
+
+.erp-origem-help__head strong {
+    font-size: 0.72rem;
+    color: #1e40af;
+}
+
+.erp-origem-help__close {
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.1rem;
+}
+
+.erp-origem-help__close:hover {
+    color: #0f172a;
+}
+
+.erp-origem-help__intro {
+    margin: 0 0 0.25rem;
+    font-size: 0.62rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.erp-origem-help__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.62rem;
+    line-height: 1.2;
+}
+
+.erp-origem-help__table th,
+.erp-origem-help__table td {
+    padding: 0.14rem 0.28rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+}
+
+.erp-origem-help__table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.erp-origem-help__table th {
+    text-align: left;
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: #475569;
+    background: #f8fafc;
+}
+
+.erp-origem-help__cod {
+    width: 1.85rem;
+    font-weight: 800;
+    color: #1e40af;
+    text-align: center;
+}

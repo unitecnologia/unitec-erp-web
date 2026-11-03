@@ -145,4 +145,112 @@
         color: #475569;
         text-align: right;
     }
+
+    .tabular-doc__qtd-toggle {
+        display: inline;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: #1d4ed8;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+
+    .tabular-doc__qtd-toggle:hover,
+    .tabular-doc__qtd-toggle:focus-visible {
+        color: #1e40af;
+    }
+
+    .tabular-doc__qtd-toggle[aria-expanded="true"] {
+        color: #1e3a8a;
+    }
+
+    .tabular-doc__detail-row > td {
+        background: #f8fafc !important;
+        padding: 2mm 2mm 2.5mm !important;
+    }
+
+    .tabular-doc__detail {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+    }
+
+    .tabular-doc__detail th,
+    .tabular-doc__detail td {
+        border: 1px solid #cbd5e1;
+        padding: 1mm 1.2mm;
+        vertical-align: top;
+    }
+
+    .tabular-doc__detail thead th {
+        background: #e2e8f0;
+        color: #0f172a;
+        font-weight: 700;
+        text-align: left;
+    }
+
+    .tabular-doc__detail .num {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .tabular-doc__detail-link {
+        color: #1d4ed8;
+        font-weight: 700;
+        text-decoration: underline;
+    }
+
+    .tabular-doc__detail-link:hover {
+        color: #1e40af;
+    }
+
+    .tabular-doc__detail-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem 0.75rem;
+        margin-top: 1.5mm;
+        font-size: 10px;
+        color: #475569;
+    }
+
+    .tabular-doc__detail-more {
+        min-width: 5.5rem;
+        padding: 0.2rem 0.55rem;
+        border: 1px solid #94a3b8;
+        border-radius: 4px;
+        background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+        color: #0f172a;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .tabular-doc__detail-more:hover {
+        border-color: #1e5a9e;
+        background: #ffffff;
+    }
+
+    .tabular-doc__detail-status {
+        color: #64748b;
+        font-size: 10px;
+    }
+
+    @media print {
+        .tabular-doc__qtd-toggle {
+            color: inherit;
+            font-weight: inherit;
+            text-decoration: none;
+            cursor: default;
+        }
+
+        .tabular-doc__detail-row {
+            display: none !important;
+        }
+    }
 </style>

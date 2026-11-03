@@ -431,6 +431,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 0.28rem;
     padding: 0.2rem 0.65rem !important;
     line-height: 1.1;
     min-height: 0;
@@ -446,6 +447,12 @@
     cursor: pointer;
     appearance: none;
     transition: none;
+}
+
+.erp-nfe-page .erp-nfe__tab-count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    opacity: 0.92;
 }
 
 .erp-nfe-page .erp-nfe__tab:not(.erp-nfe__tab--active):hover {
@@ -944,8 +951,7 @@
     white-space: nowrap;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(1),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--transmitir {
     width: 2.25rem !important;
     min-width: 2.25rem !important;
     max-width: 2.25rem !important;
@@ -984,7 +990,7 @@
 
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected {
     background: transparent !important;
-    box-shadow: inset 5px 0 0 #1d4ed8;
+    box-shadow: inset 5px 0 0 #1e40af;
     outline: none;
 }
 
@@ -992,7 +998,7 @@
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected:nth-child(even) .fi-ta-cell,
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected:nth-child(odd) .fi-ta-cell,
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected.fi-striped .fi-ta-cell {
-    background: #bfdbfe !important;
+    background: #93c5fd !important;
     color: #0f172a !important;
     box-shadow: none !important;
 }
@@ -1000,112 +1006,127 @@
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell,
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected:nth-child(even):hover .fi-ta-cell,
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected:nth-child(odd):hover .fi-ta-cell {
-    background: #93c5fd !important;
+    background: #60a5fa !important;
 }
 
+/* Clique: destaque azul, sem engrossar o texto. */
 .erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
-.erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
-    font-weight: 700 !important;
+.erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text,
+.erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .fi-font-semibold,
+.erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .erp-list-total-cell,
+.erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .erp-list-total-cell__currency,
+.erp-list-page.erp-nfe-page.erp-nfce-page .fi-ta-row.erp-row-selected .erp-list-total-cell__amount {
+    font-weight: 500 !important;
     color: #0f172a !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(2),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(2) {
-    width: 5rem !important;
-    min-width: 5rem !important;
-    max-width: 5rem !important;
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--serie {
+    width: 2.65rem !important;
+    min-width: 2.65rem !important;
+    max-width: 2.65rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(3),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--numero {
     width: 4.5rem !important;
     min-width: 4.5rem !important;
     max-width: 4.5rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(4),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(4) {
-    width: 9.25rem !important;
-    min-width: 9.25rem !important;
-    max-width: 9.25rem !important;
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--fechado_em {
+    width: 7.75rem !important;
+    min-width: 7.75rem !important;
+    max-width: 7.75rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(5),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--chave {
     width: 14.5rem !important;
     min-width: 14.5rem !important;
     max-width: 14.5rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(6),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--protocolo {
     width: 8.75rem !important;
     min-width: 8.75rem !important;
     max-width: 8.75rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(7),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--cpf {
     width: 7.25rem !important;
     min-width: 7.25rem !important;
     max-width: 7.25rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(8),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--cliente {
     width: 7.5rem !important;
     min-width: 7.5rem !important;
     max-width: 7.5rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(9),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(9) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--caixa {
     width: 5.75rem !important;
     min-width: 5.75rem !important;
     max-width: 5.75rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(10),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(10) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--vendedor {
     width: 5.75rem !important;
     min-width: 5.75rem !important;
     max-width: 5.75rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(11),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(11) {
-    width: 4.75rem !important;
-    min-width: 4.75rem !important;
-    max-width: 4.75rem !important;
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--bruto {
+    width: 6.5rem !important;
+    min-width: 6.5rem !important;
+    max-width: 6.5rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(12),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(12) {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--desc_acres {
+    width: 5.5rem !important;
+    min-width: 5.5rem !important;
+    max-width: 5.5rem !important;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--total {
+    width: 6.25rem !important;
+    min-width: 6.25rem !important;
+    max-width: 6.25rem !important;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--pedido {
     width: 4.25rem !important;
     min-width: 4.25rem !important;
     max-width: 4.25rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-header-cell:nth-child(13),
-.erp-nfe-page.erp-nfce-page .fi-ta-row .fi-ta-cell:nth-child(13) {
-    width: 4.5rem !important;
-    min-width: 4.5rem !important;
-    max-width: 4.5rem !important;
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--dav {
+    width: 5rem !important;
+    min-width: 5rem !important;
+    max-width: 5rem !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(4) .fi-ta-col,
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(4) .fi-ta-col .fi-ta-text,
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(4) .fi-ta-text-item,
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(5) .fi-ta-col,
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(5) .fi-ta-col .fi-ta-text,
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(5) .fi-ta-text-item {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--historico {
+    width: 1.75rem !important;
+    min-width: 1.75rem !important;
+    max-width: 1.75rem !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    text-align: center;
+    overflow: hidden;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--fechado_em .fi-ta-col,
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--fechado_em .fi-ta-col .fi-ta-text,
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--fechado_em .fi-ta-text-item,
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--chave .fi-ta-col,
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--chave .fi-ta-col .fi-ta-text,
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--chave .fi-ta-text-item {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
 }
 
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(4) .fi-ta-text-item,
-.erp-nfe-page.erp-nfce-page .fi-ta-cell:nth-child(5) .fi-ta-text-item {
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--fechado_em .fi-ta-text-item,
+.erp-nfe-page.erp-nfce-page .erp-nfce-col--chave .fi-ta-text-item {
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
 }
@@ -1149,7 +1170,8 @@
     min-width: 0;
 }
 
-.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__total-label::after {
+.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-label .erp-nfe__total-label::after,
+.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce > .erp-nfe__total-label::after {
     content: none;
 }
 
@@ -6224,6 +6246,161 @@
     font-size: 0.74rem;
 }
 
+/* ── Modal histórico NFC-e (cabeçalho compacto, só produtos rolam) ── */
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__window {
+    height: min(92vh, calc(100vh - 0.6rem));
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0.28rem;
+    padding: 0.32rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__card {
+    padding: 0.28rem 0.45rem 0.3rem;
+    flex-shrink: 0;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__card-head {
+    margin-bottom: 0.16rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__section-title {
+    margin: 0 0 0.14rem;
+    font-size: 0.7rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--nfce {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.14rem 0.4rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__field--chave {
+    grid-column: span 4;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__field--proto {
+    grid-column: span 2;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--dest-nfce {
+    display: grid;
+    grid-template-columns: 2fr 1fr 0.7fr 1fr 2fr 1fr 1.2fr 0.8fr;
+    gap: 0.14rem 0.4rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--dest-nfce .erp-nfe-historico-modal__field--nome,
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--dest-nfce .erp-nfe-historico-modal__field--end {
+    grid-column: auto;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__label {
+    font-size: 0.56rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__value {
+    font-size: 0.7rem;
+    line-height: 1.15;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__value--mono {
+    font-size: 0.64rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__value--total {
+    font-size: 0.74rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__card--produtos {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__card--produtos .erp-nfe-historico-modal__table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__rodape {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 0.28rem;
+    flex-shrink: 0;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__totais--nfce {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.2rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__total-item {
+    padding: 0.16rem 0.28rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__total-item span {
+    font-size: 0.54rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__total-item strong {
+    font-size: 0.7rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__pag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__pag-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.12rem 0.28rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #f8fafc;
+    font-size: 0.7rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__pag-item span {
+    font-weight: 650;
+    color: #0f172a;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__pag-item strong {
+    font-weight: 800;
+    color: #0f3460;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+    .erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--dest-nfce {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--dest-nfce .erp-nfe-historico-modal__field--nome,
+    .erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__resumo--dest-nfce .erp-nfe-historico-modal__field--end {
+        grid-column: span 2;
+    }
+
+    .erp-nfe-page .erp-nfe-historico-modal--nfce .erp-nfe-historico-modal__rodape {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 1100px) {
     .erp-nfe-page .erp-nfe-historico-modal__resumo,
     .erp-nfe-page .erp-nfe-historico-modal__resumo--dest,
@@ -6894,33 +7071,14 @@
 
 /* ── NFC-e — chave da nota selecionada (rodapé, somente leitura) ── */
 
-.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-group--footer {
-    flex: 0 0 auto;
-    min-width: 0;
-}
-
-.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-label {
-    gap: 0.5rem;
-}
-
-.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-input--readonly {
-    width: calc(44ch + 1.4rem);
-    min-width: calc(44ch + 1.4rem);
-    max-width: calc(44ch + 1.4rem);
-    padding-inline: 0.6rem;
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0;
-    cursor: text;
-    user-select: all;
-}
-
 .erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce {
     display: flex;
     flex-wrap: wrap;
-    align-items: stretch;
+    align-items: center;
     gap: 0.55rem 0.75rem;
+    width: fit-content;
+    max-width: calc(100% - 1.3rem);
+    box-sizing: border-box;
 }
 
 .erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso {
@@ -6954,24 +7112,59 @@
     color: #a16207;
 }
 
-.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde {
-    flex: 0 0 auto;
-    margin-left: auto;
-    justify-content: flex-end;
-    padding: 0.35rem 0.65rem;
-    border: 1px solid #86efac;
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde,
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais {
+    flex: 0 1 auto;
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--erp-border-light, #dbe4f0);
     border-radius: 6px;
-    background: #ecfdf5;
+    background: #fff;
+    max-width: 100%;
 }
 
-.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde .erp-nfe__total-label {
-    color: #166534;
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-label {
     font-weight: 700;
+    white-space: nowrap;
 }
 
-.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde .erp-nfe__total-value {
-    color: #15803d;
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--bruto {
+    color: var(--erp-brand-primary, #1d4ed8);
     font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-label--canceladas,
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--canceladas {
+    color: #991b1b;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-label--liquido,
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--liquido {
+    color: #166534;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--canceladas,
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--liquido {
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-label::after {
+    content: ' |';
+    color: var(--erp-text-muted, #64748b);
+    font-weight: 500;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--bruto::after,
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-totais .erp-nfe__total-value--canceladas::after {
+    content: '  ·  ';
+    color: var(--erp-text-muted, #64748b);
+    font-weight: 500;
 }
 
 /* ── NFC-e — barra de filtros (padrão de pesquisa de Produtos) ── */
@@ -7127,4 +7320,103 @@
 .erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__label kbd,
 .erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__icon {
     color: inherit;
+}
+
+/* NF-e Ajuste/Estorno — reutiliza visual do import-menu/list */
+.erp-nfe-ajuste-tipo-modal,
+.erp-nfe-ajuste-estorno-busca-modal {
+    z-index: 80;
+}
+.erp-nfe-ajuste-tipo-modal .erp-nfe-import-menu-modal__item:disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+
+/* Estorno — filtros / atalhos / paginação */
+.erp-nfe-ajuste-estorno-busca-modal__window {
+    width: min(920px, 96vw) !important;
+    max-width: 96vw;
+}
+.erp-nfe-ajuste-estorno-busca-modal__panel {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 0.45rem;
+}
+.erp-nfe-ajuste-estorno-busca-modal__filters {
+    display: grid;
+    grid-template-columns: minmax(16rem, 1.1fr) minmax(12rem, 1fr) minmax(12rem, 1fr);
+    gap: 0.45rem 0.55rem;
+    align-items: end;
+    padding: 0.45rem 0.5rem 0.55rem;
+    border: 1px solid #b7c9de;
+    border-radius: var(--erp-radius-sm, 4px);
+    background: linear-gradient(180deg, #eef4fb 0%, #f7fafd 100%);
+}
+.erp-nfe-ajuste-estorno-busca-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    min-width: 0;
+}
+.erp-nfe-ajuste-estorno-busca-modal__atalhos {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.erp-nfe-ajuste-estorno-busca-modal__atalho {
+    appearance: none;
+    border: 1px solid #9eb4cd;
+    border-radius: 999px;
+    background: #fff;
+    color: #1e3a5f;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.22rem 0.65rem;
+    cursor: pointer;
+}
+.erp-nfe-ajuste-estorno-busca-modal__atalho:hover:not(:disabled) {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+.erp-nfe-ajuste-estorno-busca-modal__atalho:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.erp-nfe-ajuste-estorno-busca-modal__pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.15rem 0.1rem 0;
+}
+.erp-nfe-ajuste-estorno-busca-modal__pager-info {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #5a7391;
+}
+.erp-nfe-ajuste-estorno-busca-modal__pager-actions {
+    display: flex;
+    gap: 0.35rem;
+}
+@media (max-width: 760px) {
+    .erp-nfe-ajuste-estorno-busca-modal__filters {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Estorno — linha selecionada (linha inteira azul) */
+.erp-nfe-ajuste-estorno-busca-modal .erp-nfe-import-list__row--focused td {
+    background: var(--erp-brand-primary, #1e5a9e) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+.erp-nfe-ajuste-estorno-busca-modal .erp-nfe-import-list__row--focused:hover td {
+    background: var(--erp-brand-primary-dark, #0f3460) !important;
+    color: #fff !important;
 }

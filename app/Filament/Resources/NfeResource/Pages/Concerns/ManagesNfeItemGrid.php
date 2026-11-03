@@ -462,6 +462,18 @@ trait ManagesNfeItemGrid
 
     public function handleNfeModalEscape(): void
     {
+        if ($this->nfeAjusteEstornoBuscaOpen ?? false) {
+            $this->closeNfeAjusteModals();
+
+            return;
+        }
+
+        if ($this->nfeAjusteTipoOpen ?? false) {
+            $this->closeNfeAjusteTipoModal();
+
+            return;
+        }
+
         if ($this->nfeInfoAdicionaisModalOpen) {
             $this->fecharNfeInfoAdicionaisModal();
 
@@ -1665,12 +1677,17 @@ trait ManagesNfeItemGrid
             'base_ipi', 'valor_ipi', 'base_pis_icms', 'valor_pis_icms', 'base_cofins_icms', 'valor_cofins_icms',
             'v_ibs_mun', 'v_ibs_uf', 'v_cbs', 'bc_ibs',
             'aliq_pis_icms', 'aliq_ipi', 'aliq_cofins_icms', 'aliq_icms',
+            'base_icms_st', 'aliq_icms_st', 'valor_icms_st',
+            'vfcp', 'v_bc_fcp', 'v_bc_fcp_st', 'v_fcp_st',
+            'base_icms_st_ret', 'valor_icms_st_ret', 'v_icms_substituto',
+            'v_bc_fcp_st_ret', 'v_fcp_st_ret',
         ];
         $money3 = [
             'total', 'quantidade', 'valor_unitario',
         ];
         $money4 = [
             'alq_cbs', 'alq_ibs_mun', 'alq_ibs_uf',
+            'p_mva_st', 'p_red_bc_st', 'p_fcp', 'p_fcp_st', 'p_st_ret', 'p_fcp_st_ret',
         ];
 
         return array_map(function (array $row) use ($money2, $money3, $money4, $isSimples): array {

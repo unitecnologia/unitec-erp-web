@@ -73,7 +73,7 @@ final class PdvNfceFiscalPayloadBuilder
 
         $venda->loadMissing(['itens.product', 'pagamentos', 'person']);
 
-        $crt = $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples'));
+        $crt = RegimeCrtMapper::toCrt($empresa->regime_tributario ?? 'simples');
         $itens = [];
         $valorProdutos = 0.0;
         $valorDescontoItens = 0.0;
@@ -83,6 +83,19 @@ final class PdvNfceFiscalPayloadBuilder
 
         foreach ($venda->itens as $index => $item) {
             $product = $item->product;
+            if (RegimeCrtMapper::isRegimeNormal($crt)) {
+                $this->assertProdutoFiscalRegimeNormal($product, $item->descricao ?? $product?->descricao, $crt, $emissao);
+            } else {
+                if ($crt === 2) {
+                    $this->assertProdutoFiscalCrt2Icms($product, $item->descricao ?? $product?->descricao);
+                }
+                // CRT 1/2/4: PIS/COFINS do cadastro — não inventa CST 07 por ser Simples.
+                $this->assertProdutoFiscalPisCofinsInformado(
+                    $product,
+                    $item->descricao ?? $product?->descricao,
+                    $crt,
+                );
+            }
             $quantidade = (float) $item->quantidade;
             $precoLiquido = (float) $item->preco_unitario;
             // No PDV, desconto/acréscimo de item são unitários e já embutidos no preço líquido.
@@ -150,6 +163,10 @@ final class PdvNfceFiscalPayloadBuilder
                 desconto: $descontoItem,
                 acrescimo: $acrescimoItem,
                 combustivel: $combustivel,
+                cest: CestCodigo::normalizar(
+                    $product?->cest !== null ? (string) $product->cest : null,
+                    'produto "'.$descricao.'"',
+                ),
             );
         }
 
@@ -346,7 +363,7 @@ final class PdvNfceFiscalPayloadBuilder
             razaoSocial: (string) ($empresa->razao_social ?: $empresa->nome),
             nomeFantasia: (string) ($empresa->fantasia ?: $empresa->nome),
             ie: (string) $empresa->ie,
-            crt: $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples')),
+            crt: RegimeCrtMapper::toCrt($empresa->regime_tributario ?? 'simples'),
             logradouro: (string) ($empresa->endereco ?? 'NAO INFORMADO'),
             numero: (string) ($empresa->numero ?: 'S/N'),
             bairro: (string) ($empresa->bairro ?? 'CENTRO'),
@@ -463,15 +480,105 @@ final class PdvNfceFiscalPayloadBuilder
         return $partes === [] ? '' : 'Cartão: '.implode(' / ', $partes);
     }
 
-    private function mapCrt(string $regime): int
+    /**
+     * CRT 2 (Simples excesso sublimite): ICMS com CST — nunca CSOSN.
+     * PIS/COFINS seguem tratamento Simples (não valida alíquotas de Presumido).
+     */
+    private function assertProdutoFiscalCrt2Icms(?Product $product, mixed $descricaoItem): void
     {
-        return match (strtolower($regime)) {
-            'simples' => 1,
-            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
-            'mei', 'simei' => 4,
-            'presumido', 'real', 'normal' => 3,
-            default => 1,
-        };
+        $rotulo = trim((string) ($descricaoItem ?: $product?->descricao ?: $product?->codigo ?: 'item'));
+        $prefixo = 'Produto "'.$rotulo.'": ';
+
+        if ($product === null) {
+            throw new FiscalEngineException(
+                $prefixo.'sem cadastro vinculado. NFC-e CRT 2 exige produto com CST de ICMS.',
+            );
+        }
+
+        $cstIcms = preg_replace('/\D/', '', (string) ($product->cst_icms ?? '')) ?: '';
+        if ($cstIcms === '') {
+            throw new FiscalEngineException(
+                $prefixo.'informe o CST de ICMS no cadastro. '
+                .'CRT 2 (Simples excesso de sublimite) emite ICMS com CST, não CSOSN.',
+            );
+        }
+    }
+
+    /**
+     * CRT 1/2/4: exige CST PIS/COFINS no produto. Não assume isenção (07) por ser Simples.
+     */
+    private function assertProdutoFiscalPisCofinsInformado(
+        ?Product $product,
+        mixed $descricaoItem,
+        int $crt,
+    ): void {
+        $rotulo = trim((string) ($descricaoItem ?: $product?->descricao ?: $product?->codigo ?: 'item'));
+        $prefixo = 'Produto "'.$rotulo.'": ';
+
+        if ($product === null) {
+            throw new FiscalEngineException(
+                $prefixo.'sem cadastro vinculado. NFC-e CRT '.$crt.' exige CST de PIS/COFINS no produto.',
+            );
+        }
+
+        PisCofinsCst::assertInformados(
+            (string) ($product->cst_saida ?? ''),
+            (string) ($product->cst_cofins ?? $product->cst_saida ?? ''),
+            $prefixo,
+        );
+    }
+
+    /**
+     * CRT 3 (Presumido/Real/Normal): exige CST ICMS e PIS/COFINS do produto.
+     * CST 49/99 é válido (PISOutr/COFINSOutr). Não inventa alíquotas.
+     */
+    private function assertProdutoFiscalRegimeNormal(
+        ?Product $product,
+        mixed $descricaoItem,
+        int $crt,
+        \DateTimeInterface $dataEmissao,
+    ): void {
+        $rotulo = trim((string) ($descricaoItem ?: $product?->descricao ?: $product?->codigo ?: 'item'));
+        $prefixo = 'Produto "'.$rotulo.'": ';
+
+        if ($product === null) {
+            throw new FiscalEngineException(
+                $prefixo.'sem cadastro vinculado. NFC-e em regime normal (CRT '.$crt.') exige produto com tributação fiscal.',
+            );
+        }
+
+        $cstIcms = preg_replace('/\D/', '', (string) ($product->cst_icms ?? '')) ?: '';
+        if ($cstIcms === '') {
+            throw new FiscalEngineException(
+                $prefixo.'informe o CST de ICMS no cadastro (CRT '.$crt.' emite ICMS com CST).',
+            );
+        }
+
+        [$cstPis2, $cstCofins2] = PisCofinsCst::assertInformados(
+            (string) ($product->cst_saida ?? ''),
+            (string) ($product->cst_cofins ?? $product->cst_saida ?? ''),
+            $prefixo,
+        );
+
+        if (PisCofinsCst::isAliq($cstPis2) && (float) ($product->aliq_pis ?? 0) < 0) {
+            throw new FiscalEngineException($prefixo.'alíquota de PIS inválida para CST '.$cstPis2.'.');
+        }
+
+        if (PisCofinsCst::isAliq($cstCofins2) && (float) ($product->aliq_cofins ?? 0) < 0) {
+            throw new FiscalEngineException($prefixo.'alíquota de COFINS inválida para CST '.$cstCofins2.'.');
+        }
+
+        if (! IbscbsApplicabilityResolver::deveEmitir($crt, $dataEmissao)) {
+            return;
+        }
+
+        $cstIbs = preg_replace('/\D/', '', (string) ($product->iva_cst ?? '')) ?: '';
+        $cClass = preg_replace('/\D/', '', (string) ($product->cclass_trib ?? '')) ?: '';
+        if ($cstIbs === '' || $cClass === '') {
+            throw new FiscalEngineException(
+                $prefixo.'informe CST IBS/CBS e cClassTrib no cadastro (obrigatório para CRT '.$crt.' em 2026).',
+            );
+        }
     }
 
     private function mapTpAmb(int $ambienteParametro): int

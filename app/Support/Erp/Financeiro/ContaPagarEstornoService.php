@@ -115,6 +115,11 @@ final class ContaPagarEstornoService
             $payload['empresa_id'] = $empresaId;
         }
 
+        app(CaixaAbertoGuard::class)->assertPodeLancarNaConta(
+            isset($payload['caixa_conta_id']) ? (int) $payload['caixa_conta_id'] : null,
+            isset($payload['empresa_id']) ? (int) $payload['empresa_id'] : null,
+        );
+
         CaixaLancamento::query()->create($payload);
     }
 

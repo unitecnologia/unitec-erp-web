@@ -197,6 +197,8 @@ final class ContaPagarBaixaService
             throw new InvalidArgumentException('Meio de pagamento inválido ou inativo.');
         }
 
+        app(CaixaAbertoGuard::class)->assertEmpresaOperacional();
+
         $pagoEm = trim((string) ($opcoes['pago_em'] ?? ''));
         if ($pagoEm === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $pagoEm)) {
             $pagoEm = ErpTimezone::toLocal()->toDateString();
@@ -605,6 +607,12 @@ final class ContaPagarBaixaService
             return;
         }
 
+        $empresaId = ErpContext::currentEmpresaId();
+        app(CaixaAbertoGuard::class)->assertPodeLancarNaConta(
+            $caixaContaId ? (int) $caixaContaId : null,
+            $empresaId ? (int) $empresaId : null,
+        );
+
         $planoNome = null;
         if ($planoContaId) {
             $planoNome = PlanoConta::query()->whereKey($planoContaId)->value('descricao');
@@ -623,7 +631,7 @@ final class ContaPagarBaixaService
         ];
 
         if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
-            $payload['empresa_id'] = ErpContext::currentEmpresaId();
+            $payload['empresa_id'] = $empresaId;
         }
 
         CaixaLancamento::query()->create($payload);

@@ -26,5 +26,7 @@ final class ItemDto
         public readonly ?int $nItemDfeReferenciado = null,
         /** Grupo prod/comb — somente produtos com flag combustível e dados ANP. */
         public readonly ?CombustivelDto $combustivel = null,
+        /** CEST (7 dígitos). Só emitir no XML quando informado no cadastro — não inventar. */
+        public readonly ?string $cest = null,
     ) {}
 }

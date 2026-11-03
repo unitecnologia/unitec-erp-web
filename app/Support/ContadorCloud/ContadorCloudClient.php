@@ -48,6 +48,16 @@ class ContadorCloudClient
                 ];
             }
 
+            // Contrato do portal: upsert por chaveAcesso+tipo — "já existe" / 409 não é falha.
+            if ($this->isDocumentoJaExistenteNaNuvem($response->status(), $response->body())) {
+                return [
+                    'ok' => true,
+                    'message' => 'Documento já existia na nuvem (mesma chave — sem duplicar).',
+                    'http_status' => $response->status(),
+                    'response' => ContadorCloudHttpHelper::isJsonApiResponse($response) ? $response->json() : null,
+                ];
+            }
+
             $body = trim($response->body());
 
             return [
@@ -66,6 +76,29 @@ class ContadorCloudClient
                 'response' => null,
             ];
         }
+    }
+
+    private function isDocumentoJaExistenteNaNuvem(int $status, string $body): bool
+    {
+        $texto = mb_strtolower(trim($body), 'UTF-8');
+
+        if ($texto === '') {
+            return $status === 409;
+        }
+
+        if (
+            str_contains($texto, 'já existe')
+            || str_contains($texto, 'ja existe')
+            || str_contains($texto, 'already exists')
+            || str_contains($texto, 'duplicate')
+            || str_contains($texto, 'duplicad')
+            || str_contains($texto, 'idempotent')
+            || str_contains($texto, 'mesma chave')
+        ) {
+            return true;
+        }
+
+        return $status === 409;
     }
 
     /**

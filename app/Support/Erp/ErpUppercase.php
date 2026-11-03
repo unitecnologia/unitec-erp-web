@@ -23,6 +23,8 @@ final class ErpUppercase
         'param_gestor_public_url',
         'param_boleto_callback_url',
         'param_portal_contador_sistema_contabil',
+        'param_vendas_internas_tipos_venda',
+        'param_monitor_vendas_desconto_reais_item_modo',
     ];
 
     /** @var list<string> */

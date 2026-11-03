@@ -5,12 +5,14 @@
     $statusAtual = filled($this->statusFilter)
         ? (string) $this->statusFilter
         : PdvVendaNfce::TAB_TRANSMITIDOS;
+    $statusCounts = $this->statusTabCounts;
 @endphp
 
 <div
     class="erp-nfe__tabs-wrap erp-list-tabs"
     wire:ignore
     x-data="{ statusAtivo: @js($statusAtual) }"
+    x-on:erp-nfce-status.window="statusAtivo = $event.detail || @js(PdvVendaNfce::TAB_TRANSMITIDOS)"
 >
     <div class="erp-nfe__tabs">
         @foreach ($statusTabs as $value => $label)
@@ -24,7 +26,10 @@
                     const t = (window.Livewire?.getByName?.('erp.nfce-list-table') || [])[0];
                     if (t) t.call('setStatusFilter', @js($value));
                 "
-            >{{ $label }}</button>
+            >
+                <span>{{ $label }}</span>
+                <span class="erp-nfe__tab-count" data-erp-nfce-tab-count="{{ $value }}">{{ $statusCounts[$value] ?? '(0)' }}</span>
+            </button>
         @endforeach
     </div>
 </div>

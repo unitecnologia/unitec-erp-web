@@ -61,6 +61,22 @@ final class CaixaLancamentoOrigemResolver
             return $this->detalheCompra((string) $m[1], $historico, $movimento);
         }
 
+        if (CaixaTransferencia::isDocumentoTransferencia($documento)) {
+            $tipo = ((float) $lancamento->saida > 0) ? 'Saída (origem)' : 'Entrada (destino)';
+
+            return $this->linhas([
+                $this->linha('Origem', 'Transferência entre contas'),
+                $this->linha('Tipo', $tipo),
+                $this->linha('Documento', mb_strtoupper($documento, 'UTF-8')),
+                $this->linha('Valor no caixa', $this->money($movimento), money: true),
+                $this->linha(
+                    'Observação',
+                    'Par vinculado pelo mesmo documento TRF-. Exclusão estorna os dois lados juntos.',
+                    wide: true,
+                ),
+            ]);
+        }
+
         if (preg_match('/^PDV-CX-/iu', $documento) || preg_match('/^FECHAMENTO DO CX/iu', $historico)) {
             return $this->linhas([
                 $this->linha('Origem', 'Fechamento PDV (consolidado)'),

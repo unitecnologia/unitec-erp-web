@@ -116,6 +116,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/r/{slug}/chart', [TabularReportController::class, 'chart'])
         ->where('slug', '[a-z0-9\-]+')
         ->name('erp.reports.tabular.chart');
+    Route::get('/admin/reports/r/{slug}/details', [TabularReportController::class, 'details'])
+        ->where('slug', '[a-z0-9\-]+')
+        ->name('erp.reports.tabular.details');
     Route::get('/admin/reports/r/{slug}', TabularReportController::class)
         ->where('slug', '[a-z0-9\-]+')
         ->name('erp.reports.tabular');
@@ -124,6 +127,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('erp.reports.pdv-cupom');
     Route::get('/admin/reports/pdv-resumo-caixa/{sessao}', \App\Http\Controllers\Erp\PdvCaixaResumoReportController::class)
         ->name('erp.reports.pdv-resumo-caixa');
+    Route::get('/admin/reports/caixa-livro-fechamento/{movimento}', \App\Http\Controllers\Erp\CaixaLivroFechamentoReportController::class)
+        ->middleware('erp.permission:caixa.print')
+        ->name('erp.reports.caixa-livro-fechamento');
     Route::get('/admin/print/pdv-resumo-caixa-escpos/{sessao}', PdvCaixaResumoEscPosPrintController::class)
         ->name('erp.print.pdv-resumo-caixa-escpos');
     Route::get('/admin/reports/pdv-movimento-caixa/{movimento}', PdvMovimentoCaixaReportController::class)

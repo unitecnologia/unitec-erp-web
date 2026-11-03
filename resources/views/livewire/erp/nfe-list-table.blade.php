@@ -2,7 +2,7 @@
     $columns = [
         ['key' => 'selecao', 'label' => '', 'sortable' => false, 'align' => 'center'],
         ['key' => 'numero', 'label' => 'Número', 'sortable' => true, 'align' => 'center'],
-        ['key' => 'npedido', 'label' => 'OS/DAV', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'npedido', 'label' => 'Ped/OS', 'sortable' => false, 'align' => 'start'],
         ['key' => 'data_emissao', 'label' => 'Dt.Emissão', 'sortable' => true, 'align' => 'center'],
         ['key' => 'data_saida', 'label' => 'Dt.Saída', 'sortable' => false, 'align' => 'center'],
         ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start'],

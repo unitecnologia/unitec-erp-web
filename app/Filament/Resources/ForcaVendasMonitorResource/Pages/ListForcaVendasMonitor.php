@@ -30,6 +30,7 @@ use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\ForcaVendas\ForcaVendasCancelamentoBoletoPendenteException;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasMonitorCancelamentoService;
+use App\Support\ForcaVendas\ForcaVendasMonitorTotaisAggregator;
 use App\Support\ForcaVendas\ForcaVendasTelaVendaService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -363,10 +364,11 @@ class ListForcaVendasMonitor extends ListRecords
         }
 
         if ($plataforma === 'fv') {
+            // Exclui SCV (rótulo ERP) para o filtro "Força de Vendas" bater com a coluna.
             $query->where(function (Builder $q): void {
                 $q->whereNull('payload')
                     ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) IS NULL")
-                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) NOT IN ('vendas_internas', 'mercado_livre')");
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) NOT IN ('vendas_internas', 'mercado_livre', 'scv')");
             });
 
             return;
@@ -525,7 +527,7 @@ class ListForcaVendasMonitor extends ListRecords
     {
         return Person::query()
             ->where('is_cliente', true)
-            ->whereIn('id', ForcaVendasOrder::query()->whereNotNull('cliente_id')->distinct()->pluck('cliente_id'))
+            ->whereIn('id', ForcaVendasMonitorResource::ordersQuery()->whereNotNull('cliente_id')->distinct()->pluck('cliente_id'))
             ->orderBy('nome_razao')
             ->pluck('nome_razao', 'id')
             ->all();
@@ -535,16 +537,60 @@ class ListForcaVendasMonitor extends ListRecords
     public function vendedoresOptions(): array
     {
         return Vendedor::query()
-            ->whereIn('id', ForcaVendasOrder::query()->whereNotNull('vendedor_id')->distinct()->pluck('vendedor_id'))
+            ->whereIn('id', ForcaVendasMonitorResource::ordersQuery()->whereNotNull('vendedor_id')->distinct()->pluck('vendedor_id'))
             ->orderBy('nome')
             ->pluck('nome', 'id')
             ->all();
     }
 
+    /**
+     * Identificação discreta da empresa ativa na barra de filtros (só leitura).
+     * Ex.: "Loja 01 — JONITAM CONFECÇÕES LTDA"
+     */
+    #[Computed]
+    public function empresaLojaRotulo(): string
+    {
+        $empresa = ErpContext::currentEmpresa();
+
+        if (! $empresa) {
+            return 'Loja —';
+        }
+
+        $codigo = (int) ($empresa->codigo ?? 0);
+        if ($codigo <= 0) {
+            $codigo = (int) ($empresa->id ?? 0);
+        }
+
+        $loja = $codigo > 0
+            ? str_pad((string) $codigo, 2, '0', STR_PAD_LEFT)
+            : '—';
+
+        $nome = trim((string) (
+            $empresa->fantasia
+            ?: $empresa->nome
+            ?: ($empresa->razao_social ?? '')
+        ));
+
+        return $nome !== ''
+            ? 'Loja '.$loja.' — '.$nome
+            : 'Loja '.$loja;
+    }
+
+    /**
+     * Totais do rodapé da grade (todos os registros filtrados, não só a página).
+     *
+     * @return array{desconto: float, acrescimo: float, bruto: float, liquido: float, qtd: int}
+     */
+    #[Computed]
+    public function totaisFiltrados(): array
+    {
+        return ForcaVendasMonitorTotaisAggregator::fromQuery($this->getTableQuery());
+    }
+
     #[Computed]
     public function totalFiltrado(): float
     {
-        return (float) $this->getTableQuery()->sum('total');
+        return (float) ($this->totaisFiltrados['liquido'] ?? 0);
     }
 
     public function content(Schema $schema): Schema
@@ -554,6 +600,7 @@ class ListForcaVendasMonitor extends ListRecords
             ->components([
                 View::make('filament.components.erp.forca-vendas.monitor-screen'),
                 EmbeddedTable::make()->columnSpanFull(),
+                View::make('filament.components.erp.forca-vendas.monitor-footer-totais'),
                 View::make('filament.components.erp.forca-vendas.monitor-detalhe-host'),
                 View::make('filament.components.erp.forca-vendas.monitor-cancel-modal'),
                 View::make('filament.components.erp.forca-vendas.monitor-clonar-pedido-modal'),
@@ -576,14 +623,14 @@ class ListForcaVendasMonitor extends ListRecords
             return null;
         }
 
-        return ForcaVendasOrder::query()
+        return ForcaVendasMonitorResource::ordersQuery()
             ->with(['pedido', 'cliente'])
             ->find($this->financeiroOrderId);
     }
 
     public function abrirLiberacaoFinanceira(int $orderId): void
     {
-        $order = ForcaVendasOrder::query()->find($orderId);
+        $order = ForcaVendasMonitorResource::ordersQuery()->find($orderId);
         if (! $order || $order->situacao !== ForcaVendasOrder::SITUACAO_FINANCEIRO) {
             $this->avisa('Pedido não está aguardando liberação financeira.', 'warning');
 
@@ -808,7 +855,7 @@ class ListForcaVendasMonitor extends ListRecords
     {
         return Person::query()
             ->where('is_cliente', true)
-            ->whereIn('id', ForcaVendasOrder::query()->whereNotNull('cliente_id')->distinct()->pluck('cliente_id'))
+            ->whereIn('id', ForcaVendasMonitorResource::ordersQuery()->whereNotNull('cliente_id')->distinct()->pluck('cliente_id'))
             ->orderBy('nome_razao')
             ->get(['id', 'nome_razao', 'apelido_fantasia', 'cpf_cnpj'])
             ->map(fn (Person $p): array => [
@@ -847,7 +894,7 @@ class ListForcaVendasMonitor extends ListRecords
             ->all();
 
         // Meios já usados em pedidos (mesmo inativos / textos do app).
-        $usados = ForcaVendasOrder::query()
+        $usados = ForcaVendasMonitorResource::ordersQuery()
             ->where('tipo', 'pedido')
             ->whereNotNull('payload')
             ->selectRaw("DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento')) as forma")
@@ -1360,7 +1407,7 @@ class ListForcaVendasMonitor extends ListRecords
         $ok = false;
         $erro = null;
 
-        $order = ForcaVendasOrder::query()->with('pedido')->find((int) $item['id']);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido')->find((int) $item['id']);
 
         if (! $order instanceof ForcaVendasOrder || $order->pedido === null) {
             $erro = 'Pedido não encontrado.';
@@ -1610,7 +1657,7 @@ class ListForcaVendasMonitor extends ListRecords
         $item = $this->cancelarFila[$this->cancelarFilaIndex];
         $numero = (string) $item['numero'];
         $etapa = 'Validando pedido';
-        $order = ForcaVendasOrder::query()->with('pedido')->find((int) $item['id']);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido')->find((int) $item['id']);
 
         if (! $order instanceof ForcaVendasOrder) {
             return $this->registrarResultadoCancelamento($item, false, $etapa, 'Pedido não encontrado.');
@@ -1832,7 +1879,7 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        $order = ForcaVendasOrder::query()->with('pedido')->find($orderId);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido')->find($orderId);
 
         if (! $order instanceof ForcaVendasOrder) {
             $this->avisa('Pedido não encontrado.', 'warning');
@@ -1873,7 +1920,7 @@ class ListForcaVendasMonitor extends ListRecords
 
         $numero = $this->reabrirNumero;
         $etapa = 'Validando pedido';
-        $order = ForcaVendasOrder::query()->with('pedido')->find($this->reabrirOrderId);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido')->find($this->reabrirOrderId);
 
         if (! $order instanceof ForcaVendasOrder) {
             return $this->guardarReabertura(false, $numero, $etapa, 'Pedido não encontrado.', false, false);
@@ -2457,7 +2504,7 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        $order = ForcaVendasOrder::query()->with('pedido')->find($recordId);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido')->find($recordId);
 
         if (! $order) {
             $this->avisa('Pedido não encontrado.', 'warning');
@@ -2532,7 +2579,7 @@ class ListForcaVendasMonitor extends ListRecords
             return $this->guardarClonagem(false, 'Validando pedido cancelado', 'Usuário não autenticado.', null);
         }
 
-        $order = ForcaVendasOrder::query()->with('pedido.itens')->find($this->clonarPedidoOrderId);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido.itens')->find($this->clonarPedidoOrderId);
 
         if (! $order instanceof ForcaVendasOrder) {
             return $this->guardarClonagem(false, 'Validando pedido cancelado', 'Pedido não encontrado.', null);
@@ -2616,7 +2663,7 @@ class ListForcaVendasMonitor extends ListRecords
             return null;
         }
 
-        $order = ForcaVendasOrder::query()->with('pedido')->find($recordId);
+        $order = ForcaVendasMonitorResource::ordersQuery()->with('pedido')->find($recordId);
 
         if (! $order) {
             $this->avisa('Pedido não encontrado.', 'warning');

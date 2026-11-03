@@ -1,11 +1,11 @@
 @if ($this->activeModal === 'importar')
-    <div class="erp-pdv-modal" role="dialog" aria-label="Importar documento">
+    <div class="erp-pdv-modal erp-pdv-importar-orcamento" role="dialog" aria-label="Importar documento">
         <div class="erp-pdv-modal__backdrop" wire:click="cancelImportar"></div>
-        <div class="erp-pdv-modal__window erp-pdv-modal__window--wide">
-            <header class="erp-pdv-modal__header">
+        <div class="erp-pdv-modal__window erp-pdv-modal__window--wide erp-pdv-importar-orcamento__window">
+            <header class="erp-pdv-modal__header erp-pdv-importar-orcamento__header">
                 <h2>{{ $this->importarTitulo }}</h2>
             </header>
-            <div class="erp-pdv-modal__body">
+            <div class="erp-pdv-modal__body erp-pdv-importar-orcamento__body">
                 <label class="erp-pdv-modal__label" for="erp-pdv-importar-search">Número ou cliente</label>
                 <input
                     id="erp-pdv-importar-search"
@@ -16,8 +16,14 @@
                     data-erp-uppercase
                     autocomplete="off"
                 >
-                <div class="erp-pdv-modal__grid-scroll">
-                    <table class="erp-pdv__grid erp-pdv-modal__grid">
+                <div class="erp-pdv-modal__grid-scroll erp-pdv-importar-orcamento__grid-scroll">
+                    <table class="erp-pdv__grid erp-pdv-modal__grid erp-pdv-importar-orcamento__grid">
+                        <colgroup>
+                            <col class="erp-pdv-importar-orcamento__col-numero">
+                            <col class="erp-pdv-importar-orcamento__col-data">
+                            <col class="erp-pdv-importar-orcamento__col-cliente">
+                            <col class="erp-pdv-importar-orcamento__col-total">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Número</th>
@@ -28,25 +34,27 @@
                         </thead>
                         <tbody>
                             @forelse ($this->importarResults as $index => $row)
+                                @php($selecionado = (int) ($this->selectedImportarIndex ?? -1) === (int) $index)
                                 <tr
                                     wire:click="selectImportarRow({{ $index }})"
                                     wire:dblclick="confirmImportarOrcamento"
                                     wire:key="pdv-importar-{{ $row['orcamento_id'] ?? $index }}"
                                     id="erp-pdv-importar-row-{{ $index }}"
+                                    aria-selected="{{ $selecionado ? 'true' : 'false' }}"
                                     @class([
                                         'erp-pdv__grid-row',
-                                        'erp-pdv__grid-row--selected' => $this->selectedImportarIndex === $index,
+                                        'erp-pdv__grid-row--selected' => $selecionado,
                                     ])
                                 >
-                                    <td>{{ $row['numero'] ?? '—' }}</td>
-                                    <td>{{ $row['data'] ?? '' }}</td>
-                                    <td class="erp-pdv__grid-col-descricao">{{ $row['cliente'] ?? '—' }}</td>
-                                    <td class="erp-pdv__grid-col-num">{{ $row['total'] ?? '0,00' }}</td>
+                                    <td class="erp-pdv-importar-orcamento__numero">{{ $row['numero'] ?? '—' }}</td>
+                                    <td class="erp-pdv-importar-orcamento__data">{{ $row['data'] ?? '' }}</td>
+                                    <td class="erp-pdv__grid-col-descricao erp-pdv-importar-orcamento__cliente">{{ $row['cliente'] ?? '—' }}</td>
+                                    <td class="erp-pdv__grid-col-num erp-pdv-importar-orcamento__total">{{ $row['total'] ?? '0,00' }}</td>
                                 </tr>
                             @empty
                                 <tr class="erp-pdv__grid-empty">
                                     <td colspan="4">
-                                        Nenhum orçamento disponível para importação.
+                                        Nenhum orçamento fechado disponível para importação.
                                     </td>
                                 </tr>
                             @endforelse
@@ -54,7 +62,7 @@
                     </table>
                 </div>
             </div>
-            <footer class="erp-pdv-modal__footer">
+            <footer class="erp-pdv-modal__footer erp-pdv-importar-orcamento__footer">
                 <button type="button" wire:click="confirmImportarOrcamento" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary">Importar</button>
                 <button type="button" wire:click="backImportarMenu" class="erp-pdv-modal__btn">Voltar</button>
                 <button type="button" wire:click="cancelImportarMenu" class="erp-pdv-modal__btn">Cancelar</button>

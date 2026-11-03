@@ -45,7 +45,8 @@
             @forelse ($records as $index => $record)
                 @php
                     $cells = $formatter->format($record);
-                    $rowClass = 'fi-ta-row' . ($index % 2 === 1 ? ' fi-striped' : '');
+                    $extraRow = (string) ($cells['row_class'] ?? '');
+                    $rowClass = 'fi-ta-row' . ($index % 2 === 1 ? ' fi-striped' : '') . $extraRow;
                     unset($cells['row_class']);
                 @endphp
                 <tr class="{{ $rowClass }}" data-record-key="{{ $record->getKey() }}">

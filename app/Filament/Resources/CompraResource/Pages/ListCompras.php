@@ -2918,6 +2918,7 @@ JS);
     public function lancamentoParcelasSubcaixasOptions(): array
     {
         return CaixaConta::query()
+            ->visiveisNaEmpresa()
             ->where('ativo', true)
             ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
             ->orderBy('codigo')

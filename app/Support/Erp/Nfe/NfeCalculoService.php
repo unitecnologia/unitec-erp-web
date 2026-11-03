@@ -8,7 +8,10 @@ use App\Models\Product;
 
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Fiscal\IbptLookupService;
+use App\Support\Fiscal\IcmsStFcp;
 use App\Support\Fiscal\MeiFiscalNormalizer;
+use App\Support\Fiscal\PisCofinsCst;
+use App\Support\Fiscal\RegimeCrtMapper;
 
 final class NfeCalculoService
 
@@ -201,17 +204,35 @@ final class NfeCalculoService
                 ? (int) $row['origem']
                 : (int) ($product?->origem ?? 0);
 
+            // Nunca inventar CST 01/07: só produto, operação ou regra de devolução.
             $cstPis = filled($row['cst_pis'] ?? null)
                 ? (string) $row['cst_pis']
                 : ($isDevolucaoCompra
                     ? ($this->isEmpresaSimples($empresa) ? '99' : '49')
-                    : ($product?->cst_saida ?? '01'));
+                    : (filled($product?->cst_saida) ? (string) $product->cst_saida : ''));
 
             $cstCofins = filled($row['cst_cofins'] ?? null)
                 ? (string) $row['cst_cofins']
                 : ($isDevolucaoCompra
                     ? ($this->isEmpresaSimples($empresa) ? '99' : '49')
-                    : ($product?->cst_cofins ?? $product?->cst_saida ?? '01'));
+                    : (filled($product?->cst_cofins)
+                        ? (string) $product->cst_cofins
+                        : (filled($product?->cst_saida) ? (string) $product->cst_saida : '')));
+
+            $cstPisN = PisCofinsCst::normalizar($cstPis);
+            $cstCofinsN = PisCofinsCst::normalizar($cstCofins);
+
+            if (PisCofinsCst::isNt($cstPisN)) {
+                $basePis = 0.0;
+                $aliqPis = 0.0;
+                $valorPis = 0.0;
+            }
+
+            if (PisCofinsCst::isNt($cstCofinsN)) {
+                $baseCofins = 0.0;
+                $aliqCof = 0.0;
+                $valorCof = 0.0;
+            }
 
             $calculatedRows[] = [
 
@@ -289,6 +310,8 @@ final class NfeCalculoService
 
                 'valor_desoneracao' => $valorDesoneracao,
 
+                'ind_deduz_deson' => $this->resolveIndDeduzDeson($row),
+
                 'base_ipi' => $baseIpi,
 
                 'aliq_ipi' => $aliqIpi,
@@ -299,7 +322,7 @@ final class NfeCalculoService
                     ? (string) $row['cst_ipi']
                     : ($product?->cst_ipi ?? '99'),
 
-                'cst_pis' => $cstPis,
+                'cst_pis' => $cstPisN !== '' ? $cstPisN : $cstPis,
 
                 'base_pis_icms' => $basePis,
 
@@ -307,7 +330,7 @@ final class NfeCalculoService
 
                 'valor_pis_icms' => $valorPis,
 
-                'cst_cofins' => $cstCofins,
+                'cst_cofins' => $cstCofinsN !== '' ? $cstCofinsN : $cstCofins,
 
                 'base_cofins_icms' => $baseCofins,
 
@@ -350,6 +373,10 @@ final class NfeCalculoService
             $totais['outras'] += $outros;
 
             $totais['desoneracao'] += $valorDesoneracao;
+            $indDeduzDeson = $this->resolveIndDeduzDeson($row);
+            if ($valorDesoneracao > 0 && $indDeduzDeson === 1) {
+                $totais['desoneracao_deduzivel'] = (float) ($totais['desoneracao_deduzivel'] ?? 0) + $valorDesoneracao;
+            }
 
             $totais['base_icms'] += $baseIcms;
 
@@ -367,11 +394,103 @@ final class NfeCalculoService
 
             $totais['valor_cofins'] += $valorCof;
 
-            $baseSt = $this->rowMoney($row, 'base_icms_st', 0.0);
-            $valorSt = $this->rowMoney($row, 'valor_icms_st', 0.0);
+            $crtEmpresa = RegimeCrtMapper::toCrt($empresa?->regime_tributario ?? 'simples', false);
+            $baseStRaw = $this->rowMoney($row, 'base_icms_st', 0.0);
+            $aliqStRaw = $this->rowMoney($row, 'aliq_icms_st', 0.0);
+            $valorStRaw = $this->rowMoney($row, 'valor_icms_st', 0.0);
+            $baseStRet = $this->rowMoney($row, 'base_icms_st_ret', 0.0);
+            $pStRet = $this->rowMoney($row, 'p_st_ret', 0.0);
+            $valorStRet = $this->rowMoney($row, 'valor_icms_st_ret', 0.0);
+            $temStVals = $baseStRaw > 0 || $valorStRaw > 0 || $aliqStRaw > 0;
 
+            $modoSt = IcmsStFcp::modo(
+                $crtEmpresa,
+                (string) ($cst ?? ''),
+                (string) ($csosn ?? ''),
+                $temStVals,
+            );
+
+            $baseSt = 0.0;
+            $aliqSt = 0.0;
+            $valorSt = 0.0;
+            if ($modoSt === IcmsStFcp::MODO_COBRADA) {
+                $baseSt = $baseStRaw;
+                $aliqSt = $aliqStRaw;
+                $valorSt = $valorStRaw;
+            } elseif ($modoSt === IcmsStFcp::MODO_RETIDA) {
+                // Compat: CST 60/CSOSN 500 com valores só nos campos antigos.
+                if ($baseStRet <= 0 && $valorStRet <= 0 && $temStVals) {
+                    $baseStRet = $baseStRaw;
+                    $pStRet = $aliqStRaw;
+                    $valorStRet = $valorStRaw;
+                }
+            }
+
+            $pFcp = $this->rowMoney($row, 'p_fcp', (float) ($product?->fcp_pct ?? 0));
+            $vFcp = $this->rowMoney($row, 'vfcp', 0.0);
+            $vBcFcp = $this->rowMoney($row, 'v_bc_fcp', 0.0);
+            $vFcpSt = $modoSt === IcmsStFcp::MODO_COBRADA
+                ? $this->rowMoney($row, 'v_fcp_st', 0.0)
+                : 0.0;
+            $vBcFcpSt = $modoSt === IcmsStFcp::MODO_COBRADA
+                ? $this->rowMoney($row, 'v_bc_fcp_st', 0.0)
+                : 0.0;
+            // pFCPST não herda fcp_pct: alíquotas FCP e FCP-ST podem diferir na operação.
+            $pFcpSt = $modoSt === IcmsStFcp::MODO_COBRADA
+                ? $this->rowMoney($row, 'p_fcp_st', 0.0)
+                : 0.0;
+            if ($modoSt === IcmsStFcp::MODO_COBRADA && $vFcpSt > 0 && $vBcFcpSt <= 0 && $pFcpSt > 0) {
+                $vBcFcpSt = round($vFcpSt / ($pFcpSt / 100), 2);
+            }
+            $vFcpStRet = $modoSt === IcmsStFcp::MODO_RETIDA
+                ? $this->rowMoney($row, 'v_fcp_st_ret', 0.0)
+                : 0.0;
+            $pFcpStRet = $modoSt === IcmsStFcp::MODO_RETIDA
+                ? $this->rowMoney($row, 'p_fcp_st_ret', 0.0)
+                : 0.0;
+            $vBcFcpStRet = $modoSt === IcmsStFcp::MODO_RETIDA
+                ? $this->rowMoney($row, 'v_bc_fcp_st_ret', 0.0)
+                : 0.0;
+
+            // ST/FCP retidos são informativos — não somam em base_st/valor_st/total.
             $totais['base_st'] += $baseSt;
             $totais['valor_st'] += $valorSt;
+            $totais['valor_fcp'] += $vFcp;
+            $totais['valor_fcp_st'] += $vFcpSt;
+            $totais['valor_fcp_st_ret'] += $vFcpStRet;
+            $totais['base_st_ret'] += $baseStRet;
+            $totais['valor_st_ret'] += $valorStRet;
+
+            $idx = array_key_last($calculatedRows);
+            if ($idx !== null) {
+                $calculatedRows[$idx]['base_icms_st'] = $baseSt;
+                $calculatedRows[$idx]['aliq_icms_st'] = $aliqSt;
+                $calculatedRows[$idx]['valor_icms_st'] = $valorSt;
+                $calculatedRows[$idx]['mod_bc_st'] = filled($row['mod_bc_st'] ?? null)
+                    ? (string) $row['mod_bc_st']
+                    : null;
+                $calculatedRows[$idx]['p_mva_st'] = $this->rowMoney(
+                    $row,
+                    'p_mva_st',
+                    (float) ($product?->mva_pct ?? 0),
+                );
+                $calculatedRows[$idx]['p_red_bc_st'] = $this->rowMoney($row, 'p_red_bc_st', 0.0);
+                $calculatedRows[$idx]['p_fcp'] = $pFcp;
+                $calculatedRows[$idx]['vfcp'] = $vFcp;
+                $calculatedRows[$idx]['v_bc_fcp'] = $vBcFcp;
+                $calculatedRows[$idx]['v_bc_fcp_st'] = $vBcFcpSt;
+                $calculatedRows[$idx]['p_fcp_st'] = $pFcpSt;
+                $calculatedRows[$idx]['v_fcp_st'] = $vFcpSt;
+                $calculatedRows[$idx]['base_icms_st_ret'] = $baseStRet;
+                $calculatedRows[$idx]['p_st_ret'] = $pStRet;
+                $calculatedRows[$idx]['valor_icms_st_ret'] = $valorStRet;
+                $calculatedRows[$idx]['v_icms_substituto'] = $modoSt === IcmsStFcp::MODO_RETIDA
+                    ? $this->rowMoney($row, 'v_icms_substituto', 0.0)
+                    : 0.0;
+                $calculatedRows[$idx]['v_bc_fcp_st_ret'] = $vBcFcpStRet;
+                $calculatedRows[$idx]['p_fcp_st_ret'] = $pFcpStRet;
+                $calculatedRows[$idx]['v_fcp_st_ret'] = $vFcpStRet;
+            }
 
             $totais['trib_fed'] += $ibpt['trib_fed'];
             $totais['trib_est'] += $ibpt['trib_est'];
@@ -392,8 +511,29 @@ final class NfeCalculoService
         $totais['frete'] = round($totais['frete'], 2);
         $totais['seguro'] = round($totais['seguro'], 2);
         $totais['outras'] = round($totais['outras'], 2);
+        $totais['base_st'] = round((float) $totais['base_st'], 2);
+        $totais['valor_st'] = round((float) $totais['valor_st'], 2);
+        $totais['valor_fcp'] = round((float) ($totais['valor_fcp'] ?? 0), 2);
+        $totais['valor_fcp_st'] = round((float) ($totais['valor_fcp_st'] ?? 0), 2);
+        $totais['valor_fcp_st_ret'] = round((float) ($totais['valor_fcp_st_ret'] ?? 0), 2);
+        $totais['base_st_ret'] = round((float) ($totais['base_st_ret'] ?? 0), 2);
+        $totais['valor_st_ret'] = round((float) ($totais['valor_st_ret'] ?? 0), 2);
+        $totais['desoneracao'] = round((float) ($totais['desoneracao'] ?? 0), 2);
+        $totais['desoneracao_deduzivel'] = round((float) ($totais['desoneracao_deduzivel'] ?? 0), 2);
+        $totais['valor_ipi'] = round((float) ($totais['valor_ipi'] ?? 0), 2);
+        // W16-10 + NT 2023.004 v1.11 / financeiro:
+        // vProd - vDesc - vICMSDeson(só indDeduzDeson=1) + vST + vFCPST + frete/seg/outro + vIPI
+        // FCP próprio, ST/FCP retidos, vPIS/vCOFINS NÃO entram.
         $totais['total'] = round(
-            $totais['subtotal'] - $totais['desconto'] + $totais['frete'] + $totais['seguro'] + $totais['outras'],
+            $totais['subtotal']
+            - $totais['desconto']
+            - $totais['desoneracao_deduzivel']
+            + $totais['frete']
+            + $totais['seguro']
+            + $totais['outras']
+            + $totais['valor_st']
+            + $totais['valor_fcp_st']
+            + $totais['valor_ipi'],
             2,
         );
         $totais['trib_fed'] = round((float) $totais['trib_fed'], 2);
@@ -451,6 +591,8 @@ final class NfeCalculoService
 
             'desoneracao' => 0.0,
 
+            'desoneracao_deduzivel' => 0.0,
+
             'base_icms' => 0.0,
 
             'valor_icms' => 0.0,
@@ -458,6 +600,16 @@ final class NfeCalculoService
             'base_st' => 0.0,
 
             'valor_st' => 0.0,
+
+            'base_st_ret' => 0.0,
+
+            'valor_st_ret' => 0.0,
+
+            'valor_fcp' => 0.0,
+
+            'valor_fcp_st' => 0.0,
+
+            'valor_fcp_st_ret' => 0.0,
 
             'base_ipi' => 0.0,
 
@@ -663,6 +815,33 @@ final class NfeCalculoService
 
         return $default;
 
+    }
+
+    /**
+     * NT 2023.004 v1.11: 1 = deduz do vNF; 0 ou ausente = não deduz (Exceção 4 W16-10).
+     * motDesICMS=7 (SUFRAMA) com valor de desoneração → obrigatoriamente 1.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function resolveIndDeduzDeson(array $row): ?int
+    {
+        $vDeson = $this->rowMoney($row, 'valor_desoneracao', 0.0);
+        $mot = preg_replace('/\D/', '', (string) ($row['motivo_desoneracao'] ?? '')) ?? '';
+        $mot = $mot === '' ? '' : (string) ((int) $mot);
+
+        if ($vDeson > 0 && $mot === '7') {
+            return 1;
+        }
+
+        if (! array_key_exists('ind_deduz_deson', $row) || $row['ind_deduz_deson'] === '' || $row['ind_deduz_deson'] === null) {
+            return null;
+        }
+
+        $raw = is_numeric($row['ind_deduz_deson'])
+            ? (int) $row['ind_deduz_deson']
+            : (int) preg_replace('/\D/', '', (string) $row['ind_deduz_deson']);
+
+        return $raw === 1 ? 1 : 0;
     }
 
     /**

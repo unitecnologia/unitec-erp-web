@@ -186,6 +186,7 @@
     @include('filament.components.erp.produtos.form.ncm-confirm-modal')
     @include('filament.components.erp.produtos.form.duplicate-confirm-modal')
     @include('filament.components.erp.produtos.form.exit-confirm-modal')
+    @include('filament.components.erp.produtos.form.imposto-padrao-restore-modal')
     @include('filament.components.erp.produtos.form.precificacao-modal')
     @include('filament.components.erp.produtos.form.replica-precos-modal')
     @include('filament.components.erp.fiscal.cclass-trib-modal')

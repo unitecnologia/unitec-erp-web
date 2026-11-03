@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\VendasInternas;
 
+use App\Models\CaixaConta;
 use App\Models\User;
 use App\Models\VendasInternasDevice;
+use App\Support\Erp\EmpresaParametros;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -122,14 +124,26 @@ class AuthController
      */
     private function userPayload(User $user): array
     {
+        $user->loadMissing(['vendedor.usuario']);
+
+        $vendedor = $user->vendedor;
+        // Mesma regra da Força de Vendas: Permissões → Caixas (empresa);
+        // sem vínculo → CAIXA GERAL.
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+        $caixa = $vendedor?->caixaContaDaEmpresa($empresaId)
+            ?? CaixaConta::ensureCaixaGeral();
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'empresa_id' => $user->empresa_id,
             'vendedor_id' => $user->vendedor_id,
-            'vendedor_nome' => $user->vendedor?->nome,
+            'vendedor_nome' => $vendedor?->nome,
+            'caixa_id' => $caixa->id,
+            'caixa_nome' => $caixa->nome,
             'is_admin' => (bool) $user->is_admin,
             'permissions' => $user->effectivePermissionKeys(),
+            'vendas_internas' => EmpresaParametros::vendasInternasAppConfig($empresaId),
         ];
     }
 }

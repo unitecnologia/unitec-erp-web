@@ -19,23 +19,59 @@ final class CaixaListRowFormatter
      */
     public function format(CaixaLancamento $record): array
     {
+        $evento = (string) ($record->getAttribute('livro_evento') ?? '');
+        $isAbertura = $evento === 'abertura' || (bool) $record->getAttribute('livro_abertura');
+        $isFechamento = $evento === 'fechamento' || (bool) $record->getAttribute('livro_fechamento');
+        $isVirtual = $isAbertura || $isFechamento;
+
         $historico = mb_strtoupper(
             preg_replace('/^\[MANUAL\]\s*/iu', '', (string) ($record->historico ?? '')) ?? '',
             'UTF-8',
         );
 
-        $historico = self::comSessaoPdv($historico, $record);
+        if (! $isVirtual) {
+            $historico = self::comSessaoPdv($historico, $record);
+        }
+
+        $emissao = match (true) {
+            $isAbertura => (string) ($record->getAttribute('livro_abertura_em') ?: $this->formatData($record->emissao)),
+            $isFechamento => (string) ($record->getAttribute('livro_fechamento_em') ?: $this->formatData($record->emissao)),
+            default => $this->formatData($record->emissao),
+        };
+
+        $documento = match (true) {
+            $isAbertura => 'ABERTURA',
+            $isFechamento => 'FECHAMENTO',
+            default => ContaReceberPedidoExibicao::texto($record->documento, $this->pedidosMonitor),
+        };
+
+        $rowClass = match (true) {
+            $isAbertura => ' erp-caixa-row--abertura',
+            $isFechamento => ' erp-caixa-row--fechamento',
+            default => '',
+        };
+
+        $verItens = '';
+        if ($isFechamento) {
+            $movId = (int) ($record->getAttribute('livro_movimento_id') ?? 0);
+            $verItens = $this->formatFechamentoButton($movId);
+        } elseif (! $isVirtual) {
+            $verItens = $this->formatViewButton((int) $record->getKey());
+        }
 
         return [
-            'codigo' => e((string) ($record->codigo ?? '—')),
-            'emissao' => e($this->formatData($record->emissao)),
-            'documento' => e(ContaReceberPedidoExibicao::texto($record->documento, $this->pedidosMonitor)),
+            'codigo' => e($isVirtual ? '—' : (string) ($record->codigo ?? '—')),
+            'emissao' => e($emissao),
+            'documento' => e($documento),
             'historico' => e($historico !== '' ? $historico : '—'),
-            'plano_contas' => filled($record->plano_contas) ? e((string) $record->plano_contas) : '—',
+            'plano_contas' => $isVirtual
+                ? 'CONFERÊNCIA'
+                : (filled($record->plano_contas) ? e((string) $record->plano_contas) : '—'),
             'conta' => e($record->conta?->nome ?? '—'),
             'entrada' => $this->formatMoneyCell((float) ($record->entrada ?? 0)),
             'saida' => $this->formatMoneyCell((float) ($record->saida ?? 0)),
-            'ver_itens' => $this->formatViewButton((int) $record->getKey()),
+            'ver_itens' => $verItens,
+            'row_class' => $rowClass,
         ];
     }
 
@@ -88,6 +124,23 @@ final class CaixaListRowFormatter
             . ' wire:click.stop="$dispatch(\'erp-caixa-open-view\', { lancamentoId: '.$lancamentoId.' })"'
             . ' wire:keydown.enter.stop="$dispatch(\'erp-caixa-open-view\', { lancamentoId: '.$lancamentoId.' })"'
             . ' class="erp-caixa__eye-btn" title="Visualizar lançamento" aria-label="Visualizar lançamento">'
+            . '<svg class="erp-caixa__eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"'
+            . ' stroke-width="1.75" stroke="currentColor" aria-hidden="true">'
+            . '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>'
+            . '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>'
+            . '</svg></span>';
+    }
+
+    private function formatFechamentoButton(int $movimentoId): string
+    {
+        if ($movimentoId <= 0) {
+            return '';
+        }
+
+        return '<span role="button" tabindex="0"'
+            . ' wire:click.stop="$dispatch(\'erp-caixa-open-fechamento\', { movimentoId: '.$movimentoId.' })"'
+            . ' wire:keydown.enter.stop="$dispatch(\'erp-caixa-open-fechamento\', { movimentoId: '.$movimentoId.' })"'
+            . ' class="erp-caixa__eye-btn" title="Consultar fechamento" aria-label="Consultar fechamento">'
             . '<svg class="erp-caixa__eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"'
             . ' stroke-width="1.75" stroke="currentColor" aria-hidden="true">'
             . '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>'

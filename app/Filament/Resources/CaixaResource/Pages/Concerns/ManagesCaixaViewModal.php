@@ -18,6 +18,24 @@ trait ManagesCaixaViewModal
 
     public function openCaixaView(int $lancamentoId): void
     {
+        $display = \App\Support\Erp\Financeiro\CaixaLivroAberturaDisplay::class;
+
+        if ($display::isLinhaFechamento($lancamentoId)) {
+            $this->selecionarHistoricoFechamento($display::movimentoIdFromVirtual($lancamentoId));
+
+            return;
+        }
+
+        if ($display::isLinhaVirtual($lancamentoId)) {
+            Notification::make()
+                ->title('Abertura de caixa')
+                ->body('Linha de conferência do troco inicial — sem lançamento financeiro vinculado.')
+                ->info()
+                ->send();
+
+            return;
+        }
+
         $lancamento = $lancamentoId < 0
             ? (new CaixaListQueryBuilder(contaFilter: $this->contaFilter, applyDefaultOrder: false))
                 ->buildForList()

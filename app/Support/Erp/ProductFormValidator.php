@@ -340,12 +340,24 @@ class ProductFormValidator
      */
     public static function fiscalDefaultsFromEmpresa(?Empresa $empresa): array
     {
-        $pad = static fn (?string $value, string $fallback, int $length): string => str_pad(
-            substr(trim((string) ($value ?: $fallback)), 0, $length),
-            $length,
-            '0',
-            STR_PAD_LEFT,
-        );
+        // CRT 3: herda exatamente o Imposto Padrão (pode vir vazio — contador preenche).
+        // Demais regimes: se o campo da empresa estiver vazio, usa fallback histórico do Simples.
+        $crt = \App\Support\Fiscal\RegimeCrtMapper::toCrt($empresa?->regime_tributario ?? 'simples', false);
+        $exatoQuandoVazio = $crt === 3;
+
+        $pad = static function (?string $value, string $fallback, int $length) use ($exatoQuandoVazio): string {
+            $trimmed = trim((string) ($value ?? ''));
+            if ($trimmed === '') {
+                return $exatoQuandoVazio ? '' : str_pad(
+                    substr($fallback, 0, $length),
+                    $length,
+                    '0',
+                    STR_PAD_LEFT,
+                );
+            }
+
+            return str_pad(substr($trimmed, 0, $length), $length, '0', STR_PAD_LEFT);
+        };
 
         $nullable = static function (mixed $value): ?string {
             $trimmed = trim((string) ($value ?? ''));
@@ -361,13 +373,11 @@ class ProductFormValidator
 
         $cst = $pad($empresa?->param_imp_icms_cst ?? null, '000', 3);
         $csosn = $pad($empresa?->param_imp_csosn ?? null, '102', 3);
-        $cstExterno = $pad($empresa?->param_imp_icms_cst_externo ?? null, $cst, 3);
-        $csosnExterno = $pad($empresa?->param_imp_csosn_externo ?? null, $csosn, 3);
+        $cstExterno = $pad($empresa?->param_imp_icms_cst_externo ?? null, $cst !== '' ? $cst : '000', 3);
+        $csosnExterno = $pad($empresa?->param_imp_csosn_externo ?? null, $csosn !== '' ? $csosn : '102', 3);
 
-        $fcp = $empresa?->param_imp_fcp_pct;
-        if ($fcp === null || $fcp === '') {
-            $fcp = $empresa?->param_difal_fcp_pct ?? 0;
-        }
+        // Só Imposto Padrão / produto — sem copiar DIFAL.
+        $fcp = $empresa?->param_imp_fcp_pct ?? 0;
 
         $motivoDeson = $nullable($empresa?->param_imp_motivo_desoneracao);
 
