@@ -1229,7 +1229,11 @@ trait ManagesNfeEmissaoModal
     #[Computed]
     public function nfeMeiosPagamentoOptions(): array
     {
-        $options = [];
+        $options = [[
+            'value' => 'sem_pagamento',
+            'label' => 'SEM PAGAMENTO',
+            'tipo' => 'sem_pagamento',
+        ]];
 
         foreach ($this->formasPagamentoAtivasParaNfe() as $forma) {
             $label = mb_strtoupper(trim((string) $forma->descricao), 'UTF-8');
@@ -1283,6 +1287,11 @@ trait ManagesNfeEmissaoModal
     {
         $stored = trim((string) $stored);
         $formas = $this->formasPagamentoAtivasParaNfe();
+
+        $tipoStored = mb_strtolower($stored, 'UTF-8');
+        if (in_array($tipoStored, ['sem_pagamento', 'sem pagamento', '90'], true)) {
+            return 'sem_pagamento';
+        }
 
         if ($formas === []) {
             return $stored !== '' ? $stored : 'dinheiro';

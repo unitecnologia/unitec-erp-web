@@ -73,6 +73,7 @@ final class FormaPagamentoTPagMap
             'pix' => '17',
             'transferencia' => '18',
             'troca' => '99',
+            'sem_pagamento' => '90',
             default => '01',
         };
     }
@@ -84,6 +85,7 @@ final class FormaPagamentoTPagMap
         return match ($tipo) {
             'cartao' => 'cartao_credito',
             'credito_loja' => 'crediario',
+            '90', 'sem pagamento' => 'sem_pagamento',
             default => $tipo,
         };
     }

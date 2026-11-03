@@ -93,8 +93,8 @@ final class NfeXmlBuilder
         $this->appendTotais($infNFe, $request, $totaisImposto);
         $this->appendTransporte($infNFe, $request);
         $this->appendCobranca($infNFe, $request);
-        // Devolução (finNFe=4): SEFAZ exige tPag=90 (Sem Pagamento).
-        $pagamentos = $request->finNFe === 4
+        // AJUSTE (3) e DEVOLUÇÃO (4): SEFAZ exige tPag=90 / vPag=0 (rejeição 871).
+        $pagamentos = in_array($request->finNFe, [3, 4], true)
             ? [new PagamentoDto('90', 0.0)]
             : $request->pagamentos;
         $this->appendPagamentos($infNFe, $pagamentos);

@@ -258,7 +258,7 @@ final class NfeFiscalPayloadBuilder
             valorOutros: $this->sumItensCampo($nfe, 'outros'),
             valorTotTrib: $valorTotTrib,
             dataSaida: $dataSaida,
-            parcelas: ($finNFe === 4 || $this->isTrocaEmGarantia($nfe)) ? [] : $parcelas,
+            parcelas: ($this->exigeSemPagamento($finNFe, $nfe)) ? [] : $parcelas,
             informacoesComplementares: $informacoesContribuinte,
             informacoesFisco: $informacoesFisco,
             pagamentos: $this->mapPagamentos($nfe, $finNFe),
@@ -719,12 +719,19 @@ final class NfeFiscalPayloadBuilder
     }
 
     /**
+     * AJUSTE (3), DEVOLUÇÃO (4) e troca em garantia: SEFAZ exige tPag=90 / vPag=0 (rejeição 871).
+     */
+    private function exigeSemPagamento(int $finNFe, Nfe $nfe): bool
+    {
+        return in_array($finNFe, [3, 4], true) || $this->isTrocaEmGarantia($nfe);
+    }
+
+    /**
      * @return list<PagamentoDto>
      */
     private function mapPagamentos(Nfe $nfe, int $finNFe = 1): array
     {
-        // Devolução (finNFe=4) e troca em garantia: sem pagamento (tPag=90).
-        if ($finNFe === 4 || $this->isTrocaEmGarantia($nfe)) {
+        if ($this->exigeSemPagamento($finNFe, $nfe)) {
             return [new PagamentoDto(tipo: '90', valor: 0.0)];
         }
 

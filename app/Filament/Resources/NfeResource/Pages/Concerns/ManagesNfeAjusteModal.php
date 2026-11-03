@@ -307,8 +307,8 @@ trait ManagesNfeAjusteModal
             $this->nfeForm['movimento'] = 'entrada';
             $this->nfeForm['natureza_operacao'] = (string) $payload['natureza_operacao'];
             $this->nfeForm['obs_fisco'] = (string) $payload['obs_fisco'];
-            $this->nfeForm['forma_pgto'] = (string) ($payload['forma_pgto'] ?? 'a_vista');
-            $this->nfeForm['meio_pgto'] = $this->normalizeNfeMeioPgto($payload['meio_pgto'] ?? 'dinheiro');
+            $this->nfeForm['forma_pgto'] = (string) ($payload['forma_pgto'] ?? 'outros');
+            $this->nfeForm['meio_pgto'] = $this->normalizeNfeMeioPgto($payload['meio_pgto'] ?? 'sem_pagamento');
             $this->nfeForm['data_emissao'] = (string) $payload['data_emissao'];
             $this->nfeForm['data_saida'] = (string) $payload['data_saida'];
             $this->nfeForm['natureza_operacao'] = (string) $payload['natureza_operacao'];
@@ -320,6 +320,7 @@ trait ManagesNfeAjusteModal
 
             $this->nfeModalReferencias = $payload['referencias'] ?? [];
             $this->nfeModalRows = $payload['rows'] ?? [];
+            // Estorno AJUSTE: sem duplicatas/cobrança (XML com tPag=90 / vPag=0).
             $this->nfeModalFaturas = [];
             $this->nfeSelectedRowIndex = $this->nfeModalRows === [] ? null : 0;
             $this->nfeModalMainTab = 'itens';
