@@ -6,9 +6,10 @@
 .DESCRIPTION
     Chamado pelo apply da atualizacao quando o pacote traz runtime-update.
     Para o servico, aplica tools\frankenphp e bin\ a partir de
-    storage\app\unitec-desktop-pending, sobe de novo e grava status.json.
-    So remove o pending apos sucesso. Nunca sobrescreve runtime ja mais novo
-    que o manifesto pendente. Apenas ASCII neste arquivo (Windows PowerShell 5.1).
+    storage\app\unitec-desktop-pending, sobe de novo e grava status persistente em
+    storage\framework\desktop-runtime-status.json (fora do pending).
+    So remove o pending apos gravar o status final. Nunca sobrescreve runtime
+    ja mais novo que o manifesto pendente. Apenas ASCII (Windows PowerShell 5.1).
 #>
 
 param(
@@ -16,7 +17,10 @@ param(
     [string]$AppPath,
 
     [Parameter(Mandatory = $false)]
-    [string]$ExpectedVersion = ''
+    [string]$ExpectedVersion = '',
+
+    [Parameter(Mandatory = $false)]
+    [string]$RunId = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,8 +32,9 @@ $pendingRoot = Join-Path $AppPath 'storage\app\unitec-desktop-pending'
 $pendingBin = Join-Path $pendingRoot 'bin'
 $pendingFranken = Join-Path $pendingRoot 'frankenphp'
 $manifestPath = Join-Path $pendingRoot 'manifest.json'
-$statusPath = Join-Path $pendingRoot 'status.json'
 $readySignalPath = Join-Path $pendingRoot 'ready.signal'
+# Status persistente: NAO fica dentro do pending (evita corrida com Remove-Item).
+$statusPath = Join-Path $AppPath 'storage\framework\desktop-runtime-status.json'
 $runtimeMarkerPath = Join-Path $AppPath 'storage\app\unitec-desktop-runtime.json'
 $targetBin = Join-Path $AppPath 'bin'
 $targetFranken = Join-Path $AppPath 'tools\frankenphp'
@@ -56,21 +61,23 @@ function Write-Status {
     )
 
     try {
-        if (-not (Test-Path $pendingRoot)) {
-            New-Item -ItemType Directory -Path $pendingRoot -Force | Out-Null
+        $dir = Split-Path $statusPath
+        if (-not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
         $payload = [ordered]@{
             state             = $State
             message           = $Message
             expected_version  = $ExpectedVersion
             health_version    = $HealthVersion
+            run_id            = $RunId
             updated_at        = (Get-Date).ToUniversalTime().ToString('o')
         }
         $json = $payload | ConvertTo-Json -Compress
         $utf8NoBom = New-Object System.Text.UTF8Encoding $false
         [System.IO.File]::WriteAllText($statusPath, $json, $utf8NoBom)
     } catch {
-        Write-Log ("falha ao gravar status.json: {0}" -f $_.Exception.Message)
+        Write-Log ("falha ao gravar desktop-runtime-status.json: {0}" -f $_.Exception.Message)
     }
 }
 
@@ -133,6 +140,7 @@ function Write-RuntimeMarker([string]$Version) {
         $payload = [ordered]@{
             erp_version = $Version
             applied_at  = (Get-Date).ToUniversalTime().ToString('o')
+            run_id      = $RunId
         }
         $json = $payload | ConvertTo-Json -Compress
         $utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -158,8 +166,16 @@ function Test-HealthVersion([string]$Body, [string]$Expected) {
     }
 }
 
+function Clear-PendingFolder {
+    try {
+        if (Test-Path $pendingRoot) {
+            Remove-Item -LiteralPath $pendingRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+}
+
 try {
-    Write-Log "inicio AppPath=$AppPath ExpectedVersion=$ExpectedVersion"
+    Write-Log ("inicio AppPath=$AppPath ExpectedVersion=$ExpectedVersion RunId=$RunId")
     Write-Status -State 'running' -Message 'Iniciando aplicacao do runtime desktop.'
 
     if (-not (Test-Path (Join-Path $AppPath 'artisan'))) {
@@ -187,9 +203,7 @@ try {
         if ((Compare-UnitecVersions $installedRuntime $pendingVersion) -gt 0) {
             Write-Log ("runtime instalado $installedRuntime > pendente $pendingVersion - nao sobrescreve")
             Write-Status -State 'skipped_newer' -Message ("Runtime instalado ($installedRuntime) ja e mais novo que o pendente ($pendingVersion).")
-            try {
-                Remove-Item -LiteralPath $pendingRoot -Recurse -Force -ErrorAction SilentlyContinue
-            } catch { }
+            Clear-PendingFolder
             exit 0
         }
     }
@@ -323,11 +337,9 @@ try {
         Write-RuntimeMarker -Version $pendingVersion
     }
 
+    # Grava status FINAL ANTES de apagar o pending (status fica em framework/).
     Write-Status -State 'completed' -Message 'Runtime desktop aplicado.' -HealthVersion $healthVersion
-
-    try {
-        Remove-Item -LiteralPath $pendingRoot -Recurse -Force -ErrorAction SilentlyContinue
-    } catch { }
+    Clear-PendingFolder
 
     Write-Log 'concluido'
     exit 0

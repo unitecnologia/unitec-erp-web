@@ -234,7 +234,7 @@ final class AtualizacaoApplyService
             }
             AtualizacaoLog::line('Versao', 'disco='.$installedAfterCopy.' pacote='.$version, $appPath);
 
-            // Runtime obrigatório: só conclui após status.json completed/skipped_newer do PS1.
+            // Runtime obrigatório: só conclui após status persistente completed/skipped_newer do PS1.
             if ($runtimePending) {
                 $this->etapa = 'RuntimeApply';
                 self::writeProgress($appPath, [
@@ -923,13 +923,14 @@ final class AtualizacaoApplyService
             'message' => 'Runtime staged; aguardando apply.',
             'expected_version' => $packageVersion,
             'health_version' => '',
+            'run_id' => trim((string) (self::readProgress($appPath)['run_id'] ?? '')),
         ]);
 
         return true;
     }
 
     /**
-     * Sinaliza o PS1, aguarda status.json e falha sem apagar pending.
+     * Sinaliza o PS1, aguarda status persistente (fora do pending) com run_id desta tentativa.
      */
     private function applyAndWaitDesktopRuntime(string $appPath, string $expectedVersion): void
     {
@@ -945,27 +946,53 @@ final class AtualizacaoApplyService
             throw new RuntimeException('Runtime pendente incompleto (falta UnitecErpServer.exe). Pending preservado.');
         }
 
+        $runId = trim((string) (self::readProgress($appPath)['run_id'] ?? ''));
+        if ($runId === '') {
+            $runId = bin2hex(random_bytes(8));
+            AtualizacaoLog::line('Runtime', 'run_id ausente no progress — gerado '.$runId, $appPath);
+        }
+
         $this->writeDesktopRuntimeStatus($appPath, [
             'state' => 'waiting',
             'message' => 'Aguardando script de runtime.',
             'expected_version' => $expectedVersion,
             'health_version' => '',
+            'run_id' => $runId,
         ]);
 
         File::ensureDirectoryExists($pendingRoot);
         File::put($pendingRoot.DIRECTORY_SEPARATOR.'ready.signal', now()->toIso8601String());
 
-        if (! $this->launchDesktopRuntimeUpdateScript($appPath, $expectedVersion)) {
+        if (! $this->launchDesktopRuntimeUpdateScript($appPath, $expectedVersion, $runId)) {
+            $this->writeDesktopRuntimeStatus($appPath, [
+                'state' => 'failed',
+                'message' => 'Nao foi possivel iniciar apply-desktop-runtime-update.ps1.',
+                'expected_version' => $expectedVersion,
+                'health_version' => '',
+                'run_id' => $runId,
+            ]);
             throw new RuntimeException(
                 'Nao foi possivel iniciar apply-desktop-runtime-update.ps1. Pending preservado em storage/app/unitec-desktop-pending.'
             );
         }
 
-        AtualizacaoLog::line('Runtime', 'script iniciado — aguardando status.json (versao='.$expectedVersion.')', $appPath);
+        AtualizacaoLog::line(
+            'Runtime',
+            'script iniciado — aguardando desktop-runtime-status.json (versao='.$expectedVersion.' run_id='.$runId.')',
+            $appPath,
+        );
 
         $deadline = time() + 360;
         while (time() < $deadline) {
             $status = $this->readDesktopRuntimeStatus($appPath);
+            $statusRunId = trim((string) ($status['run_id'] ?? ''));
+            // Ignora status de outra tentativa (arquivo residual).
+            if ($statusRunId !== '' && $statusRunId !== $runId) {
+                usleep(500_000);
+
+                continue;
+            }
+
             $state = (string) ($status['state'] ?? '');
             $message = trim((string) ($status['message'] ?? ''));
 
@@ -980,7 +1007,9 @@ final class AtualizacaoApplyService
             ]);
 
             if (in_array($state, ['completed', 'skipped_newer'], true)) {
-                AtualizacaoLog::line('Runtime', 'status='.$state.' '.$message, $appPath);
+                AtualizacaoLog::line('Runtime', 'status='.$state.' '.$message.' run_id='.$runId, $appPath);
+                // Pending pode ja ter sido limpo pelo PS1; reforca limpeza sem tocar no status.
+                $this->clearDesktopPendingFolder($appPath);
 
                 return;
             }
@@ -995,8 +1024,16 @@ final class AtualizacaoApplyService
             usleep(500_000);
         }
 
+        $this->writeDesktopRuntimeStatus($appPath, [
+            'state' => 'timeout',
+            'message' => 'Timeout aguardando runtime desktop (status persistente).',
+            'expected_version' => $expectedVersion,
+            'health_version' => '',
+            'run_id' => $runId,
+        ]);
+
         throw new RuntimeException(
-            'Timeout aguardando runtime desktop (status.json). Pending preservado — tente novamente a mesma atualização.'
+            'Timeout aguardando runtime desktop (status persistente). Pending preservado — tente novamente a mesma atualização.'
         );
     }
 
@@ -1028,8 +1065,11 @@ final class AtualizacaoApplyService
         }
     }
 
-    private function launchDesktopRuntimeUpdateScript(string $appPath, string $expectedVersion = ''): bool
-    {
+    private function launchDesktopRuntimeUpdateScript(
+        string $appPath,
+        string $expectedVersion = '',
+        string $runId = '',
+    ): bool {
         if (PHP_OS_FAMILY !== 'Windows') {
             return false;
         }
@@ -1055,6 +1095,9 @@ final class AtualizacaoApplyService
         $psArgs = '-NoProfile -ExecutionPolicy Bypass -File "'.$quote($script).'" -AppPath "'.$quote($appPath).'"';
         if (trim($expectedVersion) !== '' && $expectedVersion !== 'desconhecida') {
             $psArgs .= ' -ExpectedVersion "'.$quote($expectedVersion).'"';
+        }
+        if (trim($runId) !== '') {
+            $psArgs .= ' -RunId "'.$quote($runId).'"';
         }
 
         File::put($batch, implode("\r\n", [
@@ -1082,10 +1125,32 @@ final class AtualizacaoApplyService
             .DIRECTORY_SEPARATOR.'unitec-desktop-pending';
     }
 
+    private function desktopRuntimeStatusPath(string $appPath): string
+    {
+        return rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'framework'
+            .DIRECTORY_SEPARATOR.'desktop-runtime-status.json';
+    }
+
     private function desktopRuntimeMarkerPath(string $appPath): string
     {
         return rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'app'
             .DIRECTORY_SEPARATOR.'unitec-desktop-runtime.json';
+    }
+
+    private function clearDesktopPendingFolder(string $appPath): void
+    {
+        $root = $this->desktopPendingRoot($appPath);
+        if (! is_dir($root)) {
+            return;
+        }
+
+        try {
+            File::deleteDirectory($root);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao limpar unitec-desktop-pending apos runtime OK.', [
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function writeDesktopPendingManifest(string $appPath, string $packageVersion): void
@@ -1131,25 +1196,24 @@ final class AtualizacaoApplyService
     }
 
     /**
-     * @param  array{state: string, message?: string, expected_version?: string, health_version?: string}  $status
+     * Status persistente fora do pending (evita corrida com Remove-Item do PS1).
+     *
+     * @param  array{state: string, message?: string, expected_version?: string, health_version?: string, run_id?: string}  $status
      */
     private function writeDesktopRuntimeStatus(string $appPath, array $status): void
     {
-        $root = $this->desktopPendingRoot($appPath);
-        File::ensureDirectoryExists($root);
+        $path = $this->desktopRuntimeStatusPath($appPath);
+        File::ensureDirectoryExists(dirname($path));
         $status['updated_at'] = now()->toIso8601String();
-        File::put(
-            $root.DIRECTORY_SEPARATOR.'status.json',
-            json_encode($status, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
-        );
+        File::put($path, json_encode($status, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     /**
-     * @return array{state?: string, message?: string, expected_version?: string, health_version?: string}
+     * @return array{state?: string, message?: string, expected_version?: string, health_version?: string, run_id?: string}
      */
     private function readDesktopRuntimeStatus(string $appPath): array
     {
-        $path = $this->desktopPendingRoot($appPath).DIRECTORY_SEPARATOR.'status.json';
+        $path = $this->desktopRuntimeStatusPath($appPath);
         if (! is_file($path)) {
             return [];
         }
