@@ -10,7 +10,6 @@ use App\Models\Empresa;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Saldo físico por depósito (product_estoque_saldos) com espelho em products.estoque.
@@ -25,12 +24,20 @@ final class ProductEstoqueSaldoService
 {
     private ?int $estoquePrincipalIdCache = null;
 
-    /** @var array<int, int|null> */
+    /**
+     * Fallback só para CLI/sem request. Em HTTP o memo fica em request()->attributes
+     * (FrankenPHP reutiliza o worker — cache estático entre requests ficaria stale
+     * após criar/alterar depósitos).
+     *
+     * @var array<int, int|null>
+     */
     private array $estoqueIdPorEmpresaCache = [];
 
     public function tabelaDisponivel(): bool
     {
-        return Schema::hasTable('product_estoque_saldos');
+        // ErpSchema memoiza com invalidação por fingerprint de migrations.
+        // Não usa assumeMigrated: instalações antigas podem não ter a tabela.
+        return ErpSchema::hasTable('product_estoque_saldos');
     }
 
     public function fisico(int $productId, ?int $estoqueId = null): float
@@ -271,7 +278,7 @@ final class ProductEstoqueSaldoService
         ?Empresa $empresa,
         ?EstoqueMovimentacaoContext $movimentacao,
     ): void {
-        if (! Schema::hasTable('estoque_movimentacoes')) {
+        if (! ErpSchema::hasTable('estoque_movimentacoes')) {
             return;
         }
 
@@ -302,7 +309,7 @@ final class ProductEstoqueSaldoService
             'observacao' => $ctx->observacao,
         ];
 
-        if (Schema::hasColumn('estoque_movimentacoes', 'doc_fiscal_tipo')) {
+        if (ErpSchema::hasColumn('estoque_movimentacoes', 'doc_fiscal_tipo')) {
             $payload['doc_fiscal_tipo'] = $ctx->docFiscalTipo;
             $payload['doc_fiscal_numero'] = $ctx->docFiscalNumero;
         }
@@ -328,7 +335,7 @@ final class ProductEstoqueSaldoService
             return (int) $empresa->id;
         }
 
-        if ($estoqueId !== null && $estoqueId > 0 && Schema::hasTable('estoques')) {
+        if ($estoqueId !== null && $estoqueId > 0 && ErpSchema::hasTable('estoques')) {
             $fromEstoque = Estoque::query()->whereKey($estoqueId)->value('empresa_id');
             if ($fromEstoque !== null && (int) $fromEstoque > 0) {
                 return (int) $fromEstoque;
@@ -384,12 +391,13 @@ final class ProductEstoqueSaldoService
 
     public function estoqueIdParaEmpresa(?int $empresaId): ?int
     {
-        if ($empresaId === null || $empresaId <= 0 || ! Schema::hasTable('estoques')) {
+        if ($empresaId === null || $empresaId <= 0 || ! ErpSchema::hasTable('estoques')) {
             return null;
         }
 
-        if (array_key_exists($empresaId, $this->estoqueIdPorEmpresaCache)) {
-            return $this->estoqueIdPorEmpresaCache[$empresaId];
+        [$hit, $cached] = $this->rememberedEstoqueId($empresaId);
+        if ($hit) {
+            return $cached;
         }
 
         $id = Estoque::query()
@@ -399,9 +407,49 @@ final class ProductEstoqueSaldoService
             ->orderBy('codigo')
             ->value('id');
 
-        $this->estoqueIdPorEmpresaCache[$empresaId] = $id !== null ? (int) $id : null;
+        $resolved = $id !== null ? (int) $id : null;
+        $this->storeRememberedEstoqueId($empresaId, $resolved);
 
-        return $this->estoqueIdPorEmpresaCache[$empresaId];
+        return $resolved;
+    }
+
+    /**
+     * @return array{0: bool, 1: int|null}
+     */
+    private function rememberedEstoqueId(int $empresaId): array
+    {
+        if (app()->bound('request')) {
+            $bag = request()->attributes->get('erp.estoque_id_por_empresa');
+            if (is_array($bag) && array_key_exists($empresaId, $bag)) {
+                $value = $bag[$empresaId];
+
+                return [true, $value === null ? null : (int) $value];
+            }
+
+            return [false, null];
+        }
+
+        if (array_key_exists($empresaId, $this->estoqueIdPorEmpresaCache)) {
+            return [true, $this->estoqueIdPorEmpresaCache[$empresaId]];
+        }
+
+        return [false, null];
+    }
+
+    private function storeRememberedEstoqueId(int $empresaId, ?int $estoqueId): void
+    {
+        if (app()->bound('request')) {
+            $bag = request()->attributes->get('erp.estoque_id_por_empresa');
+            if (! is_array($bag)) {
+                $bag = [];
+            }
+            $bag[$empresaId] = $estoqueId;
+            request()->attributes->set('erp.estoque_id_por_empresa', $bag);
+
+            return;
+        }
+
+        $this->estoqueIdPorEmpresaCache[$empresaId] = $estoqueId;
     }
 
     public function suportaEstoquePorEmpresa(?int $empresaId): bool
@@ -501,7 +549,7 @@ END)";
             return $id;
         }
 
-        if (! Schema::hasTable('estoques')) {
+        if (! ErpSchema::hasTable('estoques')) {
             $this->estoquePrincipalIdCache = 0;
 
             return null;

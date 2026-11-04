@@ -117,8 +117,6 @@ final class ErpDashboardFiscalDocsChart
         }
 
         $query = Nfe::query()
-            ->whereDate('data_emissao', '>=', $inicio->toDateString())
-            ->whereDate('data_emissao', '<=', $fim->toDateString())
             ->where(function ($builder): void {
                 $builder->where('situacao', Nfe::SITUACAO_TRANSMITIDA)
                     ->orWhere('status', Nfe::STATUS_TRANSMITIDA)
@@ -126,6 +124,7 @@ final class ErpDashboardFiscalDocsChart
                     ->orWhereIn('status', [Nfe::STATUS_ABERTA, Nfe::STATUS_CONTINGENCIA]);
             });
 
+        ErpDashboardDateFilter::whereDateColumnBetween($query, 'data_emissao', $inicio, $fim);
         ErpFinanceiroMetricas::applyEmpresaColumn($query, (new Nfe)->getTable(), $empresaScope);
 
         $nfe = static::sqlTable((new Nfe)->getTable());
@@ -162,8 +161,6 @@ final class ErpDashboardFiscalDocsChart
         }
 
         $query = Nfse::query()
-            ->whereDate('data_emissao', '>=', $inicio->toDateString())
-            ->whereDate('data_emissao', '<=', $fim->toDateString())
             ->whereIn('status', [
                 Nfse::STATUS_AUTORIZADA,
                 Nfse::STATUS_ABERTA,
@@ -171,6 +168,7 @@ final class ErpDashboardFiscalDocsChart
                 Nfse::STATUS_CONTINGENCIA,
             ]);
 
+        ErpDashboardDateFilter::whereDateColumnBetween($query, 'data_emissao', $inicio, $fim);
         ErpFinanceiroMetricas::applyEmpresaColumn($query, (new Nfse)->getTable(), $empresaScope);
 
         $nfse = static::sqlTable((new Nfse)->getTable());

@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 
 trait InteractsWithErpListPage
 {
+    use InteractsWithErpSpaRedirect;
+
     public ?int $highlightedRecordId = null;
 
     /** Versão local do canal de sync (híbrido em rede). */
@@ -287,7 +289,7 @@ trait InteractsWithErpListPage
     {
         ErpScreen::set('Principal');
 
-        $this->redirect(filament()->getUrl());
+        $this->redirectErpAdmin((string) filament()->getUrl());
     }
 
     public function modulePending(string $module): void

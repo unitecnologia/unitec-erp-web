@@ -44,7 +44,7 @@ final class ErpDashboardRecentSales
                 $momento = ErpTimezone::toLocal($venda->fechado_em ?? $venda->created_at);
 
                 $items->push([
-                    'id' => (string) $venda->numero,
+                    'id' => static::formatNumeroVenda($venda->numero),
                     'cliente' => $venda->person_nome ?: 'Consumidor',
                     'valor' => 'R$ '.ErpMoney::formatBr((float) $venda->total),
                     'data' => $momento->format('d/m H:i'),
@@ -81,7 +81,7 @@ final class ErpDashboardRecentSales
                 $momento = ErpTimezone::toLocal($data->format('Y-m-d').' '.$hora);
 
                 $items->push([
-                    'id' => (string) $venda->numero,
+                    'id' => static::formatNumeroVenda($venda->numero),
                     'cliente' => $venda->cliente?->nome_razao ?? 'Cliente',
                     'valor' => 'R$ '.ErpMoney::formatBr($venda->total),
                     'data' => $momento->format('d/m H:i'),
@@ -102,6 +102,21 @@ final class ErpDashboardRecentSales
                 'status' => $row['status'],
             ])
             ->values();
+    }
+
+    private static function formatNumeroVenda(mixed $numero): string
+    {
+        $raw = trim((string) $numero);
+
+        if ($raw === '') {
+            return '—';
+        }
+
+        if (preg_match('/^\d+$/', $raw) === 1) {
+            return (string) ((int) ltrim($raw, '0') ?: 0);
+        }
+
+        return ltrim($raw, '0') !== '' ? ltrim($raw, '0') : $raw;
     }
 
     /**

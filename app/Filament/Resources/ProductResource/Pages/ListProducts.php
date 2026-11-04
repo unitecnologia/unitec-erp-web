@@ -238,7 +238,7 @@ class ListProducts extends ListRecords
 
         ErpScreen::set('Principal');
 
-        $this->redirect(filament()->getUrl());
+        $this->redirectErpAdmin((string) filament()->getUrl());
     }
 
     protected function erpListEntityName(): string
@@ -529,7 +529,7 @@ class ListProducts extends ListRecords
             return;
         }
 
-        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('create')));
+        $this->redirectErpAdmin($this->urlWithPdvEmbed(ProductResource::getUrl('create')));
     }
 
     public function editProduct(int | string | null $recordId = null): void
@@ -555,7 +555,7 @@ class ListProducts extends ListRecords
             return;
         }
 
-        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $resolvedId])));
+        $this->redirectErpAdmin($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $resolvedId])));
     }
 
     public function deleteProduct(int | string | null $recordId = null): void
@@ -660,7 +660,7 @@ class ListProducts extends ListRecords
             ->success()
             ->send();
 
-        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $clone])));
+        $this->redirectErpAdmin($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $clone])));
     }
 
     public function printProducts(): void

@@ -11,18 +11,37 @@ use App\Support\Erp\ErpScreen;
 use App\Support\Erp\License\LicencaPortalPagamentoService;
 use App\Support\Erp\License\LicencaRemotaService;
 use Filament\Notifications\Notification;
-use Throwable;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
+use Throwable;
 
 class Dashboard extends BaseDashboard
 {
     public string $dashboardVisao = ErpDashboardScope::VISAO_EMPRESA;
 
+    /** True quando o bloco pesado foi carregado com sucesso (revelação única/coordenada). */
     public bool $dashboardHeavyReady = false;
+
+    /** True quando a carga única do bloco pesado falhou (permite retry). */
+    public bool $dashboardHeavyError = false;
+
+    /**
+     * Shell (KPIs + metadados) persistido entre requests Livewire — evita recalcular KPIs no heavy.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $cachedShell = null;
+
+    /**
+     * Payload único do bloco pesado (gauges, gráficos, listas, alertas).
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $cachedHeavy = null;
 
     public bool $pixRenovacaoOpen = false;
 
@@ -53,7 +72,8 @@ class Dashboard extends BaseDashboard
     {
         ErpScreen::set('Principal');
         $this->dashboardVisao = ErpDashboardScope::VISAO_EMPRESA;
-        $this->dashboardHeavyReady = false;
+        $this->resetHeavyState(preserveShell: false);
+        $this->ensureCachedShell();
         $this->avisarLicencaNaAbertura();
     }
 
@@ -110,50 +130,14 @@ class Dashboard extends BaseDashboard
         return $this->accessibleEmpresaCount >= 2;
     }
 
-    /**
-     * First paint: KPIs + metadados de visão.
-     *
-     * @return array<string, mixed>
-     */
     public function dashboardInicialAtivo(): bool
     {
         return ErpAccess::currentCan('dashboard.access')
             && EmpresaParametros::mostrarDashboardInicial();
     }
 
-    #[Computed]
-    public function dashboardShell(): array
-    {
-        if (! $this->dashboardInicialAtivo()) {
-            return [];
-        }
-
-        return ErpDashboardData::shell(
-            empresaId: ErpContext::currentEmpresaId(),
-            visao: $this->dashboardVisao,
-        );
-    }
-
     /**
-     * Blocos pesados (carregados após wire:init).
-     *
-     * @return array<string, mixed>
-     */
-    #[Computed]
-    public function dashboardHeavy(): array
-    {
-        if (! $this->dashboardInicialAtivo()) {
-            return [];
-        }
-
-        return ErpDashboardData::heavy(
-            empresaId: ErpContext::currentEmpresaId(),
-            visao: $this->dashboardVisao,
-        );
-    }
-
-    /**
-     * Compat: shell + heavy quando pronto; só shell no first paint.
+     * KPIs (shell) + bloco pesado quando pronto — sem recalcular KPIs no heavy.
      *
      * @return array<string, mixed>
      */
@@ -164,26 +148,59 @@ class Dashboard extends BaseDashboard
             return [];
         }
 
-        $shell = $this->dashboardShell;
+        $shell = $this->ensureCachedShell();
+        unset($shell['_seed']);
 
-        if (! $this->dashboardHeavyReady) {
+        if (! $this->dashboardHeavyReady || ! is_array($this->cachedHeavy)) {
             return $shell;
         }
 
         return [
             ...$shell,
-            ...$this->dashboardHeavy,
+            ...$this->cachedHeavy,
         ];
     }
 
+    /**
+     * Carga única do bloco pesado (1 request Livewire). Revelação coordenada na UI.
+     */
     public function loadDashboardHeavy(): void
     {
         if (! $this->dashboardInicialAtivo()) {
             return;
         }
 
-        $this->dashboardHeavyReady = true;
-        unset($this->dashboardHeavy, $this->dashboardData);
+        if ($this->dashboardHeavyReady && is_array($this->cachedHeavy)) {
+            return;
+        }
+
+        $this->dashboardHeavyError = false;
+
+        try {
+            $shell = $this->ensureCachedShell();
+            $seed = is_array($shell['_seed'] ?? null) ? $shell['_seed'] : null;
+
+            $this->cachedHeavy = ErpDashboardData::heavy(
+                empresaId: ErpContext::currentEmpresaId(),
+                visao: $this->dashboardVisao,
+                seed: $seed,
+            );
+            $this->dashboardHeavyReady = true;
+            $this->dashboardHeavyError = false;
+            unset($this->dashboardData);
+            $this->dispatch('erp-dash-refresh');
+            $this->js(
+                'window.__erpDashHeavyDone=true;'
+                .'window.dispatchEvent(new CustomEvent("erp-dash-heavy-done"));'
+                .'window.dispatchEvent(new CustomEvent("erp-dash-waves-done"));'
+            );
+        } catch (Throwable $e) {
+            Log::warning('Dashboard heavy falhou', ['message' => $e->getMessage()]);
+            $this->cachedHeavy = null;
+            $this->dashboardHeavyReady = false;
+            $this->dashboardHeavyError = true;
+            unset($this->dashboardData);
+        }
     }
 
     public function setDashboardVisao(string $visao): void
@@ -201,8 +218,9 @@ class Dashboard extends BaseDashboard
         }
 
         $this->dashboardVisao = $visao;
-        $this->dashboardHeavyReady = false;
-        unset($this->dashboardShell, $this->dashboardHeavy, $this->dashboardData);
+        $this->resetHeavyState(preserveShell: false);
+        $this->ensureCachedShell();
+        unset($this->dashboardData);
         $this->dispatch('erp-dash-refresh');
     }
 
@@ -287,7 +305,9 @@ class Dashboard extends BaseDashboard
                 $licencas->syncMensalidadeNoGate();
                 $licencas->rememberLoginGate($portal);
 
-                unset($this->dashboardShell, $this->dashboardData);
+                $this->cachedShell = null;
+                $this->ensureCachedShell();
+                unset($this->dashboardData);
 
                 Notification::make()
                     ->title('Pagamento confirmado')
@@ -319,6 +339,40 @@ class Dashboard extends BaseDashboard
         }
 
         return $amount;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function ensureCachedShell(): array
+    {
+        if (! $this->dashboardInicialAtivo()) {
+            $this->cachedShell = [];
+
+            return [];
+        }
+
+        if (is_array($this->cachedShell) && $this->cachedShell !== []) {
+            return $this->cachedShell;
+        }
+
+        $this->cachedShell = ErpDashboardData::shell(
+            empresaId: ErpContext::currentEmpresaId(),
+            visao: $this->dashboardVisao,
+        );
+
+        return $this->cachedShell;
+    }
+
+    private function resetHeavyState(bool $preserveShell): void
+    {
+        if (! $preserveShell) {
+            $this->cachedShell = null;
+        }
+
+        $this->dashboardHeavyReady = false;
+        $this->dashboardHeavyError = false;
+        $this->cachedHeavy = null;
     }
 
     public function getHeading(): string | Htmlable | null

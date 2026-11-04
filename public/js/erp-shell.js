@@ -240,6 +240,10 @@
         bindMenuUi();
     }
 
+    // SPA: menu pode ser recriado quando o fingerprint muda (empresa/perms).
+    // Com wire:ignore o DOM do menu costuma permanecer; rebind é idempotente (dataset).
+    document.addEventListener('livewire:navigated', bindMenuUi);
+
     function canCloseUpdateModal() {
         if (updateCompletedHandled) {
             return false;

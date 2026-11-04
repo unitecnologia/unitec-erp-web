@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\OrdemServicoResource\Pages\Concerns;
 
+use App\Filament\Concerns\InteractsWithErpSpaRedirect;
 use App\Filament\Pages\Concerns\ManagesBoletoPosDocumentoPrompt;
 use App\Filament\Pages\NfsePage;
 use App\Filament\Resources\OrdemServicoResource;
@@ -41,6 +42,7 @@ use Illuminate\Support\Str;
 
 trait ErpOrdemServicoFormPage
 {
+    use InteractsWithErpSpaRedirect;
     use ManagesBoletoPosDocumentoPrompt;
     use ManagesOrdemServicoFotos;
     use ManagesOrdemServicoFaturamentoParcelas;
@@ -3062,14 +3064,14 @@ trait ErpOrdemServicoFormPage
     {
         $this->postSavePromptOpen = false;
         ErpScreen::set('Ordem de Serviço');
-        $this->redirect(OrdemServicoResource::getUrl('index'), navigate: false);
+        $this->redirectErpAdmin(OrdemServicoResource::getUrl('index'));
     }
 
     public function iniciarNovaOs(): void
     {
         $this->postSavePromptOpen = false;
         ErpScreen::set('Lançamento OS');
-        $this->redirect(OrdemServicoResource::getUrl('create'), navigate: false);
+        $this->redirectErpAdmin(OrdemServicoResource::getUrl('create'));
     }
 
     public function abrirFaturamentoOsCarregado(): void
@@ -3199,6 +3201,6 @@ trait ErpOrdemServicoFormPage
     public function cancelForm(): void
     {
         ErpScreen::set('Ordem de Serviço');
-        $this->redirect(OrdemServicoResource::getUrl('index'), navigate: false);
+        $this->redirectErpAdmin(OrdemServicoResource::getUrl('index'));
     }
 }

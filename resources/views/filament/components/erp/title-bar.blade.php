@@ -45,7 +45,10 @@
                             'erp-title-bar__status-value',
                             'erp-title-bar__status-value--accent' => $label === 'Empresa',
                         ])
-                        @if ($label === 'Atualizado Em') id="erp-status-updated-at" @endif
+                        @if ($label === 'Atualizado Em')
+                            id="erp-status-updated-at"
+                            data-erp-clock="1"
+                        @endif
                     >{{ $value }}</span>
                     @if ($label === 'Versão' && $hotfix !== null)
                         <span

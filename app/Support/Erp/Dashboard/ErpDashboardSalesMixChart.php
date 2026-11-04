@@ -72,19 +72,9 @@ final class ErpDashboardSalesMixChart
 
         $q = PdvVenda::query()
             ->comercial()
-            ->where('situacao', '!=', 'C')
-            ->where(function ($query) use ($from, $to): void {
-                $query->where(function ($fechamento) use ($from, $to): void {
-                    $fechamento->whereNotNull('fechado_em')
-                        ->whereDate('fechado_em', '>=', $from->toDateString())
-                        ->whereDate('fechado_em', '<=', $to->toDateString());
-                })->orWhere(function ($fallback) use ($from, $to): void {
-                    $fallback->whereNull('fechado_em')
-                        ->whereDate('created_at', '>=', $from->toDateString())
-                        ->whereDate('created_at', '<=', $to->toDateString());
-                });
-            });
+            ->where('situacao', '!=', 'C');
 
+        ErpDashboardDateFilter::wherePdvPeriodo($q, $from, $to);
         ErpEmpresaScopeFilter::applyPdvSessao($q, $empresaScope);
 
         return (float) $q->sum('total');
@@ -106,10 +96,9 @@ final class ErpDashboardSalesMixChart
                 // Exclui PDV e espelho de OS (plataforma=os) — OS entra no segmento próprio.
                 $query->whereNull('plataforma')
                     ->orWhereNotIn('plataforma', [Venda::PLATAFORMA_PDV, Venda::PLATAFORMA_OS]);
-            })
-            ->whereDate('data', '>=', $from->toDateString())
-            ->whereDate('data', '<=', $to->toDateString());
+            });
 
+        ErpDashboardDateFilter::whereDateColumnBetween($q, 'data', $from, $to);
         ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), $empresaScope);
 
         return (float) $q->sum('total');
@@ -131,10 +120,9 @@ final class ErpDashboardSalesMixChart
                 OrdemServico::SITUACAO_FINALIZADA,
                 OrdemServico::SITUACAO_ENTREGUE,
             ])
-            ->whereNotNull('data_termino')
-            ->whereDate('data_termino', '>=', $from->toDateString())
-            ->whereDate('data_termino', '<=', $to->toDateString());
+            ->whereNotNull('data_termino');
 
+        ErpDashboardDateFilter::whereDateColumnBetween($q, 'data_termino', $from, $to);
         ErpEmpresaScopeFilter::applyColumn($q, (new OrdemServico)->getTable(), $empresaScope);
 
         return (float) $q->sum('total_geral');

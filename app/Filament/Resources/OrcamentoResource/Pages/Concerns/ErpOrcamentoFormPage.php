@@ -14,6 +14,7 @@ use App\Models\OsVeiculo;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductGrade;
+use App\Models\PromocaoItem;
 use App\Models\Vendedor;
 use App\Support\Erp\CepLookupService;
 use App\Support\Erp\EmpresaModulos;
@@ -22,10 +23,14 @@ use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\MunicipioLookupService;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use App\Support\Erp\Orcamento\OrcamentoPrecoService;
 use App\Support\Erp\Orcamento\OrcamentoTotaisService;
+use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Support\Erp\ProductTabelaPrecoService;
+use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
@@ -2088,8 +2093,28 @@ trait ErpOrcamentoFormPage
 
         $like = '%' . $term . '%';
         $prefix = $term . '%';
+        $empresaId = (int) (ErpContext::currentEmpresa()?->id ?? session('erp_empresa_id') ?? 0);
+        $saldoService = app(ProductEstoqueSaldoService::class);
+        $estoqueEmpresaId = $empresaId > 0 && $saldoService->suportaEstoquePorEmpresa($empresaId)
+            ? $saldoService->estoqueIdParaEmpresa($empresaId)
+            : null;
+        $reservas = app(EstoqueReservaService::class)->totaisReservadosAtivos($estoqueEmpresaId);
+        $precoService = app(OrcamentoPrecoService::class);
 
-        $this->produtoResults = Product::query()
+        $query = Product::query()
+            ->select([
+                'id',
+                'codigo',
+                'descricao',
+                'estoque',
+                'preco_venda',
+                'preco_atacado',
+                'qtd_atacado',
+                'promo_preco_venda',
+                'promo_data_inicio',
+                'promo_data_fim',
+                'usa_tab_preco',
+            ])
             ->where('ativo', true)
             ->where(function ($query) use ($like, $term): void {
                 $query->where('codigo', 'like', $like)
@@ -2108,16 +2133,81 @@ trait ErpOrcamentoFormPage
                 [$term, $term, $prefix, $term, $term, $prefix]
             )
             ->orderBy('descricao')
-            ->limit(50)
-            ->get()
-            ->map(fn (Product $product): array => [
-                'id' => $product->id,
-                'codigo' => mb_strtoupper((string) $product->codigo, 'UTF-8'),
-                'descricao' => mb_strtoupper($product->descricao, 'UTF-8'),
-            ])
+            ->limit(50);
+
+        if ($empresaId > 0) {
+            $saldoService->applyEstoqueEmpresaSelect($query, $empresaId);
+        }
+
+        $produtos = $query->get();
+
+        if ($produtos->isNotEmpty()) {
+            if ($empresaId > 0) {
+                $produtos->load([
+                    'empresaPrecos' => fn ($relation) => $relation->where('empresa_id', $empresaId),
+                ]);
+            }
+
+            $this->hydrateOrcamentoProdutoLookupPromocoes($produtos, $empresaId);
+            app(ProductTabelaPrecoService::class)->carregarItens($produtos);
+        }
+
+        $this->produtoResults = $produtos
+            ->map(function (Product $product) use ($reservas, $precoService): array {
+                $atual = array_key_exists('estoque_empresa_atual', $product->getAttributes())
+                    ? (float) $product->getAttribute('estoque_empresa_atual')
+                    : (float) ($product->estoque ?? 0);
+                $reservado = (float) ($reservas[$product->id] ?? $reservas[(string) $product->id] ?? 0);
+                $disponivel = $atual - $reservado;
+                $preco = $precoService->resolvePreco($product, 1.0);
+
+                return [
+                    'id' => (int) $product->id,
+                    'codigo' => mb_strtoupper((string) $product->codigo, 'UTF-8'),
+                    'descricao' => mb_strtoupper((string) $product->descricao, 'UTF-8'),
+                    'atual' => ErpMoney::formatBr($atual, 3),
+                    'reservado' => ErpMoney::formatBr($reservado, 3),
+                    'disponivel' => ErpMoney::formatBr($disponivel, 3),
+                    'preco' => ErpMoney::formatBr($preco, 2),
+                ];
+            })
             ->all();
 
         $this->selectedProdutoIndex = $this->produtoResults === [] ? null : 0;
+    }
+
+    /**
+     * Carrega promoções ativas da empresa em lote (evita N+1 na pesquisa).
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>  $produtos
+     */
+    protected function hydrateOrcamentoProdutoLookupPromocoes($produtos, int $empresaId): void
+    {
+        if ($produtos->isEmpty()) {
+            return;
+        }
+
+        $mins = collect();
+
+        if ($empresaId > 0) {
+            $hoje = Carbon::today()->toDateString();
+            $mins = PromocaoItem::query()
+                ->selectRaw('product_id, MIN(preco_promocao) as preco_promocao')
+                ->whereIn('product_id', $produtos->modelKeys())
+                ->whereHas('promocao', function ($query) use ($empresaId, $hoje): void {
+                    $query->where('empresa_id', $empresaId)
+                        ->where('ativa', true)
+                        ->whereDate('data_inicio', '<=', $hoje)
+                        ->whereDate('data_fim', '>=', $hoje);
+                })
+                ->groupBy('product_id')
+                ->pluck('preco_promocao', 'product_id');
+        }
+
+        foreach ($produtos as $product) {
+            $min = $mins->get($product->id) ?? $mins->get((string) $product->id);
+            $product->setRelation('precoPromocaoLote', $min === null ? null : (float) $min);
+        }
     }
 
     public function selectProdutoResult(int $index): void
@@ -3036,6 +3126,6 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        $this->redirect(ProductResource::getUrl('edit', ['record' => $productId]));
+        $this->redirectErpAdmin(ProductResource::getUrl('edit', ['record' => $productId]));
     }
 }

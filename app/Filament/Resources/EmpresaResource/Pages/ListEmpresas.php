@@ -138,7 +138,7 @@ class ListEmpresas extends ListRecords
 
     public function createEmpresa(): void
     {
-        $this->redirect(EmpresaResource::getUrl('create'));
+        $this->redirectErpAdmin(EmpresaResource::getUrl('create'));
     }
 
     public function editEmpresa(): void
@@ -149,6 +149,6 @@ class ListEmpresas extends ListRecords
             return;
         }
 
-        $this->redirect(EmpresaResource::getUrl('edit', ['record' => $recordId]));
+        $this->redirectErpAdmin(EmpresaResource::getUrl('edit', ['record' => $recordId]));
     }
 }

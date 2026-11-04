@@ -76,6 +76,29 @@
         displayColors: false,
     };
 
+    // Animação curta e leve (PCs com pouca RAM) — todos os gráficos juntos.
+    const prefersReducedMotion = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const chartAnimation = prefersReducedMotion
+        ? false
+        : {
+            duration: 380,
+            easing: 'easeOutQuart',
+        };
+
+    const chartDefaultsLite = {
+        animation: chartAnimation,
+        animations: prefersReducedMotion ? false : {
+            colors: false,
+            numbers: { type: 'number', duration: 380, easing: 'easeOutQuart' },
+        },
+        transitions: {
+            active: { animation: { duration: 120 } },
+            resize: { animation: { duration: 0 } },
+        },
+    };
+
     const CHART_CANVAS_IDS = [
         'erp-dash-sales-chart',
         'erp-dash-cashflow-chart',
@@ -175,24 +198,25 @@
                         backgroundColor: (ctx) => {
                             const { ctx: c, chartArea } = ctx.chart;
                             if (!chartArea) {
-                                return 'rgba(30, 90, 158, 0.14)';
+                                return 'rgba(30, 90, 158, 0.12)';
                             }
                             const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                            gradient.addColorStop(0, 'rgba(30, 90, 158, 0.28)');
-                            gradient.addColorStop(1, 'rgba(30, 90, 158, 0.03)');
+                            gradient.addColorStop(0, 'rgba(30, 90, 158, 0.22)');
+                            gradient.addColorStop(1, 'rgba(30, 90, 158, 0.02)');
                             return gradient;
                         },
                         fill: true,
-                        tension: 0.3,
-                        borderWidth: 2.5,
-                        pointRadius: 2,
-                        pointHoverRadius: 5,
+                        tension: 0.28,
+                        borderWidth: 2.25,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
                         pointBackgroundColor: '#1e5a9e',
                         pointBorderColor: '#fff',
                         pointBorderWidth: 1.5,
                     }],
                 },
                 options: {
+                    ...chartDefaultsLite,
                     responsive: true,
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
@@ -207,7 +231,7 @@
                                 ...axisDefaults.ticks,
                                 callback: moneyTick,
                             },
-                            grid: { color: 'rgba(15, 52, 96, 0.08)' },
+                            grid: { color: 'rgba(15, 52, 96, 0.07)' },
                         },
                         x: {
                             ...axisDefaults,
@@ -262,6 +286,7 @@
                     ],
                 },
                 options: {
+                    ...chartDefaultsLite,
                     responsive: true,
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
@@ -294,7 +319,7 @@
                                 ...axisDefaults.ticks,
                                 callback: moneyTick,
                             },
-                            grid: { color: 'rgba(15, 52, 96, 0.08)' },
+                            grid: { color: 'rgba(15, 52, 96, 0.07)' },
                         },
                         x: {
                             ...axisDefaults,
@@ -313,15 +338,16 @@
                     datasets: [{
                         data: mixData.values,
                         backgroundColor: mixData.colors ?? ['#1e5a9e', '#0d9488', '#d97706'],
-                        borderColor: '#f1f5f9',
-                        borderWidth: 3,
-                        hoverOffset: 4,
+                        borderColor: '#f8fafc',
+                        borderWidth: 2,
+                        hoverOffset: 2,
                     }],
                 },
                 options: {
+                    ...chartDefaultsLite,
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '58%',
+                    cutout: '60%',
                     plugins: {
                         legend: {
                             position: 'bottom',
@@ -366,15 +392,16 @@
                     datasets: [{
                         data: fiscalData.values,
                         backgroundColor: fiscalData.colors ?? ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
-                        borderColor: '#f1f5f9',
-                        borderWidth: 3,
-                        hoverOffset: 4,
+                        borderColor: '#f8fafc',
+                        borderWidth: 2,
+                        hoverOffset: 2,
                     }],
                 },
                 options: {
+                    ...chartDefaultsLite,
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '58%',
+                    cutout: '60%',
                     plugins: {
                         legend: {
                             position: 'bottom',
@@ -420,15 +447,16 @@
                     datasets: [{
                         data: paymentsData.values,
                         backgroundColor: paymentsData.colors ?? ['#1d4ed8', '#0f766e', '#7c3aed', '#6366f1'],
-                        borderColor: '#f1f5f9',
-                        borderWidth: 3,
-                        hoverOffset: 4,
+                        borderColor: '#f8fafc',
+                        borderWidth: 2,
+                        hoverOffset: 2,
                     }],
                 },
                 options: {
+                    ...chartDefaultsLite,
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '58%',
+                    cutout: '60%',
                     plugins: {
                         legend: {
                             position: 'bottom',

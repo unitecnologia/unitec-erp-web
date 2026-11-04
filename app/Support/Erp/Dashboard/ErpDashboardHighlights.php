@@ -109,10 +109,9 @@ final class ErpDashboardHighlights
                 ->where(function ($query): void {
                     $query->whereNull('plataforma')
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
-                })
-                ->whereDate('data', '>=', $inicio->toDateString())
-                ->whereDate('data', '<=', $fim->toDateString());
+                });
 
+            ErpDashboardDateFilter::whereDateColumnBetween($q, 'data', $inicio, $fim);
             ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), self::$empresaScope);
 
             $row = $q->selectRaw('COUNT(*) as qtd, COALESCE(SUM(total), 0) as total')->first();
@@ -159,9 +158,6 @@ final class ErpDashboardHighlights
         }
 
         if (ErpSchema::hasTable((new VendaItem)->getTable()) && ErpSchema::hasTable((new Venda)->getTable())) {
-            $from = $inicio->copy()->startOfDay()->toDateString();
-            $to = $fim->copy()->toDateString();
-
             $vendasPeriodo = Venda::query()
                 ->select((new Venda)->getTable().'.id')
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
@@ -169,9 +165,8 @@ final class ErpDashboardHighlights
                 ->where(function ($plataforma): void {
                     $plataforma->whereNull('plataforma')
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
-                })
-                ->whereDate('data', '>=', $from)
-                ->whereDate('data', '<=', $to);
+                });
+            ErpDashboardDateFilter::whereDateColumnBetween($vendasPeriodo, 'data', $inicio, $fim);
             ErpEmpresaScopeFilter::applyColumn($vendasPeriodo, (new Venda)->getTable(), self::$empresaScope);
 
             $rows = VendaItem::query()
@@ -180,11 +175,8 @@ final class ErpDashboardHighlights
                 ->where('product_id', '>', 0)
                 ->whereIn('venda_id', $vendasPeriodo)
                 ->groupBy('product_id')
+                ->orderByDesc('qty')
                 ->get();
-
-            $nomes = Product::query()
-                ->whereIn('id', $rows->pluck('product_id')->filter()->all())
-                ->pluck('descricao', 'id');
 
             foreach ($rows as $row) {
                 $pid = (int) ($row->product_id ?? 0);
@@ -192,9 +184,8 @@ final class ErpDashboardHighlights
                     continue;
                 }
                 $key = 'p:'.$pid;
-                $nome = trim((string) ($nomes[$pid] ?? 'Produto'));
                 $map[$key] = [
-                    'nome' => $nome !== '' ? $nome : ($map[$key]['nome'] ?? 'Produto'),
+                    'nome' => (string) ($map[$key]['nome'] ?? 'Produto'),
                     'qty' => (float) ($map[$key]['qty'] ?? 0) + (float) $row->qty,
                 ];
             }
@@ -208,8 +199,26 @@ final class ErpDashboardHighlights
             ];
         }
 
-        uasort($map, fn (array $a, array $b): int => $b['qty'] <=> $a['qty']);
-        $top = reset($map);
+        $topKey = null;
+        $topQty = -1.0;
+        foreach ($map as $key => $item) {
+            if ((float) $item['qty'] > $topQty) {
+                $topQty = (float) $item['qty'];
+                $topKey = $key;
+            }
+        }
+        $top = $map[$topKey];
+
+        // Busca pontual do nome do vencedor (evita pluck de todos os produtos do mês).
+        if (str_starts_with((string) $topKey, 'p:')) {
+            $pid = (int) substr((string) $topKey, 2);
+            if ($pid > 0) {
+                $nome = trim((string) (Product::query()->whereKey($pid)->value('descricao') ?? ''));
+                if ($nome !== '') {
+                    $top['nome'] = $nome;
+                }
+            }
+        }
 
         return [
             'label' => 'Produto mais vendido',
@@ -238,7 +247,7 @@ final class ErpDashboardHighlights
 
             ErpEmpresaScopeFilter::applyPdvSessao($q, self::$empresaScope);
 
-            $rows = $q->groupBy('person_id')->pluck('total', 'person_id');
+            $rows = $q->groupBy('person_id')->orderByDesc('total')->pluck('total', 'person_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -253,13 +262,12 @@ final class ErpDashboardHighlights
                 ->where(function ($query): void {
                     $query->whereNull('plataforma')
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
-                })
-                ->whereDate('data', '>=', $inicio->toDateString())
-                ->whereDate('data', '<=', $fim->toDateString());
+                });
 
+            ErpDashboardDateFilter::whereDateColumnBetween($q, 'data', $inicio, $fim);
             ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), self::$empresaScope);
 
-            $rows = $q->groupBy('cliente_id')->pluck('total', 'cliente_id');
+            $rows = $q->groupBy('cliente_id')->orderByDesc('total')->pluck('total', 'cliente_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -274,9 +282,14 @@ final class ErpDashboardHighlights
             ];
         }
 
-        arsort($totais);
-        $clienteId = (int) array_key_first($totais);
-        $valor = (float) $totais[$clienteId];
+        $clienteId = 0;
+        $valor = -1.0;
+        foreach ($totais as $id => $total) {
+            if ((float) $total > $valor) {
+                $valor = (float) $total;
+                $clienteId = (int) $id;
+            }
+        }
         $nome = Person::query()->whereKey($clienteId)->value('nome_razao') ?: 'Cliente';
 
         return [
@@ -306,7 +319,7 @@ final class ErpDashboardHighlights
 
             ErpEmpresaScopeFilter::applyPdvSessao($q, self::$empresaScope);
 
-            $rows = $q->groupBy('vendedor_id')->pluck('total', 'vendedor_id');
+            $rows = $q->groupBy('vendedor_id')->orderByDesc('total')->pluck('total', 'vendedor_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -321,13 +334,12 @@ final class ErpDashboardHighlights
                 ->where(function ($query): void {
                     $query->whereNull('plataforma')
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
-                })
-                ->whereDate('data', '>=', $inicio->toDateString())
-                ->whereDate('data', '<=', $fim->toDateString());
+                });
 
+            ErpDashboardDateFilter::whereDateColumnBetween($q, 'data', $inicio, $fim);
             ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), self::$empresaScope);
 
-            $rows = $q->groupBy('vendedor_id')->pluck('total', 'vendedor_id');
+            $rows = $q->groupBy('vendedor_id')->orderByDesc('total')->pluck('total', 'vendedor_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -342,9 +354,14 @@ final class ErpDashboardHighlights
             ];
         }
 
-        arsort($totais);
-        $vendedorId = (int) array_key_first($totais);
-        $valor = (float) $totais[$vendedorId];
+        $vendedorId = 0;
+        $valor = -1.0;
+        foreach ($totais as $id => $total) {
+            if ((float) $total > $valor) {
+                $valor = (float) $total;
+                $vendedorId = (int) $id;
+            }
+        }
         $nome = Vendedor::query()->whereKey($vendedorId)->value('nome') ?: 'Vendedor';
 
         return [

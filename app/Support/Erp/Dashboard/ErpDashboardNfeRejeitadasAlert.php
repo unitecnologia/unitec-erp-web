@@ -34,6 +34,12 @@ final class ErpDashboardNfeRejeitadasAlert
      */
     private static function countRejeitadas(int|array|null $empresaScope = null): int
     {
+        $collector = ErpDashboardCollector::current();
+
+        if ($collector !== null) {
+            return $collector->notasRejeitadasCount();
+        }
+
         if ($empresaScope === null) {
             $empresaId = ErpDashboardCertificadoAlert::resolveEmpresaId();
             $empresaScope = ($empresaId && $empresaId > 0) ? $empresaId : null;

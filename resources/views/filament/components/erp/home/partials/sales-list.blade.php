@@ -8,25 +8,25 @@
         <span class="erp-dash-panel__meta">{{ count($recentSales) > 0 ? count($recentSales) . ' registros' : 'Sem vendas recentes' }}</span>
     </header>
     <div class="erp-dash-panel__body erp-dash-panel__body--flush">
-        <div class="erp-dash-table-wrap">
-            <table class="erp-dash-table">
+        <div class="erp-dash-table-wrap erp-dash-table-wrap--float">
+            <table class="erp-dash-table erp-dash-table--float">
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Cliente</th>
-                        <th>Valor</th>
-                        <th>Data</th>
-                        <th>Status</th>
+                        <th class="erp-dash-table__col-id">Ped.</th>
+                        <th class="erp-dash-table__col-cliente">Cliente</th>
+                        <th class="erp-dash-table__col-valor">Valor</th>
+                        <th class="erp-dash-table__col-data">Data</th>
+                        <th class="erp-dash-table__col-status">Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($recentSales as $sale)
                         <tr>
-                            <td>{{ $sale['id'] }}</td>
-                            <td>{{ $sale['cliente'] }}</td>
-                            <td class="erp-dash-table__money">{{ $sale['valor'] }}</td>
-                            <td>{{ $sale['data'] }}</td>
-                            <td>
+                            <td class="erp-dash-table__col-id">{{ $sale['id'] }}</td>
+                            <td class="erp-dash-table__col-cliente">{{ $sale['cliente'] }}</td>
+                            <td class="erp-dash-table__col-valor erp-dash-table__money">{{ $sale['valor'] }}</td>
+                            <td class="erp-dash-table__col-data">{{ $sale['data'] }}</td>
+                            <td class="erp-dash-table__col-status">
                                 <span class="erp-dash-badge erp-dash-badge--{{ \Illuminate\Support\Str::slug($sale['status']) }}">
                                     {{ $sale['status'] }}
                                 </span>

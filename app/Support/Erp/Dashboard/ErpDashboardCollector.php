@@ -2,9 +2,11 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Models\ContaPagar;
 use App\Support\Erp\ErpSchema;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
+use Throwable;
 
 /**
  * Coletor único de dados do dashboard — memoiza agregados compartilhados
@@ -89,9 +91,80 @@ final class ErpDashboardCollector
         return $this->memo[$key] ??= ErpDashboardSalesMetrics::faturamentoPeriodo($from, $to, $this->empresaScope);
     }
 
+    /**
+     * Reaproveita agregados já calculados (ex.: shell → heavy no mesmo carregamento).
+     * Não é cache persistente: só memo do request atual.
+     *
+     * @param  array{
+     *     saldo_caixa?: float,
+     *     receber_vencido?: float,
+     *     pagar_vencido?: float,
+     *     faturamento_mes?: float,
+     *     obrigacoes_7d?: float
+     * }  $seed
+     */
+    public function seed(array $seed): void
+    {
+        if (array_key_exists('saldo_caixa', $seed)) {
+            $this->memo['saldo_caixa'] = (float) $seed['saldo_caixa'];
+        }
+
+        if (array_key_exists('receber_vencido', $seed)) {
+            $this->memo['receber_vencido'] = [
+                'qtd' => (int) ($seed['receber_vencido_qtd'] ?? 0),
+                'valor' => (float) $seed['receber_vencido'],
+            ];
+        }
+
+        if (array_key_exists('pagar_vencido', $seed)) {
+            $this->memo['pagar_vencido'] = [
+                'qtd' => (int) ($seed['pagar_vencido_qtd'] ?? 0),
+                'valor' => (float) $seed['pagar_vencido'],
+            ];
+        }
+
+        if (array_key_exists('faturamento_mes', $seed)) {
+            $key = 'fat_periodo:'.$this->inicioMes->toDateString().':'.$this->fimMes->toDateString();
+            $this->memo[$key] = (float) $seed['faturamento_mes'];
+        }
+
+        if (array_key_exists('obrigacoes_7d', $seed)) {
+            $this->memo['obrigacoes_7d'] = (float) $seed['obrigacoes_7d'];
+        }
+    }
+
     public function saldoCaixa(): float
     {
         return $this->memo['saldo_caixa'] ??= ErpFinanceiroMetricas::saldoCaixa(null, $this->empresaScope);
+    }
+
+    /**
+     * Obrigações a pagar: vencidos + a vencer em até 7 dias (mesmo critério da Saúde).
+     */
+    public function obrigacoesPagar7d(): float
+    {
+        if (array_key_exists('obrigacoes_7d', $this->memo)) {
+            return (float) $this->memo['obrigacoes_7d'];
+        }
+
+        try {
+            if (! ErpSchema::hasTable((new ContaPagar)->getTable())) {
+                return $this->memo['obrigacoes_7d'] = 0.0;
+            }
+
+            $q = ContaPagar::query()
+                ->where('saldo', '>', 0);
+            ErpDashboardDateFilter::whereDateColumnLte(
+                $q,
+                'vencimento',
+                $this->hoje->copy()->addDays(7)
+            );
+            ErpFinanceiroMetricas::applyEmpresaColumn($q, (new ContaPagar)->getTable(), $this->empresaScope);
+
+            return $this->memo['obrigacoes_7d'] = (float) $q->sum('saldo');
+        } catch (Throwable) {
+            return $this->memo['obrigacoes_7d'] = 0.0;
+        }
     }
 
     /**

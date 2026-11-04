@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\EmpresaResource\Pages\Concerns;
 
+use App\Filament\Concerns\InteractsWithErpSpaRedirect;
 use App\Filament\Concerns\ManagesCclassTribLookup;
 use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\EmpresaResource;
@@ -23,6 +24,7 @@ use Illuminate\Contracts\Support\Htmlable;
 
 trait ErpEmpresaFormPage
 {
+    use InteractsWithErpSpaRedirect;
     use ManagesCclassTribLookup;
     use ManagesEmpresaBloquearEstoqueNegativo;
     use ManagesEmpresaBoletoContas;
@@ -132,7 +134,7 @@ trait ErpEmpresaFormPage
                 // Commit do banco primeiro; efeitos colaterais (WhatsApp/.env/e-mail) depois do redirect controlado.
                 $this->save(shouldRedirect: false, shouldSendSavedNotification: true);
                 $this->runEmpresaPostSaveSideEffects();
-                $this->redirect($this->getEmpresaListRedirectUrl());
+                $this->redirectErpAdmin($this->getEmpresaListRedirectUrl());
 
                 return;
             }
@@ -220,7 +222,7 @@ trait ErpEmpresaFormPage
     {
         ErpScreen::set('Empresa');
 
-        $this->redirect(EmpresaResource::getUrl('index'));
+        $this->redirectErpAdmin(EmpresaResource::getUrl('index'));
     }
 
     /**

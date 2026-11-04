@@ -300,7 +300,8 @@ trait ErpPersonFormPage
         $this->discardPendingPersonPhoto();
 
         if ($this->embedsInPdv) {
-            $this->redirect($this->getPersonListRedirectUrl());
+            // PDV iframe: full reload obrigatório.
+            $this->redirectErpAdmin($this->getPersonListRedirectUrl());
 
             return;
         }

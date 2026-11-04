@@ -7,6 +7,8 @@ use App\Support\Erp\ErpScreen;
 
 trait InteractsWithErpFormReturnUrl
 {
+    use InteractsWithErpSpaRedirect;
+
     public ?string $erpFormReturnUrl = null;
 
     public function mountInteractsWithErpFormReturnUrl(): void
@@ -54,24 +56,32 @@ trait InteractsWithErpFormReturnUrl
     {
         $returnUrl = $this->resolveErpFormReturnUrl();
 
+        // Monitor: estado vivo / polling — full reload seguro.
         if (ErpFormReturnUrl::isMonitorUrl($returnUrl)) {
             ErpFormReturnUrl::forget();
             ErpScreen::set('Monitor de Vendas');
-            $this->redirect(ErpFormReturnUrl::toRedirectUrl($returnUrl), navigate: false);
+            $this->redirectErpAdmin(
+                (string) ErpFormReturnUrl::toRedirectUrl($returnUrl),
+                forceFullPage: true,
+            );
 
             return;
         }
 
+        // Retorno ao lançamento de orçamento (contexto de overlay/form pesado).
         if (ErpFormReturnUrl::isOrcamentoFormUrl($returnUrl)) {
             ErpFormReturnUrl::forget();
             ErpScreen::set('Lançamento de Orçamento');
-            $this->redirect(ErpFormReturnUrl::toRedirectUrl($returnUrl), navigate: false);
+            $this->redirectErpAdmin(
+                (string) ErpFormReturnUrl::toRedirectUrl($returnUrl),
+                forceFullPage: true,
+            );
 
             return;
         }
 
         ErpScreen::set($defaultScreen);
-        $this->redirect($fallback, navigate: false);
+        $this->redirectErpAdmin($fallback);
     }
 
     protected function redirectToOrcamentoReturnIfPresent(): bool
@@ -84,7 +94,10 @@ trait InteractsWithErpFormReturnUrl
 
         ErpFormReturnUrl::forget();
         ErpScreen::set('Lançamento de Orçamento');
-        $this->redirect(ErpFormReturnUrl::toRedirectUrl($returnUrl), navigate: false);
+        $this->redirectErpAdmin(
+            (string) ErpFormReturnUrl::toRedirectUrl($returnUrl),
+            forceFullPage: true,
+        );
 
         return true;
     }

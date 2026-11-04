@@ -213,7 +213,7 @@ class ListPeople extends ListRecords
 
         ErpScreen::set('Principal');
 
-        $this->redirect(filament()->getUrl());
+        $this->redirectErpAdmin((string) filament()->getUrl());
     }
 
     protected function erpListEntityName(): string
@@ -427,7 +427,7 @@ class ListPeople extends ListRecords
             $createUrl .= '?tipo=' . urlencode($this->tipoFilter);
         }
 
-        $this->redirect($this->urlWithPdvEmbed($createUrl));
+        $this->redirectErpAdmin($this->urlWithPdvEmbed($createUrl));
     }
 
     public function editPerson(int | string | null $recordId = null): void
@@ -455,7 +455,7 @@ class ListPeople extends ListRecords
             return;
         }
 
-        $this->redirect($this->urlWithPdvEmbed(
+        $this->redirectErpAdmin($this->urlWithPdvEmbed(
             PersonResource::getUrl('edit', ['record' => $resolvedId])
         ));
     }

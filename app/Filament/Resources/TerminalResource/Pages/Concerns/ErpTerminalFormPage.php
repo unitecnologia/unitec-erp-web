@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\TerminalResource\Pages\Concerns;
 
+use App\Filament\Concerns\InteractsWithErpSpaRedirect;
 use App\Filament\Resources\TerminalResource;
 use App\Models\Terminal;
 use App\Support\Erp\ErpScreen;
@@ -18,6 +19,8 @@ use Illuminate\Contracts\Support\Htmlable;
 
 trait ErpTerminalFormPage
 {
+    use InteractsWithErpSpaRedirect;
+
     public string $activeTerminalTab = 'configuracoes';
 
     public function getHeading(): string | Htmlable | null
@@ -111,7 +114,7 @@ trait ErpTerminalFormPage
     {
         ErpScreen::set('Terminais');
 
-        $this->redirect(TerminalResource::getUrl('index'));
+        $this->redirectErpAdmin(TerminalResource::getUrl('index'));
     }
 
     /**

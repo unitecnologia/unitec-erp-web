@@ -49,6 +49,7 @@
     && \App\Support\Erp\EmpresaParametros::mostrarDashboardInicial()
 )
     <script src="{{ asset('js/vendor/chart.umd.min.js') }}?v={{ $version }}"></script>
-    <script src="{{ asset('js/erp-home-charts.js') }}?v={{ $version }}" defer></script>
-    <script src="{{ asset('js/erp-warm-prefetch.js') }}?v={{ $version }}" defer></script>
+    <script src="{{ asset('js/erp-home-charts.js') }}?v={{ $version }}-dash-lite1" defer></script>
+    {{-- Prefetch full-page desativado na Fase 1 (ENABLED=false em erp-warm-prefetch.js). --}}
+    <script src="{{ asset('js/erp-warm-prefetch.js') }}?v={{ $version }}-fase1-noprefetch" defer></script>
 @endif

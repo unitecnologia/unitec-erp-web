@@ -98,6 +98,7 @@ class ErpAccess
   public static function forgetSession(): void
   {
     session()->forget(static::SESSION_KEY);
+    \App\Support\Erp\ErpMenu::forgetCachedMenuHtml();
 
     try {
       app(\App\Support\Erp\License\LicencaRemotaService::class)->forgetLoginGate();
@@ -142,6 +143,7 @@ class ErpAccess
 
     if ((int) Auth::id() === (int) $userId) {
       static::storeInSession($user, $valid);
+      \App\Support\Erp\ErpMenu::forgetCachedMenuHtml();
     }
   }
 

@@ -8,6 +8,7 @@
     @class([
         'erp-dash',
         'erp-dash--has-visao' => $this->showDashboardVisaoToggle,
+        'erp-dash--heavy-ready' => $this->dashboardHeavyReady,
     ])
 >
     @if ($this->showDashboardVisaoToggle)
@@ -41,40 +42,53 @@
         'kpis' => $dash['kpis'],
     ])
 
-    <div class="erp-dash__heavy" wire:init="loadDashboardHeavy">
+    <div
+        class="erp-dash__heavy"
+        @if (! $this->dashboardHeavyReady && ! $this->dashboardHeavyError)
+            wire:init="loadDashboardHeavy"
+        @endif
+    >
         @if ($this->dashboardHeavyReady)
-            @include('filament.components.erp.home.partials.gauges', [
-                'gauges' => $dash['gauges'] ?? [],
-                'sellerGauges' => $dash['sellerGauges'] ?? [],
-                'visao' => $visao,
-            ])
-
-            <div class="erp-dash__layout">
-                <div class="erp-dash__main">
-                    @include('filament.components.erp.home.partials.charts', [
-                        'salesChart' => $dash['salesChart'],
-                        'cashflowChart' => $dash['cashflowChart'],
-                        'salesMixChart' => $dash['salesMixChart'] ?? [],
-                        'fiscalDocsChart' => $dash['fiscalDocsChart'] ?? [],
-                        'paymentMethodsChart' => $dash['paymentMethodsChart'] ?? [],
-                        'visao' => $visao,
-                    ])
-
-                    <div class="erp-dash__sales-row">
-                        @include('filament.components.erp.home.partials.sales-list', [
-                            'recentSales' => $dash['recentSales'],
-                        ])
-
-                        @include('filament.components.erp.home.partials.highlights', [
-                            'highlights' => $dash['highlights'] ?? [],
-                        ])
-                    </div>
-                </div>
-
-                @include('filament.components.erp.home.partials.alerts-sidebar', [
-                    'alerts' => $dash['alerts'],
+            <div class="erp-dash__heavy-content is-ready">
+                @include('filament.components.erp.home.partials.gauges', [
+                    'gauges' => $dash['gauges'] ?? [],
+                    'sellerGauges' => $dash['sellerGauges'] ?? [],
+                    'visao' => $visao,
                 ])
+
+                <div class="erp-dash__layout">
+                    <div class="erp-dash__main">
+                        @include('filament.components.erp.home.partials.charts', [
+                            'salesChart' => $dash['salesChart'],
+                            'cashflowChart' => $dash['cashflowChart'],
+                            'salesMixChart' => $dash['salesMixChart'] ?? [],
+                            'fiscalDocsChart' => $dash['fiscalDocsChart'] ?? [],
+                            'paymentMethodsChart' => $dash['paymentMethodsChart'] ?? [],
+                            'visao' => $visao,
+                        ])
+
+                        <div class="erp-dash__sales-row">
+                            @include('filament.components.erp.home.partials.sales-list', [
+                                'recentSales' => $dash['recentSales'],
+                            ])
+
+                            @include('filament.components.erp.home.partials.highlights', [
+                                'highlights' => $dash['highlights'] ?? [],
+                            ])
+                        </div>
+                    </div>
+
+                    @include('filament.components.erp.home.partials.alerts-sidebar', [
+                        'alerts' => $dash['alerts'],
+                    ])
+                </div>
             </div>
+        @elseif ($this->dashboardHeavyError)
+            @include('filament.components.erp.home.partials.wave-error', [
+                'message' => 'Não foi possível carregar o painel. Verifique a conexão e tente novamente.',
+                'retryMethod' => 'loadDashboardHeavy',
+            ])
+            @include('filament.components.erp.home.partials.heavy-skeleton')
         @else
             @include('filament.components.erp.home.partials.heavy-skeleton')
         @endif

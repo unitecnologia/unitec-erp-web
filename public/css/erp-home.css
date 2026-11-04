@@ -100,12 +100,14 @@
     height: 100%;
     min-height: 0;
     margin: 0;
-    padding: 0.28rem 0.35rem 0.22rem;
+    /* Padding inferior maior evita corte pela barra do Windows / bordas do viewport */
+    padding: 0.28rem 0.35rem 0.55rem;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 0.28rem;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     font-family: var(--erp-font, 'Segoe UI', system-ui, sans-serif);
     color: #0f172a;
 }
@@ -173,7 +175,8 @@
     gap: 0.28rem;
     min-height: 0;
     min-width: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .erp-dash__heavy > .erp-dash__layout {
@@ -186,6 +189,48 @@
     min-height: 4rem;
     background: #f1f5f9;
     border-radius: 4px;
+}
+
+.erp-dash__wave-error {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0 0 0.35rem;
+    padding: 0.35rem 0.15rem;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+/* Revelação única do bloco pesado (sem efeito de “quadros em cascata”). */
+.erp-dash__heavy-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: 0.28rem;
+    min-height: 0;
+    min-width: 0;
+    opacity: 0;
+    transform: translateY(4px);
+}
+
+.erp-dash__heavy-content > .erp-dash__layout {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.erp-dash__heavy-content.is-ready,
+.erp-dash--heavy-ready .erp-dash__heavy-content {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .erp-dash__heavy-content.is-ready,
+    .erp-dash--heavy-ready .erp-dash__heavy-content {
+        transition: none;
+    }
 }
 
 /* Gauges (velocímetros) */
@@ -1143,8 +1188,9 @@ button.erp-dash-kpi__action:disabled {
 }
 
 .erp-dash__main {
+    /* Gráficos acima + faixa inferior com altura mínima garantida */
     display: grid;
-    grid-template-rows: minmax(0, 1fr) minmax(0, auto);
+    grid-template-rows: minmax(0, 1fr) minmax(7.75rem, 0.62fr);
     gap: 0.35rem;
     min-width: 0;
     min-height: 0;
@@ -1198,22 +1244,26 @@ button.erp-dash-kpi__action:disabled {
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(12rem, 0.85fr);
     gap: 0.35rem;
-    min-height: 0;
+    min-height: 7.75rem;
+    height: 100%;
     align-items: stretch;
+    overflow: hidden;
 }
 
 .erp-dash__sales {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    max-height: calc(clamp(6.5rem, 28vh, 11rem) + 0.20cm);
+    height: 100%;
+    max-height: none;
 }
 
 .erp-dash__highlights {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    max-height: calc(clamp(6.5rem, 28vh, 11rem) + 0.20cm);
+    height: 100%;
+    max-height: none;
 }
 
 .erp-dash__highlights-body {
@@ -1363,9 +1413,10 @@ button.erp-dash-kpi__action:disabled {
 
 .erp-dash-panel__body--chart {
     flex: 1;
-    min-height: clamp(5rem, 18vh, 10rem);
+    /* Um pouco mais compacto para liberar altura aos quadros inferiores */
+    min-height: clamp(4.25rem, 13.5vh, 8.25rem);
     height: auto;
-    padding: 0.35rem 0.45rem 0.4rem;
+    padding: 0.3rem 0.4rem 0.35rem;
     background: #ffffff;
 }
 
@@ -1454,6 +1505,96 @@ button.erp-dash-kpi__action:disabled {
     text-align: center;
     color: #7b8ca3;
     padding: 0.8rem !important;
+}
+
+/* Últimas vendas — grade branca, colunas estáveis */
+.erp-dash-table-wrap--float {
+    padding: 0;
+    background: #ffffff;
+}
+
+.erp-dash-table--float {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font-size: 0.7rem;
+    background: #ffffff;
+}
+
+.erp-dash-table--float thead th {
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #64748b;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.32rem 0.55rem;
+}
+
+.erp-dash-table--float tbody tr,
+.erp-dash-table--float tbody tr:nth-child(even) {
+    background: #ffffff;
+}
+
+.erp-dash-table--float tbody td {
+    border-bottom: 1px solid #eef2f7;
+    background: #ffffff;
+    box-shadow: none;
+    padding: 0.3rem 0.55rem;
+    color: #334155;
+    vertical-align: middle;
+}
+
+.erp-dash-table--float tbody tr:hover td {
+    background: #f8fafc;
+    box-shadow: none;
+}
+
+.erp-dash-table__col-id {
+    width: 4.4rem;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.erp-dash-table__col-cliente {
+    width: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-dash-table__col-valor {
+    width: 6.6rem;
+    text-align: right !important;
+    white-space: nowrap;
+}
+
+.erp-dash-table__col-data {
+    width: 5.5rem;
+    text-align: center !important;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.erp-dash-table__col-status {
+    width: 5.2rem;
+    text-align: right !important;
+}
+
+.erp-dash-table--float .erp-dash-table__money {
+    font-weight: 700;
+}
+
+.erp-dash-table--float .erp-dash-badge {
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-weight: 700;
+    background: #eef2f7;
+    color: #475569;
+    box-shadow: none;
 }
 
 .erp-dash-badge {
@@ -1691,25 +1832,39 @@ button.erp-dash-kpi__action:disabled {
 
     .erp-dash__sales-row {
         grid-template-columns: 1fr;
+        min-height: 0;
+        height: auto;
     }
 
-    .erp-dash__sales {
-        max-height: calc(clamp(5.5rem, 24vh, 9rem) + 0.20cm);
+    .erp-dash__main {
+        grid-template-rows: minmax(0, auto) minmax(0, auto);
     }
 
+    .erp-dash__sales,
     .erp-dash__highlights {
         max-height: none;
+        min-height: 7.25rem;
+        height: auto;
     }
 }
 
 @media (max-height: 820px) {
     .erp-dash-panel__body--chart {
-        min-height: clamp(3.8rem, 15vh, 7rem);
+        min-height: clamp(3.5rem, 12vh, 6.5rem);
     }
 
-    .erp-dash__sales,
-    .erp-dash__highlights {
-        max-height: calc(clamp(5rem, 22vh, 8rem) + 0.20cm);
+    .erp-dash__main {
+        grid-template-rows: minmax(0, 1fr) minmax(7.25rem, 0.68fr);
+    }
+
+    .erp-dash__sales-row {
+        min-height: 7.25rem;
+    }
+
+    .erp-dash-gauge__meter,
+    .erp-dash__gauges .erp-dash-gauge__meter {
+        height: calc(5.6rem + 0.45cm);
+        max-width: min(100%, calc(14rem + 0.45cm));
     }
 }
 

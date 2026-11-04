@@ -1,20 +1,30 @@
 @php
     use App\Support\Erp\ErpMenu;
 
+    /**
+     * Fase 2 (corrigida):
+     * - wire:navigate no Livewire 3.8 faz document.body.replaceWith(newBody).
+     * - wire:ignore só age no morph de componente Livewire — NÃO preserva DOM na navegação SPA.
+     * - O mecanismo correto é @persist → <div x-persist="..."> (SupportNavigate).
+     * - Sem cache de ~129KB de HTML na sessão (custo de read/write em todo request).
+     */
+    $fase2 = ErpMenu::SHELL_MENU_FASE2;
+    $fp = $fase2 ? ErpMenu::shellFingerprint() : 'legacy';
     $menus = ErpMenu::mainMenus();
 @endphp
 
-<nav class="erp-menu-bar" aria-label="Menu principal">
-    <ul class="erp-menu-bar__list">
-        @foreach ($menus as $menu)
-            <li class="erp-menu-bar__item">
-                <div class="erp-menu-bar__details">
-                    <button type="button" class="erp-menu-bar__trigger">{{ $menu['label'] }}</button>
-                    <div class="erp-menu-bar__dropdown">
-                        @include('filament.components.erp.menu-bar-items', ['items' => $menu['items']])
-                    </div>
-                </div>
-            </li>
-        @endforeach
-    </ul>
-</nav>
+@if ($fase2)
+    @persist('erp-menu-'.$fp)
+        @include('filament.components.erp.menu-bar-nav', [
+            'fase2' => false,
+            'fp' => $fp,
+            'menus' => $menus,
+        ])
+    @endpersist
+@else
+    @include('filament.components.erp.menu-bar-nav', [
+        'fase2' => false,
+        'fp' => $fp,
+        'menus' => $menus,
+    ])
+@endif

@@ -72,13 +72,62 @@ use App\Filament\Resources\VeiculoResource;
 use App\Filament\Resources\DevolucaoCompraResource;
 use App\Filament\Resources\DevolucaoVendaResource;
 use App\Filament\Resources\VendaResource;
-use App\Support\Erp\ErpAccess;
+use Illuminate\Support\Facades\Auth;
 
 class ErpMenu
 {
+    /**
+     * Fase 2 shell: @persist (x-persist) no navigate + ícones leves.
+     * NÃO usa wire:ignore para SPA (ineficaz no body swap do Livewire 3.8).
+     * Defina false para reverter ao markup Filament anterior sem remover código.
+     */
+    public const SHELL_MENU_FASE2 = true;
+
+    /** @deprecated Mantido só para limpar sessões antigas da Fase 2 inicial. */
+    public const SESSION_MENU_HTML_KEY = 'erp_shell_menu_cache';
+
     public static function mainMenus(): array
     {
         return static::filterMenusByPermission(static::allMenus());
+    }
+
+    /**
+     * Fingerprint do menu para o usuário/empresa atuais (não reutiliza entre tenants).
+     */
+    public static function shellFingerprint(): string
+    {
+        $user = Auth::user();
+        $userId = $user?->getAuthIdentifier() ?? 0;
+        $empresaId = ErpContext::currentEmpresaId() ?? 0;
+        $empresa = ErpContext::currentEmpresa();
+
+        $permToken = 'guest';
+        if ($user) {
+            $permToken = $user->is_admin
+                ? 'admin'
+                : hash('sha256', implode("\n", ErpAccess::permissionsFor($user)));
+        }
+
+        $modulos = '';
+        if ($empresa !== null) {
+            $modulos = implode('|', [
+                (string) $empresa->getAttribute('param_modulo_pdv'),
+                (string) $empresa->getAttribute('param_modulo_ordens_servico'),
+                (string) $empresa->getAttribute('param_modulo_logistica'),
+                (string) $empresa->getAttribute('param_modulo_rh'),
+                (string) $empresa->getAttribute('param_modulo_mercado_livre'),
+                (string) $empresa->getAttribute('tipo_atividade'),
+                (string) $empresa->getAttribute('param_geral_usar_pdv_erp'),
+                EmpresaModulos::empresaPrestadorServicos($empresa) ? '1' : '0',
+            ]);
+        }
+
+        return hash('sha256', $userId.'|'.$empresaId.'|'.$permToken.'|'.$modulos);
+    }
+
+    public static function forgetCachedMenuHtml(): void
+    {
+        session()->forget(self::SESSION_MENU_HTML_KEY);
     }
 
     /**

@@ -51,7 +51,7 @@ class CreateEmpresa extends CreateRecord
         }
 
         ErpScreen::set('Empresa');
-        $this->redirect(EmpresaResource::getUrl('index'));
+        $this->redirect(EmpresaResource::getUrl('index'), navigate: true);
     }
 
     protected function afterCreate(): void

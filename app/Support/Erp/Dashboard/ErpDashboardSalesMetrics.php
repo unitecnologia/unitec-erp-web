@@ -72,9 +72,9 @@ final class ErpDashboardSalesMetrics
             }
 
             $q = Venda::query()
-                ->whereNotIn('status', [Venda::STATUS_CANCELADO])
-                ->whereDate('data', $day->toDateString());
+                ->whereNotIn('status', [Venda::STATUS_CANCELADO]);
 
+            ErpDashboardDateFilter::whereDateColumn($q, 'data', $day);
             ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), $empresaScope);
 
             return (float) $q->sum('total');
@@ -94,10 +94,9 @@ final class ErpDashboardSalesMetrics
             }
 
             $q = Venda::query()
-                ->whereNotIn('status', [Venda::STATUS_CANCELADO])
-                ->whereDate('data', '>=', $from->toDateString())
-                ->whereDate('data', '<=', $to->toDateString());
+                ->whereNotIn('status', [Venda::STATUS_CANCELADO]);
 
+            ErpDashboardDateFilter::whereDateColumnBetween($q, 'data', $from, $to);
             ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), $empresaScope);
 
             return (float) $q->sum('total');
@@ -118,15 +117,9 @@ final class ErpDashboardSalesMetrics
 
             $q = PdvVenda::query()
                 ->where('situacao', '!=', 'C')
-                ->whereNull('venda_id')
-                ->where(function ($query) use ($day): void {
-                    $query->whereDate('fechado_em', $day->toDateString())
-                        ->orWhere(function ($fallback) use ($day): void {
-                            $fallback->whereNull('fechado_em')
-                                ->whereDate('created_at', $day->toDateString());
-                        });
-                });
+                ->whereNull('venda_id');
 
+            ErpDashboardDateFilter::wherePdvDia($q, $day);
             ErpEmpresaScopeFilter::applyPdvSessao($q, $empresaScope);
 
             return (float) $q->sum('total');
@@ -147,19 +140,9 @@ final class ErpDashboardSalesMetrics
 
             $q = PdvVenda::query()
                 ->where('situacao', '!=', 'C')
-                ->whereNull('venda_id')
-                ->where(function ($query) use ($from, $to): void {
-                    $query->where(function ($fechamento) use ($from, $to): void {
-                        $fechamento->whereNotNull('fechado_em')
-                            ->whereDate('fechado_em', '>=', $from->toDateString())
-                            ->whereDate('fechado_em', '<=', $to->toDateString());
-                    })->orWhere(function ($fallback) use ($from, $to): void {
-                        $fallback->whereNull('fechado_em')
-                            ->whereDate('created_at', '>=', $from->toDateString())
-                            ->whereDate('created_at', '<=', $to->toDateString());
-                    });
-                });
+                ->whereNull('venda_id');
 
+            ErpDashboardDateFilter::wherePdvPeriodo($q, $from, $to);
             ErpEmpresaScopeFilter::applyPdvSessao($q, $empresaScope);
 
             return (float) $q->sum('total');

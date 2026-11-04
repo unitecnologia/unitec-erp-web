@@ -159,6 +159,7 @@ class TrocarEmpresaPage extends Page
 
         session(['erp_empresa_id' => $empresaId]);
         ErpContext::clearMemo();
+        \App\Support\Erp\ErpMenu::forgetCachedMenuHtml();
 
         $nome = Empresa::query()->find($empresaId);
         $label = $nome

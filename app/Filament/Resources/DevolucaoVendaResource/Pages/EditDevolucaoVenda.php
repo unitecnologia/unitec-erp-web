@@ -31,7 +31,7 @@ class EditDevolucaoVenda extends EditRecord
                 ->warning()
                 ->send();
 
-            $this->redirect(DevolucaoVendaResource::getUrl('index'));
+            $this->redirectErpAdmin(DevolucaoVendaResource::getUrl('index'));
 
             return;
         }

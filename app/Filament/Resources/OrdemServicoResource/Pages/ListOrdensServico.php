@@ -594,7 +594,7 @@ class ListOrdensServico extends ListRecords
             return;
         }
 
-        $this->redirect(OrdemServicoResource::getUrl('create'));
+        $this->redirectErpAdmin(OrdemServicoResource::getUrl('create'));
     }
 
     /**
@@ -798,7 +798,7 @@ class ListOrdensServico extends ListRecords
             return;
         }
 
-        $this->redirect(OrdemServicoResource::getUrl('edit', ['record' => $this->highlightedRecordId]));
+        $this->redirectErpAdmin(OrdemServicoResource::getUrl('edit', ['record' => $this->highlightedRecordId]));
     }
 
     public function cancelOrdem(): void

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\DevolucaoVendaResource\Pages\Concerns;
 
+use App\Filament\Concerns\InteractsWithErpSpaRedirect;
 use App\Filament\Resources\DevolucaoVendaResource;
 use App\Models\DevolucaoVenda;
 use App\Models\DevolucaoVendaItem;
@@ -27,6 +28,8 @@ use Illuminate\Support\Str;
 
 trait ErpDevolucaoVendaFormPage
 {
+    use InteractsWithErpSpaRedirect;
+
     public string $numeroDisplay = '';
 
     public string $dataDevolucao = '';
@@ -844,9 +847,8 @@ trait ErpDevolucaoVendaFormPage
                     ->send();
 
                 if ($createdId !== null) {
-                    $this->redirect(
+                    $this->redirectErpAdmin(
                         DevolucaoVendaResource::getUrl('edit', ['record' => $createdId]),
-                        navigate: false,
                     );
                 }
 
@@ -861,9 +863,8 @@ trait ErpDevolucaoVendaFormPage
                     ->send();
 
                 if ($createdId !== null) {
-                    $this->redirect(
+                    $this->redirectErpAdmin(
                         DevolucaoVendaResource::getUrl('edit', ['record' => $createdId]),
-                        navigate: false,
                     );
                 }
 
@@ -872,9 +873,8 @@ trait ErpDevolucaoVendaFormPage
         }
 
         if ($createdId !== null && ! $finalizar) {
-            $this->redirect(
+            $this->redirectErpAdmin(
                 DevolucaoVendaResource::getUrl('edit', ['record' => $createdId]),
-                navigate: false,
             );
 
             return true;
@@ -911,7 +911,7 @@ trait ErpDevolucaoVendaFormPage
         }
 
         ErpScreen::set('Devolução de Venda');
-        $this->redirect(DevolucaoVendaResource::getUrl('index'), navigate: false);
+        $this->redirectErpAdmin(DevolucaoVendaResource::getUrl('index'));
     }
 
     protected function carregarPreviaVale(): void

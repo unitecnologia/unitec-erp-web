@@ -60,14 +60,24 @@ final class ErpFinanceiroMetricas
             $q = CaixaLancamento::query();
             self::applyCaixaEscopo($q, $caixaContaId, $empresaScope);
 
-            $row = $q
-                ->selectRaw('COALESCE(SUM(entrada), 0) as entradas, COALESCE(SUM(saida), 0) as saidas')
-                ->first();
-
-            return round((float) ($row->entradas ?? 0) - (float) ($row->saidas ?? 0), 2);
+            // Um único SUM(entrada − saída): mesmo resultado de SUM(entrada)−SUM(saida),
+            // com menos trabalho no agregador. Escopo/empresa inalterados.
+            return round(self::saldoCaixaAgregado($q), 2);
         } catch (Throwable) {
             return 0.0;
         }
+    }
+
+    /**
+     * Σ(entrada − saída) em um único passe — mesmo resultado de SUM(entrada)−SUM(saida).
+     */
+    private static function saldoCaixaAgregado(Builder $query): float
+    {
+        $row = $query
+            ->selectRaw('COALESCE(SUM(COALESCE(entrada, 0) - COALESCE(saida, 0)), 0) as saldo')
+            ->first();
+
+        return (float) ($row->saldo ?? 0);
     }
 
     /**
@@ -80,13 +90,10 @@ final class ErpFinanceiroMetricas
                 return 0.0;
             }
 
-            $qEntrada = CaixaLancamento::query()->whereDate('emissao', '<=', $day->toDateString());
-            $qSaida = CaixaLancamento::query()->whereDate('emissao', '<=', $day->toDateString());
+            $q = CaixaLancamento::query()->where('emissao', '<=', $day->toDateString());
+            self::applyCaixaEscopo($q, $caixaContaId, $empresaScope);
 
-            self::applyCaixaEscopo($qEntrada, $caixaContaId, $empresaScope);
-            self::applyCaixaEscopo($qSaida, $caixaContaId, $empresaScope);
-
-            return round((float) $qEntrada->sum('entrada') - (float) $qSaida->sum('saida'), 2);
+            return round(self::saldoCaixaAgregado($q), 2);
         } catch (Throwable) {
             return 0.0;
         }
@@ -148,7 +155,7 @@ final class ErpFinanceiroMetricas
 
             $q = ContaReceber::query()
                 ->where('saldo', '>', 0)
-                ->whereDate('vencimento', '<', $hoje->toDateString())
+                ->where('vencimento', '<', $hoje->toDateString())
                 ->whereNotNull('cliente_id');
 
             self::applyEmpresaColumn($q, (new ContaReceber)->getTable(), $empresaScope);
@@ -180,10 +187,10 @@ final class ErpFinanceiroMetricas
 
             $q = ContaReceber::query()
                 ->where('saldo', '>', 0)
-                ->whereDate('vencimento', '<=', $to->toDateString());
+                ->where('vencimento', '<=', $to->toDateString());
 
             if ($from) {
-                $q->whereDate('vencimento', '>=', $from->toDateString());
+                $q->where('vencimento', '>=', $from->toDateString());
             }
 
             self::applyEmpresaColumn($q, (new ContaReceber)->getTable(), $empresaScope);
@@ -214,10 +221,10 @@ final class ErpFinanceiroMetricas
 
             $q = ContaPagar::query()
                 ->where('saldo', '>', 0)
-                ->whereDate('vencimento', '<=', $to->toDateString());
+                ->where('vencimento', '<=', $to->toDateString());
 
             if ($from) {
-                $q->whereDate('vencimento', '>=', $from->toDateString());
+                $q->where('vencimento', '>=', $from->toDateString());
             }
 
             self::applyEmpresaColumn($q, (new ContaPagar)->getTable(), $empresaScope);
@@ -247,7 +254,7 @@ final class ErpFinanceiroMetricas
             }
 
             $q = CaixaLancamento::query()
-                ->whereDate('emissao', $day->toDateString());
+                ->where('emissao', $day->toDateString());
 
             self::applyCaixaEscopo($q, null, $empresaScope);
             CaixaTransferencia::excluirDoQuery($q);
@@ -282,11 +289,12 @@ final class ErpFinanceiroMetricas
                 return [];
             }
 
+            // emissao é DATE: agrupa direto na coluna (sem DATE()) para usar o índice.
             $q = CaixaLancamento::query()
-                ->whereDate('emissao', '>=', $from->toDateString())
-                ->whereDate('emissao', '<=', $to->toDateString())
-                ->selectRaw('DATE(emissao) as dia, SUM(entrada) as entradas, SUM(saida) as saidas')
-                ->groupByRaw('DATE(emissao)');
+                ->where('emissao', '>=', $from->toDateString())
+                ->where('emissao', '<=', $to->toDateString())
+                ->selectRaw('emissao as dia, SUM(entrada) as entradas, SUM(saida) as saidas')
+                ->groupBy('emissao');
 
             self::applyCaixaEscopo($q, null, $empresaScope);
             CaixaTransferencia::excluirDoQuery($q);
@@ -333,13 +341,13 @@ final class ErpFinanceiroMetricas
             foreach ($semanas as $i => $semana) {
                 $inicio = $semana['inicio']->toDateString();
                 $fim = $semana['fim']->toDateString();
-                $selectParts[] = "COALESCE(SUM(CASE WHEN DATE(emissao) >= '{$inicio}' AND DATE(emissao) <= '{$fim}' THEN entrada ELSE 0 END), 0) as w{$i}_ent";
-                $selectParts[] = "COALESCE(SUM(CASE WHEN DATE(emissao) >= '{$inicio}' AND DATE(emissao) <= '{$fim}' THEN saida ELSE 0 END), 0) as w{$i}_sai";
+                $selectParts[] = "COALESCE(SUM(CASE WHEN emissao >= '{$inicio}' AND emissao <= '{$fim}' THEN entrada ELSE 0 END), 0) as w{$i}_ent";
+                $selectParts[] = "COALESCE(SUM(CASE WHEN emissao >= '{$inicio}' AND emissao <= '{$fim}' THEN saida ELSE 0 END), 0) as w{$i}_sai";
             }
 
             $q = CaixaLancamento::query()
-                ->whereDate('emissao', '>=', $globalInicio->toDateString())
-                ->whereDate('emissao', '<=', $globalFim->toDateString());
+                ->where('emissao', '>=', $globalInicio->toDateString())
+                ->where('emissao', '<=', $globalFim->toDateString());
 
             self::applyCaixaEscopo($q, null, $empresaScope);
             CaixaTransferencia::excluirDoQuery($q);
@@ -371,8 +379,8 @@ final class ErpFinanceiroMetricas
             }
 
             $q = CaixaLancamento::query()
-                ->whereDate('emissao', '>=', $from->toDateString())
-                ->whereDate('emissao', '<=', $to->toDateString());
+                ->where('emissao', '>=', $from->toDateString())
+                ->where('emissao', '<=', $to->toDateString());
 
             self::applyCaixaEscopo($q, null, $empresaScope);
             CaixaTransferencia::excluirDoQuery($q);
@@ -415,18 +423,18 @@ final class ErpFinanceiroMetricas
             $antAte = $fimMesAnt->toDateString();
 
             $q = CaixaLancamento::query()
-                ->whereDate('emissao', '>=', $antDe)
-                ->whereDate('emissao', '<=', $mesAte);
+                ->where('emissao', '>=', $antDe)
+                ->where('emissao', '<=', $mesAte);
 
             self::applyCaixaEscopo($q, null, $empresaScope);
             CaixaTransferencia::excluirDoQuery($q);
 
             $row = $q
                 ->selectRaw(
-                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN entrada ELSE 0 END), 0) as mes_entradas,'.
-                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN saida ELSE 0 END), 0) as mes_saidas,'.
-                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN entrada ELSE 0 END), 0) as ant_entradas,'.
-                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN saida ELSE 0 END), 0) as ant_saidas',
+                    'COALESCE(SUM(CASE WHEN emissao >= ? AND emissao <= ? THEN entrada ELSE 0 END), 0) as mes_entradas,'.
+                    'COALESCE(SUM(CASE WHEN emissao >= ? AND emissao <= ? THEN saida ELSE 0 END), 0) as mes_saidas,'.
+                    'COALESCE(SUM(CASE WHEN emissao >= ? AND emissao <= ? THEN entrada ELSE 0 END), 0) as ant_entradas,'.
+                    'COALESCE(SUM(CASE WHEN emissao >= ? AND emissao <= ? THEN saida ELSE 0 END), 0) as ant_saidas',
                     [$mesDe, $mesAte, $mesDe, $mesAte, $antDe, $antAte, $antDe, $antAte]
                 )
                 ->first();

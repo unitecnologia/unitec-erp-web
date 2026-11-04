@@ -57,24 +57,45 @@ final class ErpDashboardGauges
         $fim = $hoje;
         $gauges = [];
 
-        // Visão geral da empresa (agrega os demais indicadores).
-        $gauges[] = static::saudeEmpresa($empresa, $inicio, $fim, $scope);
+        self::$gaugeMemo = [];
+        $ownedPreload = false;
+        $collector = ErpDashboardCollector::current();
 
-        // Meta de vendas da empresa: só no dashboard se o valor estiver preenchido (> 0).
-        $metaEmpresa = static::resolveMetaVendas($empresa, $scope);
-        if ($metaEmpresa > 0) {
-            $collector = ErpDashboardCollector::current();
-            $realizado = $collector !== null
-                ? $collector->realizadoPdvMonitor($inicio, $fim)
-                : static::realizadoPdvMonitor($inicio, $fim, $scope);
-            $gauges[] = static::metaVendas($empresa, $realizado, $metaEmpresa);
+        // Reutiliza agregados do Collector (mesmas fórmulas) para a Saúde no /admin.
+        if ($collector !== null && self::$saudePreload === null) {
+            self::$saudePreload = [
+                'saldo' => $collector->saldoCaixa(),
+                'receber_vencido' => (float) $collector->receberVencido()['valor'],
+                'pagar_vencido' => (float) $collector->pagarVencido()['valor'],
+                'faturamento_mes' => $collector->faturamentoPeriodo($inicio, $fim),
+                'obrigacoes_7d' => $collector->obrigacoesPagar7d(),
+            ];
+            $ownedPreload = true;
         }
 
-        $gauges[] = static::recebimento($inicio, $fim, $scope);
-        $gauges[] = static::margemLucro($inicio, $fim, $scope);
-        $gauges[] = static::saudeEstoque();
+        try {
+            // Visão geral da empresa (agrega os demais indicadores).
+            $gauges[] = static::saudeEmpresa($empresa, $inicio, $fim, $scope);
 
-        return $gauges;
+            // Meta de vendas da empresa: só no dashboard se o valor estiver preenchido (> 0).
+            $metaEmpresa = static::resolveMetaVendas($empresa, $scope);
+            if ($metaEmpresa > 0) {
+                $realizado = $collector !== null
+                    ? $collector->realizadoPdvMonitor($inicio, $fim)
+                    : static::realizadoPdvMonitor($inicio, $fim, $scope);
+                $gauges[] = static::metaVendas($empresa, $realizado, $metaEmpresa);
+            }
+
+            $gauges[] = static::recebimento($inicio, $fim, $scope);
+            $gauges[] = static::margemLucro($inicio, $fim, $scope);
+            $gauges[] = static::saudeEstoque();
+
+            return $gauges;
+        } finally {
+            if ($ownedPreload) {
+                self::$saudePreload = null;
+            }
+        }
     }
 
     /**
@@ -230,22 +251,13 @@ final class ErpDashboardGauges
 
         try {
             if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
-                $rows = PdvVenda::query()
+                $pdvPorVendedor = PdvVenda::query()
                     ->comercial()
                     ->selectRaw('vendedor_id, SUM(total) as total')
                     ->whereIn('vendedor_id', $vendedorIds)
-                    ->where('situacao', '!=', 'C')
-                    ->where(function ($query) use ($inicio, $fim): void {
-                        $query->where(function ($fechamento) use ($inicio, $fim): void {
-                            $fechamento->whereNotNull('fechado_em')
-                                ->whereDate('fechado_em', '>=', $inicio->toDateString())
-                                ->whereDate('fechado_em', '<=', $fim->toDateString());
-                        })->orWhere(function ($fallback) use ($inicio, $fim): void {
-                            $fallback->whereNull('fechado_em')
-                                ->whereDate('created_at', '>=', $inicio->toDateString())
-                                ->whereDate('created_at', '<=', $fim->toDateString());
-                        });
-                    })
+                    ->where('situacao', '!=', 'C');
+                ErpDashboardDateFilter::wherePdvPeriodo($pdvPorVendedor, $inicio, $fim);
+                $rows = $pdvPorVendedor
                     ->groupBy('vendedor_id')
                     ->pluck('total', 'vendedor_id');
 
@@ -255,21 +267,22 @@ final class ErpDashboardGauges
             }
 
             if (ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
+                [$fvFrom, $fvToExclusive] = ErpDashboardDateFilter::dateTimeDayBounds($inicio, $fim);
                 $rows = ForcaVendasOrder::query()
                     ->selectRaw('vendedor_id, SUM(total) as total')
                     ->whereIn('vendedor_id', $vendedorIds)
                     ->where('situacao', '!=', ForcaVendasOrder::SITUACAO_CANCELADO)
                     ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
-                    ->where(function ($query) use ($inicio, $fim): void {
-                        $query->where(function ($faturado) use ($inicio, $fim): void {
+                    ->where(function ($query) use ($fvFrom, $fvToExclusive): void {
+                        $query->where(function ($faturado) use ($fvFrom, $fvToExclusive): void {
                             $faturado->whereNotNull('faturado_at')
-                                ->whereDate('faturado_at', '>=', $inicio->toDateString())
-                                ->whereDate('faturado_at', '<=', $fim->toDateString());
-                        })->orWhere(function ($received) use ($inicio, $fim): void {
+                                ->where('faturado_at', '>=', $fvFrom)
+                                ->where('faturado_at', '<', $fvToExclusive);
+                        })->orWhere(function ($received) use ($fvFrom, $fvToExclusive): void {
                             $received->whereNull('faturado_at')
                                 ->whereNotNull('received_at')
-                                ->whereDate('received_at', '>=', $inicio->toDateString())
-                                ->whereDate('received_at', '<=', $fim->toDateString());
+                                ->where('received_at', '>=', $fvFrom)
+                                ->where('received_at', '<', $fvToExclusive);
                         });
                     })
                     ->groupBy('vendedor_id')
@@ -374,9 +387,8 @@ final class ErpDashboardGauges
                 return self::$gaugeMemo[$memoKey] = static::emptyGauge('recebimento', 'Recebimento', 'Sem contas a receber');
             }
 
-            $query = ContaReceber::query()
-                ->whereDate('vencimento', '>=', $inicio->toDateString())
-                ->whereDate('vencimento', '<=', $fim->toDateString());
+            $query = ContaReceber::query();
+            ErpDashboardDateFilter::whereDateColumnBetween($query, 'vencimento', $inicio, $fim);
 
             ErpFinanceiroMetricas::applyEmpresaColumn($query, (new ContaReceber)->getTable(), $empresaScope);
 
@@ -443,15 +455,15 @@ final class ErpDashboardGauges
 
             // Vendas da retaguarda são a fonte canônica: incluem os espelhos
             // do PDV e os pedidos da Força de Vendas depois de faturados.
+            // Partir de vendas (filtro de data/status) reduz o conjunto antes do JOIN de itens.
             if (ErpSchema::hasTable((new VendaItem)->getTable())
                 && ErpSchema::hasTable((new Venda)->getTable())) {
-                $vendaQuery = VendaItem::query()
-                    ->join('vendas', 'vendas.id', '=', 'venda_itens.venda_id')
+                $vendaQuery = Venda::query()
+                    ->join('venda_itens', 'venda_itens.venda_id', '=', 'vendas.id')
                     ->leftJoin('products', 'products.id', '=', 'venda_itens.product_id')
-                    ->whereNotIn('vendas.status', [Venda::STATUS_CANCELADO])
-                    ->whereDate('vendas.data', '>=', $inicio->toDateString())
-                    ->whereDate('vendas.data', '<=', $fim->toDateString());
+                    ->whereNotIn('vendas.status', [Venda::STATUS_CANCELADO]);
 
+                ErpDashboardDateFilter::whereDateColumnBetween($vendaQuery, 'vendas.data', $inicio, $fim);
                 ErpEmpresaScopeFilter::applyColumn($vendaQuery, 'vendas', $empresaScope);
 
                 $agg = $vendaQuery
@@ -466,23 +478,15 @@ final class ErpDashboardGauges
             }
 
             // PDV sem espelho na retaguarda; os espelhados já entraram acima.
-            if (ErpSchema::hasTable((new PdvVendaItem)->getTable())) {
-                $pdvQuery = PdvVendaItem::query()
-                    ->join('pdv_vendas', 'pdv_vendas.id', '=', 'pdv_venda_itens.pdv_venda_id')
+            if (ErpSchema::hasTable((new PdvVendaItem)->getTable())
+                && ErpSchema::hasTable((new PdvVenda)->getTable())) {
+                $pdvQuery = PdvVenda::query()
+                    ->join('pdv_venda_itens', 'pdv_venda_itens.pdv_venda_id', '=', 'pdv_vendas.id')
                     ->leftJoin('products', 'products.id', '=', 'pdv_venda_itens.product_id')
                     ->where('pdv_vendas.situacao', '!=', 'C')
-                    ->whereNull('pdv_vendas.venda_id')
-                    ->where(function ($query) use ($inicio, $fim): void {
-                        $query->where(function ($fechamento) use ($inicio, $fim): void {
-                            $fechamento->whereNotNull('pdv_vendas.fechado_em')
-                                ->whereDate('pdv_vendas.fechado_em', '>=', $inicio->toDateString())
-                                ->whereDate('pdv_vendas.fechado_em', '<=', $fim->toDateString());
-                        })->orWhere(function ($fallback) use ($inicio, $fim): void {
-                            $fallback->whereNull('pdv_vendas.fechado_em')
-                                ->whereDate('pdv_vendas.created_at', '>=', $inicio->toDateString())
-                                ->whereDate('pdv_vendas.created_at', '<=', $fim->toDateString());
-                        });
-                    });
+                    ->whereNull('pdv_vendas.venda_id');
+
+                ErpDashboardDateFilter::wherePdvPeriodo($pdvQuery, $inicio, $fim, 'pdv_vendas');
 
                 if ($empresaScope !== null) {
                     $ids = is_array($empresaScope)
@@ -769,8 +773,12 @@ final class ErpDashboardGauges
             } elseif (ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 // Inclui vencidos + a vencer em até 7 dias (pressão de caixa).
                 $pagarQuery = ContaPagar::query()
-                    ->where('saldo', '>', 0)
-                    ->whereDate('vencimento', '<=', $hoje->copy()->addDays(7)->toDateString());
+                    ->where('saldo', '>', 0);
+                ErpDashboardDateFilter::whereDateColumnLte(
+                    $pagarQuery,
+                    'vencimento',
+                    $hoje->copy()->addDays(7)
+                );
 
                 ErpFinanceiroMetricas::applyEmpresaColumn($pagarQuery, (new ContaPagar)->getTable(), $empresaScope);
                 $obrigacoes = (float) $pagarQuery->sum('saldo');
@@ -1028,38 +1036,29 @@ final class ErpDashboardGauges
             if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 $pdvQuery = PdvVenda::query()
                     ->comercial()
-                    ->where('situacao', '!=', 'C')
-                    ->where(function ($query) use ($inicio, $fim): void {
-                        $query->where(function ($fechamento) use ($inicio, $fim): void {
-                            $fechamento->whereNotNull('fechado_em')
-                                ->whereDate('fechado_em', '>=', $inicio->toDateString())
-                                ->whereDate('fechado_em', '<=', $fim->toDateString());
-                        })->orWhere(function ($fallback) use ($inicio, $fim): void {
-                            $fallback->whereNull('fechado_em')
-                                ->whereDate('created_at', '>=', $inicio->toDateString())
-                                ->whereDate('created_at', '<=', $fim->toDateString());
-                        });
-                    });
+                    ->where('situacao', '!=', 'C');
 
+                ErpDashboardDateFilter::wherePdvPeriodo($pdvQuery, $inicio, $fim);
                 ErpEmpresaScopeFilter::applyPdvSessao($pdvQuery, $empresaScope);
 
                 $total += (float) $pdvQuery->sum('total');
             }
 
             if (ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
+                [$fvFrom, $fvToExclusive] = ErpDashboardDateFilter::dateTimeDayBounds($inicio, $fim);
                 $fvQuery = ForcaVendasOrder::query()
                     ->where('situacao', '!=', ForcaVendasOrder::SITUACAO_CANCELADO)
                     ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
-                    ->where(function ($query) use ($inicio, $fim): void {
-                        $query->where(function ($faturado) use ($inicio, $fim): void {
+                    ->where(function ($query) use ($fvFrom, $fvToExclusive): void {
+                        $query->where(function ($faturado) use ($fvFrom, $fvToExclusive): void {
                             $faturado->whereNotNull('faturado_at')
-                                ->whereDate('faturado_at', '>=', $inicio->toDateString())
-                                ->whereDate('faturado_at', '<=', $fim->toDateString());
-                        })->orWhere(function ($received) use ($inicio, $fim): void {
+                                ->where('faturado_at', '>=', $fvFrom)
+                                ->where('faturado_at', '<', $fvToExclusive);
+                        })->orWhere(function ($received) use ($fvFrom, $fvToExclusive): void {
                             $received->whereNull('faturado_at')
                                 ->whereNotNull('received_at')
-                                ->whereDate('received_at', '>=', $inicio->toDateString())
-                                ->whereDate('received_at', '<=', $fim->toDateString());
+                                ->where('received_at', '>=', $fvFrom)
+                                ->where('received_at', '<', $fvToExclusive);
                         });
                     });
 

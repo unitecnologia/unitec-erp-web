@@ -298,7 +298,7 @@ class ListDevolucoesVenda extends ListRecords
             return;
         }
 
-        $this->redirect(DevolucaoVendaResource::getUrl('create'));
+        $this->redirectErpAdmin(DevolucaoVendaResource::getUrl('create'));
     }
 
     public function editDevolucao(): void
@@ -311,7 +311,7 @@ class ListDevolucoesVenda extends ListRecords
             return;
         }
 
-        $this->redirect(DevolucaoVendaResource::getUrl('edit', ['record' => $this->highlightedRecordId]));
+        $this->redirectErpAdmin(DevolucaoVendaResource::getUrl('edit', ['record' => $this->highlightedRecordId]));
     }
 
     public function cancelDevolucao(): void

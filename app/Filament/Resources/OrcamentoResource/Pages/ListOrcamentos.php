@@ -317,7 +317,7 @@ class ListOrcamentos extends ListRecords
 
     public function createOrcamento(): void
     {
-        $this->redirect(OrcamentoResource::getUrl('create'));
+        $this->redirectErpAdmin(OrcamentoResource::getUrl('create'));
     }
 
     public function editOrcamento(int | string | null $recordId = null): void
@@ -330,7 +330,7 @@ class ListOrcamentos extends ListRecords
             return;
         }
 
-        $this->redirect(OrcamentoResource::getUrl('edit', ['record' => $resolvedId]));
+        $this->redirectErpAdmin(OrcamentoResource::getUrl('edit', ['record' => $resolvedId]));
     }
 
     public function cancelOrcamento(): void

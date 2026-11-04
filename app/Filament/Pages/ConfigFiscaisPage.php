@@ -672,6 +672,7 @@ class ConfigFiscaisPage extends Page
         ];
 
         $params->update($payload);
+        \App\Support\Erp\Dashboard\ErpDashboardCertificadoAlert::forgetCacheForEmpresa($empresaId);
         $params = NfeFiscalConfig::syncStoragePaths($params->fresh());
         $params = NfeFiscalConfig::syncWebStack($params);
 
@@ -771,6 +772,8 @@ class ConfigFiscaisPage extends Page
                 ...NfeFiscalConfig::defaultWebStack(),
             ])->save();
 
+            \App\Support\Erp\Dashboard\ErpDashboardCertificadoAlert::forgetCacheForEmpresa($empresaId);
+
             try {
                 NfeFiscalConfig::ensureDirectories($params->fresh());
                 NfeFiscalConfig::syncWebStack($params->fresh());
@@ -857,6 +860,8 @@ class ConfigFiscaisPage extends Page
             'senha_certificado' => null,
             'numero_serie_certificado' => null,
         ])->save();
+
+        \App\Support\Erp\Dashboard\ErpDashboardCertificadoAlert::forgetCacheForEmpresa($empresaId);
 
         $this->certificadoUpload = null;
         $this->certificadoInfo = null;

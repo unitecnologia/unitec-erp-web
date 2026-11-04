@@ -644,7 +644,8 @@ trait ErpProductFormPage
     protected function leaveProductForm(): void
     {
         if ($this->embedsInPdv) {
-            $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('index')));
+            // PDV iframe: full reload obrigatório.
+            $this->redirectErpAdmin($this->urlWithPdvEmbed(ProductResource::getUrl('index')));
 
             return;
         }
