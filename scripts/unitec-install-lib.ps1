@@ -3331,7 +3331,9 @@ function Copy-UnitecProjectTree {
         'docs',
         'suporte',
         'importar',
-        'staging'
+        'staging',
+        # Migracoes one-off (SCV etc.): nunca no UPDATE/instalador do cliente.
+        'migracoes'
     )
 
     if ($UpdateMode -or $ExcludeTools) {

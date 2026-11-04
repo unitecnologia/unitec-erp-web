@@ -327,6 +327,8 @@ final class AtualizacaoApplyService
             'staging',
             'tests',
             'docs',
+            // Migracoes one-off (SCV etc.): nunca aplicar no cliente.
+            'migracoes',
         ];
 
         $excludeFiles = [

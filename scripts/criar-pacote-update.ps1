@@ -327,7 +327,8 @@ $forbiddenRelative = @(
     'scripts\dev-windows.ps1',
     '_tmp_parse_ps1.ps1',
     '.env.appurl.local.bak',
-    'importar'
+    'importar',
+    'migracoes'
 )
 foreach ($rel in $forbiddenRelative) {
     $hit = Join-Path $StagingDir $rel
