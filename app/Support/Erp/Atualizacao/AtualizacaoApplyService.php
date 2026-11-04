@@ -109,7 +109,7 @@ final class AtualizacaoApplyService
         self::writeProgress($appPath, $payload, preserveIdentity: $runId === null);
     }
 
-    public function apply(?string $appPath = null): string
+    public function apply(?string $appPath = null, bool $afterCopy = false): string
     {
         $appPath = rtrim($appPath ?: base_path(), '\\/');
         $source = AtualizacaoPasta::filesRoot($appPath);
@@ -124,29 +124,49 @@ final class AtualizacaoApplyService
             }
 
             $version = AtualizacaoPasta::pendingVersion($appPath) ?: 'desconhecida';
-            Log::info('Aplicando atualizacao/ versão '.$version);
+            Log::info('Aplicando atualizacao/ versão '.$version.($afterCopy ? ' (apos copia)' : ''));
             $this->etapa = 'Apply';
             AtualizacaoLog::line(
                 'Apply',
-                'inicio pacote='.$version.' instalada='.(string) config('unitec.versao', ''),
+                'inicio pacote='.$version.' instalada='.(string) config('unitec.versao', '')
+                .($afterCopy ? ' modo=after-copy' : ''),
                 $appPath,
             );
 
             $deviceDistInPackage = DeviceServiceLauncher::packageContainsDist($source);
-            if ($deviceDistInPackage) {
-                Log::info('Update inclui Device Service dist — parando Unitec.DeviceService.');
-                DeviceServiceLauncher::stopRunning();
+
+            if (! $afterCopy) {
+                if ($deviceDistInPackage) {
+                    Log::info('Update inclui Device Service dist — parando Unitec.DeviceService.');
+                    DeviceServiceLauncher::stopRunning();
+                }
+
+                $this->etapa = 'Copia';
+                AtualizacaoLog::line('Copia', 'inicio', $appPath);
+                $this->copyTree($source, $appPath);
+                AtualizacaoLog::line('Copia', 'ok', $appPath);
+
+                $this->etapa = 'Runtime';
+                AtualizacaoLog::line('Runtime', 'inicio', $appPath);
+                $runtimePending = $this->stageDesktopRuntimeUpdate($source, $appPath, $version);
+                AtualizacaoLog::line('Runtime', $runtimePending ? 'staged' : 'ausente (ok)', $appPath);
+
+                // Codigo novo ja esta em disco: continua num processo PHP fresco
+                // (o processo atual ainda tem as classes antigas em memoria).
+                return $this->continueAfterCopyInFreshProcess($appPath, $version);
             }
 
-            $this->etapa = 'Copia';
-            AtualizacaoLog::line('Copia', 'inicio', $appPath);
-            $this->copyTree($source, $appPath);
-            AtualizacaoLog::line('Copia', 'ok', $appPath);
-
-            $this->etapa = 'Runtime';
-            AtualizacaoLog::line('Runtime', 'inicio', $appPath);
-            $runtimePending = $this->stageDesktopRuntimeUpdate($source, $appPath, $version);
-            AtualizacaoLog::line('Runtime', $runtimePending ? 'staged' : 'ausente (ok)', $appPath);
+            $serverExe = $this->desktopPendingRoot($appPath)
+                .DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'UnitecErpServer.exe';
+            $runtimePending = is_file($serverExe);
+            if (! $runtimePending) {
+                $this->etapa = 'Runtime';
+                AtualizacaoLog::line('Runtime', 're-stage apos copia', $appPath);
+                $runtimePending = $this->stageDesktopRuntimeUpdate($source, $appPath, $version);
+                AtualizacaoLog::line('Runtime', $runtimePending ? 'staged' : 'ausente (ok)', $appPath);
+            } else {
+                AtualizacaoLog::line('Runtime', 'pending ja staged', $appPath);
+            }
 
             $this->etapa = 'Pacotes';
             AtualizacaoLog::line('Pacotes', 'inicio', $appPath);
@@ -1213,18 +1233,70 @@ final class AtualizacaoApplyService
      */
     private function readDesktopRuntimeStatus(string $appPath): array
     {
-        $path = $this->desktopRuntimeStatusPath($appPath);
-        if (! is_file($path)) {
-            return [];
+        foreach ([
+            $this->desktopRuntimeStatusPath($appPath),
+            $this->desktopPendingRoot($appPath).DIRECTORY_SEPARATOR.'status.json',
+        ] as $path) {
+            if (! is_file($path)) {
+                continue;
+            }
+
+            try {
+                $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($data) && $data !== []) {
+                    return $data;
+                }
+            } catch (\Throwable) {
+                // tenta o proximo caminho
+            }
         }
+
+        return [];
+    }
+
+    /**
+     * Apos copyTree o disco ja tem o codigo novo; este processo ainda carrega o antigo.
+     * Dispara um filho --after-copy e propaga o resultado do progress.
+     */
+    private function continueAfterCopyInFreshProcess(string $appPath, string $version): string
+    {
+        AtualizacaoLog::line('Apply', 'handoff --after-copy (PHP fresco apos copia)', $appPath);
+        self::writeProgress($appPath, [
+            'state' => 'copying',
+            'percent' => 85,
+            'done' => 0,
+            'total' => 0,
+            'message' => 'Reiniciando apply com o código novo…',
+            'target_version' => $version,
+        ]);
+
+        $php = $this->resolvePhp($appPath);
+        $command = '"'.$php.'" -d opcache.enable=0 -d opcache.enable_cli=0 artisan'
+            .' unitec:apply-atualizacao --app-path="'.$appPath.'" --after-copy';
 
         try {
-            $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+            $this->runShell($command, $appPath);
+        } catch (\Throwable $e) {
+            $progress = self::readProgress($appPath);
+            $fromProgress = trim((string) ($progress['error'] ?? ''));
+            if (($progress['state'] ?? '') === 'failed' && $fromProgress !== '') {
+                throw new RuntimeException($fromProgress, (int) $e->getCode(), $e);
+            }
 
-            return is_array($data) ? $data : [];
-        } catch (\Throwable) {
-            return [];
+            throw $e;
         }
+
+        $progress = self::readProgress($appPath);
+        if (($progress['state'] ?? '') === 'completed') {
+            $done = trim((string) ($progress['target_version'] ?? ''));
+
+            return $done !== '' ? $done : $version;
+        }
+
+        $error = trim((string) ($progress['error'] ?? ''));
+        throw new RuntimeException(
+            $error !== '' ? $error : 'Falha ao continuar a atualização após a cópia.'
+        );
     }
 
     private function resolvePhp(string $appPath): string

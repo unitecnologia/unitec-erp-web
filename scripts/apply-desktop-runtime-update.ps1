@@ -34,7 +34,9 @@ $pendingFranken = Join-Path $pendingRoot 'frankenphp'
 $manifestPath = Join-Path $pendingRoot 'manifest.json'
 $readySignalPath = Join-Path $pendingRoot 'ready.signal'
 # Status persistente: NAO fica dentro do pending (evita corrida com Remove-Item).
+# Persistente (PHP novo) + legado no pending (PHP antigo ainda em memoria no 1o apply).
 $statusPath = Join-Path $AppPath 'storage\framework\desktop-runtime-status.json'
+$legacyStatusPath = Join-Path $pendingRoot 'status.json'
 $runtimeMarkerPath = Join-Path $AppPath 'storage\app\unitec-desktop-runtime.json'
 $targetBin = Join-Path $AppPath 'bin'
 $targetFranken = Join-Path $AppPath 'tools\frankenphp'
@@ -60,24 +62,35 @@ function Write-Status {
         [string]$HealthVersion = ''
     )
 
+    $payload = [ordered]@{
+        state             = $State
+        message           = $Message
+        expected_version  = $ExpectedVersion
+        health_version    = $HealthVersion
+        run_id            = $RunId
+        updated_at        = (Get-Date).ToUniversalTime().ToString('o')
+    }
+    $json = $payload | ConvertTo-Json -Compress
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+
     try {
         $dir = Split-Path $statusPath
         if (-not (Test-Path $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        $payload = [ordered]@{
-            state             = $State
-            message           = $Message
-            expected_version  = $ExpectedVersion
-            health_version    = $HealthVersion
-            run_id            = $RunId
-            updated_at        = (Get-Date).ToUniversalTime().ToString('o')
-        }
-        $json = $payload | ConvertTo-Json -Compress
-        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
         [System.IO.File]::WriteAllText($statusPath, $json, $utf8NoBom)
     } catch {
         Write-Log ("falha ao gravar desktop-runtime-status.json: {0}" -f $_.Exception.Message)
+    }
+
+    # Espelho legado: apply em memoria da versao anterior ainda le pending\status.json.
+    try {
+        if (-not (Test-Path $pendingRoot)) {
+            New-Item -ItemType Directory -Path $pendingRoot -Force | Out-Null
+        }
+        [System.IO.File]::WriteAllText($legacyStatusPath, $json, $utf8NoBom)
+    } catch {
+        Write-Log ("aviso: nao gravou pending\status.json legado: {0}" -f $_.Exception.Message)
     }
 }
 
@@ -167,6 +180,9 @@ function Test-HealthVersion([string]$Body, [string]$Expected) {
 }
 
 function Clear-PendingFolder {
+    # Da tempo ao PHP (poll ~500ms) ler completed no pending\status.json legado
+    # antes de apagar a pasta. O status persistente em framework\ ja foi gravado.
+    Start-Sleep -Seconds 5
     try {
         if (Test-Path $pendingRoot) {
             Remove-Item -LiteralPath $pendingRoot -Recurse -Force -ErrorAction SilentlyContinue

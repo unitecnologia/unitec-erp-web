@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class ApplyAtualizacaoCommand extends Command
 {
-    protected $signature = 'unitec:apply-atualizacao {--app-path=}';
+    protected $signature = 'unitec:apply-atualizacao {--app-path=} {--after-copy}';
 
     protected $description = 'Aplica arquivos da pasta atualizacao/ (sem ZIP) e roda migrate';
 
@@ -17,9 +17,10 @@ class ApplyAtualizacaoCommand extends Command
         @ini_set('memory_limit', '512M');
 
         $appPath = (string) ($this->option('app-path') ?: base_path());
+        $afterCopy = (bool) $this->option('after-copy');
 
         try {
-            $version = $service->apply($appPath);
+            $version = $service->apply($appPath, $afterCopy);
             $this->info('Atualização aplicada: '.$version);
 
             return self::SUCCESS;
