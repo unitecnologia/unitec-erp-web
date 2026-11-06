@@ -3,6 +3,7 @@
 namespace App\Support\ForcaVendas;
 
 use App\Models\CaixaConta;
+use App\Models\Estoque;
 use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
 use App\Models\Pedido;
@@ -11,11 +12,14 @@ use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Venda;
+use App\Models\Vendedor;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Financeiro\FormaPagamentoDestino;
+use App\Support\Erp\Financeiro\VendaCaixaDestinoResolver;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -63,12 +67,46 @@ class ForcaVendasTelaVendaService
     }
 
     /**
+     * Isolamento multiempresa: o DAV deve pertencer à empresa informada.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertOrderDaEmpresa(ForcaVendasOrder $order, int $empresaId): void
+    {
+        if ($empresaId <= 0) {
+            throw new \RuntimeException('Empresa da operação inválida.');
+        }
+
+        $orderEmpresaId = (int) ($order->empresa_id ?? 0);
+
+        if ($orderEmpresaId <= 0) {
+            throw new \RuntimeException(
+                'Este pedido não possui empresa vinculada e não pode ser operado pela Tela de Venda.'
+            );
+        }
+
+        if ($orderEmpresaId !== $empresaId) {
+            throw new \RuntimeException(
+                'Este pedido pertence a outra empresa. Selecione a empresa correta antes de abrir, gravar ou faturar.'
+            );
+        }
+
+        if (! ErpContext::userCanAccessEmpresa($empresaId)) {
+            throw new \RuntimeException('Sem permissão para a empresa deste pedido.');
+        }
+    }
+
+    /**
      * Grava pedido novo ou atualiza um existente (Pedido + ForcaVendasOrder).
      *
      * @param  array{
+     *   empresa_id?: int|null,
      *   cliente_id: int,
      *   vendedor_id?: int|null,
+     *   caixa_conta_id?: int|null,
+     *   estoque_id?: int|null,
      *   observacoes?: string|null,
+     *   cpf_nota?: string|null,
      *   desconto_valor?: float,
      *   percentual_desconto?: float,
      *   forma_pagamento_id?: int|null,
@@ -91,90 +129,140 @@ class ForcaVendasTelaVendaService
      */
     private function criarPedido(User $user, array $data): ForcaVendasOrder
     {
-        [$clienteId, $itens, $vendedorId, $descontoValor, $percentualDesconto, $formaId, $formaNome] = $this->validarPayload($data, $user);
+        $empresaId = $this->resolverEmpresaIdOperacao($data, $user);
+        [$clienteId, $itens, $vendedorId, $descontoValor, $percentualDesconto, $formaId, $formaNome] = $this->validarPayload($data, $user, $empresaId);
 
-        $uuid = (string) Str::uuid();
+        // Idempotência Tela de Venda: UUID da operação congelado na Page (F3/Sair/F10).
+        // Fallback: gera novo (chamadas sem uuid). Numeração Pedido::nextNumero preservada.
+        $uuid = trim((string) ($data['uuid'] ?? ''));
+        if ($uuid === '' || ! Str::isUuid($uuid)) {
+            $uuid = (string) Str::uuid();
+        }
+
+        $existentePorUuid = ForcaVendasOrder::query()->where('uuid', $uuid)->first();
+        if ($existentePorUuid instanceof ForcaVendasOrder) {
+            return $this->orderIdempotenteExistente($existentePorUuid, $empresaId);
+        }
+
         $momentoLocal = ErpTimezone::toLocal();
 
-        return DB::transaction(function () use (
-            $user,
-            $uuid,
-            $clienteId,
-            $vendedorId,
-            $itens,
-            $descontoValor,
-            $percentualDesconto,
-            $formaId,
-            $formaNome,
-            $data,
-            $momentoLocal,
-        ): ForcaVendasOrder {
-            $pedido = Pedido::query()->create([
-                'numero' => Pedido::nextNumero(),
-                'data' => $momentoLocal->toDateString(),
-                'hora' => $momentoLocal->format('H:i:s'),
-                'cliente_id' => $clienteId,
-                'vendedor_id' => $vendedorId,
-                'subtotal' => 0,
-                'percentual_desconto' => $percentualDesconto,
-                'desconto_valor' => $descontoValor,
-                'forma_pagamento' => $formaNome !== '' ? $formaNome : null,
-                'validade_dias' => 0,
-                'observacoes' => $data['observacoes'] ?? null,
-                'total' => 0,
-                'status' => Pedido::STATUS_ABERTO,
-                'plataforma' => Pedido::PLATAFORMA_FV,
-            ]);
+        try {
+            return DB::transaction(function () use (
+                $user,
+                $uuid,
+                $clienteId,
+                $vendedorId,
+                $itens,
+                $descontoValor,
+                $percentualDesconto,
+                $formaId,
+                $formaNome,
+                $data,
+                $momentoLocal,
+                $empresaId,
+            ): ForcaVendasOrder {
+                // Revalida empresa da sessão dentro da TX (troca em outra aba).
+                $this->assertSessaoCompativelComEmpresa($empresaId);
 
-            [$subtotal, $payloadItens] = $this->gravarItens($pedido, $itens);
-            $total = round($subtotal - $descontoValor, 2);
+                // Corrida residual: outro request pode ter criado entre o find e a TX.
+                $jaExiste = ForcaVendasOrder::query()->where('uuid', $uuid)->lockForUpdate()->first();
+                if ($jaExiste instanceof ForcaVendasOrder) {
+                    return $this->orderIdempotenteExistente($jaExiste, $empresaId);
+                }
 
-            $pedido->update([
-                'subtotal' => round($subtotal, 2),
-                'total' => $total,
-            ]);
+                $pedido = Pedido::query()->create([
+                    'numero' => Pedido::nextNumero(),
+                    'data' => $momentoLocal->toDateString(),
+                    'hora' => $momentoLocal->format('H:i:s'),
+                    'cliente_id' => $clienteId,
+                    'vendedor_id' => $vendedorId,
+                    'subtotal' => 0,
+                    'percentual_desconto' => $percentualDesconto,
+                    'desconto_valor' => $descontoValor,
+                    'forma_pagamento' => $formaNome !== '' ? $formaNome : null,
+                    'validade_dias' => 0,
+                    'observacoes' => $data['observacoes'] ?? null,
+                    'total' => 0,
+                    'status' => Pedido::STATUS_ABERTO,
+                    'plataforma' => Pedido::PLATAFORMA_FV,
+                ]);
 
-            $dataSanitizado = $this->sanitizarPrazoNoData($data, $formaId, $formaNome);
-            $payload = $this->montarPayload(
-                uuid: $uuid,
-                clienteId: $clienteId,
-                payloadItens: $payloadItens,
-                descontoValor: $descontoValor,
-                percentualDesconto: $percentualDesconto,
-                formaId: $formaId,
-                formaNome: $formaNome,
-                data: $dataSanitizado,
-                tabelaPrazo: $dataSanitizado['tabela_prazo_dias'] ?? null,
-            );
+                [$subtotal, $payloadItens] = $this->gravarItens($pedido, $itens);
+                $total = round($subtotal - $descontoValor, 2);
 
-            $fvOrder = ForcaVendasOrder::query()->create([
-                'uuid' => $uuid,
-                'device_uuid' => 'monitor-web',
-                'user_id' => $user->id,
-                'empresa_id' => ErpContext::currentEmpresaId() ?? $user->empresa_id,
-                'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
-                'cliente_id' => $clienteId,
-                'vendedor_id' => $vendedorId,
-                'pedido_id' => $pedido->id,
-                'venda_id' => null,
-                'total' => $total,
-                'status' => ForcaVendasOrder::STATUS_IMPORTADO,
-                'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
-                'payload' => $payload,
-                'client_created_at' => now(),
-                'received_at' => now(),
-            ]);
+                $pedido->update([
+                    'subtotal' => round($subtotal, 2),
+                    'total' => $total,
+                ]);
 
-            (new EstoqueReservaService())->reservarPedido($fvOrder, $pedido, $user);
+                $dataSanitizado = $this->sanitizarPrazoNoData($data, $formaId, $formaNome);
+                $payload = $this->montarPayload(
+                    uuid: $uuid,
+                    clienteId: $clienteId,
+                    payloadItens: $payloadItens,
+                    descontoValor: $descontoValor,
+                    percentualDesconto: $percentualDesconto,
+                    formaId: $formaId,
+                    formaNome: $formaNome,
+                    data: $dataSanitizado,
+                    tabelaPrazo: $dataSanitizado['tabela_prazo_dias'] ?? null,
+                );
 
-            try {
-                app(\App\Support\Gestor\GestorPushService::class)->notifyPedidoPendente($fvOrder);
-            } catch (\Throwable) {
-                // Push não deve quebrar a gravação.
+                $orcamentoId = filled($data['orcamento_id'] ?? null) ? (int) $data['orcamento_id'] : null;
+                $orcamentoId = $orcamentoId > 0 ? $orcamentoId : null;
+
+                // Antes de criar o DAV: lock + elegibilidade + IMPORTADO (rollback se a TX falhar).
+                if ($orcamentoId !== null) {
+                    app(ForcaVendasOrcamentoVinculo::class)->vincularAoGravarDav($orcamentoId);
+                }
+
+                $fvOrder = ForcaVendasOrder::query()->create([
+                    'uuid' => $uuid,
+                    'device_uuid' => 'monitor-web',
+                    'user_id' => $user->id,
+                    'empresa_id' => $empresaId,
+                    'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
+                    'cliente_id' => $clienteId,
+                    'vendedor_id' => $vendedorId,
+                    'orcamento_id' => $orcamentoId,
+                    'pedido_id' => $pedido->id,
+                    'venda_id' => null,
+                    'total' => $total,
+                    'status' => ForcaVendasOrder::STATUS_IMPORTADO,
+                    'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
+                    'payload' => $payload,
+                    'client_created_at' => now(),
+                    'received_at' => now(),
+                ]);
+
+                (new EstoqueReservaService())->reservarPedido($fvOrder, $pedido, $user);
+
+                try {
+                    app(\App\Support\Gestor\GestorPushService::class)->notifyPedidoPendente($fvOrder);
+                } catch (\Throwable) {
+                    // Push não deve quebrar a gravação.
+                }
+
+                return $fvOrder->fresh(['pedido', 'cliente']) ?? $fvOrder;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $existente = ForcaVendasOrder::query()->where('uuid', $uuid)->first();
+            if ($existente instanceof ForcaVendasOrder) {
+                return $this->orderIdempotenteExistente($existente, $empresaId);
             }
 
-            return $fvOrder->fresh(['pedido', 'cliente']) ?? $fvOrder;
-        });
+            throw $e;
+        }
+    }
+
+    /**
+     * Retorno idempotente: mesmo UUID → mesmo DAV (sem criar segundo pedido).
+     */
+    private function orderIdempotenteExistente(ForcaVendasOrder $order, int $empresaId): ForcaVendasOrder
+    {
+        $this->assertOrderDaEmpresa($order, $empresaId);
+
+        return $order->fresh(['pedido', 'cliente']) ?? $order;
     }
 
     /**
@@ -184,7 +272,10 @@ class ForcaVendasTelaVendaService
     {
         $this->assertEditavel($order);
 
-        [$clienteId, $itens, $vendedorId, $descontoValor, $percentualDesconto, $formaId, $formaNome] = $this->validarPayload($data, $user);
+        $empresaId = $this->resolverEmpresaIdOperacao($data, $user, $order);
+        $this->assertOrderDaEmpresa($order, $empresaId);
+
+        [$clienteId, $itens, $vendedorId, $descontoValor, $percentualDesconto, $formaId, $formaNome] = $this->validarPayload($data, $user, $empresaId);
 
         return DB::transaction(function () use (
             $order,
@@ -197,9 +288,12 @@ class ForcaVendasTelaVendaService
             $formaId,
             $formaNome,
             $data,
+            $empresaId,
         ): ForcaVendasOrder {
             $order = ForcaVendasOrder::query()->lockForUpdate()->findOrFail($order->id);
             $this->assertEditavel($order);
+            $this->assertOrderDaEmpresa($order, $empresaId);
+            $this->assertSessaoCompativelComEmpresa($empresaId);
 
             $pedido = Pedido::query()->lockForUpdate()->find($order->pedido_id);
 
@@ -273,7 +367,7 @@ class ForcaVendasTelaVendaService
      * @param  array<string, mixed>  $data
      * @return array{0: int, 1: list<array<string, mixed>>, 2: int|null, 3: float, 4: float, 5: int|null, 6: string}
      */
-    private function validarPayload(array $data, User $user): array
+    private function validarPayload(array $data, User $user, ?int $empresaIdOperacao = null): array
     {
         $clienteId = (int) ($data['cliente_id'] ?? 0);
         $itens = is_array($data['itens'] ?? null) ? $data['itens'] : [];
@@ -286,12 +380,20 @@ class ForcaVendasTelaVendaService
             throw new \RuntimeException('Inclua ao menos um item na venda.');
         }
 
+        $empresaId = $empresaIdOperacao ?? $this->resolverEmpresaIdOperacao($data, $user);
+        $this->assertSessaoCompativelComEmpresa($empresaId);
+
+        $vendedorId = (int) ($data['vendedor_id'] ?? $user->vendedor_id ?? 0) ?: null;
+        $this->assertVendedorDaEmpresa($vendedorId, $empresaId);
+
         $caixaId = filled($data['caixa_conta_id'] ?? null) ? (int) $data['caixa_conta_id'] : null;
 
         // Sem caixa vinculado/selecionado: CAIXA GERAL (padrão).
         if ($caixaId === null || $caixaId <= 0) {
             $caixaId = (int) CaixaConta::ensureCaixaGeral()->id;
         }
+
+        $this->assertCaixaDaEmpresa($caixaId, $user, $empresaId);
 
         $estoqueId = filled($data['estoque_id'] ?? null) ? (int) $data['estoque_id'] : null;
 
@@ -316,9 +418,10 @@ class ForcaVendasTelaVendaService
                     );
                 }
             }
+        } else {
+            $this->assertEstoqueDaEmpresa($estoqueId, $vendedorId, $empresaId);
         }
 
-        $vendedorId = (int) ($data['vendedor_id'] ?? $user->vendedor_id ?? 0) ?: null;
         $descontoValor = round((float) ($data['desconto_valor'] ?? 0), 2);
         $percentualDesconto = round((float) ($data['percentual_desconto'] ?? 0), 4);
         $formaId = filled($data['forma_pagamento_id'] ?? null) ? (int) $data['forma_pagamento_id'] : null;
@@ -332,6 +435,131 @@ class ForcaVendasTelaVendaService
     }
 
     /**
+     * Empresa da operação: payload congelado da tela → order → sessão → user.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function resolverEmpresaIdOperacao(array $data, User $user, ?ForcaVendasOrder $order = null): int
+    {
+        $fromData = filled($data['empresa_id'] ?? null) ? (int) $data['empresa_id'] : 0;
+        $fromOrder = $order && $order->empresa_id ? (int) $order->empresa_id : 0;
+        $fromSessao = (int) (ErpContext::currentEmpresaId() ?? 0);
+        $fromUser = (int) ($user->empresa_id ?? 0);
+
+        $empresaId = $fromData > 0
+            ? $fromData
+            : ($fromOrder > 0 ? $fromOrder : ($fromSessao > 0 ? $fromSessao : $fromUser));
+
+        if ($empresaId <= 0) {
+            throw new \RuntimeException('Nenhuma empresa selecionada para gravar a venda.');
+        }
+
+        if (! ErpContext::userCanAccessEmpresa($empresaId, $user)) {
+            throw new \RuntimeException('Sem permissão para a empresa da venda.');
+        }
+
+        // Payload e pedido existentes não podem divergir.
+        if ($fromData > 0 && $fromOrder > 0 && $fromData !== $fromOrder) {
+            throw new \RuntimeException('Empresa do contexto diverge da empresa do pedido.');
+        }
+
+        return $empresaId;
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    private function assertSessaoCompativelComEmpresa(int $empresaId): void
+    {
+        $sessao = ErpContext::currentEmpresaId();
+
+        if ($sessao === null || (int) $sessao !== $empresaId) {
+            throw new \RuntimeException(
+                'A empresa ativa foi alterada. Retorne à empresa original da venda '
+                .'antes de gravar ou faturar.'
+            );
+        }
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    private function assertVendedorDaEmpresa(?int $vendedorId, int $empresaId): void
+    {
+        if ($vendedorId === null || $vendedorId <= 0) {
+            throw new \RuntimeException('Selecione um vendedor válido para a venda.');
+        }
+
+        $vendedor = Vendedor::query()->with('empresas')->find($vendedorId);
+
+        if (! $vendedor) {
+            throw new \RuntimeException('Vendedor inválido.');
+        }
+
+        if (! $vendedor->ativo || ! $vendedor->efetua_venda) {
+            throw new \RuntimeException('Vendedor inativo ou sem permissão de venda.');
+        }
+
+        $ok = (int) ($vendedor->empresa_id ?? 0) === $empresaId
+            || $vendedor->empresas->contains(fn ($e): bool => (int) $e->id === $empresaId);
+
+        if (! $ok) {
+            throw new \RuntimeException('Vendedor não autorizado para a empresa desta venda.');
+        }
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    private function assertCaixaDaEmpresa(int $caixaId, User $user, int $empresaId): void
+    {
+        $geralId = (int) CaixaConta::ensureCaixaGeral()->id;
+
+        if ($caixaId === $geralId) {
+            return;
+        }
+
+        if (! CaixaConta::query()->whereKey($caixaId)->where('ativo', true)->exists()) {
+            throw new \RuntimeException('Caixa inválido ou inativo.');
+        }
+
+        $opcoes = app(VendaCaixaDestinoResolver::class)->opcoesParaUsuario($user, $empresaId);
+        $ids = array_map(static fn (array $op): int => (int) ($op['id'] ?? 0), $opcoes);
+
+        if (! in_array($caixaId, $ids, true)) {
+            throw new \RuntimeException('Caixa não autorizado para a empresa desta venda.');
+        }
+    }
+
+    /**
+     * Depósito deve pertencer à empresa e, se o vendedor tiver vínculo, coincidir com ele.
+     *
+     * @throws \RuntimeException
+     */
+    private function assertEstoqueDaEmpresa(int $estoqueId, ?int $vendedorId, int $empresaId): void
+    {
+        $estoque = Estoque::query()->find($estoqueId);
+
+        if (! $estoque || ! $estoque->ativo) {
+            throw new \RuntimeException('Depósito de estoque inválido ou inativo.');
+        }
+
+        $estoqueEmpresa = (int) ($estoque->empresa_id ?? 0);
+
+        if ($estoqueEmpresa > 0 && $estoqueEmpresa !== $empresaId) {
+            throw new \RuntimeException('Depósito não pertence à empresa desta venda.');
+        }
+
+        if ($vendedorId && $vendedorId > 0) {
+            $vendedorEstoqueId = (int) (Vendedor::query()->whereKey($vendedorId)->value('estoque_id') ?? 0);
+
+            if ($vendedorEstoqueId > 0 && $vendedorEstoqueId !== $estoqueId) {
+                throw new \RuntimeException('Depósito não corresponde ao vínculo do vendedor da venda.');
+            }
+        }
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $itens
      * @return array{0: float, 1: list<array<string, mixed>>}
      */
@@ -341,9 +569,25 @@ class ForcaVendasTelaVendaService
         $linha = 1;
         $payloadItens = [];
 
+        $productIds = [];
+        foreach ($itens as $item) {
+            $pid = (int) ($item['product_id'] ?? 0);
+            if ($pid > 0) {
+                $productIds[$pid] = $pid;
+            }
+        }
+
+        /** @var \Illuminate\Support\Collection<int, Product> $products */
+        $products = $productIds === []
+            ? collect()
+            : Product::query()
+                ->whereIn('id', array_values($productIds))
+                ->get(['id', 'descricao'])
+                ->keyBy('id');
+
         foreach ($itens as $item) {
             $productId = (int) ($item['product_id'] ?? 0);
-            $product = Product::query()->find($productId);
+            $product = $productId > 0 ? $products->get($productId) : null;
 
             if (! $product) {
                 throw new \RuntimeException('Produto inválido no item '.$linha.'.');
@@ -385,6 +629,7 @@ class ForcaVendasTelaVendaService
                 'product_grade_id' => $item['product_grade_id'] ?? null,
                 'quantidade' => $quantidade,
                 'preco_unitario' => $precoInformado,
+                'preco_manual' => (bool) ($item['preco_manual'] ?? false),
                 'desconto' => $descItem,
                 'acrescimo' => $acrItem,
                 'descricao' => $descricao,
@@ -429,7 +674,7 @@ class ForcaVendasTelaVendaService
             ? $data['condicao_pagamento']
             : null;
 
-        return [
+        $payload = [
             'uuid' => $uuid,
             'device_uuid' => 'monitor-web',
             'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
@@ -448,9 +693,29 @@ class ForcaVendasTelaVendaService
             'caixa_conta_id' => filled($data['caixa_conta_id'] ?? null) ? (int) $data['caixa_conta_id'] : null,
             'estoque_id' => filled($data['estoque_id'] ?? null) ? (int) $data['estoque_id'] : null,
             'observacoes' => $data['observacoes'] ?? null,
+            'cpf_nota' => filled($data['cpf_nota'] ?? null) ? trim((string) $data['cpf_nota']) : null,
             'created_at' => now()->toIso8601String(),
             'origem' => 'monitor_tela_venda',
         ];
+
+        // Pagamento misto: lista com valores reais (sem migration; só JSON do payload).
+        if (isset($data['pagamentos']) && is_array($data['pagamentos']) && $data['pagamentos'] !== []) {
+            $payload['pagamentos'] = array_values(array_filter(
+                $data['pagamentos'],
+                static function (mixed $p): bool {
+                    if (! is_array($p)) {
+                        return false;
+                    }
+                    $valor = isset($p['valor']) && is_numeric($p['valor'])
+                        ? (float) $p['valor']
+                        : 0.0;
+
+                    return $valor > 0.009;
+                },
+            ));
+        }
+
+        return $payload;
     }
 
     /**
@@ -518,6 +783,45 @@ class ForcaVendasTelaVendaService
             return true;
         }
 
+        $canhoto = $data['cartao_canhoto'] ?? null;
+        $temCanhoto = is_array($canhoto) && ! empty($canhoto['dias']) && is_array($canhoto['dias']);
+
+        // Misto: qualquer linha a prazo/cartão/CR mantém os campos de prazo do payload.
+        $pagamentos = $data['pagamentos'] ?? null;
+        if (is_array($pagamentos) && $pagamentos !== []) {
+            foreach ($pagamentos as $pag) {
+                if (! is_array($pag)) {
+                    continue;
+                }
+
+                $linha = [
+                    'forma' => (string) ($pag['descricao'] ?? $pag['forma_pagamento'] ?? $pag['forma'] ?? ''),
+                    'tipo' => (string) ($pag['tipo'] ?? ''),
+                    'tipo_movimento' => (string) ($pag['tipo_movimento'] ?? ''),
+                    'aparece_contas_receber' => (bool) ($pag['aparece_contas_receber'] ?? false),
+                ];
+
+                if (PdvFinalizarPagamentosHelper::isFormaCartao($linha)) {
+                    if ($temCanhoto) {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                if (PdvFinalizarPagamentosHelper::precisaParcelasCarne($linha)) {
+                    return true;
+                }
+
+                if (FormaPagamentoDestino::geraContasReceber($linha)) {
+                    return true;
+                }
+            }
+
+            // Misto só à vista (dinheiro/PIX/caixa): não mantém prazo residual.
+            return false;
+        }
+
         $formaModel = $formaId && $formaId > 0
             ? FormaPagamento::query()->find($formaId)
             : null;
@@ -535,9 +839,6 @@ class ForcaVendasTelaVendaService
             'tipo_movimento' => (string) ($formaModel?->tipo_movimento ?? ''),
             'aparece_contas_receber' => (bool) ($formaModel?->aparece_contas_receber ?? false),
         ];
-
-        $canhoto = $data['cartao_canhoto'] ?? null;
-        $temCanhoto = is_array($canhoto) && ! empty($canhoto['dias']) && is_array($canhoto['dias']);
 
         // Cartão: só mantém prazo do canhoto (não herda carnê antigo).
         if (PdvFinalizarPagamentosHelper::isFormaCartao($pagamento)) {
@@ -719,6 +1020,7 @@ class ForcaVendasTelaVendaService
                 'propriedade',
                 'local_estoque_id',
                 'tabela_preco_id',
+                'cpf_nota',
             ] as $chave) {
                 if (! array_key_exists($chave, $payload) || $payload[$chave] === null || $payload[$chave] === '') {
                     continue;

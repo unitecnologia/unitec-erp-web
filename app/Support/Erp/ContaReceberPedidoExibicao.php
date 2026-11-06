@@ -8,14 +8,15 @@ use App\Models\Venda;
 use Illuminate\Support\Collection;
 
 /**
- * Número da coluna Pedido no Contas a Receber, igual ao Nº Pedido do Monitor:
- * vendas.numero do pedido faturado (sem zeros à esquerda).
+ * Número da coluna Pedido (Caixa / Contas a Receber), alinhado ao Nº do Monitor:
+ * Tela de Venda ERP → TV-{n} (mesmo padrão de OS-{n}); App FV → FV-{n}.
+ * O n é vendas.numero do pedido faturado (sem zeros à esquerda).
  */
 final class ContaReceberPedidoExibicao
 {
     /**
-     * @param  iterable<ContaReceber>  $records
-     * @return array<int, string> id do forca_vendas_orders => número do Monitor
+     * @param  iterable<object>  $records
+     * @return array<int, string> id do forca_vendas_orders => rótulo exibido (TV-25 / FV-25 / 25)
      */
     public static function mapa(iterable $records): array
     {
@@ -37,12 +38,15 @@ final class ContaReceberPedidoExibicao
         ForcaVendasOrder::query()
             ->whereIn('id', array_keys($ids))
             ->with('venda:id,numero')
-            ->get(['id', 'venda_id'])
+            ->get(['id', 'venda_id', 'device_uuid'])
             ->each(function (ForcaVendasOrder $order) use (&$mapa): void {
                 $numero = self::formatarNumeroVenda($order->venda?->numero);
-                if ($numero !== null) {
-                    $mapa[(int) $order->id] = $numero;
+                if ($numero === null) {
+                    return;
                 }
+
+                $prefixo = self::prefixoPedido($order);
+                $mapa[(int) $order->id] = $prefixo.'-'.$numero;
             });
 
         return $mapa;
@@ -64,6 +68,19 @@ final class ContaReceberPedidoExibicao
         }
 
         return $documento;
+    }
+
+    /**
+     * Extrai só o número do Monitor a partir do valor do mapa (aceita "25" ou "TV-25").
+     */
+    public static function numeroDoMapa(mixed $valor): ?string
+    {
+        return self::formatarNumeroVenda($valor);
+    }
+
+    public static function prefixoPedido(ForcaVendasOrder $order): string
+    {
+        return (string) ($order->device_uuid ?? '') === 'monitor-web' ? 'TV' : 'FV';
     }
 
     /**

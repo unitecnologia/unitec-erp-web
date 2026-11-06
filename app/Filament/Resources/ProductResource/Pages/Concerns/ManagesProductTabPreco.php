@@ -14,19 +14,34 @@ trait ManagesProductTabPreco
 
     public bool $tabPrecoEspecial = false;
 
+    public bool $productTabPrecoHydrated = false;
+
     public function updatedDataUsaTabPreco(mixed $value): void
     {
         if (! $value) {
             return;
         }
 
+        $this->ensureProductTabPrecoLoaded();
+
         if (! $this->tabPrecoVarejo && ! $this->tabPrecoAtacado && ! $this->tabPrecoEspecial) {
             $this->tabPrecoVarejo = true;
         }
     }
 
+    protected function ensureProductTabPrecoLoaded(): void
+    {
+        if ($this->productTabPrecoHydrated) {
+            return;
+        }
+
+        $product = ($this->record ?? null) instanceof Product ? $this->record : null;
+        $this->loadProductPriceTableItems($product);
+    }
+
     protected function loadProductPriceTableItems(?Product $product = null): void
     {
+        $this->productTabPrecoHydrated = true;
         $this->tabPrecoVarejo = false;
         $this->tabPrecoAtacado = false;
         $this->tabPrecoEspecial = false;
@@ -76,6 +91,11 @@ trait ManagesProductTabPreco
             return;
         }
 
+        // Sem hidratar a aba: níveis já gravados permanecem; não exigir seleção fantasma.
+        if (! $this->productTabPrecoHydrated) {
+            return;
+        }
+
         if ($this->selectedTabPrecoNiveis() === []) {
             Notification::make()
                 ->title('Selecione ao menos uma tabela (Varejo, Atacado ou Especial).')
@@ -92,6 +112,11 @@ trait ManagesProductTabPreco
     {
         // Flag desligada: não apaga as tabelas — só desativa o uso na venda.
         if (! ($product->usa_tab_preco ?? false)) {
+            return;
+        }
+
+        // Aba não aberta: não interpretar flags zeradas como "nenhum nível".
+        if (! $this->productTabPrecoHydrated) {
             return;
         }
 

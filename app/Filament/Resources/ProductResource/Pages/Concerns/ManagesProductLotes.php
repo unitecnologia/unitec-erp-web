@@ -4,10 +4,10 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 
 use App\Models\Product;
 use App\Models\ProductLote;
+use App\Support\Erp\ErpSchema;
 use App\Support\Erp\ProductLoteService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Schema;
 
 trait ManagesProductLotes
 {
@@ -210,7 +210,7 @@ trait ManagesProductLotes
 
     protected function canManageProductLotes(): bool
     {
-        if (! Schema::hasTable('product_lotes')) {
+        if (! ErpSchema::hasTable('product_lotes')) {
             Notification::make()->title('Tabela de lotes indisponível.')->danger()->send();
 
             return false;
@@ -242,7 +242,7 @@ trait ManagesProductLotes
     {
         $this->productLotesRows = [];
 
-        if (! Schema::hasTable('product_lotes')) {
+        if (! ErpSchema::hasTable('product_lotes')) {
             return;
         }
 

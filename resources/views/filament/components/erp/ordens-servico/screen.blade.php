@@ -118,4 +118,29 @@
             }
         });
     }
+
+    // Opt-in: medir gap Concluir → listagem (localStorage.erpOsFinPerf=1).
+    try {
+        if (localStorage.getItem('erpOsFinPerf') === '1') {
+            const raw = sessionStorage.getItem('erpOsFinPerfConcluir');
+            if (raw) {
+                const prev = JSON.parse(raw);
+                const listReadyAt = performance.now();
+                const wallNow = Date.now();
+                const summary = {
+                    roundtripMs: prev.roundtripMs ?? null,
+                    redirectGapMs: prev.redirectGapMs ?? null,
+                    enterToPagehideMs: prev.enterToPagehideMs ?? null,
+                    listLoadMs: prev.pagehideWall
+                        ? Math.round(wallNow - prev.pagehideWall)
+                        : (prev.startedAt ? Math.round(wallNow - prev.startedAt - (prev.roundtripMs || 0)) : null),
+                    enterToListReadyMs: prev.startedAt ? Math.round(wallNow - prev.startedAt) : null,
+                    listDomReadyMs: Math.round(listReadyAt),
+                };
+                // eslint-disable-next-line no-console
+                console.info('[os-fin-perf] listagem pronta após Concluir', summary);
+                sessionStorage.removeItem('erpOsFinPerfConcluir');
+            }
+        }
+    } catch (e) { /* ignore */ }
 </script>

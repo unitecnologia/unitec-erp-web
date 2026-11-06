@@ -333,28 +333,16 @@ class ListProducts extends ListRecords
     public function productStatusCounts(): array
     {
         $this->pullListSearch();
-        $empresa = $this->currentEmpresa();
-        $searchColumn = $this->searchColumn;
-        $localSearch = $this->localSearch;
-        $searchFieldsActive = $this->searchFieldsActive;
 
-        $countFor = static function (string $status) use ($empresa, $searchColumn, $localSearch, $searchFieldsActive): int {
-            return (new ProductListQueryBuilder(
-                statusFilter: $status,
-                searchColumn: $searchColumn,
-                localSearch: $localSearch,
-                empresa: $empresa,
-                applyDefaultOrder: false,
-                searchFieldsActive: $searchFieldsActive,
-                deferReservaSum: true,
-            ))->build()->count();
-        };
-
-        return [
-            'ativos' => $countFor('ativos'),
-            'inativos' => $countFor('inativos'),
-            'todos' => $countFor('todos'),
-        ];
+        return (new ProductListQueryBuilder(
+            statusFilter: 'todos',
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            empresa: $this->currentEmpresa(),
+            applyDefaultOrder: false,
+            searchFieldsActive: $this->searchFieldsActive,
+            deferReservaSum: true,
+        ))->countByStatus();
     }
 
     public function updatedSearchColumn(): void

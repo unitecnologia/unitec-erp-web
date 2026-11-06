@@ -82,8 +82,20 @@
             if (! this.open) return;
             const opts = this.visibleOptions();
             if (! opts.length) return;
-            const el = this.activeIndex >= 0 ? opts[this.activeIndex] : opts[0];
-            el?.click();
+            // Com seta: confirma o item ativo.
+            if (this.activeIndex >= 0) {
+                opts[this.activeIndex]?.click();
+                return;
+            }
+            // Sem seta: não escolher a opção vazia (limpava Grupo, ex.: DIVERSOS).
+            const qq = this.norm(this.q).trim();
+            const selected = this.norm(this.selectedLabel).trim();
+            if (! qq || qq === selected) {
+                this.closeAndRestore();
+                return;
+            }
+            const firstReal = opts.find((el) => el.getAttribute('data-empty') !== '1') ?? opts[0];
+            firstReal?.click();
         },
         placeMenu() {
             const t = this.$refs.trigger;
@@ -221,6 +233,7 @@
                         type="button"
                         role="option"
                         data-option
+                        data-empty="1"
                         aria-selected="{{ $selected === '' ? 'true' : 'false' }}"
                         class="erp-prod-grupo-select__pick"
                         @click="pick('', '')"

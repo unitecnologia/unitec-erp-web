@@ -1,5 +1,10 @@
 document.addEventListener('DOMContentLoaded', initErpProdutosForm);
 document.addEventListener('livewire:navigated', initErpProdutosForm);
+// wire:navigate pode injetar este script DEPOIS de livewire:navigated —
+// sem esta chamada, o 1º Novo Produto fica sem F5 e sem foco na Descrição.
+if (document.readyState !== 'loading') {
+    queueMicrotask(() => initErpProdutosForm());
+}
 
 const ERP_PRODUCT_LOOKUP_FIELDS = {
     'pprod-marca': 'marca',
@@ -160,33 +165,55 @@ function focusProdutoDescricaoOnCreate(page) {
         return;
     }
 
+    // Já focamos nesta instância do formulário (dataset some no próximo navigate).
+    if (page.dataset.erpDescricaoFocused === '1') {
+        return;
+    }
+
     bindProdutoDescricaoFocusCancel();
     cancelProdutoDescricaoFocus();
 
-    const attempts = [0, 50, 150];
+    // Mais tentativas: morph/readonly do Livewire pode atrasar o input na 1ª abertura.
+    const waits = [0, 40, 100, 200, 350, 600];
 
     const tryFocus = (index) => {
         erpDescricaoFocusTimer = null;
 
+        // Usuário já está em outro campo — não roubar o foco.
+        const active = document.activeElement;
+        if (
+            active
+            && page.contains(active)
+            && active.id
+            && active.id !== 'pprod-descricao'
+            && active.matches('input, textarea, select, button, [contenteditable="true"]')
+        ) {
+            page.dataset.erpDescricaoFocused = '1';
+
+            return;
+        }
+
         const input = document.getElementById('pprod-descricao');
 
-        if (input && ! input.disabled) {
+        if (input && ! input.disabled && page.contains(input)) {
             input.removeAttribute('readonly');
             input.focus();
 
             if (document.activeElement === input) {
+                page.dataset.erpDescricaoFocused = '1';
+
                 return;
             }
         }
 
         const next = index + 1;
 
-        if (next < attempts.length) {
-            erpDescricaoFocusTimer = window.setTimeout(() => tryFocus(next), attempts[next]);
+        if (next < waits.length) {
+            erpDescricaoFocusTimer = window.setTimeout(() => tryFocus(next), waits[next]);
         }
     };
 
-    erpDescricaoFocusTimer = window.setTimeout(() => tryFocus(0), attempts[0]);
+    erpDescricaoFocusTimer = window.setTimeout(() => tryFocus(0), waits[0]);
 }
 
 function initErpProdutosForm() {
@@ -306,7 +333,34 @@ function getErpProdutosComponent() {
     const wireRoot = page.hasAttribute('wire:id') ? page : page.closest('[wire\\:id]');
     const wireId = wireRoot?.getAttribute('wire:id');
 
-    return wireId ? window.Livewire.find(wireId) : null;
+    if (wireId) {
+        const byId = window.Livewire.find(wireId);
+
+        if (byId) {
+            return byId;
+        }
+    }
+
+    // Fallback raro: wire:id ainda não no nó da página na 1ª pintura SPA.
+    try {
+        const components = typeof window.Livewire.all === 'function' ? window.Livewire.all() : [];
+
+        for (const component of components) {
+            const el = component?.el ?? null;
+
+            if (! el) {
+                continue;
+            }
+
+            if (el === page || el.contains(page) || page.contains(el)) {
+                return component;
+            }
+        }
+    } catch (_error) {
+        // ignore
+    }
+
+    return null;
 }
 
 function sanitizeErpProdutosLocInput(input) {
@@ -424,28 +478,51 @@ window.saveErpProdutosForm = async function saveErpProdutosForm() {
         return;
     }
 
-    commitErpProdutosFormInputs(page);
-
-    const component = getErpProdutosComponent();
-
-    if (! component) {
+    // Evita gravação duplicada por F5/clique repetido enquanto a anterior não terminou.
+    if (page.dataset.erpSaving === '1') {
         return;
     }
 
-    syncErpProdutosPrecoVendaBeforeSave(component, page);
+    page.dataset.erpSaving = '1';
 
-    // Sem o bloco Localizações no DOM (outra subaba), não envia '' — isso apagava
-    // a localização gravada. O Livewire já mantém o valor em $data.
-    if (! document.querySelector('[data-erp-loc-fields]')) {
-        await component.call('saveForm');
+    try {
+        commitErpProdutosFormInputs(page);
 
-        return;
+        let component = getErpProdutosComponent();
+
+        // 1ª abertura SPA: Livewire pode resolver o component alguns ms depois do F5.
+        if (! component) {
+            for (const delay of [30, 80, 160]) {
+                await new Promise((resolve) => window.setTimeout(resolve, delay));
+                component = getErpProdutosComponent();
+
+                if (component) {
+                    break;
+                }
+            }
+        }
+
+        if (! component) {
+            return;
+        }
+
+        syncErpProdutosPrecoVendaBeforeSave(component, page);
+
+        // Sem o bloco Localizações no DOM (outra subaba), não envia '' — isso apagava
+        // a localização gravada. O Livewire já mantém o valor em $data.
+        if (! document.querySelector('[data-erp-loc-fields]')) {
+            await component.call('saveForm');
+
+            return;
+        }
+
+        const loc = readErpProdutosLocValues();
+        const localizacao = formatErpProdutosLocalizacao(loc);
+
+        await component.call('saveForm', localizacao);
+    } finally {
+        page.dataset.erpSaving = '0';
     }
-
-    const loc = readErpProdutosLocValues();
-    const localizacao = formatErpProdutosLocalizacao(loc);
-
-    await component.call('saveForm', localizacao);
 };
 
 function bindProductCadastroLookup(page) {
@@ -674,11 +751,13 @@ function bindErpProdutosSaveButtons(page) {
 }
 
 function bindErpProdutosFormKeys() {
-    if (window.__erpProdutosFormKeysBoundV10) {
+    // v11: F5 sempre preventDefault na tela de produto (antes exigia component e o
+    // 1º cadastro via SPA ficava sem listener se o init não rodasse).
+    if (window.__erpProdutosFormKeysBoundV11) {
         return;
     }
 
-    window.__erpProdutosFormKeysBoundV10 = true;
+    window.__erpProdutosFormKeysBoundV11 = true;
 
     document.addEventListener('keydown', (event) => {
         const page = document.querySelector('.erp-produtos-form-page');
@@ -687,20 +766,43 @@ function bindErpProdutosFormKeys() {
             return;
         }
 
-        // Precificação: Enter tratado por erp-precif-enter-v5.js (capture).
-        // Aqui só evitamos F5/ESC do formulário por baixo da modal.
-        if (document.querySelector('.erp-prod-precificacao-modal')) {
-            if (event.key === 'Enter') {
+        // F5: bloquear reload nativo SEMPRE nesta tela, mesmo se o Livewire
+        // ainda não resolveu o component (caso típico da 1ª abertura SPA).
+        if (event.key === 'F5') {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (document.querySelector('.erp-prod-precificacao-modal')) {
+                const component = getErpProdutosComponent();
+
+                if (component) {
+                    window.aplicarErpProdutosPrecificacao(component);
+                }
+
                 return;
             }
 
-            const component = getErpProdutosComponent();
+            const lookupModal = getLookupModal();
 
-            if (event.key === 'F5' && component) {
-                event.preventDefault();
-                event.stopPropagation();
-                // Igual ao botão Aplicar: commit do foco + aplicarProductPrecificacao.
-                window.aplicarErpProdutosPrecificacao(component);
+            if (lookupModal) {
+                const component = getErpProdutosComponent();
+
+                if (component && lookupModal.querySelector('.erp-lookup-modal__body--form')) {
+                    component.call('saveLookupRecord');
+                }
+
+                return;
+            }
+
+            window.saveErpProdutosForm();
+
+            return;
+        }
+
+        // Precificação: Enter tratado por erp-precif-enter-v5.js (capture).
+        if (document.querySelector('.erp-prod-precificacao-modal')) {
+            if (event.key === 'Enter') {
+                return;
             }
 
             return;
@@ -730,13 +832,6 @@ function bindErpProdutosFormKeys() {
 
                 return;
             }
-        }
-
-        if (event.key === 'F5') {
-            event.preventDefault();
-            window.saveErpProdutosForm();
-
-            return;
         }
 
         // Enter no botão Salvar encerra o ciclo do formulário gravando.

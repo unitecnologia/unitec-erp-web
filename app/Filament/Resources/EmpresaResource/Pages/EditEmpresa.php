@@ -6,6 +6,7 @@ use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\EmpresaResource\Pages\Concerns\ErpEmpresaFormPage;
 use App\Models\Empresa;
 use App\Support\Erp\Boleto\BoletoContaApiDefaults;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpScreen;
 use Filament\Resources\Pages\EditRecord;
 
@@ -61,6 +62,19 @@ class EditEmpresa extends EditRecord
             BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
             $this->syncEmpresaNfeEmitentes();
             $this->syncPortalContadorAposSalvar($empresa);
+            EmpresaParametros::gravarAtalhoConcluirVenda(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA]
+                    ?? EmpresaParametros::ATALHO_CONCLUIR_VENDA_DEFAULT,
+            );
+            EmpresaParametros::gravarPerguntarImprimirPosVendaTv(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV] ?? false,
+            );
+            EmpresaParametros::gravarPermanecerTelaVendaAposConcluir(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR] ?? false,
+            );
         }
     }
 }

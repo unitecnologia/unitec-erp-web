@@ -10,6 +10,9 @@ trait EmbedsInPdvOverlay
 
     public bool $embedsInNotaFornecedor = false;
 
+    /** Overlay F8 da OS — mesmo cadastro, iframe deve acompanhar a altura da janela. */
+    public bool $embedsInOsOverlay = false;
+
     public function mountEmbedsInPdvOverlay(): void
     {
         if (request()->boolean('pdv')) {
@@ -17,6 +20,11 @@ trait EmbedsInPdvOverlay
         }
 
         if (request()->boolean('orcamento')) {
+            $this->embedsInOrcamento = true;
+        }
+
+        if (request()->boolean('os_embed')) {
+            $this->embedsInOsOverlay = true;
             $this->embedsInOrcamento = true;
         }
 
@@ -88,6 +96,10 @@ trait EmbedsInPdvOverlay
 
         if ($this->embedsInOrcamento || $this->embedsInNotaFornecedor) {
             $attributes['class'] = trim(($attributes['class'] ?? '') . ' erp-orcamento-embed-body');
+        }
+
+        if ($this->embedsInOsOverlay) {
+            $attributes['class'] = trim(($attributes['class'] ?? '') . ' erp-os-overlay-embed-body');
         }
 
         return $attributes;

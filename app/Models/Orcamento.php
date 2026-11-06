@@ -276,15 +276,17 @@ class Orcamento extends Model
     }
 
     /**
-     * Orçamentos visíveis na tela Orçamentos do ERP.
-     * Pedidos/DAV ficam em `pedidos` + Monitor; este scope ainda exclui legado
-     * se algum forca_vendas_orders.tipo=pedido ainda apontar para orcamento_id.
+     * Elegíveis para nova importação (F2 / PDV / OS).
+     * Exclui orçamentos com DAV FV ativo (pendente/faturado etc.).
+     * Não usar na listagem do cadastro Orçamentos — IMPORTADO deve permanecer consultável.
      */
     public function scopeVisivelNaListaOrcamentos(Builder $query): Builder
     {
         return $query->whereDoesntHave(
             'forcaVendasOrder',
-            fn (Builder $q) => $q->where('tipo', ForcaVendasOrder::TIPO_PEDIDO),
+            fn (Builder $q) => $q
+                ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
+                ->where('situacao', '!=', ForcaVendasOrder::SITUACAO_CANCELADO),
         );
     }
 

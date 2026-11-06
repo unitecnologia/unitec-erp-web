@@ -28,6 +28,11 @@ class CreateProduct extends CreateRecord
             $this->embedsInOrcamento = true;
         }
 
+        if (request()->boolean('os_embed')) {
+            $this->embedsInOsOverlay = true;
+            $this->embedsInOrcamento = true;
+        }
+
         if (request()->boolean('nota_fornecedor')) {
             $this->embedsInNotaFornecedor = true;
         }
@@ -65,11 +70,9 @@ class CreateProduct extends CreateRecord
         $this->hydrateNcmDescricaoFromCatalog(fillForm: true);
         $this->dispatch('erp-masks-refresh');
         $this->mountProductPhoto();
-        $this->loadProductGrades();
-        $this->loadProductCompositions();
-        $this->loadProductPriceTableItems();
-        $this->loadProductPriceHistories();
-        $this->loadProductImeis();
+
+        // Filhos (grade/composição/IMEI/tab preço/histórico) só na abertura da aba.
+        $this->ensureProductTabPayload($this->activeFormTab);
 
         if ($this->embedsInNotaFornecedor && filled($this->data['ncm'] ?? null)) {
             $this->hydrateNcmDescricaoFromCatalog(fillForm: true);
@@ -82,6 +85,10 @@ class CreateProduct extends CreateRecord
     {
         if ($this->embedsInPdv) {
             return static::getResource()::getUrl('create') . '?pdv=1';
+        }
+
+        if ($this->embedsInOsOverlay) {
+            return static::getResource()::getUrl('create') . '?orcamento=1&os_embed=1';
         }
 
         if ($this->embedsInOrcamento) {
@@ -100,7 +107,7 @@ class CreateProduct extends CreateRecord
         $this->syncProductChildRecords($this->record);
 
         if ($this->record instanceof Product) {
-            app(\App\Support\Erp\ProductLoteService::class)->garantirLoteInicial($this->record->fresh());
+            app(\App\Support\Erp\ProductLoteService::class)->garantirLoteInicial($this->record);
         }
 
         $prefill = NotaFornecedorProductPrefill::peek();

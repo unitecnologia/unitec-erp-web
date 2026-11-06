@@ -6,10 +6,11 @@ use App\Models\FormaPagamento;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
+use App\Support\Erp\ProductPhotoUrl;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Importar orçamentos finalizados (status fechado) para a Tela de Venda.
@@ -18,12 +19,21 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 {
     public bool $fvImportarOrcamentoOpen = false;
 
-    public string $fvImportarOrcamentoSearch = '';
+    public string $fvImportarOrcNumero = '';
+
+    public string $fvImportarOrcCliente = '';
+
+    public string $fvImportarOrcDataDe = '';
+
+    public string $fvImportarOrcDataAte = '';
 
     /** @var list<array{orcamento_id: int, numero: string, data: string, cliente: string, total: string}> */
     public array $fvImportarOrcamentoResults = [];
 
     public ?int $fvImportarOrcamentoSelectedIndex = null;
+
+    /** Orçamento importado nesta sessão (vínculo → forca_vendas_orders.orcamento_id no F3). */
+    public ?int $orcamentoOrigemId = null;
 
     public function abrirImportarOrcamento(): void
     {
@@ -56,7 +66,11 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
             return;
         }
 
-        $this->fvImportarOrcamentoSearch = '';
+        $this->fvImportarOrcNumero = '';
+        $this->fvImportarOrcCliente = '';
+        $mes = ErpTimezone::toLocal();
+        $this->fvImportarOrcDataDe = $mes->copy()->startOfMonth()->toDateString();
+        $this->fvImportarOrcDataAte = $mes->copy()->endOfMonth()->toDateString();
         $this->refreshFvImportarOrcamentoResults();
         $this->fvImportarOrcamentoOpen = true;
         $this->dispatch('erp-fv-focus-importar-orcamento');
@@ -65,51 +79,100 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
     public function fecharImportarOrcamento(): void
     {
         $this->fvImportarOrcamentoOpen = false;
-        $this->fvImportarOrcamentoSearch = '';
+        $this->fvImportarOrcNumero = '';
+        $this->fvImportarOrcCliente = '';
+        $this->fvImportarOrcDataDe = '';
+        $this->fvImportarOrcDataAte = '';
         $this->fvImportarOrcamentoResults = [];
         $this->fvImportarOrcamentoSelectedIndex = null;
         $this->dispatch('fv-tela-venda-focus-barcode');
     }
 
-    public function updatedFvImportarOrcamentoSearch(string $value): void
+    public function updatedFvImportarOrcNumero(string $value): void
     {
         $upper = mb_strtoupper($value, 'UTF-8');
 
-        if ($this->fvImportarOrcamentoSearch !== $upper) {
-            $this->fvImportarOrcamentoSearch = $upper;
+        if ($this->fvImportarOrcNumero !== $upper) {
+            $this->fvImportarOrcNumero = $upper;
         }
 
         $this->refreshFvImportarOrcamentoResults();
     }
 
+    public function updatedFvImportarOrcCliente(string $value): void
+    {
+        $upper = mb_strtoupper($value, 'UTF-8');
+
+        if ($this->fvImportarOrcCliente !== $upper) {
+            $this->fvImportarOrcCliente = $upper;
+        }
+
+        $this->refreshFvImportarOrcamentoResults();
+    }
+
+    public function updatedFvImportarOrcDataDe(): void
+    {
+        $this->refreshFvImportarOrcamentoResults();
+    }
+
+    public function updatedFvImportarOrcDataAte(): void
+    {
+        $this->refreshFvImportarOrcamentoResults();
+    }
+
     public function refreshFvImportarOrcamentoResults(): void
     {
-        $term = trim($this->fvImportarOrcamentoSearch);
-        $like = $term !== '' ? '%'.$term.'%' : null;
+        $numero = trim($this->fvImportarOrcNumero);
+        $cliente = trim($this->fvImportarOrcCliente);
+        $dataDe = $this->dataFiltroFvImportarOrcamento($this->fvImportarOrcDataDe);
+        $dataAte = $this->dataFiltroFvImportarOrcamento($this->fvImportarOrcDataAte);
 
         $query = OrcamentoFaturamentoGuard::aplicarNaoFaturados(Orcamento::query()->visivelNaListaOrcamentos())
-            ->with(['cliente:id,nome_razao,codigo'])
+            ->with(['cliente:id,nome_razao,apelido_fantasia,codigo'])
             ->where('status', Orcamento::STATUS_FECHADO)
             ->orderByDesc('data')
             ->orderByDesc('id');
 
-        if ($like) {
+        if ($numero !== '') {
+            $query->where('numero', 'like', '%'.$numero.'%');
+        }
+
+        if ($cliente !== '') {
+            $like = '%'.$cliente.'%';
             $query->where(function ($q) use ($like): void {
-                $q->where('numero', 'like', $like)
-                    ->orWhereHas('cliente', fn ($sub) => $sub->where('nome_razao', 'like', $like));
+                $q->where('cliente_nome', 'like', $like)
+                    ->orWhereHas('cliente', function ($sub) use ($like): void {
+                        $sub->where('nome_razao', 'like', $like)
+                            ->orWhere('apelido_fantasia', 'like', $like);
+                    });
             });
+        }
+
+        if ($dataDe !== null) {
+            $query->whereDate('data', '>=', $dataDe);
+        }
+
+        if ($dataAte !== null) {
+            $query->whereDate('data', '<=', $dataAte);
         }
 
         $this->fvImportarOrcamentoResults = $query
             ->limit(50)
             ->get()
-            ->map(fn (Orcamento $orcamento): array => [
-                'orcamento_id' => $orcamento->id,
-                'numero' => (string) $orcamento->numero,
-                'data' => $orcamento->data?->format('d/m/Y') ?? '',
-                'cliente' => mb_strtoupper($orcamento->cliente?->nome_razao ?? '—', 'UTF-8'),
-                'total' => ErpMoney::formatBr($orcamento->total),
-            ])
+            ->map(function (Orcamento $orcamento): array {
+                $clienteNome = $orcamento->clienteDisplayNome();
+                if ($clienteNome === '') {
+                    $clienteNome = (string) ($orcamento->cliente?->nome_razao ?? '—');
+                }
+
+                return [
+                    'orcamento_id' => $orcamento->id,
+                    'numero' => (string) $orcamento->numero,
+                    'data' => $orcamento->data?->format('d/m/Y') ?? '',
+                    'cliente' => mb_strtoupper($clienteNome, 'UTF-8'),
+                    'total' => ErpMoney::formatBr($orcamento->total),
+                ];
+            })
             ->values()
             ->all();
 
@@ -120,6 +183,8 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
     {
         if (isset($this->fvImportarOrcamentoResults[$index])) {
             $this->fvImportarOrcamentoSelectedIndex = $index;
+            $this->dispatch('erp-fv-highlight-importar-orcamento', index: $index);
+            $this->skipRender();
         }
     }
 
@@ -132,7 +197,8 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
         $count = count($this->fvImportarOrcamentoResults);
         $index = ($this->fvImportarOrcamentoSelectedIndex ?? 0) + $delta;
         $this->fvImportarOrcamentoSelectedIndex = max(0, min($count - 1, $index));
-        $this->dispatch('erp-fv-scroll-importar-orcamento', index: $this->fvImportarOrcamentoSelectedIndex);
+        $this->dispatch('erp-fv-highlight-importar-orcamento', index: $this->fvImportarOrcamentoSelectedIndex);
+        $this->skipRender();
     }
 
     public function confirmarImportarOrcamento(): void
@@ -147,7 +213,13 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
         $orcamentoId = (int) ($this->fvImportarOrcamentoResults[$index]['orcamento_id'] ?? 0);
         $orcamento = Orcamento::query()
-            ->with(['itens.product', 'itens.grade', 'cliente', 'vendedor'])
+            ->with([
+                'itens' => fn ($q) => $q->orderBy('item')->orderBy('id'),
+                'itens.product:id,codigo,descricao,ativo,is_grade,foto_path',
+                'itens.grade:id,descricao',
+                'cliente',
+                'vendedor',
+            ])
             ->find($orcamentoId);
 
         if (! $orcamento || $orcamento->status !== Orcamento::STATUS_FECHADO) {
@@ -174,6 +246,7 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
         $itens = [];
         $ignorados = [];
+        $descontoSvc = app(OrcamentoDescontoService::class);
 
         foreach ($orcamento->itens as $item) {
             /** @var OrcamentoItem $item */
@@ -193,7 +266,7 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
             $qtd = (float) $item->quantidade;
             $preco = (float) $item->preco_unitario;
-            $partes = app(OrcamentoDescontoService::class)->partesDaLinha($item);
+            $partes = $descontoSvc->partesDaLinha($item);
 
             if ($qtd <= 0) {
                 $ignorados[] = $item->descricao ?? $product->descricao;
@@ -217,7 +290,8 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
                 'acrescimo' => $partes['acrescimo'],
                 'desconto' => $partes['desconto'],
                 'total' => $partes['total'],
-                'foto' => $product->fotoUrl(),
+                // Sem cache-bust em disco (exists/lastModified) — import em lote.
+                'foto' => ProductPhotoUrl::forPath($product->foto_path ?? null, cacheBust: false),
             ];
         }
 
@@ -231,9 +305,9 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
             return;
         }
 
-        DB::transaction(function () use ($orcamento): void {
-            $orcamento->update(['status' => Orcamento::STATUS_IMPORTADO]);
-        });
+        // F2 só carrega na venda: status permanece FECHADO no banco.
+        // IMPORTADO + forca_vendas_orders.orcamento_id só na gravação do DAV (F3/Sair/F10).
+        $this->orcamentoOrigemId = (int) $orcamento->id;
 
         if ($orcamento->cliente) {
             $this->aplicarCliente($orcamento->cliente);
@@ -349,5 +423,16 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
         }
 
         $this->valorPagamento = $this->formatMoney($this->valorRestante());
+    }
+
+    protected function dataFiltroFvImportarOrcamento(string $value): ?string
+    {
+        $value = trim($value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            return null;
+        }
+
+        return $value;
     }
 }

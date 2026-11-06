@@ -127,7 +127,7 @@
                                             type="text"
                                             class="erp-pdv-parcelas__cheque-input"
                                             id="erp-os-parcela-cheque-{{ $index }}"
-                                            wire:model.live="osParcelasRows.{{ $index }}.numero_cheque"
+                                            wire:model.blur="osParcelasRows.{{ $index }}.numero_cheque"
                                             wire:click.stop
                                             autocomplete="off"
                                             maxlength="40"

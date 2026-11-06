@@ -111,6 +111,7 @@ echo.
 echo [3/3] Limpando cache do indicador BD...
 "%PHPEXE%" artisan optimize:clear >nul 2>&1
 "%PHPEXE%" artisan config:cache >nul 2>&1
+"%PHPEXE%" artisan unitec:filament-cache --force >nul 2>&1
 echo.
 echo ========================================
 echo   MIGRATIONS OK

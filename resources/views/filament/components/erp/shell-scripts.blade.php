@@ -20,6 +20,11 @@
     $pdvScriptUrl = asset('js/erp-pdv.js').'?v='.$pdvJsVersion;
 @endphp
 <script src="{{ asset('js/erp-shell.js') }}?v={{ $shellJsVersion }}-{{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}"></script>
+@php
+    $dividirJsPath = public_path('js/erp-dividir-conta.js');
+    $dividirJsVersion = $version.'-div'.(is_file($dividirJsPath) ? (int) filemtime($dividirJsPath) : time());
+@endphp
+<script src="{{ asset('js/erp-dividir-conta.js') }}?v={{ $dividirJsVersion }}"></script>
 {{-- PDV sob demanda: SPA não reexecuta script da tela; loader carrega/teardown ao entrar/sair. --}}
 <script>
     window.__erpPdvScriptUrl = @json($pdvScriptUrl);

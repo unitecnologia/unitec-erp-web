@@ -5,8 +5,8 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 trait ManagesProductMovimentacoes
 {
@@ -32,7 +32,7 @@ trait ManagesProductMovimentacoes
         $product ??= $this->record instanceof Product ? $this->record : null;
         $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
 
-        if ($product === null || $empresaId <= 0 || ! Schema::hasTable('estoque_movimentacoes')) {
+        if ($product === null || $empresaId <= 0 || ! ErpSchema::hasTable('estoque_movimentacoes')) {
             $this->productMovimentacoes = [];
             $this->movTotal = 0;
             $this->productMovimentacoesLoaded = true;
@@ -76,8 +76,8 @@ trait ManagesProductMovimentacoes
             'm.origem_numero',
             'u.name as usuario_nome',
         ];
-        $hasDocFiscal = Schema::hasColumn('estoque_movimentacoes', 'doc_fiscal_tipo')
-            && Schema::hasColumn('estoque_movimentacoes', 'doc_fiscal_numero');
+        $hasDocFiscal = ErpSchema::hasColumn('estoque_movimentacoes', 'doc_fiscal_tipo')
+            && ErpSchema::hasColumn('estoque_movimentacoes', 'doc_fiscal_numero');
         if ($hasDocFiscal) {
             $select[] = 'm.doc_fiscal_tipo';
             $select[] = 'm.doc_fiscal_numero';

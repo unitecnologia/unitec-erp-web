@@ -50,6 +50,93 @@ final class ProductEstoqueSaldoService
     }
 
     /**
+     * Saldo físico em lote (mesmo critério de {@see fisico()} / {@see fisicoPorEstoques()}).
+     * Evita N+1 em pesquisas (Tela de Venda / lookups).
+     *
+     * @param  list<int>  $productIds
+     * @param  array<int, float>|null  $estoqueGlobalByProduct  products.estoque já carregado (opcional)
+     * @return array<int, float> product_id => quantidade física
+     */
+    public function fisicoParaProdutos(
+        array $productIds,
+        ?int $estoqueId = null,
+        ?array $estoqueGlobalByProduct = null,
+    ): array {
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn ($id): int => (int) $id, $productIds),
+            static fn (int $id): bool => $id > 0,
+        )));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        if ($estoqueGlobalByProduct === null) {
+            $estoqueGlobalByProduct = Product::query()
+                ->whereIn('id', $ids)
+                ->pluck('estoque', 'id')
+                ->map(static fn ($v): float => (float) $v)
+                ->all();
+        }
+
+        $out = [];
+
+        if ($estoqueId === null) {
+            foreach ($ids as $productId) {
+                $out[$productId] = (float) ($estoqueGlobalByProduct[$productId]
+                    ?? $estoqueGlobalByProduct[(string) $productId]
+                    ?? 0);
+            }
+
+            return $out;
+        }
+
+        if (! $this->tabelaDisponivel()) {
+            foreach ($ids as $productId) {
+                $out[$productId] = (float) ($estoqueGlobalByProduct[$productId]
+                    ?? $estoqueGlobalByProduct[(string) $productId]
+                    ?? 0);
+            }
+
+            return $out;
+        }
+
+        $saldosRows = ProductEstoqueSaldo::query()
+            ->whereIn('product_id', $ids)
+            ->get(['product_id', 'estoque_id', 'quantidade']);
+
+        /** @var array<int, array<int, float>> $saldosPorProduto */
+        $saldosPorProduto = [];
+
+        foreach ($saldosRows as $row) {
+            $pid = (int) $row->product_id;
+            $eid = (int) $row->estoque_id;
+            $saldosPorProduto[$pid][$eid] = (float) $row->quantidade;
+        }
+
+        $principalId = $this->estoquePrincipalId();
+
+        foreach ($ids as $productId) {
+            $global = (float) ($estoqueGlobalByProduct[$productId]
+                ?? $estoqueGlobalByProduct[(string) $productId]
+                ?? 0);
+            $saldos = $saldosPorProduto[$productId] ?? [];
+            $sumDepots = array_sum($saldos);
+            $naoDistribuido = max(0.0, round($global - $sumDepots, 3));
+            $out[$productId] = $this->fisicoDeposito(
+                $estoqueId,
+                $global,
+                $saldos,
+                $principalId,
+                $sumDepots,
+                $naoDistribuido,
+            );
+        }
+
+        return $out;
+    }
+
+    /**
      * Saldo físico de vários depósitos com uma leitura do produto e uma dos saldos.
      *
      * @param  list<int>  $estoqueIds

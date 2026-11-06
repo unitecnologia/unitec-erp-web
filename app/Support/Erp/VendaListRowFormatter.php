@@ -47,7 +47,7 @@ final class VendaListRowFormatter
             'cliente' => (string) ($record->cliente?->nome_razao ?? '—'),
             'vendedor' => $record->vendedorNome(),
             'plataforma' => '<span class="fi-badge fi-color-' . e($plataformaClass) . '" title="' . e($plataformaLabel) . '">' . e($plataformaLabel) . '</span>',
-            'forma_pagamento' => filled($record->forma_pagamento) ? (string) $record->forma_pagamento : '—',
+            'forma_pagamento' => VendaMeioPagamentoExibicao::htmlCelula($record),
             'total' => '<span class="erp-vendas-total-cell" title="R$ ' . e($valor) . '"><span class="erp-vendas-total-cell__currency">R$</span>'
                 . '<span class="erp-vendas-total-cell__amount">' . e($valor) . '</span></span>',
             'status' => '<span class="erp-vendas-status erp-vendas-status--' . e($status) . '" title="' . e($statusLabel) . '">' . e($statusLabel) . '</span>',

@@ -6,6 +6,7 @@ use App\Filament\Resources\OrdemServicoResource\Pages;
 use App\Models\OrdemServico;
 use App\Support\Erp\ErpAccess;
 use BackedEnum;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -34,6 +35,11 @@ class OrdemServicoResource extends Resource
     public static function canAccess(): bool
     {
         return ErpAccess::currentCan('ordens_servico.access');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->daEmpresaAtiva();
     }
 
     public static function form(Schema $schema): Schema
@@ -144,7 +150,7 @@ class OrdemServicoResource extends Resource
                     ->state(fn (OrdemServico $record): string => $record->meioPagamentoLista())
                     ->placeholder('—')
                     ->wrap(false)
-                    ->tooltip(fn (OrdemServico $record): ?string => ($t = $record->meioPagamentoLista()) !== '—' ? $t : null)
+                    ->tooltip(fn (OrdemServico $record): ?string => ($t = $record->meioPagamentoTooltip()) !== '' ? $t : null)
                     ->extraHeaderAttributes(self::colunaOs('meio-pagamento'))
                     ->extraCellAttributes(self::colunaOs('meio-pagamento'))
                     ->weight(FontWeight::SemiBold),

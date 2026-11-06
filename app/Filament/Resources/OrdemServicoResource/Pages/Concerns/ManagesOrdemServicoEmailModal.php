@@ -103,6 +103,7 @@ trait ManagesOrdemServicoEmailModal
         }
 
         $ordem = OrdemServico::query()
+            ->daEmpresaAtiva()
             ->when($modo !== 'tecnica', fn ($query) => $query->with('cliente'))
             ->find($this->highlightedRecordId);
 
@@ -175,6 +176,7 @@ trait ManagesOrdemServicoEmailModal
         }
 
         $ordem = OrdemServico::query()
+            ->daEmpresaAtiva()
             ->when($this->emailEnvioModo !== 'tecnica', fn ($query) => $query->with(['cliente', 'nfse']))
             ->find($this->emailOrdemId);
 
@@ -378,7 +380,7 @@ trait ManagesOrdemServicoEmailModal
             ->send();
 
         $ordem = $this->emailOrdemId
-            ? OrdemServico::query()->find($this->emailOrdemId)
+            ? OrdemServico::query()->daEmpresaAtiva()->find($this->emailOrdemId)
             : null;
 
         if ($ordem instanceof OrdemServico && $this->emailEnvioModo !== 'tecnica') {
@@ -503,7 +505,7 @@ trait ManagesOrdemServicoEmailModal
             ->send();
 
         $ordem = $this->emailOrdemId
-            ? OrdemServico::query()->find($this->emailOrdemId)
+            ? OrdemServico::query()->daEmpresaAtiva()->find($this->emailOrdemId)
             : null;
 
         if ($ordem instanceof OrdemServico && $this->emailEnvioModo !== 'tecnica') {

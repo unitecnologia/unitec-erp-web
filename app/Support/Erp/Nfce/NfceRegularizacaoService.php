@@ -20,6 +20,7 @@ use App\Support\Erp\ErpSchema;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
+use App\Support\Erp\Pdv\PdvNotaClienteService;
 use App\Support\Erp\Pdv\TerminalResolver;
 use App\Support\Fiscal\FiscalEmitenteUf;
 use App\Support\Fiscal\NfceTerminalSequencia;
@@ -478,7 +479,8 @@ final class NfceRegularizacaoService
             'user_id' => $userId,
             'venda_id' => $venda->id,
             'person_id' => $venda->cliente_id,
-            'cpf_nota' => null,
+            // Tela de Venda: CPF na Nota do F4 (payload) — nunca CNPJ.
+            'cpf_nota' => $this->cpfNotaDoPedidoForcaVendas($venda),
             'vendedor_id' => $venda->vendedor_id,
             'vendedor_nome' => $venda->vendedor_nome,
             'numero' => $this->numeroReferencia($venda),
@@ -519,6 +521,48 @@ final class NfceRegularizacaoService
         ]);
 
         return $pdvVenda;
+    }
+
+    /**
+     * CPF na Nota gravado no F4 da Tela de Venda (payload do DAV).
+     * Só CPF válido com 11 dígitos — CNPJ nunca entra neste campo.
+     */
+    private function cpfNotaDoPedidoForcaVendas(Venda $venda): ?string
+    {
+        if (! ErpSchema::hasTable('forca_vendas_orders')) {
+            return null;
+        }
+
+        $payloadRaw = DB::table('forca_vendas_orders')
+            ->where('venda_id', $venda->id)
+            ->value('payload');
+
+        if ($payloadRaw === null) {
+            return null;
+        }
+
+        $payload = is_array($payloadRaw)
+            ? $payloadRaw
+            : (is_string($payloadRaw) ? (json_decode($payloadRaw, true) ?: []) : []);
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $raw = trim((string) ($payload['cpf_nota'] ?? ''));
+
+        if ($raw === '') {
+            return null;
+        }
+
+        // Revalida no servidor antes de uso fiscal (mesmo serviço do F4/PDV).
+        if ((new PdvNotaClienteService())->validaDocumentoCpfNota($raw) !== null) {
+            return null;
+        }
+
+        $formatado = PdvNotaClienteService::formatarCpfNota($raw);
+
+        return $formatado !== '' ? $formatado : null;
     }
 
     /**

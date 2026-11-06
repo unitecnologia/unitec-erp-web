@@ -1,5 +1,10 @@
 /* ERP — Lançamento OS (visual alinhado à NF-e) */
 
+.erp-os-form-page [x-cloak],
+.erp-os-shell [x-cloak] {
+    display: none !important;
+}
+
 :root {
     --erp-os-chrome: 6.35rem;
     --erp-os-gap: 0.45rem;
@@ -218,6 +223,22 @@
 }
 
 .erp-os-shell__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0.45rem;
+}
+
+/*
+ * Painel de aba (Alpine x-show): ocupa o lugar que os filhos diretos
+ * (.erp-os-panel--dados / --fill) tinham em .erp-os-shell__content.
+ * Sem isso a grade de Serviços/Peças encolhe e sobra área cinza vazia.
+ * display:flex no CSS; Alpine aplica display:none inline quando oculto
+ * (inline vence — sem !important aqui).
+ */
+.erp-os-shell__content > .erp-os-shell__panel {
     display: flex;
     flex-direction: column;
     flex: 1 1 0;
@@ -1084,6 +1105,14 @@
     z-index: 400 !important;
 }
 
+/* Concluir: foco programático (1º Enter) não dispara :focus-visible — anel no :focus. */
+.erp-os-fin #erp-os-finalizar-op-faturar:focus,
+.erp-os-fin .erp-pdv-finalizar__operacao-btn--concluir:focus {
+    outline: 3px solid rgba(22, 163, 74, 0.55);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.22), 0 4px 12px -3px rgba(22, 163, 74, 0.55) !important;
+}
+
 /* Preview impressão OS — modal fullscreen (mesmo padrão orçamentos) */
 .erp-os-form-page .erp-os-preview-overlay {
     position: fixed;
@@ -1148,7 +1177,7 @@
 }
 
 .erp-os-produto-bar .erp-os-suggest--pecas {
-    min-width: min(52rem, 96vw);
+    min-width: min(58rem, 96vw);
     max-height: min(360px, 48vh);
     padding: 0.15rem;
     gap: 0;
@@ -1157,13 +1186,13 @@
 .erp-os-produto-bar .erp-os-suggest-btn {
     width: 100%;
     display: grid;
-    grid-template-columns: 3.2rem minmax(0, 1fr) 15.6rem;
-    gap: 0.4rem;
+    grid-template-columns: 3.2rem minmax(0, 1fr) 6.5rem;
+    gap: 0.45rem 0.55rem;
     align-items: center;
     border: 0;
     background: transparent;
     text-align: left;
-    padding: 0.22rem 0.45rem;
+    padding: 0.22rem 0.5rem 0.22rem 0.45rem;
     border-radius: 5px;
     cursor: pointer;
     font-size: 0.75rem;
@@ -1172,8 +1201,27 @@
     font-family: inherit;
 }
 
-.erp-os-produto-bar .erp-os-suggest-btn:not(:has(.erp-fv-tv__suggest-estoques)) {
-    grid-template-columns: 3.2rem minmax(0, 1fr);
+.erp-os-produto-bar .erp-os-suggest--pecas .erp-os-suggest-btn {
+    grid-template-columns: 3.2rem minmax(0, 1fr) 15.6rem 8rem;
+    column-gap: 0.75rem;
+}
+
+.erp-os-produto-bar .erp-os-suggest-btn .erp-fv-tv__suggest-preco {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 7.4rem;
+    justify-self: end;
+    font-size: 0.86rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #1e3a8a;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+}
+
+.erp-os-produto-bar .erp-os-suggest-btn.is-selected .erp-fv-tv__suggest-preco {
+    color: #1e3a8a;
 }
 
 .erp-os-produto-bar .erp-os-suggest-btn:hover {
@@ -1315,9 +1363,50 @@
     min-height: 0 !important;
 }
 
-.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected {
-    background: #bfdbfe !important;
-    box-shadow: inset 3px 0 0 #2563eb;
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected td,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing td {
+    background: #1d4ed8 !important;
+    border-bottom-color: #3b82f6 !important;
+    border-right-color: #3b82f6 !important;
+    color: #fff;
+}
+
+/* Células internas (fundo branco) precisam acompanhar a seleção — padrão FV. */
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-fv-tv__cell,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-fv-tv__cell,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-os-itens__cell-input--concluido,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-os-itens__cell-input--concluido {
+    border-color: rgb(255 255 255 / 45%) !important;
+    background: rgb(255 255 255 / 10%) !important;
+    color: #fff !important;
+    box-shadow: none;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-fv-tv__money-rs,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-fv-tv__money-rs {
+    color: #bfdbfe !important;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-fv-tv__money-val,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-fv-tv__money-val {
+    color: #fff !important;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val {
+    color: #bbf7d0 !important;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val {
+    color: #fecaca !important;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-selected .erp-os-itens__trash-btn,
+.erp-os-form-page .erp-os-itens__grid-fv tbody tr.is-editing .erp-os-itens__trash-btn {
+    border-color: rgb(255 255 255 / 55%);
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
 }
 
 .erp-os-form-page .erp-os-itens__grid-fv .erp-os-itens__col-descricao {
@@ -1331,8 +1420,21 @@
 }
 
 .erp-os-form-page .erp-os-itens__grid-fv .erp-os-itens__col-concluido {
-    width: 9.75rem;
-    max-width: 9.75rem;
+    width: 11.25rem;
+    min-width: 10.5rem;
+    max-width: 12rem;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv--pecas .erp-os-itens__col-concluido {
+    display: none;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv--pecas .erp-os-itens__col-tecnico {
+    border-right: 0;
+}
+
+.erp-os-form-page .erp-os-itens__grid-fv--pecas .erp-os-itens__col-descricao {
+    min-width: 8rem;
 }
 
 .erp-os-form-page .erp-os-itens__grid-fv .erp-os-itens__cell-tecnico {
@@ -1346,12 +1448,15 @@
     width: 100%;
     min-width: 0;
     margin: 0;
-    padding: 0.1rem 0.28rem;
+    padding: 0.1rem 0.2rem 0.1rem 0.28rem;
     font: inherit;
     font-size: 0.72rem;
     line-height: 1.25;
     color: #0f172a;
     cursor: text;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
 }
 
 .erp-os-form-page .erp-os-itens__grid-fv .erp-os-itens__cell-input--concluido:focus {
@@ -1369,7 +1474,15 @@
     font-size: 0.72rem;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+    text-overflow: clip;
+}
+
+@media (max-width: 1280px) {
+    .erp-os-form-page .erp-os-itens__grid-fv .erp-os-itens__col-concluido {
+        width: 10.75rem;
+        min-width: 10.25rem;
+        max-width: 11.5rem;
+    }
 }
 
 .erp-os-itens__desc-cell {

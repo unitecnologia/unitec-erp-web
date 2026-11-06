@@ -22,6 +22,10 @@ use App\Http\Controllers\Erp\DeviceServiceEnsureController;
 use App\Http\Controllers\Erp\MonitorPedidosReportController;
 use App\Http\Controllers\Erp\OrcamentoReportController;
 use App\Http\Controllers\Erp\OrdemServicoReportController;
+use App\Http\Controllers\Erp\FvClienteLookupController;
+use App\Http\Controllers\Erp\FvProdutoLookupController;
+use App\Http\Controllers\Erp\OsClienteLookupController;
+use App\Http\Controllers\Erp\OsProdutoLookupController;
 use App\Http\Controllers\Erp\OsVeiculoHistoricoReportController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloEscPosPrintController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloReportController;
@@ -78,6 +82,16 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('erp.atualizacao.progress');
     Route::get('/admin/erp/warm-urls', ErpWarmUrlsController::class)
         ->name('erp.warm.urls');
+    Route::get('/admin/erp/os/produtos-lookup', OsProdutoLookupController::class)
+        ->middleware('erp.permission:ordens_servico.access')
+        ->name('erp.os.produtos-lookup');
+    Route::get('/admin/erp/ordens-servico/clientes-lookup', OsClienteLookupController::class)
+        ->middleware('erp.permission:ordens_servico.access')
+        ->name('erp.os.clientes-lookup');
+    Route::get('/admin/erp/forca-vendas/produtos-lookup', FvProdutoLookupController::class)
+        ->name('erp.fv.produtos-lookup');
+    Route::get('/admin/erp/forca-vendas/clientes-lookup', FvClienteLookupController::class)
+        ->name('erp.fv.clientes-lookup');
     Route::post('/admin/erp/device-service/ensure', DeviceServiceEnsureController::class)
         ->name('erp.device-service.ensure');
     Route::get('/admin/erp/files/{path}', PublicStorageFileController::class)

@@ -3052,7 +3052,8 @@ function collectFinalizarAtalhos() {
     document.querySelectorAll('.erp-pdv-finalizar__kbd').forEach((el) => {
         const valor = (el.textContent || '').trim().toUpperCase();
 
-        if (valor.length === 1) {
+        // Letras A–Z ou teclas F1–F12 conforme cadastro da forma de pagamento.
+        if (/^[A-Z]$/.test(valor) || /^F([1-9]|1[0-2])$/.test(valor)) {
             atalhos.add(valor);
         }
     });
@@ -3284,6 +3285,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
     const valorFocused = document.activeElement?.id?.startsWith('erp-pdv-finalizar-valor-');
     const cpfFocused = document.activeElement?.id === 'erp-pdv-finalizar-cpf';
     const informacoesFocused = document.activeElement?.id === 'erp-pdv-finalizar-informacoes';
+    const dividirFocused = !! document.activeElement?.closest?.('[data-erp-dividir-conta]');
     const clienteTyping = isFinalizarClienteTyping(event);
     const operacaoFocused = document.activeElement?.classList?.contains('erp-pdv-finalizar__operacao-btn');
     const canhotoModal = document.querySelector('.erp-pdv-canhoto-overlay') !== null;
@@ -3528,6 +3530,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
+    // Fiscais F3–F6 (atalhos dos botões do terminal) — preservados; meios não usam essas teclas.
     if (['F3', 'F4', 'F5', 'F6'].includes(event.key)) {
         if (triggerFinalizarOperacao(component, event.key)) {
             event.preventDefault();
@@ -3536,13 +3539,18 @@ function handlePdvFinalizarModalKeydown(event, component) {
         }
     }
 
-    if (event.key === 'F10' || event.key === 'F7') {
+    // Concluir: somente o atalho configurado (F7/F9/F10) — o <kbd> do botão.
+    // F7 em canhoto/parcelas já retorna acima. F7 NÃO conclui se a config for F9/F10.
+    const atalhoConcluir = (document.querySelector('.erp-pdv-finalizar__footer-actions')?.dataset?.erpAtalhoConcluir
+        || 'F10').toUpperCase();
+    if (event.key === atalhoConcluir) {
         event.preventDefault();
         commitAndConfirmFinalizarVenda(component);
 
         return;
     }
 
+    // F8 = próxima forma no PDV (Tela de Venda: só setas).
     if (event.key === 'F8') {
         event.preventDefault();
         component.call('movePagamentoSelection', 1);
@@ -3565,10 +3573,11 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
+    // Meios de pagamento (letra ou F livre do cadastro) — após Concluir/fiscais/F8.
     if (! event.ctrlKey && ! event.altKey && ! event.metaKey && ! cpfFocused && ! informacoesFocused) {
         const tecla = (event.key || '').toUpperCase();
 
-        if (tecla.length === 1 && collectFinalizarAtalhos().has(tecla)) {
+        if (collectFinalizarAtalhos().has(tecla)) {
             event.preventDefault();
             component.call('selectPagamentoByAtalho', tecla);
 
@@ -3576,7 +3585,8 @@ function handlePdvFinalizarModalKeydown(event, component) {
         }
     }
 
-    if (! event.ctrlKey && ! event.altKey && ! event.metaKey && ! valorFocused && ! cpfFocused && ! informacoesFocused) {
+    if (! event.ctrlKey && ! event.altKey && ! event.metaKey
+        && ! valorFocused && ! cpfFocused && ! informacoesFocused && ! dividirFocused) {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
             component.call('movePagamentoSelection', event.key === 'ArrowDown' ? 1 : -1);
@@ -5478,3 +5488,9 @@ initErpPdv();
     document.addEventListener('DOMContentLoaded', resetIdle);
     resetIdle();
 })();
+
+// Stepper "Dividir a conta" vive em public/js/erp-dividir-conta.js (shell).
+// Mantém alias se o PDV carregar sem o shell ter definido (dev/testes isolados).
+if (typeof window.erpDividirContaStepper !== 'function') {
+    console.warn('[erp-pdv] erpDividirContaStepper ausente — carregue js/erp-dividir-conta.js');
+}

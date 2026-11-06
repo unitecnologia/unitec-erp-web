@@ -286,12 +286,17 @@ class ContaReceberListQueryBuilder
      */
     protected function applyLocalSearchByDocumento(Builder $query, string $term): void
     {
-        $numero = preg_match('/^\d+$/', $term) === 1 ? (int) $term : null;
+        $numero = null;
+        if (preg_match('/^\d+$/', $term) === 1) {
+            $numero = (int) $term;
+        } elseif (preg_match('/^(TV|FV)-?(\d+)$/i', $term, $m) === 1) {
+            $numero = (int) $m[2];
+        }
 
         $query->where(function (Builder $inner) use ($term, $numero): void {
             $inner->where('documento', 'like', $term.'%');
 
-            if ($numero === null) {
+            if ($numero === null || $numero <= 0) {
                 return;
             }
 

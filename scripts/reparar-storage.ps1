@@ -44,6 +44,13 @@ try {
 }
 
 try {
+    Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('unitec:filament-cache', '--force') -AllowFailure | Out-Null
+    Write-Ok 'Cache Filament reconstruido.'
+} catch {
+    Write-Warn ("Nao foi possivel gerar cache Filament: {0}" -f $_.Exception.Message)
+}
+
+try {
     Start-UnitecStack -AppPath $AppPath -WaitSeconds 20
     Write-Ok ('Sistema ativo em {0}' -f (Get-UnitecDefaultAppUrl))
 } catch {

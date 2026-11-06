@@ -108,9 +108,22 @@ trait ManagesProductPriceCalculation
             return;
         }
 
+        // Só atualiza $this->data — mergeLivewireFormData prioriza data no save.
         $this->data[$field] = \App\Support\Erp\ProductEanGenerator::generate($codigo);
-        $this->form->fill($this->data);
     }
+
+    /**
+     * Campos de preço tocados pelo ProductPriceCalculator (evita reformatar o form inteiro).
+     *
+     * @var list<string>
+     */
+    private const PRICE_CALC_DISPLAY_KEYS = [
+        'preco_compra',
+        'pct_custos',
+        'preco_custo',
+        'pct_lucro',
+        'preco_venda',
+    ];
 
     /**
      * @param  array<string, mixed>  $data
@@ -120,9 +133,16 @@ trait ManagesProductPriceCalculation
         $this->suppressProductPriceRecalculation = true;
 
         try {
-            $formatted = $this->formatProductFormDataForDisplay($data);
-            $this->data = $formatted;
-            $this->form->fill($formatted);
+            // Patch só dos campos de preço — sem form->fill completo nem format fiscal/nutri.
+            $patch = [];
+            foreach (self::PRICE_CALC_DISPLAY_KEYS as $key) {
+                if (! array_key_exists($key, $data)) {
+                    continue;
+                }
+                $patch[$key] = $this->formatBrDecimal($data[$key] ?? 0, 2);
+            }
+
+            $this->data = array_merge(is_array($this->data) ? $this->data : [], $patch);
             $this->dispatch('erp-masks-refresh');
         } finally {
             $this->suppressProductPriceRecalculation = false;

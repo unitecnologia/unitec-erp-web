@@ -7,7 +7,7 @@
         ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start'],
         ['key' => 'vendedor', 'label' => 'Vendedor', 'sortable' => false, 'align' => 'start'],
         ['key' => 'plataforma', 'label' => 'Plataforma', 'sortable' => false, 'align' => 'center', 'html' => true],
-        ['key' => 'forma_pagamento', 'label' => 'Meio de Pagamento', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'forma_pagamento', 'label' => 'Meio de Pagamento', 'sortable' => false, 'align' => 'start', 'html' => true],
         ['key' => 'total', 'label' => 'Total', 'sortable' => true, 'align' => 'end', 'html' => true],
         ['key' => 'status', 'label' => 'Situação', 'sortable' => false, 'align' => 'center', 'html' => true],
         ['key' => 'entrega', 'label' => 'Entrega', 'sortable' => false, 'align' => 'center'],

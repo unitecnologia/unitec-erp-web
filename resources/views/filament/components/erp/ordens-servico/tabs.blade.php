@@ -28,7 +28,7 @@
                     'erp-orcamentos__tab--cancelado' => $value === OrdemServico::SITUACAO_CANCELADA,
                 ])
                 :class="{ 'erp-orcamentos__tab--active': statusAtivo === @js($value) }"
-                @click="statusAtivo = @js($value); $wire.setStatusFilter(@js($value))"
+                @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.os-list-table') || [])[0]; if (t) t.call('setStatusFilter', @js($value)); else $wire.setStatusFilter(@js($value))"
             >{{ $label }}</button>
         @endforeach
     </div>

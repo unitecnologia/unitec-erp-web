@@ -212,6 +212,8 @@ final class AtualizacaoApplyService
                 ['command' => 'config:cache', 'percent' => 95, 'message' => 'Finalizando caches…'],
                 ['command' => 'route:cache', 'percent' => 96, 'message' => 'Finalizando caches…'],
                 ['command' => 'view:cache', 'percent' => 97, 'message' => 'Finalizando caches…'],
+                // Síncrono (não background): optimize:clear apaga o cache Filament; sem isto o ERP fica lento.
+                ['command' => 'unitec:filament-cache --force', 'percent' => 97, 'message' => 'Gerando cache Filament…', 'critical' => true],
             ];
 
             $this->etapa = 'Caches';
@@ -299,10 +301,8 @@ final class AtualizacaoApplyService
                 'target_version' => $version,
             ]);
 
-            if (! ErpUpdateProcessLauncher::launchFilamentCaches($appPath)) {
-                Log::warning('Nao foi possivel iniciar caches Filament em background pos-atualizacao.');
-                AtualizacaoLog::line('Caches', 'nao foi possivel iniciar caches Filament em background', $appPath);
-            }
+            // Cache Filament já gerado de forma síncrona nos cacheSteps (unitec:filament-cache --force).
+            // Não disparar background aqui: evitava corrida e podia mascarar falha.
 
             AtualizacaoLog::line('Concluida', 'versao='.$version, $appPath);
 
@@ -712,7 +712,7 @@ final class AtualizacaoApplyService
                 AtualizacaoLog::line('Health', 'optimize:clear na recuperacao: '.$e->getMessage(), $appPath);
             }
             $this->rediscoverPackagesViaCli($appPath);
-            foreach (['config:cache', 'route:cache', 'view:cache'] as $cmd) {
+            foreach (['config:cache', 'route:cache', 'view:cache', 'unitec:filament-cache --force'] as $cmd) {
                 try {
                     $this->runCliArtisan($appPath, $cmd);
                 } catch (\Throwable $e) {

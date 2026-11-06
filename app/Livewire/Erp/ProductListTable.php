@@ -9,9 +9,10 @@ use App\Support\Erp\ProductListLiveSearch;
 use App\Support\Erp\ProductListRowFormatter;
 use App\Support\Erp\Queries\ProductListQueryBuilder;
 use App\Support\Erp\Queries\ProductSerialListQueryBuilder;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -205,7 +206,7 @@ class ProductListTable extends Component
         ]);
     }
 
-    protected function records(): LengthAwarePaginator
+    protected function records(): LengthAwarePaginatorContract
     {
         if ($this->isSeriaisView()) {
             $query = $this->buildSerialQuery();
@@ -223,6 +224,16 @@ class ProductListTable extends Component
             searchFieldsActive: $this->searchFieldsActive,
             deferReservaSum: true,
         );
+
+        // COUNT sem JOIN de estoque de display (Etapa B) — preserva total/paginação.
+        $total = $builder->countForPagination();
+        $currentPage = max(1, (int) $this->getPage());
+        $perPage = max(1, $this->perPage);
+
+        if ($total === 0) {
+            return $this->productListPaginator(collect(), 0, $perPage, $currentPage);
+        }
+
         $query = $builder->build();
         $this->applySort($query);
 
@@ -234,10 +245,27 @@ class ProductListTable extends Component
             }]);
         }
 
-        $paginator = $query->paginate($this->perPage);
-        $builder->hydrateReservaSums($paginator->getCollection());
+        $items = $query->forPage($currentPage, $perPage)->get();
+        $builder->hydrateReservaSums($items);
 
-        return $paginator;
+        return $this->productListPaginator($items, $total, $perPage, $currentPage);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, mixed>|array<int, mixed>  $items
+     */
+    protected function productListPaginator(mixed $items, int $total, int $perPage, int $currentPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $currentPage,
+            [
+                'path' => LengthAwarePaginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        );
     }
 
     protected function buildSerialQuery(): Builder

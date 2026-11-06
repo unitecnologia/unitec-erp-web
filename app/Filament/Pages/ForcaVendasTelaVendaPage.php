@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Models\CaixaConta;
-use App\Models\ContaReceber;
 use App\Models\Estoque;
 use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
@@ -14,7 +13,9 @@ use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\Vendedor;
 use App\Support\Erp\ConsumidorFinalGuard;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ProductEmpresaPrecoService;
 use App\Support\Erp\ProductTabelaPrecoService;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
@@ -22,16 +23,17 @@ use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\EstoqueReservaService;
-use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Erp\Financeiro\VendaCaixaDestinoResolver;
 use App\Support\Erp\Pdv\PdvClienteLimiteService;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
+use App\Support\Erp\Pdv\PdvNotaClienteService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasItemAgrupamento;
 use App\Support\ForcaVendas\ForcaVendasMargemVendaCalculator;
 use App\Support\ForcaVendas\ForcaVendasTelaVendaService;
 use App\Filament\Pages\Concerns\ManagesBoletoPosDocumentoPrompt;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaImportarOrcamento;
+use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaListarVendas;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaMargem;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaParcelas;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaTransportadora;
@@ -44,7 +46,10 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 
@@ -52,6 +57,7 @@ class ForcaVendasTelaVendaPage extends Page
 {
     use ManagesBoletoPosDocumentoPrompt;
     use ManagesForcaVendasTelaVendaImportarOrcamento;
+    use ManagesForcaVendasTelaVendaListarVendas;
     use ManagesForcaVendasTelaVendaMargem;
     use ManagesForcaVendasTelaVendaParcelas;
     use ManagesForcaVendasTelaVendaTransportadora;
@@ -71,6 +77,18 @@ class ForcaVendasTelaVendaPage extends Page
     /** Pedido FV em edição (null = nova venda). */
     #[Url(as: 'pedido')]
     public ?int $pedidoId = null;
+
+    /**
+     * Empresa congelada no início da venda (sessão no mount ou order.empresa_id).
+     * Impede gravar/faturar após troca de empresa em outra aba.
+     */
+    public ?int $vendaEmpresaId = null;
+
+    /**
+     * UUID da operação de tela (venda nova). Congelado no mount / nova venda.
+     * Idempotência F3/Sair: o mesmo UUID não cria dois DAVs.
+     */
+    public string $operacaoUuid = '';
 
     public ?string $davNumero = null;
 
@@ -154,6 +172,31 @@ class ForcaVendasTelaVendaPage extends Page
     /** Tabela já confirmada para o produto atual no formulário. */
     public bool $tabPrecoItemConfirmada = false;
 
+    /** Inclusão de item em andamento (bloqueia F3/F4 até concluir). */
+    public bool $isConfirmingItem = false;
+
+    /** Key do item retirado da grade para edição na barra (duplo clique). */
+    public ?string $editingItemKey = null;
+
+    /**
+     * Snapshot do item em edição (para Esc restaurar sem alterar).
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $editingItemSnapshot = null;
+
+    /**
+     * Memo request-local (não serializa no Livewire) — evita reconsultar price_table no mesmo mount.
+     *
+     * @var array<int, int|null>
+     */
+    private array $fvMemoPriceTableCliente = [];
+
+    /**
+     * @var array<int, int|null>
+     */
+    private array $fvMemoPriceTableVendedor = [];
+
     public string $codigoBarras = '';
 
     /** @var list<array{id: int, codigo: string, nome: string, atual: string, reservado: string, disponivel: string, preco: string}> */
@@ -167,7 +210,7 @@ class ForcaVendasTelaVendaPage extends Page
 
     public string $precoUnitario = '0,00';
 
-    /** Preço de tabela do produto em lançamento (base para desconto/acréscimo ao digitar outro valor). */
+    /** Preço sugerido (tabela/promo) do produto em lançamento — referência; o digitado é o unitário efetivo. */
     public string $precoListaItem = '0,00';
 
     public string $descontoPct = '0,00';
@@ -183,6 +226,37 @@ class ForcaVendasTelaVendaPage extends Page
     public bool $descontoModalOpen = false;
 
     public bool $excluirItemModalOpen = false;
+
+    /** Modal de confirmação do botão Sair / navegação SPA (grava pendente). */
+    public bool $fvSairConfirmOpen = false;
+
+    /** Destino SPA após confirmar o modal (null = Monitor). */
+    public ?string $fvSairNavigateUrl = null;
+
+    /** Pós-faturamento TV: perguntar se deseja imprimir o comprovante. */
+    public bool $fvImprimirPosVendaOpen = false;
+
+    /** Popup de impressão bloqueado pelo navegador — oferece link manual. */
+    public bool $fvImprimirPosVendaPopupBloqueado = false;
+
+    /** Evita duplo clique em Sim/Não no modal de impressão. */
+    public bool $fvImprimirPosVendaProcessando = false;
+
+    /** order id (forca_vendas_orders) da venda recém-faturada. */
+    public ?int $fvImprimirPosVendaOrderId = null;
+
+    public string $fvImprimirPosVendaUrl = '';
+
+    public string $fvImprimirPosVendaMonitorUrl = '';
+
+    /** Se true, abre a pergunta de impressão ao encerrar o fluxo de boleto. */
+    public bool $fvImprimirPosVendaAposBoleto = false;
+
+    /** Após concluir: permanece na TV e inicia nova venda (em vez de Monitor). */
+    public bool $fvAposConcluirPermanecer = false;
+
+    /** Incrementa a cada nova venda pós-conclusão (protege contra Livewire atrasado). */
+    public int $fvVendaGeracao = 0;
 
     /** @var 'desconto'|'acrescimo' */
     public string $itemAjusteTipo = 'desconto';
@@ -210,6 +284,7 @@ class ForcaVendasTelaVendaPage extends Page
      *   descricao: string,
      *   quantidade: float,
      *   preco_unitario: float,
+     *   preco_manual?: bool,
      *   acrescimo: float,
      *   desconto: float,
      *   total: float,
@@ -230,6 +305,9 @@ class ForcaVendasTelaVendaPage extends Page
 
     public string $observacoes = '';
 
+    /** CPF na Nota (NFC-e) — só no payload do DAV; não é o CPF do cadastro do cliente. */
+    public string $cpfNota = '';
+
     public bool $observacaoPedidoModalOpen = false;
 
     public bool $observacaoClienteModalOpen = false;
@@ -240,6 +318,9 @@ class ForcaVendasTelaVendaPage extends Page
 
     /** @var list<array{id: int, descricao: string, atalho: string, valor: string}> */
     public array $meiosPagamento = [];
+
+    /** Divisão informativa da conta (F4) — não altera pagamentos. */
+    public string $fvDividirPor = '1';
 
     public ?int $formaSelecionadaId = null;
 
@@ -264,6 +345,10 @@ class ForcaVendasTelaVendaPage extends Page
             $this->carregarPedidoExistente((int) $this->pedidoId);
             $this->dispatch('fv-tela-venda-focus-barcode');
 
+            return;
+        }
+
+        if (! $this->iniciarContextoVendaNova()) {
             return;
         }
 
@@ -296,6 +381,9 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function resetarVenda(): void
     {
+        // F2 não altera status no banco; limpeza só cobre IMPORTADO órfão legado.
+        $this->devolverOrcamentoOrigemSeNaoGravado();
+
         $agora = ErpTimezone::toLocal();
         $this->etapa = 'venda';
         $this->itens = [];
@@ -321,6 +409,7 @@ class ForcaVendasTelaVendaPage extends Page
         $this->acrescimoPedidoValor = '0,00';
         $this->fecharMargemVenda();
         $this->observacoes = '';
+        $this->cpfNota = '';
         $this->clienteObservacoes = '';
         $this->observacaoPedidoModalOpen = false;
         $this->observacaoClienteModalOpen = false;
@@ -345,6 +434,10 @@ class ForcaVendasTelaVendaPage extends Page
             $this->pedidoId = null;
         }
 
+        $this->vendaEmpresaId = null;
+        $this->operacaoUuid = '';
+        $this->orcamentoOrigemId = null;
+
         $this->caixaId = null;
         $this->caixaLabel = '';
         $this->estoqueId = null;
@@ -356,21 +449,91 @@ class ForcaVendasTelaVendaPage extends Page
         $this->tabelaProgressOpen = false;
         $this->tabelaRecalcAlterados = 0;
         $this->excluirItemModalOpen = false;
+        $this->fvSairConfirmOpen = false;
+        $this->fvSairNavigateUrl = null;
+        $this->resetImprimirPosVendaState();
         $this->resetFinalizarCartaoCanhoto();
+
+        $this->fvMemoPriceTableCliente = [];
+        $this->fvMemoPriceTableVendedor = [];
 
         $this->carregarClientePadrao();
         $this->carregarOpcoesOperacao();
         $this->carregarVendedorPadrao();
+
+        // Caixa: carregarOpcoes não pré-carrega mais (evita 2×). Se não veio com o vendedor, resolve agora.
+        if ($this->caixaOpcoes === []) {
+            $this->caixaOpcoes = $this->opcoesCaixaDaTela();
+            $this->caixaOperacionalDefinido();
+        }
+
+        // Tabela: aplicarCliente/aplicarVendedor já tentaram; uma passagem final cobre o caso sem vendedor.
         $this->carregarTabelaPrecoPadrao();
-        $this->carregarMeiosPagamento();
+
+        // Meios de pagamento: só na finalização (irParaFinalizacao) — não na abertura da venda.
     }
 
     public function novoPedido(): void
     {
         $this->pedidoId = null;
         $this->resetarVenda();
+
+        if (! $this->iniciarContextoVendaNova()) {
+            return;
+        }
+
         Notification::make()->title('Nova venda iniciada.')->success()->send();
         $this->dispatch('fv-tela-venda-focus-cliente');
+    }
+
+    /**
+     * F2 mantém FECHADO no banco — abandono sem gravação não depende desta rotina.
+     * Mantida só para recuperar IMPORTADO órfão de versões anteriores.
+     * Com pedidoId, o cancelamento do Monitor trata o vínculo via orcamento_id.
+     */
+    private function devolverOrcamentoOrigemSeNaoGravado(): void
+    {
+        $orcamentoId = (int) ($this->orcamentoOrigemId ?? 0);
+
+        if ($orcamentoId <= 0 || $this->pedidoId) {
+            return;
+        }
+
+        app(\App\Support\ForcaVendas\ForcaVendasOrcamentoVinculo::class)
+            ->devolverSeImportacaoNaoGravada($orcamentoId);
+        $this->orcamentoOrigemId = null;
+    }
+
+    /**
+     * Congela empresa + UUID de operação para venda nova (idempotência F3/Sair).
+     */
+    private function iniciarContextoVendaNova(): bool
+    {
+        $this->vendaEmpresaId = ErpContext::currentEmpresaId();
+
+        if ($this->vendaEmpresaId === null || $this->vendaEmpresaId <= 0) {
+            Notification::make()
+                ->title('Nenhuma empresa selecionada.')
+                ->body('Selecione a empresa ativa antes de iniciar uma venda.')
+                ->warning()
+                ->send();
+            $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
+
+            return false;
+        }
+
+        $this->operacaoUuid = (string) Str::uuid();
+
+        return true;
+    }
+
+    /**
+     * Venda com itens em memória (ainda não gravados via F3/F4 nesta sessão de tela).
+     * Usado pela proteção de F5 / beforeunload / navegação SPA.
+     */
+    public function vendaTemAlteracoesPendentes(): bool
+    {
+        return $this->itens !== [];
     }
 
     public function cancelarVenda(): void
@@ -384,9 +547,111 @@ class ForcaVendasTelaVendaPage extends Page
         $this->sair();
     }
 
+    /**
+     * Sair: com itens, abre modal laranja UNI. Sem itens, retorna ao Monitor.
+     */
     public function sair(): void
     {
+        if ($this->tabelaProgressOpen) {
+            return;
+        }
+
+        if ($this->vendaTemAlteracoesPendentes()) {
+            $this->fvSairNavigateUrl = null;
+            $this->fvSairConfirmOpen = true;
+            $this->dispatch('erp-fv-focus-sair-confirm');
+
+            return;
+        }
+
+        // Sem itens: limpeza defensiva de IMPORTADO órfão (F2 atual não muda status).
+        $this->devolverOrcamentoOrigemSeNaoGravado();
+        $this->liberarSaidaTelaVenda();
         $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
+    }
+
+    /**
+     * Navegação SPA do menu com itens: mesmo modal (destino = URL pretendida).
+     */
+    public function abrirSairConfirmNavegacao(?string $url = null): void
+    {
+        if (! $this->vendaTemAlteracoesPendentes()) {
+            return;
+        }
+
+        $this->fvSairNavigateUrl = $this->normalizarUrlSaidaInterna($url);
+        $this->fvSairConfirmOpen = true;
+        $this->dispatch('erp-fv-focus-sair-confirm');
+    }
+
+    public function dismissSairConfirm(): void
+    {
+        $this->fvSairConfirmOpen = false;
+        $this->fvSairNavigateUrl = null;
+        $this->rearmarGuardSaidaTelaVenda();
+    }
+
+    /**
+     * Confirmação do modal: grava/atualiza pendente (fluxo F3) e só então navega.
+     */
+    public function confirmSairSalvarPendente(?string $qtdRaw = null, ?string $precoRaw = null): void
+    {
+        $this->fvSairConfirmOpen = false;
+        $this->gravarPedidoPendente(aoSair: true, qtdRaw: $qtdRaw, precoRaw: $precoRaw);
+    }
+
+    /**
+     * Libera livewire:navigate do redirect após gravação/saída autorizada.
+     */
+    private function liberarSaidaTelaVenda(): void
+    {
+        $this->dispatch('fv-tela-venda-allow-leave');
+    }
+
+    /**
+     * Reativa o bloqueio SPA se a gravação/validação falhou.
+     */
+    private function rearmarGuardSaidaTelaVenda(): void
+    {
+        $this->dispatch('fv-tela-venda-keep-guard');
+    }
+
+    /**
+     * Aceita só URLs internas (mesmo host ou path relativo).
+     */
+    private function normalizarUrlSaidaInterna(?string $url): ?string
+    {
+        $url = trim((string) $url);
+
+        if ($url === '') {
+            return null;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+
+        $app = rtrim((string) config('app.url'), '/');
+        if ($app !== '' && str_starts_with($url, $app.'/')) {
+            return $url;
+        }
+
+        try {
+            $parsed = parse_url($url);
+            $host = $parsed['host'] ?? null;
+            $appHost = parse_url($app, PHP_URL_HOST);
+
+            if ($host && $appHost && strcasecmp((string) $host, (string) $appHost) === 0) {
+                $path = (string) ($parsed['path'] ?? '/');
+                $query = isset($parsed['query']) ? '?'.$parsed['query'] : '';
+
+                return $path.$query;
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
     }
 
     public function abrirObservacaoPedido(): void
@@ -426,6 +691,8 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         try {
+            $this->assertContextoEmpresaOperavel();
+            app(ForcaVendasTelaVendaService::class)->assertOrderDaEmpresa($order, (int) $this->vendaEmpresaId);
             app(ForcaVendasTelaVendaService::class)->assertEditavel($order);
         } catch (\Throwable) {
             return;
@@ -565,9 +832,83 @@ class ForcaVendasTelaVendaPage extends Page
         $this->selectedClienteSugestaoIndex = 0;
         $this->clienteBusca = $this->formatarClienteBusca($person);
 
+        if ($this->etapa === 'finalizacao') {
+            // Crediário/cheque/boleto: prazo depende do cliente — força remonte no F10.
+            if ($this->fvCrediarioTotalValor > 0) {
+                $this->tabelaPrazoDias = null;
+                $this->fvTabelaPrazoId = null;
+                $this->fvParcelasRows = [];
+                $this->fvTabelaPrazoConsulta = false;
+            }
+
+            $this->dispatch('erp-fv-fin-cliente-synced', value: $this->clienteBusca);
+            $this->dispatch('erp-fv-fin-cpf-synced', value: $this->cpfNota);
+
+            return;
+        }
+
         if ($this->etapa === 'venda') {
             $this->dispatch('fv-tela-venda-focus-barcode');
         }
+    }
+
+    /**
+     * Antes do F10/Concluir: o texto visível no campo Cliente do F4 deve
+     * corresponder ao cadastro selecionado (não aceita texto livre).
+     */
+    public function sincronizarClienteFinalizacaoBusca(string $buscaVisivel, bool $skipRender = true): bool
+    {
+        if ($this->etapa !== 'finalizacao') {
+            return true;
+        }
+
+        $term = trim($buscaVisivel);
+
+        if ($this->clienteId && ($term === '' || $this->clienteJaSelecionadoCorresponde($term))) {
+            if ($term === '') {
+                $this->restaurarClienteBuscaSelecionado();
+            }
+
+            $this->fecharSugestoesCliente();
+            if ($skipRender) {
+                $this->skipRender();
+            }
+
+            return true;
+        }
+
+        $this->restaurarClienteBuscaSelecionado();
+        $this->fecharSugestoesCliente();
+        Notification::make()
+            ->title('Selecione o cliente na lista.')
+            ->body('A troca só vale após escolher um cadastro válido.')
+            ->warning()
+            ->send();
+
+        $this->dispatch('erp-fv-fin-cliente-synced', value: $this->clienteBusca);
+
+        return false;
+    }
+
+    private function restaurarClienteBuscaSelecionado(): void
+    {
+        if (! $this->clienteId) {
+            $this->clienteBusca = '';
+
+            return;
+        }
+
+        $person = Person::query()->find((int) $this->clienteId);
+
+        if ($person) {
+            $this->clienteBusca = $this->formatarClienteBusca($person);
+
+            return;
+        }
+
+        $this->clienteBusca = trim(
+            ($this->clienteCodigo !== '' ? $this->clienteCodigo.' — ' : '').$this->clienteNome
+        );
     }
 
     public function confirmarClienteFinalizacao(): void
@@ -659,30 +1000,26 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function updatedCodigoBarras(string $value): void
     {
+        // Pesquisa de sugestões: GET /admin/erp/forca-vendas/produtos-lookup (JS/DOM).
+        // Mantém o estado Livewire limpo — não remonta a venda a cada tecla.
         $term = trim($value);
 
         if ($term === '' || ($this->produtoAtualNome !== '' && mb_strtoupper($term, 'UTF-8') === mb_strtoupper($this->produtoAtualNome, 'UTF-8'))) {
             $this->fecharSugestoesProduto();
-
-            return;
-        }
-
-        $this->produtoSugestoes = $this->montarSugestoesProduto($term);
-        $this->produtoSugestoesOpen = $this->produtoSugestoes !== [];
-        $this->selectedProdutoSugestaoIndex = 0;
-
-        if ($this->produtoSugestoesOpen) {
-            $this->dispatch('erp-fv-produto-sugestoes-ready');
         }
     }
 
     public function moverSugestaoProduto(int $delta): void
     {
-        // Navegação ↑↓ é feita no cliente (Alpine) para ficar imediata.
+        // Navegação ↑↓ é feita no cliente (JS/DOM) para ficar imediata.
+        $this->skipRender();
     }
 
     public function fecharSugestoesProduto(): void
     {
+        // Não usar skipRender aqui: limparEntradaItem() (após adicionarItem) e
+        // aplicarProdutoSelecionado() precisam remorphar grade/formulário.
+        // A lista de sugestões é DOM/GET; limpar estes arrays é barato.
         $this->produtoSugestoes = [];
         $this->produtoSugestoesOpen = false;
         $this->selectedProdutoSugestaoIndex = 0;
@@ -701,22 +1038,19 @@ class ForcaVendasTelaVendaPage extends Page
         $this->aplicarProdutoSelecionado($product);
     }
 
-    public function confirmarCodigoProduto(): void
+    public function confirmarCodigoProduto(?string $typed = null): void
     {
-        if ($this->produtoSugestoesOpen && $this->produtoSugestoes !== []) {
-            $index = $this->selectedProdutoSugestaoIndex;
-            if (! isset($this->produtoSugestoes[$index])) {
-                $index = 0;
-            }
-            $this->selecionarProduto((int) $this->produtoSugestoes[$index]['id']);
-
-            return;
+        if (is_string($typed)) {
+            $this->codigoBarras = trim($typed);
         }
 
+        // Lista de sugestões agora é DOM/GET — Enter com lista aberta já seleciona no JS.
+        // Aqui resolve código/EAN/descrição digitados (inclusive antes da lista carregar).
         $term = trim($this->codigoBarras);
 
         if ($term === '') {
-            Notification::make()->title('Informe o código, barras ou nome do produto.')->warning()->send();
+            // Evita aviso fantasma quando Enter chega após limpar a barra.
+            $this->skipRender();
 
             return;
         }
@@ -724,6 +1058,7 @@ class ForcaVendasTelaVendaPage extends Page
         // Já confirmado (campo mostra a descrição): só avança para quantidade.
         if ($this->produtoAtualId && $this->produtoAtualNome !== ''
             && mb_strtoupper($term, 'UTF-8') === mb_strtoupper($this->produtoAtualNome, 'UTF-8')) {
+            $this->skipRender();
             $this->dispatch('fv-tela-venda-focus-qtd');
 
             return;
@@ -741,11 +1076,12 @@ class ForcaVendasTelaVendaPage extends Page
             }
 
             if ($sugestoes !== []) {
-                $this->produtoSugestoes = $sugestoes;
-                $this->produtoSugestoesOpen = true;
+                // Lista no DOM (sem remorph Livewire das sugestões).
+                $this->produtoSugestoes = [];
+                $this->produtoSugestoesOpen = false;
                 $this->selectedProdutoSugestaoIndex = 0;
-                $this->dispatch('erp-fv-produto-sugestoes-ready');
-                Notification::make()->title('Selecione o produto na lista (↑ ↓ + Enter).')->info()->send();
+                $this->skipRender();
+                $this->dispatch('fv-tela-venda-produto-lookup-results', term: $term, results: $sugestoes);
 
                 return;
             }
@@ -758,8 +1094,16 @@ class ForcaVendasTelaVendaPage extends Page
         $this->aplicarProdutoSelecionado($product);
     }
 
-    public function focoPrecoAposQtd(): void
+    /**
+     * Enter na quantidade: navegação local no JS.
+     * Mantido para Tab. Preço (Enter inclui) e fallback sem o script de Enter.
+     */
+    public function focoPrecoAposQtd(?string $qtdRaw = null): void
     {
+        if (is_string($qtdRaw)) {
+            $this->quantidade = $qtdRaw;
+        }
+
         if ($this->parseDecimal($this->quantidade) <= 0) {
             Notification::make()->title('Quantidade inválida.')->warning()->send();
 
@@ -772,11 +1116,12 @@ class ForcaVendasTelaVendaPage extends Page
             && $this->produtoAtualId
             && $this->parseDecimal($this->precoUnitario) > 0
         ) {
-            $this->adicionarItem();
+            $this->adicionarItem($this->quantidade, $this->precoUnitario);
 
             return;
         }
 
+        $this->skipRender();
         $this->dispatch('fv-tela-venda-focus-preco');
     }
 
@@ -1056,8 +1401,28 @@ class ForcaVendasTelaVendaPage extends Page
         $this->selectedPagamentoIndex = $index;
     }
 
-    public function adicionarItem(): void
+    public function adicionarItem(?string $qtdRaw = null, ?string $precoRaw = null): void
     {
+        if ($this->isConfirmingItem) {
+            return;
+        }
+
+        if (is_string($qtdRaw)) {
+            $this->quantidade = $qtdRaw;
+        }
+
+        // Enter/JS pode enviar o preço sem disparar updatedPrecoUnitario.
+        // Se o unitário mudou de fato, limpa %/R$ da barra (mesmo contrato do blur).
+        if (is_string($precoRaw)) {
+            $precoAnterior = $this->parseDecimal($this->precoUnitario);
+            $this->precoUnitario = $precoRaw;
+            $precoNovo = $this->parseDecimal($this->precoUnitario);
+
+            if (abs($precoNovo - $precoAnterior) >= 0.005) {
+                $this->limparAjustePercentualSePrecoDiferenteDaLista();
+            }
+        }
+
         $product = null;
 
         if ($this->produtoAtualId) {
@@ -1110,6 +1475,11 @@ class ForcaVendasTelaVendaPage extends Page
             $acrescimo,
         );
 
+        // Origem explícita na confirmação: digitado ≠ sugerido da tabela atual.
+        // Não inferir em reabertura histórica (lá o flag vem só do payload).
+        $sugeridoTabela = round($this->precoProdutoNaTabela($product, $qtd > 0 ? $qtd : 1), 2);
+        $precoManual = abs(round($preco, 2) - $sugeridoTabela) >= 0.005;
+
         if ($qtd <= 0) {
             Notification::make()->title('Quantidade inválida.')->warning()->send();
 
@@ -1121,8 +1491,13 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         if (EstoqueNegativoPolicy::ativo() && ! $product->is_servico) {
+            $editKey = $this->editingItemKey;
             $jaNoPedido = 0.0;
             foreach ($this->itens as $existente) {
+                // Edição não destrutiva: não contar a própria linha duas vezes.
+                if ($editKey !== null && (string) ($existente['key'] ?? '') === $editKey) {
+                    continue;
+                }
                 if ((int) ($existente['product_id'] ?? 0) === (int) $product->id) {
                     $jaNoPedido += (float) ($existente['quantidade'] ?? 0);
                 }
@@ -1144,68 +1519,241 @@ class ForcaVendasTelaVendaPage extends Page
             }
         }
 
-        $productId = (int) $product->id;
-        $gradeId = null;
+        $this->isConfirmingItem = true;
 
-        // Agrupa na mesma linha quando for o mesmo produto (código/grade) e mesmo preço unitário.
-        $existenteIndex = $this->indiceItemAgrupavel($productId, $gradeId, $preco);
+        try {
+            $productId = (int) $product->id;
+            $gradeId = null;
+            $agrupado = false;
+            $editado = false;
+            $removedKey = null;
+            $editingKey = $this->editingItemKey;
+            $editIndex = ($editingKey !== null && $editingKey !== '')
+                ? $this->findItemIndexByKey($editingKey)
+                : null;
 
-        if ($existenteIndex !== null) {
-            $item = $this->itens[$existenteIndex];
-            $consolidado = ForcaVendasItemAgrupamento::consolidar(
-                (float) $item['quantidade'],
-                (float) ($item['desconto'] ?? 0),
-                (float) ($item['acrescimo'] ?? 0),
-                $qtd,
-                $desconto,
-                $acrescimo,
-            );
+            if ($editIndex !== null) {
+                $editado = true;
+                // Outra linha (não a editada) com mesmo produto+preço+ajuste → agrupa.
+                $existenteIndex = $this->indiceItemAgrupavel(
+                    $productId,
+                    $gradeId,
+                    $preco,
+                    $qtd,
+                    $desconto,
+                    $acrescimo,
+                    $editingKey,
+                );
 
-            $novaQtd = $consolidado['quantidade'];
-            $novoDesconto = $consolidado['desconto'];
-            $novoAcrescimo = $consolidado['acrescimo'];
+                if ($existenteIndex !== null) {
+                    $agrupado = true;
+                    $removedKey = $editingKey;
+                    $item = $this->itens[$existenteIndex];
+                    $consolidado = ForcaVendasItemAgrupamento::consolidar(
+                        (float) $item['quantidade'],
+                        (float) ($item['desconto'] ?? 0),
+                        (float) ($item['acrescimo'] ?? 0),
+                        $qtd,
+                        $desconto,
+                        $acrescimo,
+                    );
+                    $item['quantidade'] = $consolidado['quantidade'];
+                    $item['acrescimo'] = $consolidado['acrescimo'];
+                    $item['desconto'] = $consolidado['desconto'];
+                    $item['preco_manual'] = (bool) ($item['preco_manual'] ?? false) || $precoManual;
+                    $item['total'] = round(
+                        ($consolidado['quantidade'] * $preco) + $consolidado['acrescimo'] - $consolidado['desconto'],
+                        2,
+                    );
+                    // Remove a linha em edição e sobe a consolidada.
+                    array_splice($this->itens, $editIndex, 1);
+                    if ($existenteIndex > $editIndex) {
+                        $existenteIndex--;
+                    }
+                    array_splice($this->itens, $existenteIndex, 1);
+                    array_unshift($this->itens, $item);
+                } else {
+                    $item = $this->itens[$editIndex];
+                    $item['quantidade'] = $qtd;
+                    $item['preco_unitario'] = $preco;
+                    $item['preco_manual'] = $precoManual;
+                    $item['acrescimo'] = $acrescimo;
+                    $item['desconto'] = $desconto;
+                    $item['total'] = round(($qtd * $preco) + $acrescimo - $desconto, 2);
+                    $item['price_table_id'] = ($product->usa_tab_preco ?? false) ? $this->tabelaPrecoId : ($item['price_table_id'] ?? null);
+                    $item['tabela_nivel'] = ($product->usa_tab_preco ?? false)
+                        ? $this->nivelTabelaPrecoSelecionada()
+                        : ($item['tabela_nivel'] ?? null);
+                    array_splice($this->itens, $editIndex, 1);
+                    array_unshift($this->itens, $item);
+                }
+            } else {
+                // Inclusão nova: agrupa se já existir mesma linha (preço + ajuste).
+                $existenteIndex = $this->indiceItemAgrupavel(
+                    $productId,
+                    $gradeId,
+                    $preco,
+                    $qtd,
+                    $desconto,
+                    $acrescimo,
+                );
 
-            $item['quantidade'] = $novaQtd;
-            $item['acrescimo'] = $novoAcrescimo;
-            $item['desconto'] = $novoDesconto;
-            $item['total'] = round(($novaQtd * $preco) + $novoAcrescimo - $novoDesconto, 2);
+                if ($existenteIndex !== null) {
+                    $agrupado = true;
+                    $item = $this->itens[$existenteIndex];
+                    $consolidado = ForcaVendasItemAgrupamento::consolidar(
+                        (float) $item['quantidade'],
+                        (float) ($item['desconto'] ?? 0),
+                        (float) ($item['acrescimo'] ?? 0),
+                        $qtd,
+                        $desconto,
+                        $acrescimo,
+                    );
 
-            // Move a linha atualizada para o topo (último movimento fica primeiro).
-            array_splice($this->itens, $existenteIndex, 1);
-            array_unshift($this->itens, $item);
-        } else {
-            array_unshift($this->itens, [
-                'key' => uniqid('i', true),
-                'product_id' => $productId,
-                'product_grade_id' => $gradeId,
-                'codigo' => (string) ($product->codigo ?? ''),
-                'descricao' => (string) ($product->descricao ?? ''),
-                'quantidade' => $qtd,
-                'preco_unitario' => $preco,
-                'price_table_id' => ($product->usa_tab_preco ?? false) ? $this->tabelaPrecoId : null,
-                'tabela_nivel' => ($product->usa_tab_preco ?? false)
-                    ? $this->nivelTabelaPrecoSelecionada()
-                    : null,
-                'acrescimo' => $acrescimo,
-                'desconto' => $desconto,
-                'total' => round(($qtd * $preco) + $acrescimo - $desconto, 2),
-                'foto' => $product->fotoUrl(),
-            ]);
+                    $novaQtd = $consolidado['quantidade'];
+                    $novoDesconto = $consolidado['desconto'];
+                    $novoAcrescimo = $consolidado['acrescimo'];
+
+                    $item['quantidade'] = $novaQtd;
+                    $item['acrescimo'] = $novoAcrescimo;
+                    $item['desconto'] = $novoDesconto;
+                    $item['preco_manual'] = (bool) ($item['preco_manual'] ?? false) || $precoManual;
+                    $item['total'] = round(($novaQtd * $preco) + $novoAcrescimo - $novoDesconto, 2);
+
+                    array_splice($this->itens, $existenteIndex, 1);
+                    array_unshift($this->itens, $item);
+                } else {
+                    array_unshift($this->itens, [
+                        'key' => uniqid('i', true),
+                        'product_id' => $productId,
+                        'product_grade_id' => $gradeId,
+                        'codigo' => (string) ($product->codigo ?? ''),
+                        'descricao' => (string) ($product->descricao ?? ''),
+                        'quantidade' => $qtd,
+                        'preco_unitario' => $preco,
+                        'preco_manual' => $precoManual,
+                        'price_table_id' => ($product->usa_tab_preco ?? false) ? $this->tabelaPrecoId : null,
+                        'tabela_nivel' => ($product->usa_tab_preco ?? false)
+                            ? $this->nivelTabelaPrecoSelecionada()
+                            : null,
+                        'acrescimo' => $acrescimo,
+                        'desconto' => $desconto,
+                        'total' => round(($qtd * $preco) + $acrescimo - $desconto, 2),
+                        'foto' => $product->fotoUrl(),
+                    ]);
+                }
+            }
+
+            $this->itens = array_values($this->itens);
+            $this->itemSelecionado = 0;
+            $this->tabPrecoItemConfirmada = false;
+            $this->editingItemKey = null;
+            $this->editingItemSnapshot = null;
+
+            unset($this->totalBruto, $this->totalDescontosItens, $this->totalAcrescimosItens);
+
+            $included = $this->fvItemIncludedPayload($agrupado);
+            $this->limparEntradaItem();
+
+            // Grade + totais no DOM (1º item usa <template>; demais clonam/atualizam linha).
+            if ($included !== null) {
+                $this->skipRender();
+                $this->dispatch(
+                    'fv-tela-venda-item-included',
+                    item: $included['item'],
+                    totais: $included['totais'],
+                    foto: $included['foto'] ?? null,
+                    nome: $included['nome'] ?? '',
+                    agrupado: $agrupado,
+                    editado: $editado,
+                    removed_key: $removedKey,
+                );
+            }
+
+            $this->dispatch('fv-tela-venda-focus-barcode');
+        } finally {
+            $this->isConfirmingItem = false;
+        }
+    }
+
+    private function findItemIndexByKey(string $key): ?int
+    {
+        foreach ($this->itens as $index => $item) {
+            if ((string) ($item['key'] ?? '') === $key) {
+                return (int) $index;
+            }
         }
 
-        $this->itens = array_values($this->itens);
-        $this->itemSelecionado = 0;
-        $this->tabPrecoItemConfirmada = false;
-        $this->limparEntradaItem();
-        $this->dispatch('fv-tela-venda-focus-barcode');
+        return null;
+    }
+
+    public function selecionarItemByKey(string $key): void
+    {
+        $index = $this->findItemIndexByKey($key);
+
+        if ($index === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->selecionarItem($index);
+        // Sem remorph: foto/seleção azul via JS (payload oficial do servidor).
+        $this->skipRender();
+        $this->dispatch('fv-tela-venda-item-selected', [
+            'key' => $key,
+            'foto' => $this->produtoAtualFoto,
+            'nome' => $this->produtoAtualNome,
+        ]);
+    }
+
+    public function pedirConfirmacaoExcluirItemPorKey(string $key): void
+    {
+        $index = $this->findItemIndexByKey($key);
+
+        if ($index === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->pedirConfirmacaoExcluirItemPorIndice($index);
+    }
+
+    public function puxarItemParaInclusaoByKey(string $key): void
+    {
+        $index = $this->findItemIndexByKey($key);
+
+        if ($index === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->puxarItemParaInclusao($index);
     }
 
     /**
-     * Índice da linha existente para agrupar o mesmo item (produto + grade + preço).
+     * Índice da linha existente para agrupar o mesmo item
+     * (produto + grade + preço unitário + desconto/acréscimo unitários).
      */
-    private function indiceItemAgrupavel(int $productId, ?int $gradeId, float $preco): ?int
-    {
+    private function indiceItemAgrupavel(
+        int $productId,
+        ?int $gradeId,
+        float $preco,
+        float $quantidade,
+        float $desconto,
+        float $acrescimo,
+        ?string $excludeKey = null,
+    ): ?int {
+        $descUnit = $quantidade > 0 ? round($desconto / $quantidade, 4) : 0.0;
+        $acrUnit = $quantidade > 0 ? round($acrescimo / $quantidade, 4) : 0.0;
+
         foreach ($this->itens as $index => $item) {
+            if ($excludeKey !== null && (string) ($item['key'] ?? '') === $excludeKey) {
+                continue;
+            }
+
             if ((int) ($item['product_id'] ?? 0) !== $productId) {
                 continue;
             }
@@ -1219,6 +1767,19 @@ class ForcaVendasTelaVendaPage extends Page
             }
 
             if (round((float) ($item['preco_unitario'] ?? 0), 2) !== round($preco, 2)) {
+                continue;
+            }
+
+            $itemQtd = (float) ($item['quantidade'] ?? 0);
+            $itemDescUnit = $itemQtd > 0
+                ? round(((float) ($item['desconto'] ?? 0)) / $itemQtd, 4)
+                : 0.0;
+            $itemAcrUnit = $itemQtd > 0
+                ? round(((float) ($item['acrescimo'] ?? 0)) / $itemQtd, 4)
+                : 0.0;
+
+            // Não misturar linha limpa com linha que tem Ctrl+D (ou acréscimo legado).
+            if (abs($itemDescUnit - $descUnit) > 0.0001 || abs($itemAcrUnit - $acrUnit) > 0.0001) {
                 continue;
             }
 
@@ -1242,7 +1803,8 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * Duplo clique no nome do produto: remove da grade e recoloca na barra de inclusão.
+     * Duplo clique: carrega o item na barra sem retirar da grade (edição não destrutiva).
+     * Totais e $itens permanecem intactos até confirmar com Enter.
      */
     public function puxarItemParaInclusao(int $index): void
     {
@@ -1254,11 +1816,22 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        // Troca de item em edição: só limpa a barra (linha permanece na grade).
+        if ($this->editingItemKey !== null) {
+            $this->editingItemKey = null;
+            $this->editingItemSnapshot = null;
+        }
+
         $item = $this->itens[$index];
+        $key = (string) ($item['key'] ?? '');
         $preco = (float) ($item['preco_unitario'] ?? 0);
         $qtd = (float) ($item['quantidade'] ?? 0);
         $desconto = (float) ($item['desconto'] ?? 0);
         $acrescimo = (float) ($item['acrescimo'] ?? 0);
+
+        $this->editingItemKey = $key !== '' ? $key : null;
+        $this->editingItemSnapshot = $item;
+        $this->itemSelecionado = $index;
 
         $this->produtoAtualId = (int) ($item['product_id'] ?? 0) ?: null;
         $this->produtoAtualNome = (string) ($item['descricao'] ?? '');
@@ -1277,7 +1850,6 @@ class ForcaVendasTelaVendaPage extends Page
             }
         }
         $this->precoListaItem = $this->formatMoney($lista > 0 ? $lista : $preco);
-        // Mantém % do ajuste; o valor R$ é recalculado ao mudar preço/qtd (evita interferência do valor antigo).
         $this->descontoPct = $preco > 0 && $qtd > 0
             ? $this->formatMoney(($desconto / ($preco * $qtd)) * 100)
             : '0,00';
@@ -1289,13 +1861,89 @@ class ForcaVendasTelaVendaPage extends Page
         $this->recalcularTotalItem();
         $this->fecharSugestoesProduto();
 
-        array_splice($this->itens, $index, 1);
-        $this->itens = array_values($this->itens);
-        $this->itemSelecionado = $this->itens === []
-            ? null
-            : min($index, count($this->itens) - 1);
-
+        // Item permanece em $itens — totais inalterados. JS só marca is-editing + preenche a barra.
+        $this->skipRender();
+        $this->dispatch('fv-tela-venda-item-edit-loaded', [
+            'key' => $key,
+            'nome' => $this->produtoAtualNome,
+            'codigo' => (string) ($item['codigo'] ?? ''),
+            'qtd' => $this->quantidade,
+            'preco' => $this->precoUnitario,
+            'total' => $this->totalItem,
+            'foto' => $this->produtoAtualFoto,
+        ]);
         $this->dispatch('fv-tela-venda-focus-qtd');
+    }
+
+    /**
+     * Esc: cancela edição — item na grade fica como estava; limpa a barra.
+     */
+    public function cancelarEdicaoItem(): void
+    {
+        if ($this->editingItemKey === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $key = $this->editingItemKey;
+        $this->editingItemKey = null;
+        $this->editingItemSnapshot = null;
+        $this->limparEntradaItem();
+
+        $this->skipRender();
+        $this->dispatch('fv-tela-venda-item-edit-cancelled', key: $key);
+        $this->dispatch('fv-tela-venda-focus-barcode');
+    }
+
+    /**
+     * @return array<string, string|bool>
+     */
+    private function fvTotaisPayload(): array
+    {
+        return [
+            'bruto' => $this->formatMoney($this->totalBruto),
+            'acrescimos' => $this->formatMoney($this->totalAcrescimosItens),
+            'descontos' => $this->formatMoney($this->totalDescontosItens),
+            'liquido' => $this->formatMoney($this->totalLiquido()),
+            'itens_qtd_label' => $this->rotuloQuantidadeItens(),
+            'has_itens' => $this->itens !== [],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function fvItemRowPayload(array $row, bool $agrupado): array
+    {
+        $qtd = (float) ($row['quantidade'] ?? 0);
+        $preco = (float) ($row['preco_unitario'] ?? 0);
+        $productId = (int) ($row['product_id'] ?? 0);
+        $custo = 0.0;
+
+        if ($this->exibirCustoProdutoGrade && $productId > 0) {
+            $custos = ForcaVendasMargemVendaCalculator::custosUnitariosPorProduto(
+                [$productId],
+                ErpContext::currentEmpresaId(),
+            );
+            $custo = (float) ($custos[$productId] ?? 0);
+        }
+
+        return [
+            'key' => (string) ($row['key'] ?? ''),
+            'product_id' => $productId,
+            'codigo' => (string) ($row['codigo'] ?? ''),
+            'descricao' => (string) ($row['descricao'] ?? ''),
+            'quantidade' => $this->formatQty($qtd),
+            'preco_unitario' => $this->formatMoney($preco),
+            'bruto' => $this->formatMoney($qtd * $preco),
+            'acrescimo' => $this->formatMoney((float) ($row['acrescimo'] ?? 0)),
+            'desconto' => $this->formatMoney((float) ($row['desconto'] ?? 0)),
+            'total' => $this->formatMoney((float) ($row['total'] ?? 0)),
+            'custo' => $this->formatMoney($custo),
+            'agrupado' => $agrupado,
+        ];
     }
 
     public function pedirConfirmacaoExcluirItemPorIndice(int $index): void
@@ -1321,8 +1969,40 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function confirmarExcluirItem(): void
     {
+        $key = null;
+        if ($this->itemSelecionado !== null && isset($this->itens[$this->itemSelecionado])) {
+            $key = (string) ($this->itens[$this->itemSelecionado]['key'] ?? '');
+        }
+
         $this->excluirItemModalOpen = false;
         $this->removerItemSelecionado();
+
+        unset($this->totalBruto, $this->totalDescontosItens, $this->totalAcrescimosItens);
+
+        // Ainda há linhas: atualiza DOM sem remorph (modal já fechou no estado; JS remove o nó).
+        // Último item: remorph para restaurar a linha vazia da grade.
+        if ($key !== null && $key !== '' && $this->itens !== []) {
+            $nextKey = isset($this->itens[$this->itemSelecionado])
+                ? (string) ($this->itens[$this->itemSelecionado]['key'] ?? '')
+                : '';
+            $this->skipRender();
+            $this->dispatch(
+                'fv-tela-venda-item-deleted',
+                key: $key,
+                totais: [
+                    'bruto' => $this->formatMoney($this->totalBruto),
+                    'acrescimos' => $this->formatMoney($this->totalAcrescimosItens),
+                    'descontos' => $this->formatMoney($this->totalDescontosItens),
+                    'liquido' => $this->formatMoney($this->totalLiquido()),
+                    'itens_qtd_label' => $this->rotuloQuantidadeItens(),
+                    'has_itens' => true,
+                ],
+                next_key: $nextKey,
+                foto: $this->produtoAtualFoto,
+                nome: $this->produtoAtualNome,
+            );
+        }
+
         $this->dispatch('fv-tela-venda-focus-barcode');
     }
 
@@ -1337,13 +2017,40 @@ class ForcaVendasTelaVendaPage extends Page
         array_splice($this->itens, $this->itemSelecionado, 1);
         $this->itens = array_values($this->itens);
         $this->itemSelecionado = $this->itens === [] ? null : min($this->itemSelecionado, count($this->itens) - 1);
-        $this->produtoAtualId = null;
-        $this->produtoAtualNome = '';
-        $this->produtoAtualFoto = null;
+
+        if ($this->itemSelecionado !== null && isset($this->itens[$this->itemSelecionado])) {
+            $next = $this->itens[$this->itemSelecionado];
+            $this->produtoAtualId = (int) ($next['product_id'] ?? 0) ?: null;
+            $this->produtoAtualNome = (string) ($next['descricao'] ?? '');
+            $this->produtoAtualFoto = $next['foto'] ?? null;
+        } else {
+            $this->produtoAtualId = null;
+            $this->produtoAtualNome = '';
+            $this->produtoAtualFoto = null;
+        }
     }
 
-    public function irParaFinalizacao(): void
+    public function irParaFinalizacao(?string $qtdRaw = null, ?string $precoRaw = null): void
     {
+        if ($this->isConfirmingItem || $this->tabelaProgressOpen || $this->gravando) {
+            return;
+        }
+
+        try {
+            $this->assertContextoEmpresaOperavel();
+        } catch (\Throwable $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+
+            return;
+        }
+
+        if ($this->editingItemKey !== null) {
+            $this->adicionarItem($qtdRaw, $precoRaw);
+            if ($this->editingItemKey !== null) {
+                return;
+            }
+        }
+
         if ($this->clienteId === null) {
             $busca = trim((string) $this->clienteBusca);
             $nome = trim((string) $this->clienteNome);
@@ -1367,6 +2074,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         $this->etapa = 'finalizacao';
         ErpScreen::set('Finalização do Pedido');
+        $this->fvDividirPor = '1';
         $this->resetFinalizarCartaoCanhoto();
         $this->carregarMeiosPagamento();
 
@@ -1388,6 +2096,10 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function voltarParaVenda(): void
     {
+        if ($this->gravando) {
+            return;
+        }
+
         if ($this->fvTabelaPrazoConsulta) {
             $this->cancelarFvTabelaPrazoConsulta();
 
@@ -1405,7 +2117,49 @@ class ForcaVendasTelaVendaPage extends Page
         $this->dispatch('fv-tela-venda-focus-barcode');
     }
 
-    public function selectPagamentoRow(int $index): void
+    /**
+     * Esc/Voltar em 1 round-trip: grava valores/CPF/infos do DOM e fecha o F4.
+     *
+     * @param  array<int|string, string>  $valores
+     */
+    public function voltarParaVendaComFlush(
+        array $valores,
+        ?int $selectedIndex,
+        string $cpfNota,
+        string $observacoes,
+    ): void {
+        if ($this->gravando) {
+            return;
+        }
+
+        if ($this->fvTabelaPrazoConsulta) {
+            $this->cancelarFvTabelaPrazoConsulta();
+
+            return;
+        }
+
+        if ($this->finalizarCartaoCanhotoAberta) {
+            $this->cancelFinalizarCartaoCanhoto();
+
+            return;
+        }
+
+        if ($this->etapa !== 'finalizacao') {
+            return;
+        }
+
+        $this->flushValoresPagamento($valores, $selectedIndex, skipRender: false);
+        $this->flushCpfNotaEObservacoes($cpfNota, $observacoes, validarCpf: false, skipRender: false);
+        $this->voltarParaVenda();
+    }
+
+    /**
+     * Seleciona a linha (clique na forma / foco). NÃO preenche restante.
+     * Restante automático: somente selectPagamentoByAtalho (tecla ou botão A/P/D/C/K).
+     *
+     * @param  bool  $sugerirRestante  reservado; deve permanecer false fora de atalho.
+     */
+    public function selectPagamentoRow(int $index, bool $sugerirRestante = false): void
     {
         if (! isset($this->meiosPagamento[$index])) {
             return;
@@ -1413,9 +2167,159 @@ class ForcaVendasTelaVendaPage extends Page
 
         $this->selectedPagamentoIndex = $index;
         $this->formaSelecionadaId = (int) $this->meiosPagamento[$index]['id'];
+
+        // Restante NÃO é preenchido por clique/foco — só por atalho explícito.
+        if (
+            $sugerirRestante
+            && ErpMoney::parseBr($this->meiosPagamento[$index]['valor'] ?? '0') <= 0
+        ) {
+            $this->aplicarValorRestanteNaForma($index, focus: true);
+
+            return;
+        }
+
+        // Foco/seleção já feitos no DOM (mousedown). Sem dispatch — evita corrida com setas/Enter.
+        $this->skipRender();
     }
 
-    public function movePagamentoSelection(int $delta): void
+    /**
+     * Compat: setas/F8 não chamam mais isto (navegação 100% local).
+     * Mantido só para não quebrar clients antigos em cache.
+     */
+    public function syncPagamentoSelecao(int $index, ?string $valorSugerido = null): void
+    {
+        if (! isset($this->meiosPagamento[$index])) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->selectedPagamentoIndex = $index;
+        $this->formaSelecionadaId = (int) ($this->meiosPagamento[$index]['id'] ?? 0);
+
+        if (is_string($valorSugerido) && trim($valorSugerido) !== '') {
+            $this->meiosPagamento[$index]['valor'] = ErpMoney::formatBr(ErpMoney::parseBr($valorSugerido, 2), 2);
+        }
+
+        $this->skipRender();
+    }
+
+    /**
+     * Antes do F10: alinha valores visíveis + índice local (navegação sem request por seta).
+     *
+     * @param  array<int|string, string>  $valores
+     */
+    public function flushValoresPagamento(array $valores, ?int $selectedIndex = null, bool $skipRender = true): void
+    {
+        foreach ($valores as $index => $raw) {
+            $i = (int) $index;
+
+            if (! isset($this->meiosPagamento[$i])) {
+                continue;
+            }
+
+            $this->normalizarValorPagamentoLinha($i, (string) $raw);
+        }
+
+        if ($selectedIndex !== null && isset($this->meiosPagamento[$selectedIndex])) {
+            $this->selectedPagamentoIndex = $selectedIndex;
+            $this->formaSelecionadaId = (int) ($this->meiosPagamento[$selectedIndex]['id'] ?? 0);
+        }
+
+        if ($skipRender) {
+            $this->skipRender();
+        }
+    }
+
+    /**
+     * Atalho/Enter local + abre canhoto/carnê no servidor se necessário (UI já atualizou).
+     *
+     * @param  array<int|string, string>  $valores
+     */
+    public function aplicarPagamentoLocalEEspeciais(array $valores, int $index): void
+    {
+        if ($this->etapa !== 'finalizacao') {
+            return;
+        }
+
+        $this->flushValoresPagamento($valores, $index, skipRender: false);
+
+        if (! isset($this->meiosPagamento[$index])) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $meio = $this->meiosPagamento[$index];
+        $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
+
+        if ($valor > 0.009 && PdvFinalizarPagamentosHelper::isFormaCartao($meio)) {
+            $this->finalizarCartaoCanhotoConfirmado = false;
+            $this->finalizarCartaoParcelasRows = [];
+            $this->ensureCartaoCanhoto();
+
+            return;
+        }
+
+        if ($valor > 0.009 && PdvFinalizarPagamentosHelper::precisaParcelasCarne($this->fvPagamentoComoPdv($meio))) {
+            $this->fvParcelasRows = [];
+            $this->ensureFvTabelaPrazoCrediario();
+
+            return;
+        }
+
+        $this->skipRender();
+    }
+
+    /**
+     * Enter especial (cartão/carnê/TEF): 1 round-trip flush + confirmarValorPagamentoLinha.
+     *
+     * @param  array<int|string, string>  $valores
+     */
+    public function confirmarValorPagamentoLinhaComFlush(array $valores, int $index, string $valor): void
+    {
+        if ($this->etapa !== 'finalizacao') {
+            return;
+        }
+
+        $this->flushValoresPagamento($valores, $index, skipRender: false);
+        $this->confirmarValorPagamentoLinha($valor, $index);
+    }
+
+    /**
+     * Concluir em 1 round-trip: flush cliente/CPF/valores + faturarPedido (fluxo oficial).
+     *
+     * @param  array<int|string, string>  $valores
+     */
+    public function faturarPedidoComFlush(
+        array $valores,
+        ?int $selectedIndex,
+        string $clienteBusca,
+        string $cpfNota,
+        string $observacoes,
+    ): void {
+        if ($this->etapa !== 'finalizacao' || $this->gravando) {
+            return;
+        }
+
+        $this->flushValoresPagamento($valores, $selectedIndex, skipRender: false);
+
+        if (! $this->sincronizarClienteFinalizacaoBusca($clienteBusca, skipRender: false)) {
+            return;
+        }
+
+        if (! $this->flushCpfNotaEObservacoes($cpfNota, $observacoes, true, skipRender: false)) {
+            return;
+        }
+
+        $this->faturarPedido();
+    }
+
+    /**
+     * Avanço programático (ex.: após Enter). Nunca preenche restante —
+     * restante só via atalho A/P/D/C/K.
+     */
+    public function movePagamentoSelection(int $delta, bool $sugerirRestante = false): void
     {
         $count = count($this->meiosPagamento);
 
@@ -1427,15 +2331,32 @@ class ForcaVendasTelaVendaPage extends Page
         $index = max(0, min($count - 1, $index));
         $this->selectedPagamentoIndex = $index;
         $this->formaSelecionadaId = (int) ($this->meiosPagamento[$index]['id'] ?? 0);
+
+        // Parâmetro legado ignorado: Enter/seta não preenchem restante.
+        unset($sugerirRestante);
+
         $this->dispatch('erp-fv-focus-pagamento', index: $index);
     }
 
+    /**
+     * Único caminho que preenche o restante automaticamente (tecla ou botão do atalho).
+     * Não sobrescreve valor já digitado (> 0) — ver aplicarValorRestanteNaForma.
+     */
     public function selectPagamentoByAtalho(string $atalho): void
     {
         $atalho = strtoupper(trim($atalho));
 
         foreach ($this->meiosPagamento as $index => $meio) {
             if (strtoupper((string) ($meio['atalho'] ?? '')) === $atalho) {
+                if (ErpMoney::parseBr($meio['valor'] ?? '0') > 0.009) {
+                    // Já tem valor: só seleciona/foca, sem recalcular.
+                    $this->selectedPagamentoIndex = $index;
+                    $this->formaSelecionadaId = (int) ($meio['id'] ?? 0);
+                    $this->dispatch('erp-fv-focus-pagamento', index: $index);
+
+                    return;
+                }
+
                 $this->aplicarValorRestanteNaForma($index);
 
                 return;
@@ -1446,9 +2367,15 @@ class ForcaVendasTelaVendaPage extends Page
     /**
      * Enter no valor: grava o digitado e segue o fluxo do PDV
      * (canhoto cartão → próxima linha → foco no botão de confirmar).
+     * $index vem do input (DOM) — não depende de selectedPagamentoIndex atrasado das setas.
      */
-    public function confirmarValorPagamentoLinha(?string $valorFromInput = null): void
+    public function confirmarValorPagamentoLinha(?string $valorFromInput = null, ?int $index = null): void
     {
+        if ($index !== null && isset($this->meiosPagamento[$index])) {
+            $this->selectedPagamentoIndex = $index;
+            $this->formaSelecionadaId = (int) ($this->meiosPagamento[$index]['id'] ?? 0);
+        }
+
         $index = $this->selectedPagamentoIndex;
 
         if (! isset($this->meiosPagamento[$index])) {
@@ -1486,13 +2413,16 @@ class ForcaVendasTelaVendaPage extends Page
             $count = count($this->meiosPagamento);
 
             if ($this->selectedPagamentoIndex < $count - 1) {
-                $this->movePagamentoSelection(1);
+                // Enter só avança o foco — não preenche restante.
+                $this->movePagamentoSelection(1, false);
             }
 
             return;
         }
 
         if ($this->valorRestante() <= 0) {
+            // skipRender: evita remorph que devolve o foco ao valor após ir ao Concluir.
+            $this->skipRender();
             $this->dispatch('erp-fv-focus-finalizar-ok');
 
             return;
@@ -1501,7 +2431,11 @@ class ForcaVendasTelaVendaPage extends Page
         $count = count($this->meiosPagamento);
 
         if ($this->selectedPagamentoIndex < $count - 1) {
-            $this->movePagamentoSelection(1);
+            $next = $this->selectedPagamentoIndex + 1;
+            $this->selectedPagamentoIndex = $next;
+            $this->formaSelecionadaId = (int) ($this->meiosPagamento[$next]['id'] ?? 0);
+            $this->skipRender();
+            $this->dispatch('erp-fv-focus-pagamento', index: $next);
         }
     }
 
@@ -1523,15 +2457,56 @@ class ForcaVendasTelaVendaPage extends Page
 
     /**
      * Grava o pedido como pendente (DAV + ForcaVendasOrder) sem exigir meios de pagamento.
-     * Mesmo fluxo do FV; o faturamento fica para o monitor.
+     * Mesmo fluxo do F3; o faturamento fica para o monitor.
+     *
+     * @param  bool  $aoSair  Quando true (botão Sair), usa aviso amarelo de atenção.
      */
-    public function gravarPedidoPendente(): void
+    public function gravarPedidoPendente(bool $aoSair = false, ?string $qtdRaw = null, ?string $precoRaw = null): void
     {
-        if ($this->gravando) {
+        if ($this->gravando || $this->isConfirmingItem || $this->tabelaProgressOpen) {
             return;
         }
 
-        if ($this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen) {
+        // Trava cedo contra duplo F3/Sair (Livewire pode enfileirar dois requests).
+        $this->gravando = true;
+
+        try {
+            $this->assertContextoEmpresaOperavel();
+        } catch (\Throwable $e) {
+            $this->gravando = false;
+            $this->fvSairNavigateUrl = null;
+            $this->rearmarGuardSaidaTelaVenda();
+            Notification::make()->title($e->getMessage())->warning()->send();
+
+            return;
+        }
+
+        // Edição aberta: confirma na barra (mesmo fluxo do Enter) antes de gravar.
+        if ($this->editingItemKey !== null) {
+            $this->adicionarItem($qtdRaw, $precoRaw);
+            if ($this->editingItemKey !== null) {
+                $this->gravando = false;
+                if ($aoSair) {
+                    $this->fvSairNavigateUrl = null;
+                    $this->rearmarGuardSaidaTelaVenda();
+                }
+
+                return;
+            }
+        }
+
+        if (
+            $this->descontoModalOpen
+            || $this->excluirItemModalOpen
+            || $this->fvImportarOrcamentoOpen
+            || $this->margemModalOpen
+            || $this->fvImprimirPosVendaOpen
+            || ($this->fvSairConfirmOpen && ! $aoSair)
+        ) {
+            $this->gravando = false;
+            $this->fvSairNavigateUrl = null;
+            $this->rearmarGuardSaidaTelaVenda();
+
             return;
         }
 
@@ -1544,6 +2519,9 @@ class ForcaVendasTelaVendaPage extends Page
                 $this->aplicarCliente($person);
                 $this->clienteBusca = $this->formatarClienteBusca($person);
             } else {
+                $this->gravando = false;
+                $this->fvSairNavigateUrl = null;
+                $this->rearmarGuardSaidaTelaVenda();
                 Notification::make()->title('Selecione o cliente.')->warning()->send();
 
                 return;
@@ -1551,24 +2529,36 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         if ($this->itens === []) {
+            $this->gravando = false;
+            $this->fvSairNavigateUrl = null;
+            $this->rearmarGuardSaidaTelaVenda();
             Notification::make()->title('Inclua ao menos um item.')->warning()->send();
 
             return;
         }
 
         if ($this->bloquearSeOperacaoInvalida(exigeEstoque: $this->pedidoExigeEstoque())) {
+            $this->gravando = false;
+            $this->fvSairNavigateUrl = null;
+            $this->rearmarGuardSaidaTelaVenda();
+
             return;
         }
 
         $user = Auth::user();
 
         if (! $user) {
+            $this->gravando = false;
+            $this->fvSairNavigateUrl = null;
+            $this->rearmarGuardSaidaTelaVenda();
+
             return;
         }
 
-        $this->gravando = true;
+        $this->fvSairConfirmOpen = false;
 
         try {
+            $svc = app(ForcaVendasTelaVendaService::class);
             $existente = null;
 
             if ($this->pedidoId) {
@@ -1577,14 +2567,27 @@ class ForcaVendasTelaVendaPage extends Page
                 if (! $existente) {
                     throw new \RuntimeException('Pedido em edição não encontrado.');
                 }
+
+                $svc->assertOrderDaEmpresa($existente, (int) $this->vendaEmpresaId);
             }
 
-            $order = app(ForcaVendasTelaVendaService::class)->gravarPedido($user, [
+            // Revalida sessão × empresa congelada imediatamente antes da TX.
+            $this->assertContextoEmpresaOperavel();
+
+            if ($this->operacaoUuid === '') {
+                $this->operacaoUuid = (string) Str::uuid();
+            }
+
+            $order = $this->gravarPedidoComIdempotencia($svc, $user, [
+                'uuid' => $this->operacaoUuid,
+                'empresa_id' => (int) $this->vendaEmpresaId,
+                'orcamento_id' => $this->orcamentoOrigemId,
                 'cliente_id' => (int) $this->clienteId,
                 'vendedor_id' => $this->vendedorId,
                 'caixa_conta_id' => $this->caixaId,
                 'estoque_id' => $this->estoqueId,
                 'observacoes' => trim($this->observacoes) !== '' ? trim($this->observacoes) : null,
+                'cpf_nota' => trim($this->cpfNota) !== '' ? trim($this->cpfNota) : null,
                 'desconto_valor' => 0,
                 'percentual_desconto' => 0,
                 'forma_pagamento_id' => null,
@@ -1595,15 +2598,45 @@ class ForcaVendasTelaVendaPage extends Page
                 'itens' => $this->itensParaGravar(),
             ], $existente);
 
-            Notification::make()
-                ->title($existente ? 'Pedido atualizado.' : 'Pedido gravado como pendente.')
-                ->body('DAV Nº '.$order->pedido?->numero.' — aguardando faturamento no monitor.')
-                ->success()
-                ->send();
+            if (! $existente) {
+                $this->pedidoId = (int) $order->id;
+            }
 
-            $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
+            if ($order->orcamento_id) {
+                $this->orcamentoOrigemId = (int) $order->orcamento_id;
+            }
+
+            $dav = $order->pedido?->numero;
+
+            // Sair: aviso amarelo de atenção. F3: sucesso verde (comportamento atual).
+            if ($aoSair) {
+                Notification::make()
+                    ->title($existente
+                        ? 'Pedido atualizado e mantido como pendente.'
+                        : 'Venda gravada como pendente.')
+                    ->body('DAV Nº '.$dav.' — aguardando faturamento no monitor. Você pode abrir, concluir ou cancelar pelo Monitor.')
+                    ->warning()
+                    ->send();
+            } else {
+                Notification::make()
+                    ->title($existente ? 'Pedido atualizado.' : 'Pedido gravado como pendente.')
+                    ->body('DAV Nº '.$dav.' — aguardando faturamento no monitor.')
+                    ->success()
+                    ->send();
+            }
+
+            // Destino: URL da navegação SPA (se houver) ou Monitor (botão Sair / F3).
+            $destino = $this->fvSairNavigateUrl
+                ?: ForcaVendasMonitorResource::getUrl('index');
+            $this->fvSairNavigateUrl = null;
+
+            // JS já liberou no clique; reforça allowLeave até o redirect SPA.
+            $this->liberarSaidaTelaVenda();
+            $this->redirect($destino);
         } catch (\Throwable $e) {
             $this->gravando = false;
+            $this->fvSairNavigateUrl = null;
+            $this->rearmarGuardSaidaTelaVenda();
             Notification::make()
                 ->title('Não foi possível gravar o pedido pendente.')
                 ->body($e->getMessage())
@@ -1624,14 +2657,53 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        if ($this->totalInformado() <= 0 && $this->meiosPagamento !== []) {
-            $this->aplicarValorRestanteNaForma($this->selectedPagamentoIndex, focus: false);
+        // Trava cedo contra duplo F10/Concluir durante validações.
+        $this->gravando = true;
+
+        try {
+            $this->assertContextoEmpresaOperavel();
+        } catch (\Throwable $e) {
+            $this->gravando = false;
+            Notification::make()->title($e->getMessage())->warning()->send();
+
+            return;
         }
 
+        if ($this->etapa === 'finalizacao') {
+            if ($this->clienteId === null) {
+                $this->gravando = false;
+                Notification::make()->title('Selecione o cliente.')->warning()->send();
+
+                return;
+            }
+
+            if (! $this->clienteJaSelecionadoCorresponde(trim((string) $this->clienteBusca))) {
+                $this->gravando = false;
+                $this->restaurarClienteBuscaSelecionado();
+                Notification::make()
+                    ->title('Selecione o cliente na lista.')
+                    ->body('A troca só vale após escolher um cadastro válido.')
+                    ->warning()
+                    ->send();
+                $this->dispatch('erp-fv-fin-cliente-synced', value: $this->clienteBusca);
+
+                return;
+            }
+
+            if ($msgCpf = (new PdvNotaClienteService())->validaDocumentoCpfNota(trim($this->cpfNota))) {
+                $this->gravando = false;
+                Notification::make()->title($msgCpf)->warning()->send();
+
+                return;
+            }
+        }
+
+        // Restante automático só por atalho — F10 não preenche sozinho.
         $totalInformado = $this->totalInformado();
         $totalLiquido = $this->totalLiquido();
 
         if ($totalInformado + 0.009 < $totalLiquido) {
+            $this->gravando = false;
             Notification::make()
                 ->title('Informe o valor nos meios de pagamento.')
                 ->body('Valor restante: R$ '.$this->formatMoney($this->valorRestante()))
@@ -1641,14 +2713,27 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $formaPrincipal = collect($this->meiosPagamento)
-            ->first(fn (array $m): bool => ErpMoney::parseBr($m['valor'] ?? '0') > 0);
+        $pagamentosPositivos = $this->pagamentosPositivosParaFaturar();
 
-        if (! $formaPrincipal) {
+        if ($pagamentosPositivos === []) {
+            $this->gravando = false;
             Notification::make()->title('Selecione um meio de pagamento.')->warning()->send();
 
             return;
         }
+
+        if ($msgTroco = $this->validarExcessoPagamentoNaoMonetario($totalInformado, $totalLiquido, $pagamentosPositivos)) {
+            $this->gravando = false;
+            Notification::make()
+                ->title('Pagamento inválido.')
+                ->body($msgTroco)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $formaPrincipal = $pagamentosPositivos[0];
 
         if ($faturar) {
             try {
@@ -1664,6 +2749,7 @@ class ForcaVendasTelaVendaPage extends Page
                     ConsumidorFinalGuard::assertPagamentoPermitido($clienteGuard, $meio);
                 }
             } catch (\DomainException $e) {
+                $this->gravando = false;
                 Notification::make()
                     ->title($e->getMessage())
                     ->warning()
@@ -1674,6 +2760,7 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         if ($msg = $this->validaCartaoCanhotoFinalizar()) {
+            $this->gravando = false;
             Notification::make()->title($msg)->warning()->send();
             $this->ensureCartaoCanhoto();
 
@@ -1681,22 +2768,27 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         if (! $this->ensureFvTabelaPrazoCrediario(abrirSeNecessario: true)) {
+            $this->gravando = false;
+
             return;
         }
 
         if ($this->bloquearSeOperacaoInvalida(exigeEstoque: $this->pedidoExigeEstoque())) {
+            $this->gravando = false;
+
             return;
         }
 
         $user = Auth::user();
 
         if (! $user) {
+            $this->gravando = false;
+
             return;
         }
 
-        $this->gravando = true;
-
         try {
+            $svc = app(ForcaVendasTelaVendaService::class);
             $existente = null;
 
             if ($this->pedidoId) {
@@ -1705,13 +2797,29 @@ class ForcaVendasTelaVendaPage extends Page
                 if (! $existente) {
                     throw new \RuntimeException('Pedido em edição não encontrado.');
                 }
+
+                $svc->assertOrderDaEmpresa($existente, (int) $this->vendaEmpresaId);
             }
+
+            // Revalida sessão × empresa congelada imediatamente antes da TX.
+            $this->assertContextoEmpresaOperavel();
 
             $canhoto = $this->finalizarCartaoCanhotoPayload();
             $tabelaPrazo = $this->tabelaPrazoDias;
-            $pdvMeio = $this->fvPagamentoComoPdv($formaPrincipal);
-            $aVista = ! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pdvMeio)
-                && ! PdvFinalizarPagamentosHelper::isFormaCartao($pdvMeio);
+            $temCartao = false;
+            $temCarne = false;
+
+            foreach ($pagamentosPositivos as $pagMeio) {
+                $pdvMeio = $this->fvPagamentoComoPdv($pagMeio);
+                if (PdvFinalizarPagamentosHelper::isFormaCartao($pdvMeio)) {
+                    $temCartao = true;
+                }
+                if (PdvFinalizarPagamentosHelper::precisaParcelasCarne($pdvMeio)) {
+                    $temCarne = true;
+                }
+            }
+
+            $aVista = ! $temCartao && ! $temCarne;
 
             // À vista / sem carnê: limpa prazo residual da UI e do payload.
             if ($aVista) {
@@ -1719,7 +2827,8 @@ class ForcaVendasTelaVendaPage extends Page
                 $tabelaPrazo = null;
                 $canhoto = null;
             } elseif (
-                PdvFinalizarPagamentosHelper::isFormaCartao($pdvMeio)
+                $temCartao
+                && ! $temCarne
                 && ($canhoto === null || empty($canhoto['dias']))
             ) {
                 $this->tabelaPrazoDias = null;
@@ -1729,17 +2838,29 @@ class ForcaVendasTelaVendaPage extends Page
                 $tabelaPrazo = implode(',', array_map('intval', $canhoto['dias']));
             }
 
+            if ($this->operacaoUuid === '') {
+                $this->operacaoUuid = (string) Str::uuid();
+            }
+
+            $rotuloFormaCabecalho = $this->rotuloFormaPagamentoCabecalho($pagamentosPositivos);
+
             $dadosGravar = [
+                'uuid' => $this->operacaoUuid,
+                'empresa_id' => (int) $this->vendaEmpresaId,
+                'orcamento_id' => $this->orcamentoOrigemId,
                 'cliente_id' => (int) $this->clienteId,
                 'vendedor_id' => $this->vendedorId,
                 'caixa_conta_id' => $this->caixaId,
                 'estoque_id' => $this->estoqueId,
                 'observacoes' => trim($this->observacoes) !== '' ? trim($this->observacoes) : null,
+                'cpf_nota' => trim($this->cpfNota) !== '' ? trim($this->cpfNota) : null,
                 // Desconto/acréscimo do pedido já vão rateados nos itens.
                 'desconto_valor' => 0,
                 'percentual_desconto' => 0,
                 'forma_pagamento_id' => (int) $formaPrincipal['id'],
-                'forma_pagamento' => (string) $formaPrincipal['descricao'],
+                'forma_pagamento' => $rotuloFormaCabecalho,
+                // Detalhe misto: cada meio com valor real (faturamento lê isto).
+                'pagamentos' => $pagamentosPositivos,
                 'tabela_prazo_dias' => $tabelaPrazo,
                 'cartao_canhoto' => $canhoto,
                 'transporte' => $this->fvTransportePayload(),
@@ -1751,7 +2872,15 @@ class ForcaVendasTelaVendaPage extends Page
                 $dadosGravar['condicao_pagamento'] = null;
             }
 
-            $order = app(ForcaVendasTelaVendaService::class)->gravarPedido($user, $dadosGravar, $existente);
+            $order = $this->gravarPedidoComIdempotencia($svc, $user, $dadosGravar, $existente);
+
+            if (! $existente) {
+                $this->pedidoId = (int) $order->id;
+            }
+
+            if ($order->orcamento_id) {
+                $this->orcamentoOrigemId = (int) $order->orcamento_id;
+            }
 
             if (! $faturar) {
                 Notification::make()
@@ -1760,6 +2889,7 @@ class ForcaVendasTelaVendaPage extends Page
                     ->success()
                     ->send();
 
+                $this->liberarSaidaTelaVenda();
                 $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
 
                 return;
@@ -1788,6 +2918,10 @@ class ForcaVendasTelaVendaPage extends Page
             throw new \RuntimeException('DAV do pedido não encontrado para faturar.');
         }
 
+        // Empresa da sessão × pedido × contexto congelado (antes da TX de faturamento).
+        $this->assertContextoEmpresaOperavel();
+        app(ForcaVendasTelaVendaService::class)->assertOrderDaEmpresa($order, (int) $this->vendaEmpresaId);
+
         $restricao = $this->restricaoFinanceira($order);
 
         if ($restricao !== null) {
@@ -1799,6 +2933,7 @@ class ForcaVendasTelaVendaPage extends Page
                 ->warning()
                 ->send();
 
+            $this->liberarSaidaTelaVenda();
             $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
 
             return;
@@ -1814,24 +2949,336 @@ class ForcaVendasTelaVendaPage extends Page
             ->success()
             ->send();
 
-        $monitorUrl = ForcaVendasMonitorResource::getUrl('index');
         $contas = $resultado['contas_receber'] ?? [];
+        $this->encerrarAposFaturamentoSucesso((int) $order->id, $contas);
+    }
 
-        if ($this->offerEmitirBoletosPosDocumento($contas, $monitorUrl)) {
+    /**
+     * Destino pós-faturamento TV: boleto → impressão → permanecer/Monitor.
+     *
+     * @param  list<mixed>  $contas
+     */
+    private function encerrarAposFaturamentoSucesso(int $orderIdFaturado, array $contas): void
+    {
+        $empresaId = $this->vendaEmpresaId
+            ? (int) $this->vendaEmpresaId
+            : ErpContext::currentEmpresaId();
+        $monitorUrl = ForcaVendasMonitorResource::getUrl('index');
+        $perguntarImprimir = EmpresaParametros::perguntarImprimirPosVendaTv($empresaId);
+        $permanecer = EmpresaParametros::permanecerTelaVendaAposConcluir($empresaId);
+
+        $this->fvAposConcluirPermanecer = $permanecer;
+
+        // Fica na TV se for perguntar impressão ou permanecer (boleto não manda ao Monitor).
+        $redirectAposBoleto = ($perguntarImprimir || $permanecer) ? null : $monitorUrl;
+
+        if ($this->offerEmitirBoletosPosDocumento($contas, $redirectAposBoleto)) {
             $this->gravando = false;
-            // Venda já faturada: limpa a grade para o modal de boleto ficar em evidência.
-            $this->pedidoId = null;
-            $this->davNumero = null;
-            $this->itens = [];
-            $this->etapa = 'venda';
-            $this->meiosPagamento = [];
-            $this->resetFvParcelasFaturamento();
-            $this->resetFinalizarCartaoCanhoto();
+            $this->limparTelaAposFaturamentoSucesso();
+
+            if ($perguntarImprimir) {
+                $this->prepararImprimirPosVenda($orderIdFaturado, $monitorUrl);
+                $this->fvImprimirPosVendaAposBoleto = true;
+            }
 
             return;
         }
 
+        $this->gravando = false;
+
+        if ($perguntarImprimir) {
+            $this->prepararImprimirPosVenda($orderIdFaturado, $monitorUrl);
+
+            if ($permanecer) {
+                $this->reiniciarVendaAposConcluir(preservarImpressao: true);
+            } else {
+                $this->limparTelaAposFaturamentoSucesso();
+            }
+
+            $this->fvImprimirPosVendaOpen = true;
+            $this->dispatch('erp-fv-focus-imprimir-pos-venda');
+
+            return;
+        }
+
+        if ($permanecer) {
+            $this->reiniciarVendaAposConcluir(preservarImpressao: false);
+            $this->fvAposConcluirPermanecer = false;
+
+            return;
+        }
+
+        $this->fvAposConcluirPermanecer = false;
+        $this->limparTelaAposFaturamentoSucesso();
         $this->redirect($monitorUrl);
+    }
+
+    /**
+     * Após boletos (ou dispensa): pergunta impressão, nova venda ou Monitor.
+     */
+    protected function afterBoletoPosDocumentoFluxo(): void
+    {
+        if ($this->fvImprimirPosVendaAposBoleto && $this->fvImprimirPosVendaOrderId) {
+            $this->fvImprimirPosVendaAposBoleto = false;
+            $orderId = (int) $this->fvImprimirPosVendaOrderId;
+            $monitorUrl = $this->fvImprimirPosVendaMonitorUrl !== ''
+                ? $this->fvImprimirPosVendaMonitorUrl
+                : ForcaVendasMonitorResource::getUrl('index');
+
+            $this->prepararImprimirPosVenda($orderId, $monitorUrl);
+
+            if ($this->fvAposConcluirPermanecer) {
+                $this->reiniciarVendaAposConcluir(preservarImpressao: true);
+            }
+
+            $this->fvImprimirPosVendaOpen = true;
+            $this->dispatch('erp-fv-focus-imprimir-pos-venda');
+
+            return;
+        }
+
+        $this->finalizarDestinoAposConcluir();
+    }
+
+    private function limparTelaAposFaturamentoSucesso(): void
+    {
+        $this->liberarSaidaTelaVenda();
+        $this->pedidoId = null;
+        $this->davNumero = null;
+        $this->itens = [];
+        $this->etapa = 'venda';
+        $this->meiosPagamento = [];
+        $this->resetFvParcelasFaturamento();
+        $this->resetFinalizarCartaoCanhoto();
+    }
+
+    /**
+     * Nova venda na mesma TV após faturamento OK (sem reload completo).
+     */
+    private function reiniciarVendaAposConcluir(bool $preservarImpressao = false): void
+    {
+        $caixaId = $this->caixaId;
+        $caixaLabel = $this->caixaLabel;
+        $estoqueId = $this->estoqueId;
+        $estoqueLabel = $this->estoqueLabel;
+        $vendedorId = $this->vendedorId;
+        $vendedorLabel = $this->vendedorLabel;
+        $tabelaPrecoId = $this->tabelaPrecoId;
+        $tabelaPrecoLabel = $this->tabelaPrecoLabel;
+
+        $printSnap = null;
+        if ($preservarImpressao) {
+            $printSnap = [
+                'open' => $this->fvImprimirPosVendaOpen,
+                'bloqueado' => $this->fvImprimirPosVendaPopupBloqueado,
+                'processando' => $this->fvImprimirPosVendaProcessando,
+                'orderId' => $this->fvImprimirPosVendaOrderId,
+                'url' => $this->fvImprimirPosVendaUrl,
+                'monitorUrl' => $this->fvImprimirPosVendaMonitorUrl,
+                'aposBoleto' => $this->fvImprimirPosVendaAposBoleto,
+                'permanecer' => $this->fvAposConcluirPermanecer,
+            ];
+        }
+
+        // Evita devolver orçamento já consumido no faturamento.
+        $this->orcamentoOrigemId = null;
+        $this->pedidoId = null;
+        $this->fvVendaGeracao++;
+
+        $this->resetarVenda();
+
+        if (is_array($printSnap)) {
+            $this->fvImprimirPosVendaOpen = (bool) $printSnap['open'];
+            $this->fvImprimirPosVendaPopupBloqueado = (bool) $printSnap['bloqueado'];
+            $this->fvImprimirPosVendaProcessando = (bool) $printSnap['processando'];
+            $this->fvImprimirPosVendaOrderId = $printSnap['orderId'];
+            $this->fvImprimirPosVendaUrl = (string) $printSnap['url'];
+            $this->fvImprimirPosVendaMonitorUrl = (string) $printSnap['monitorUrl'];
+            $this->fvImprimirPosVendaAposBoleto = (bool) $printSnap['aposBoleto'];
+            $this->fvAposConcluirPermanecer = (bool) $printSnap['permanecer'];
+        }
+
+        // Restaura contexto operacional da sessão (quando ainda válido).
+        if ($vendedorId) {
+            $this->vendedorId = $vendedorId;
+            $this->vendedorLabel = $vendedorLabel;
+        }
+        if ($caixaId) {
+            $this->caixaId = $caixaId;
+            $this->caixaLabel = $caixaLabel;
+        }
+        if ($estoqueId) {
+            $this->estoqueId = $estoqueId;
+            $this->estoqueLabel = $estoqueLabel;
+        }
+        if ($tabelaPrecoId) {
+            $this->tabelaPrecoId = $tabelaPrecoId;
+            $this->tabelaPrecoLabel = $tabelaPrecoLabel;
+        }
+
+        if (! $this->iniciarContextoVendaNova()) {
+            return;
+        }
+
+        $this->gravando = false;
+        $this->editingItemKey = null;
+        $this->descontoModalOpen = false;
+        $this->excluirItemModalOpen = false;
+        $this->fvImportarOrcamentoOpen = false;
+        $this->tabPrecoItemModalOpen = false;
+        $this->rearmarGuardSaidaTelaVenda();
+
+        if (! $this->fvImprimirPosVendaOpen) {
+            $this->focarCodigoProdutoNovaVenda();
+        }
+    }
+
+    private function focarCodigoProdutoNovaVenda(): void
+    {
+        $this->js('window.__erpFvTvInitialFocusDone = true;');
+        $this->dispatch('fv-tela-venda-focus-barcode');
+    }
+
+    private function prepararImprimirPosVenda(int $orderId, string $monitorUrl): void
+    {
+        $this->fvImprimirPosVendaOrderId = $orderId > 0 ? $orderId : null;
+        $this->fvImprimirPosVendaMonitorUrl = $monitorUrl;
+        $this->fvImprimirPosVendaUrl = $orderId > 0
+            ? route('erp.reports.monitor-pedidos', [
+                'ids' => (string) $orderId,
+                'auto' => 1,
+            ])
+            : '';
+        $this->fvImprimirPosVendaPopupBloqueado = false;
+        $this->fvImprimirPosVendaProcessando = false;
+    }
+
+    public function confirmarImprimirPosVenda(): void
+    {
+        if (! $this->fvImprimirPosVendaOpen || $this->fvImprimirPosVendaProcessando) {
+            return;
+        }
+
+        $this->fvImprimirPosVendaProcessando = true;
+        $url = trim($this->fvImprimirPosVendaUrl);
+
+        if ($url === '' || ! $this->fvImprimirPosVendaOrderId) {
+            $this->finalizarAposPerguntaImprimir();
+
+            return;
+        }
+
+        $urlJs = Js::from($url);
+        $this->js(<<<JS
+            (() => {
+                let win = null;
+                try { win = window.open({$urlJs}, '_blank'); } catch (e) { win = null; }
+                if (!win || win.closed) {
+                    \$wire.marcarPopupImpressaoBloqueado();
+                    return;
+                }
+                \$wire.finalizarAposPerguntaImprimir();
+            })();
+        JS);
+    }
+
+    public function marcarPopupImpressaoBloqueado(): void
+    {
+        if (! $this->fvImprimirPosVendaOpen) {
+            return;
+        }
+
+        $this->fvImprimirPosVendaPopupBloqueado = true;
+        $this->fvImprimirPosVendaProcessando = false;
+        $this->dispatch('erp-fv-focus-imprimir-pos-venda');
+    }
+
+    public function abrirComprovantePosVendaManual(): void
+    {
+        if (! $this->fvImprimirPosVendaOpen || $this->fvImprimirPosVendaUrl === '') {
+            return;
+        }
+
+        if ($this->fvImprimirPosVendaProcessando) {
+            return;
+        }
+
+        $this->fvImprimirPosVendaProcessando = true;
+        $urlJs = Js::from($this->fvImprimirPosVendaUrl);
+        $permanecerJs = $this->fvAposConcluirPermanecer ? 'true' : 'false';
+
+        // Com "permanecer", não navega a aba atual (senão perde a nova venda).
+        $this->js(<<<JS
+            (() => {
+                let win = null;
+                try { win = window.open({$urlJs}, '_blank'); } catch (e) { win = null; }
+                if (!win || win.closed) {
+                    if ({$permanecerJs}) {
+                        \$wire.marcarPopupImpressaoBloqueado();
+                        return;
+                    }
+                    window.location.assign({$urlJs});
+                    return;
+                }
+                \$wire.finalizarAposPerguntaImprimir();
+            })();
+        JS);
+    }
+
+    public function dispensarImprimirPosVenda(): void
+    {
+        if (! $this->fvImprimirPosVendaOpen || $this->fvImprimirPosVendaProcessando) {
+            return;
+        }
+
+        $this->fvImprimirPosVendaProcessando = true;
+        $this->finalizarAposPerguntaImprimir();
+    }
+
+    /** @deprecated Nome legado — use finalizarAposPerguntaImprimir(). */
+    public function irAoMonitorAposImprimirPosVenda(): void
+    {
+        $this->finalizarAposPerguntaImprimir();
+    }
+
+    public function finalizarAposPerguntaImprimir(): void
+    {
+        $permanecer = $this->fvAposConcluirPermanecer;
+        $this->resetImprimirPosVendaState();
+
+        if ($permanecer) {
+            $this->fvAposConcluirPermanecer = false;
+            // Nova venda já foi reiniciada antes do modal (ou no pós-boleto).
+            $this->focarCodigoProdutoNovaVenda();
+
+            return;
+        }
+
+        $monitorUrl = ForcaVendasMonitorResource::getUrl('index');
+        $this->redirect($monitorUrl);
+    }
+
+    private function finalizarDestinoAposConcluir(): void
+    {
+        if ($this->fvAposConcluirPermanecer) {
+            $this->reiniciarVendaAposConcluir(preservarImpressao: false);
+            $this->fvAposConcluirPermanecer = false;
+
+            return;
+        }
+
+        $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
+    }
+
+    private function resetImprimirPosVendaState(): void
+    {
+        $this->fvImprimirPosVendaOpen = false;
+        $this->fvImprimirPosVendaPopupBloqueado = false;
+        $this->fvImprimirPosVendaProcessando = false;
+        $this->fvImprimirPosVendaOrderId = null;
+        $this->fvImprimirPosVendaUrl = '';
+        $this->fvImprimirPosVendaMonitorUrl = '';
+        $this->fvImprimirPosVendaAposBoleto = false;
     }
 
     /**
@@ -1943,6 +3390,21 @@ class ForcaVendasTelaVendaPage extends Page
         return round($brutoItens + $acr - $desc, 2);
     }
 
+    /**
+     * Mesmo parâmetro do PDV (`param_geral_rateio_pessoa_pdv`): só UI informativa no F4.
+     */
+    public function getFvRateioPessoaProperty(): bool
+    {
+        return (bool) (ErpContext::currentEmpresa()?->param_geral_rateio_pessoa_pdv ?? true);
+    }
+
+    public function getFvValorPorPessoaProperty(): string
+    {
+        $divisor = max(1, (int) ErpMoney::parseBr($this->fvDividirPor ?? '1', 0));
+
+        return $this->formatMoney(round($this->totalLiquido() / $divisor, 2));
+    }
+
     public function totalInformado(): float
     {
         return round(array_sum(array_map(
@@ -1961,14 +3423,150 @@ class ForcaVendasTelaVendaPage extends Page
         return round(max(0, $this->totalInformado() - $this->totalLiquido()), 2);
     }
 
+    /**
+     * Linhas com valor > 0 no formato persistido no payload do pedido.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function pagamentosPositivosParaFaturar(): array
+    {
+        $out = [];
+
+        foreach ($this->meiosPagamento as $meio) {
+            $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
+            if ($valor <= 0.009) {
+                continue;
+            }
+
+            $out[] = [
+                'id' => (int) ($meio['id'] ?? 0),
+                'forma_pagamento_id' => (int) ($meio['id'] ?? 0),
+                'descricao' => (string) ($meio['descricao'] ?? ''),
+                'forma_pagamento' => (string) ($meio['descricao'] ?? ''),
+                'forma' => (string) ($meio['descricao'] ?? ''),
+                'valor' => round($valor, 2),
+                'valor_br' => ErpMoney::formatBr($valor, 2),
+                'tipo' => (string) ($meio['tipo'] ?? ''),
+                'tipo_movimento' => (string) ($meio['tipo_movimento'] ?? ''),
+                'aparece_contas_receber' => (bool) ($meio['aparece_contas_receber'] ?? false),
+                'atalho' => (string) ($meio['atalho'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $pagamentos
+     */
+    private function rotuloFormaPagamentoCabecalho(array $pagamentos): string
+    {
+        $nomes = [];
+        foreach ($pagamentos as $pag) {
+            $nome = mb_strtoupper(trim((string) ($pag['descricao'] ?? $pag['forma_pagamento'] ?? '')), 'UTF-8');
+            if ($nome !== '') {
+                $nomes[] = $nome;
+            }
+        }
+
+        $nomes = array_values(array_unique($nomes));
+
+        if ($nomes === []) {
+            return 'DINHEIRO';
+        }
+
+        if (count($nomes) === 1) {
+            return $nomes[0];
+        }
+
+        // Relatórios tratam "A / B" como misto.
+        return implode(' / ', $nomes);
+    }
+
+    /**
+     * Troco só pode vir de dinheiro. Excesso em cartão/PIX/boleto etc. é bloqueado.
+     *
+     * @param  list<array<string, mixed>>  $pagamentos
+     */
+    private function validarExcessoPagamentoNaoMonetario(
+        float $totalInformado,
+        float $totalLiquido,
+        array $pagamentos,
+    ): ?string {
+        $excesso = round($totalInformado - $totalLiquido, 2);
+        if ($excesso <= 0.009) {
+            return null;
+        }
+
+        $somaDinheiro = 0.0;
+        foreach ($pagamentos as $pag) {
+            if ($this->meioEhDinheiro($pag)) {
+                $somaDinheiro += round((float) ($pag['valor'] ?? 0), 2);
+            }
+        }
+
+        if ($somaDinheiro + 0.009 < $excesso) {
+            return 'Há valor a mais sem dinheiro correspondente para troco. '
+                .'Ajuste os meios (troco só é permitido em dinheiro).';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meio
+     */
+    private function meioEhDinheiro(array $meio): bool
+    {
+        $tipo = mb_strtolower(trim((string) ($meio['tipo'] ?? '')), 'UTF-8');
+        if ($tipo === 'dinheiro') {
+            return true;
+        }
+
+        $desc = mb_strtoupper(trim((string) ($meio['descricao'] ?? $meio['forma'] ?? $meio['forma_pagamento'] ?? '')), 'UTF-8');
+
+        return $desc === 'DINHEIRO' || str_contains($desc, 'DINHEIRO');
+    }
+
     public function formatMoney(float $value): string
     {
         return number_format($value, 2, ',', '.');
     }
 
+    /**
+     * Tecla de concluir venda (empresa) — padrão F10.
+     */
+    public function atalhoConcluirVenda(): string
+    {
+        return EmpresaParametros::atalhoConcluirVenda(
+            $this->vendaEmpresaId ? (int) $this->vendaEmpresaId : ErpContext::currentEmpresaId()
+        );
+    }
+
     public function formatQty(float $value): string
     {
         return number_format($value, 3, ',', '.');
+    }
+
+    /**
+     * Soma das quantidades lançadas (respeita agrupamento: 5+3 na mesma linha = 8).
+     * Uso exclusivo do indicador visual do rodapé — não altera gravação/totais.
+     */
+    public function totalQuantidadeItens(): float
+    {
+        return round(array_sum(array_map(
+            static fn (array $i): float => (float) ($i['quantidade'] ?? 0),
+            $this->itens,
+        )), 3);
+    }
+
+    /** Rótulo do rodapé: "10,000 itens" / "1,000 item". */
+    public function rotuloQuantidadeItens(): string
+    {
+        $qtd = $this->totalQuantidadeItens();
+        $sufixo = abs($qtd - 1.0) < 0.0005 ? 'item' : 'itens';
+
+        return $this->formatQty($qtd).' '.$sufixo;
     }
 
     private function carregarPedidoExistente(int $pedidoId): void
@@ -1989,7 +3587,17 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         try {
+            $empresaSessao = ErpContext::currentEmpresaId();
+            if ($empresaSessao === null || $empresaSessao <= 0) {
+                throw new \RuntimeException('Nenhuma empresa selecionada na sessão.');
+            }
+
+            app(ForcaVendasTelaVendaService::class)->assertOrderDaEmpresa($order, (int) $empresaSessao);
             app(ForcaVendasTelaVendaService::class)->assertEditavel($order);
+            $this->vendaEmpresaId = (int) $order->empresa_id;
+            // Edição: UUID do pedido (idempotência de create não se aplica; update usa lockForUpdate).
+            $this->operacaoUuid = filled($order->uuid) ? (string) $order->uuid : (string) Str::uuid();
+            $this->orcamentoOrigemId = $order->orcamento_id ? (int) $order->orcamento_id : null;
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Não é possível editar este pedido.')
@@ -1997,6 +3605,9 @@ class ForcaVendasTelaVendaPage extends Page
                 ->warning()
                 ->send();
             $this->pedidoId = null;
+            $this->vendaEmpresaId = null;
+            $this->operacaoUuid = '';
+            $this->orcamentoOrigemId = null;
             $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
 
             return;
@@ -2019,6 +3630,10 @@ class ForcaVendasTelaVendaPage extends Page
 
         $this->davNumero = (string) ($pedido->numero ?? '');
         $this->observacoes = (string) ($pedido->observacoes ?? ($payload['observacoes'] ?? ''));
+        $cpfPayload = trim((string) ($payload['cpf_nota'] ?? ''));
+        $this->cpfNota = $cpfPayload !== ''
+            ? (PdvNotaClienteService::formatarCpfNota($cpfPayload) ?: $cpfPayload)
+            : '';
         $this->aplicarFvTransporteFromPayload(is_array($payload['transporte'] ?? null) ? $payload['transporte'] : null);
         // App: Prazo Avulso (condicao_pagamento) tem prioridade sobre tabela_prazo_dias.
         $condicaoRaw = trim((string) ($payload['condicao_pagamento'] ?? ''));
@@ -2138,6 +3753,8 @@ class ForcaVendasTelaVendaPage extends Page
                     'descricao' => (string) ($item->descricao ?: ($product?->descricao ?? 'Item')),
                     'quantidade' => $qtd,
                     'preco_unitario' => $preco,
+                    // Só do payload explícito — DAV antigo sem flag NÃO é inferido como manual.
+                    'preco_manual' => (bool) ($payloadItem['preco_manual'] ?? false),
                     'acrescimo' => $acr,
                     'desconto' => $desc,
                     'total' => round(($qtd * $preco) + $acr - $desc, 2),
@@ -2167,6 +3784,7 @@ class ForcaVendasTelaVendaPage extends Page
                     'descricao' => (string) ($raw['descricao'] ?? $product?->descricao ?? 'Item'),
                     'quantidade' => $qtd,
                     'preco_unitario' => $preco,
+                    'preco_manual' => (bool) ($raw['preco_manual'] ?? false),
                     'acrescimo' => $acr,
                     'desconto' => $desc,
                     'total' => round(($qtd * $preco) + $acr - $desc, 2),
@@ -2289,49 +3907,7 @@ class ForcaVendasTelaVendaPage extends Page
      */
     private function montarSugestoesCliente($people): array
     {
-        if ($people->isEmpty()) {
-            return [];
-        }
-
-        $ids = $people->pluck('id')->map(fn ($id): int => (int) $id)->all();
-        $hoje = ErpTimezone::toLocal()->toDateString();
-
-        $abertos = ContaReceber::query()
-            ->whereIn('cliente_id', $ids)
-            ->where('saldo', '>', 0)
-            ->groupBy('cliente_id')
-            ->selectRaw('cliente_id, SUM(saldo) as total')
-            ->pluck('total', 'cliente_id');
-
-        $vencidos = ContaReceber::query()
-            ->whereIn('cliente_id', $ids)
-            ->where('saldo', '>', 0)
-            ->whereDate('vencimento', '<', $hoje)
-            ->groupBy('cliente_id')
-            ->selectRaw('cliente_id, SUM(saldo) as total')
-            ->pluck('total', 'cliente_id');
-
-        return $people->map(function (Person $p) use ($abertos, $vencidos): array {
-            $id = (int) $p->id;
-            $limite = round((float) ($p->limite_credito ?? 0), 2);
-            $utilizado = round((float) ($abertos[$id] ?? 0), 2);
-            $vencidas = round((float) ($vencidos[$id] ?? 0), 2);
-            $doc = (string) ($p->cpf_cnpj ?? '');
-            $digits = preg_replace('/\D+/', '', $doc) ?? '';
-            $docTipo = strlen($digits) === 14 ? 'cnpj' : (strlen($digits) === 11 ? 'cpf' : '');
-
-            return [
-                'id' => $id,
-                'codigo' => (string) ($p->codigo ?? ''),
-                'nome' => (string) ($p->nome_razao ?? ''),
-                'cpf_cnpj' => $doc,
-                'doc_tipo' => $docTipo,
-                'limite' => ErpMoney::formatBr($limite),
-                'utilizado' => ErpMoney::formatBr($utilizado),
-                'vencidas' => ErpMoney::formatBr($vencidas),
-                'tem_vencidas' => $vencidas > 0,
-            ];
-        })->values()->all();
+        return app(\App\Support\ForcaVendas\FvClienteLookupService::class)->montarSugestoes($people);
     }
 
     private function formatarClienteBusca(Person $person): string
@@ -2378,7 +3954,7 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function carregarOpcoesOperacao(): void
     {
-        $empresaId = ErpContext::currentEmpresaId();
+        $empresaId = $this->vendaEmpresaId ?: ErpContext::currentEmpresaId();
 
         // Só operadores com RH (evita órfãos legados em vendedores). Value = vendedores.id.
         $vendedoresQuery = Vendedor::query()
@@ -2387,7 +3963,7 @@ class ForcaVendasTelaVendaPage extends Page
             ->whereHas('rhFuncionario')
             ->with('rhFuncionario');
 
-        // Escopo da empresa atual via pivot empresa_vendedor.
+        // Escopo da empresa da venda (congelada) ou sessão via pivot empresa_vendedor.
         if ($empresaId) {
             $vendedoresQuery->whereHas(
                 'empresas',
@@ -2411,8 +3987,8 @@ class ForcaVendasTelaVendaPage extends Page
             })
             ->all();
 
-        // CAIXA GERAL + PDVs liberados ao usuário do vendedor (Permissões → Caixas).
-        $this->caixaOpcoes = $this->opcoesCaixaDaTela();
+        // Caixa: carregado após o vendedor padrão (carregarCaixaDoVendedor), não aqui —
+        // evita opcoesCaixaDaTela() + ensureCaixaGeral() duplicados na abertura.
 
         $tabSvc = app(ProductTabelaPrecoService::class);
         $ids = array_values($tabSvc->tabelasPadraoIds());
@@ -2437,7 +4013,7 @@ class ForcaVendasTelaVendaPage extends Page
     {
         // 1º Cliente selecionado.
         if ($this->clienteId) {
-            $tabelaCliente = (int) (Person::query()->whereKey($this->clienteId)->value('price_table_id') ?? 0);
+            $tabelaCliente = (int) ($this->priceTableIdDoCliente((int) $this->clienteId) ?? 0);
 
             if ($tabelaCliente > 0 && $this->aplicarTabelaPreco($tabelaCliente)) {
                 return;
@@ -2446,7 +4022,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         // 2º Vendedor logado / selecionado.
         if ($this->vendedorId) {
-            $tabelaVendedor = (int) (Vendedor::query()->whereKey($this->vendedorId)->value('tabela_venda_id') ?? 0);
+            $tabelaVendedor = (int) ($this->priceTableIdDoVendedor((int) $this->vendedorId) ?? 0);
 
             if ($tabelaVendedor > 0 && $this->aplicarTabelaPreco($tabelaVendedor)) {
                 return;
@@ -2457,8 +4033,56 @@ class ForcaVendasTelaVendaPage extends Page
         $this->tabelaPrecoLabel = '';
     }
 
+    private function priceTableIdDoCliente(int $clienteId): ?int
+    {
+        if ($clienteId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($clienteId, $this->fvMemoPriceTableCliente)) {
+            $raw = Person::query()->whereKey($clienteId)->value('price_table_id');
+            $this->fvMemoPriceTableCliente[$clienteId] = $raw !== null ? (int) $raw : null;
+        }
+
+        $id = $this->fvMemoPriceTableCliente[$clienteId];
+
+        return ($id !== null && $id > 0) ? $id : null;
+    }
+
+    private function priceTableIdDoVendedor(int $vendedorId): ?int
+    {
+        if ($vendedorId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($vendedorId, $this->fvMemoPriceTableVendedor)) {
+            $raw = Vendedor::query()->whereKey($vendedorId)->value('tabela_venda_id');
+            $this->fvMemoPriceTableVendedor[$vendedorId] = $raw !== null ? (int) $raw : null;
+        }
+
+        $id = $this->fvMemoPriceTableVendedor[$vendedorId];
+
+        return ($id !== null && $id > 0) ? $id : null;
+    }
+
     private function aplicarTabelaPreco(int $id): bool
     {
+        // Reusa opção já carregada (evita SELECT repetido no mesmo request).
+        $labelOpcao = null;
+        foreach ($this->tabelaPrecoOpcoes as $op) {
+            if ((int) ($op['id'] ?? 0) === $id) {
+                $labelOpcao = (string) ($op['label'] ?? '');
+                break;
+            }
+        }
+
+        if ($labelOpcao !== null && $labelOpcao !== '') {
+            $this->tabelaPrecoId = $id;
+            $this->tabelaPrecoLabel = $labelOpcao;
+
+            return true;
+        }
+
         $tabela = PriceTable::query()->where('ativo', true)->find($id);
 
         if (! $tabela) {
@@ -2468,44 +4092,39 @@ class ForcaVendasTelaVendaPage extends Page
         $this->tabelaPrecoId = (int) $tabela->id;
         $this->tabelaPrecoLabel = trim(($tabela->codigo ? $tabela->codigo.' - ' : '').($tabela->descricao ?? ''));
 
-        $existe = collect($this->tabelaPrecoOpcoes)->contains(
-            fn (array $op): bool => (int) ($op['id'] ?? 0) === $this->tabelaPrecoId
-        );
-
-        if (! $existe) {
-            array_unshift($this->tabelaPrecoOpcoes, [
-                'id' => $this->tabelaPrecoId,
-                'label' => $this->tabelaPrecoLabel,
-            ]);
-        }
+        array_unshift($this->tabelaPrecoOpcoes, [
+            'id' => $this->tabelaPrecoId,
+            'label' => $this->tabelaPrecoLabel,
+        ]);
 
         return true;
     }
 
     public function updatedTabelaPrecoId(mixed $value): void
     {
-        // Combo Alpine usa fluxo item a item com barra de progresso.
+        // Combo Alpine usa aplicarTabelaPrecoNaGrid (lote). Evita segunda execução.
         if ($this->tabelaProgressOpen) {
             return;
         }
 
-        $this->iniciarAtualizacaoTabelaPreco((int) $value);
-        $total = count($this->itens);
-
-        for ($i = 0; $i < $total; $i++) {
-            $this->aplicarPrecoItemNaGrid($i);
-        }
-
-        $this->finalizarAtualizacaoTabelaPreco($this->tabelaRecalcAlterados);
+        $this->aplicarTabelaPrecoNaGrid((int) $value);
     }
 
     /**
-     * Inicia troca de tabela e prepara o recálculo item a item.
+     * Inicia troca de tabela (legado / compat). Preferir {@see aplicarTabelaPrecoNaGrid()}.
      *
      * @return array{ok: bool, total: int, label: string}
      */
     public function iniciarAtualizacaoTabelaPreco(int $id): array
     {
+        if ($this->tabelaProgressOpen) {
+            return [
+                'ok' => false,
+                'total' => 0,
+                'label' => '',
+            ];
+        }
+
         $this->tabelaProgressOpen = true;
         $this->tabelaRecalcAlterados = 0;
 
@@ -2532,7 +4151,7 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * Aplica o preço da tabela em um único item da grid (para progresso 1 a 1).
+     * Aplica o preço da tabela em um único item (compat / testes). Preferir lote.
      *
      * @return array{done: bool, atual: int, total: int, pct: int, alterado: bool, descricao: string, preco: string}
      */
@@ -2558,23 +4177,24 @@ class ForcaVendasTelaVendaPage extends Page
         $product = Product::query()->find($productId, [
             'id', 'preco_venda', 'preco_atacado', 'preco_especial',
             'qtd_atacado', 'usa_tab_preco', 'promo_preco_venda',
+            'promo_data_inicio', 'promo_data_fim',
         ]);
 
         $qtd = (float) ($item['quantidade'] ?? 0);
         $acrescimo = (float) ($item['acrescimo'] ?? 0);
         $desconto = (float) ($item['desconto'] ?? 0);
-        $precoAtual = round((float) ($item['preco_unitario'] ?? 0), 2);
-        $novoPreco = $product
-            ? $this->precoProdutoNaTabela($product, $qtd > 0 ? $qtd : 1)
-            : $precoAtual;
+        $resolvido = $this->resolverUnitarioTrocaTabela($item, $product);
+        $novoPreco = $resolvido['preco'];
 
-        if ($precoAtual !== $novoPreco) {
+        if ($resolvido['alterado']) {
             $this->tabelaRecalcAlterados++;
         }
 
-        $itens[$index]['preco_unitario'] = $novoPreco;
-        $itens[$index]['total'] = round(($qtd * $novoPreco) + $acrescimo - $desconto, 2);
-        $this->itens = array_values($itens);
+        if (! $resolvido['preservado']) {
+            $itens[$index]['preco_unitario'] = $novoPreco;
+            $itens[$index]['total'] = round(($qtd * $novoPreco) + $acrescimo - $desconto, 2);
+            $this->itens = array_values($itens);
+        }
 
         $atual = $index + 1;
 
@@ -2583,7 +4203,7 @@ class ForcaVendasTelaVendaPage extends Page
             'atual' => $atual,
             'total' => $total,
             'pct' => (int) round(($atual / max(1, $total)) * 100),
-            'alterado' => $precoAtual !== $novoPreco,
+            'alterado' => $resolvido['alterado'],
             'descricao' => (string) ($item['descricao'] ?? ''),
             'preco' => $this->formatMoney($novoPreco),
         ];
@@ -2609,7 +4229,9 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * Compat: recalcula a grid inteira de uma vez.
+     * Troca de tabela em lote: 1 request Livewire, produtos carregados de uma vez.
+     * Mesma regra comercial de {@see aplicarPrecoItemNaGrid()} —
+     * destino com preço válido aplica; destino zerado / preço manual preserva o unitário.
      *
      * @return array{ok: bool, alterados: int, total: int, label: string}
      */
@@ -2626,21 +4248,106 @@ class ForcaVendasTelaVendaPage extends Page
             ];
         }
 
-        $total = (int) $start['total'];
+        $total = (int) ($start['total'] ?? 0);
+        $label = (string) ($start['label'] ?? '');
 
-        for ($i = 0; $i < $total; $i++) {
-            $this->aplicarPrecoItemNaGrid($i);
+        try {
+            if ($total <= 0) {
+                $this->finalizarAtualizacaoTabelaPreco(0);
+
+                return [
+                    'ok' => true,
+                    'alterados' => 0,
+                    'total' => 0,
+                    'label' => $label,
+                ];
+            }
+
+            $productIds = [];
+            foreach ($this->itens as $item) {
+                $pid = (int) ($item['product_id'] ?? 0);
+                if ($pid > 0) {
+                    $productIds[$pid] = $pid;
+                }
+            }
+
+            /** @var \Illuminate\Support\Collection<int, Product> $products */
+            $products = Product::query()
+                ->whereIn('id', array_values($productIds))
+                ->get([
+                    'id', 'preco_venda', 'preco_atacado', 'preco_especial',
+                    'qtd_atacado', 'usa_tab_preco', 'promo_preco_venda',
+                    'promo_data_inicio', 'promo_data_fim',
+                ])
+                ->keyBy('id');
+
+            $comTab = $products->filter(static fn (Product $p): bool => (bool) ($p->usa_tab_preco ?? false));
+            if ($comTab->isNotEmpty()) {
+                app(ProductTabelaPrecoService::class)->carregarItens($comTab->values());
+            }
+
+            // Resolve nível uma vez (evita N× nivelDaTabelaId no loop).
+            $this->nivelTabelaPrecoSelecionada();
+
+            $itens = $this->itens;
+            $alterados = 0;
+
+            foreach ($itens as $index => $item) {
+                $qtd = (float) ($item['quantidade'] ?? 0);
+                $acrescimo = (float) ($item['acrescimo'] ?? 0);
+                $desconto = (float) ($item['desconto'] ?? 0);
+                $productId = (int) ($item['product_id'] ?? 0);
+                $product = $productId > 0 ? ($products->get($productId)) : null;
+                $resolvido = $this->resolverUnitarioTrocaTabela($item, $product);
+
+                if ($resolvido['alterado']) {
+                    $alterados++;
+                }
+
+                if ($resolvido['preservado']) {
+                    $precoAtual = round((float) ($item['preco_unitario'] ?? 0), 2);
+                    $itens[$index]['total'] = round(($qtd * $precoAtual) + $acrescimo - $desconto, 2);
+
+                    continue;
+                }
+
+                $novoPreco = $resolvido['preco'];
+                $itens[$index]['preco_unitario'] = $novoPreco;
+                $itens[$index]['total'] = round(($qtd * $novoPreco) + $acrescimo - $desconto, 2);
+            }
+
+            $this->itens = array_values($itens);
+            $this->tabelaRecalcAlterados = $alterados;
+            unset($this->totalBruto, $this->totalDescontosItens, $this->totalAcrescimosItens);
+
+            $this->finalizarAtualizacaoTabelaPreco($alterados);
+
+            return [
+                'ok' => true,
+                'alterados' => $alterados,
+                'total' => $total,
+                'label' => $label,
+            ];
+        } catch (\Throwable $e) {
+            // Falha: libera o modal e não deixa a UI travada. Itens podem estar
+            // parcialmente atualizados só se o exception ocorrer após o assign —
+            // o assign é atômico no final do foreach (uma atribuição a $this->itens).
+            $this->tabelaProgressOpen = false;
+            $this->tabelaRecalcAlterados = 0;
+
+            Notification::make()
+                ->title('Não foi possível atualizar os preços da tabela.')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return [
+                'ok' => false,
+                'alterados' => 0,
+                'total' => $total,
+                'label' => $label,
+            ];
         }
-
-        $alterados = $this->tabelaRecalcAlterados;
-        $this->finalizarAtualizacaoTabelaPreco($alterados);
-
-        return [
-            'ok' => true,
-            'alterados' => $alterados,
-            'total' => $total,
-            'label' => (string) ($start['label'] ?? ''),
-        ];
     }
 
     /**
@@ -2651,6 +4358,91 @@ class ForcaVendasTelaVendaPage extends Page
     private function precoNaTabelaSelecionada(Product $product): ?float
     {
         return $this->precoProdutoNaTabela($product);
+    }
+
+    /**
+     * Resolve o unitário na troca de tabela da Tela de Venda (somente esta tela).
+     * - preço manual digitado → preserva
+     * - nível de destino sem preço cadastrado (> 0) → preserva o unitário em uso
+     *   (não aplica fallback do motor para varejo/cadastro)
+     * - destino com preço válido → aplica {@see precoProdutoNaTabela()}
+     *
+     * @param  array<string, mixed>  $item
+     * @return array{preco: float, alterado: bool, preservado: bool}
+     */
+    private function resolverUnitarioTrocaTabela(array $item, ?Product $product): array
+    {
+        $precoAtual = round((float) ($item['preco_unitario'] ?? 0), 2);
+        $qtd = (float) ($item['quantidade'] ?? 0);
+
+        if (! empty($item['preco_manual'])) {
+            return ['preco' => $precoAtual, 'alterado' => false, 'preservado' => true];
+        }
+
+        if (! $product) {
+            return ['preco' => $precoAtual, 'alterado' => false, 'preservado' => true];
+        }
+
+        $definido = $this->precoCadastradoNoNivelSelecionado($product, $qtd > 0 ? $qtd : 1);
+
+        // Ex.: ATACADO 0,00 — mantém R$ 80,00 (não volta para cadastro 0,01).
+        if ($definido === null) {
+            return ['preco' => $precoAtual, 'alterado' => false, 'preservado' => true];
+        }
+
+        $novoPreco = $this->precoProdutoNaTabela($product, $qtd > 0 ? $qtd : 1);
+
+        return [
+            'preco' => $novoPreco,
+            'alterado' => $precoAtual !== $novoPreco,
+            'preservado' => false,
+        ];
+    }
+
+    /**
+     * Preço efetivamente cadastrado no nível da tabela selecionada, sem fallback para varejo.
+     * null = nível sem preço definido (ex.: preco_atacado = 0,00).
+     * Não altera o motor global — uso exclusivo na troca de tabela desta tela.
+     */
+    private function precoCadastradoNoNivelSelecionado(Product $product, float $quantidade = 1): ?float
+    {
+        $tabSvc = app(ProductTabelaPrecoService::class);
+        $nivel = $tabSvc->nivelDaTabelaId($this->tabelaPrecoId) ?? ProductTabelaPrecoService::NIVEL_VAREJO;
+
+        if ($product->usa_tab_preco ?? false) {
+            $tabSvc->carregarItens($product);
+
+            if (! $tabSvc->habilitaNivel($product, $nivel)) {
+                return null;
+            }
+
+            $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+            $precos = app(ProductEmpresaPrecoService::class)->resolve(
+                $product,
+                $empresaId > 0 ? $empresaId : null,
+            );
+
+            $bruto = match ($nivel) {
+                ProductTabelaPrecoService::NIVEL_ATACADO => (float) ($precos['preco_atacado'] ?? 0),
+                ProductTabelaPrecoService::NIVEL_ESPECIAL => (float) ($precos['preco_especial'] ?? $product->preco_especial ?? 0),
+                default => $tabSvc->resolvePrecoNivel(
+                    $product,
+                    ProductTabelaPrecoService::NIVEL_VAREJO,
+                    $quantidade,
+                    $empresaId > 0 ? $empresaId : null,
+                ),
+            };
+
+            return $bruto > 0 ? round($bruto, 2) : null;
+        }
+
+        $bruto = match ($nivel) {
+            ProductTabelaPrecoService::NIVEL_ATACADO => (float) ($product->preco_atacado ?? 0),
+            ProductTabelaPrecoService::NIVEL_ESPECIAL => (float) ($product->preco_especial ?? 0),
+            default => $this->precoVarejoProduto($product),
+        };
+
+        return $bruto > 0 ? round($bruto, 2) : null;
     }
 
     private function precoProdutoNaTabela(Product $product, float $quantidade = 1): float
@@ -2861,9 +4653,30 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         $qtd = $this->parseDecimal($this->quantidade);
-        $this->precoUnitario = $this->formatMoney(
-            $this->precoProdutoNaTabela($product, $qtd > 0 ? $qtd : 1)
-        );
+        $digitado = $this->parseDecimal($this->precoUnitario);
+        $listaAnterior = $this->parseDecimal($this->precoListaItem);
+        $definido = $this->precoCadastradoNoNivelSelecionado($product, $qtd > 0 ? $qtd : 1);
+
+        // Só acompanha a tabela se o operador ainda não havia digitado um valor ≠ lista.
+        $precoManualmenteNaBarra = abs(round($digitado - $listaAnterior, 2)) >= 0.005
+            && ($listaAnterior > 0 || $digitado > 0);
+
+        // Destino sem preço (0,00): atualiza só a lista de referência; mantém o unitário em uso.
+        if ($definido === null) {
+            $this->precoListaItem = $this->formatMoney(0);
+            $this->recalcularTotalItem();
+
+            return;
+        }
+
+        $this->precoListaItem = $this->formatMoney($definido);
+
+        if (! $precoManualmenteNaBarra) {
+            $this->precoUnitario = $this->formatMoney(
+                $this->precoProdutoNaTabela($product, $qtd > 0 ? $qtd : 1)
+            );
+        }
+
         $this->recalcularTotalItem();
     }
 
@@ -2883,9 +4696,7 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         // 1º: operador/vendedor vinculado ao usuário logado (mesmo fluxo do PDV).
-        $vendedor = $user->relationLoaded('vendedor')
-            ? $user->vendedor
-            : $user->vendedor()->first();
+        $vendedor = $user->vendedor()->with(['rhFuncionario', 'empresas'])->first();
 
         if ($vendedor && $this->vendedorOperacionalValido($vendedor)) {
             $this->aplicarVendedor($vendedor);
@@ -2898,7 +4709,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         if ($sessionVendedorId > 0) {
             $vendedor = Vendedor::query()
-                ->with('rhFuncionario')
+                ->with(['rhFuncionario', 'empresas'])
                 ->where('ativo', true)
                 ->find($sessionVendedorId);
 
@@ -2919,9 +4730,68 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
+     * Grava com lock por operação (user + empresa + UUID) para F3/Sair/F10 create.
+     * Update (existente) usa lockForUpdate no service; o Cache::lock ainda serializa
+     * double-submit da mesma tela.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function gravarPedidoComIdempotencia(
+        ForcaVendasTelaVendaService $svc,
+        \App\Models\User $user,
+        array $data,
+        ?ForcaVendasOrder $existente,
+    ): ForcaVendasOrder {
+        $uuid = trim((string) ($data['uuid'] ?? $this->operacaoUuid));
+        $empresaId = (int) ($this->vendaEmpresaId ?? 0);
+        $lockKey = 'fv-tv-gravar:'.(int) $user->id.':'.$empresaId.':'.$uuid;
+        $lock = Cache::lock($lockKey, 25);
+
+        if (! $lock->get()) {
+            throw new \RuntimeException('A gravação desta venda já está em andamento. Aguarde.');
+        }
+
+        try {
+            return $svc->gravarPedido($user, $data, $existente);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Garante que a sessão ainda é a empresa congelada da venda.
+     * Bloqueia F3/F4/F10/Sair após troca de empresa em outra aba.
+     *
+     * @throws \RuntimeException
+     */
+    private function assertContextoEmpresaOperavel(): void
+    {
+        $vendaEmpresaId = (int) ($this->vendaEmpresaId ?? 0);
+
+        if ($vendaEmpresaId <= 0) {
+            throw new \RuntimeException(
+                'Contexto de empresa da venda não definido. Recarregue a Tela de Venda.'
+            );
+        }
+
+        if (! ErpContext::userCanAccessEmpresa($vendaEmpresaId)) {
+            throw new \RuntimeException('Sem permissão para operar a empresa desta venda.');
+        }
+
+        $sessao = ErpContext::currentEmpresaId();
+
+        if ($sessao === null || (int) $sessao !== $vendaEmpresaId) {
+            throw new \RuntimeException(
+                'A empresa ativa foi alterada. Retorne à empresa original da venda '
+                .'antes de gravar, sair com pendente, fechar ou faturar.'
+            );
+        }
+    }
+
+    /**
      * Operador válido para NOVA venda (combo / padrão).
      */
-    private function vendedorOperacionalValido(Vendedor $vendedor): bool
+    private function vendedorOperacionalValido(Vendedor $vendedor, ?int $empresaId = null): bool
     {
         if (! $vendedor->ativo || ! $vendedor->efetua_venda) {
             return false;
@@ -2933,10 +4803,10 @@ class ForcaVendasTelaVendaPage extends Page
             return false;
         }
 
-        $empresaId = ErpContext::currentEmpresaId();
+        $empresaId ??= $this->vendaEmpresaId ?? ErpContext::currentEmpresaId();
 
         if (! $empresaId) {
-            return true;
+            return false;
         }
 
         if ((int) ($vendedor->empresa_id ?? 0) === (int) $empresaId) {
@@ -3021,21 +4891,27 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function pedidoExigeEstoque(): bool
     {
+        $productIds = [];
+
         foreach ($this->itens as $item) {
             $productId = (int) ($item['product_id'] ?? 0);
 
-            if ($productId <= 0) {
-                continue;
-            }
-
-            $isServico = Product::query()->whereKey($productId)->value('is_servico');
-
-            if (! $isServico) {
-                return true;
+            if ($productId > 0) {
+                $productIds[$productId] = $productId;
             }
         }
 
-        return false;
+        if ($productIds === []) {
+            return false;
+        }
+
+        // 1 query: se existir qualquer produto físico, a venda exige depósito.
+        return Product::query()
+            ->whereIn('id', array_values($productIds))
+            ->where(function ($q): void {
+                $q->whereNull('is_servico')->orWhere('is_servico', false);
+            })
+            ->exists();
     }
 
     private function notificarEstoqueNaoDefinido(): void
@@ -3057,7 +4933,8 @@ class ForcaVendasTelaVendaPage extends Page
      */
     private function opcoesCaixaDaTela(?Vendedor $vendedor = null): array
     {
-        $empresaId = ErpContext::currentEmpresaId()
+        $empresaId = $this->vendaEmpresaId
+            ?: ErpContext::currentEmpresaId()
             ?: ((int) (Auth::user()?->empresa_id ?? 0) ?: null);
 
         $usuario = null;
@@ -3101,7 +4978,8 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function carregarCaixaDoVendedor(Vendedor $vendedor): void
     {
-        $empresaId = ErpContext::currentEmpresaId()
+        $empresaId = $this->vendaEmpresaId
+            ?: ErpContext::currentEmpresaId()
             ?: ($vendedor->empresa_id ? (int) $vendedor->empresa_id : null)
             ?: ((int) (Auth::user()?->empresa_id ?? 0) ?: null);
 
@@ -3140,7 +5018,15 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $vendedor = Vendedor::query()->find($id);
+        try {
+            $this->assertContextoEmpresaOperavel();
+        } catch (\Throwable $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+
+            return;
+        }
+
+        $vendedor = Vendedor::query()->with(['rhFuncionario', 'empresas', 'usuario'])->find($id);
 
         if (! $vendedor) {
             Notification::make()->title('Vendedor não encontrado.')->warning()->send();
@@ -3148,9 +5034,19 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        if (! $this->vendedorOperacionalValido($vendedor, (int) $this->vendaEmpresaId)) {
+            Notification::make()
+                ->title('Vendedor não autorizado para a empresa desta venda.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         // Ao trocar de vendedor, o caixa amarrado (ou GERAL) é sugerido de novo.
         $this->caixaId = null;
         $this->caixaLabel = '';
+        $this->fvMemoPriceTableVendedor = [];
         $this->aplicarVendedor($vendedor);
         $this->caixaOperacionalDefinido();
 
@@ -3170,10 +5066,36 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        try {
+            $this->assertContextoEmpresaOperavel();
+        } catch (\Throwable $e) {
+            $this->caixaId = null;
+            $this->caixaLabel = '';
+            Notification::make()->title($e->getMessage())->warning()->send();
+
+            return;
+        }
+
         $caixa = CaixaConta::query()->find($id);
 
         if (! $caixa) {
             Notification::make()->title('Caixa não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $autorizados = collect($this->opcoesCaixaDaTela())
+            ->pluck('id')
+            ->map(fn ($cid): int => (int) $cid)
+            ->all();
+
+        if (! in_array((int) $caixa->id, $autorizados, true)) {
+            Notification::make()
+                ->title('Caixa não autorizado para a empresa desta venda.')
+                ->warning()
+                ->send();
+            $this->caixaId = null;
+            $this->caixaLabel = '';
 
             return;
         }
@@ -3258,12 +5180,12 @@ class ForcaVendasTelaVendaPage extends Page
      */
     private function resolveAtalhoForma(string $atalho, string $descricao, array &$usados): string
     {
-        $atalho = mb_strtoupper(trim($atalho), 'UTF-8');
+        $cadastrado = \App\Support\Erp\FormaPagamentoAtalho::cadastradoUtilizavel($atalho, $usados);
 
-        if ($atalho !== '' && mb_strlen($atalho, 'UTF-8') === 1 && ! isset($usados[$atalho])) {
-            $usados[$atalho] = true;
+        if ($cadastrado !== null) {
+            $usados[$cadastrado] = true;
 
-            return $atalho;
+            return $cadastrado;
         }
 
         $desc = mb_strtoupper(trim($descricao), 'UTF-8');
@@ -3510,9 +5432,99 @@ class ForcaVendasTelaVendaPage extends Page
         $this->clienteWhatsapp = (string) ($person->fone1 ?? $person->celular1 ?? '');
         $this->clienteObservacoes = trim((string) ($person->observacoes ?? ''));
         $this->observacaoClienteModalOpen = false;
+        $this->syncCpfNotaFromCliente($person);
 
         // Sempre realinha a tabela: cliente (se tiver) senão vendedor.
         $this->carregarTabelaPrecoPadrao();
+    }
+
+    /**
+     * Troca efetiva de cliente: realinha CPF na Nota (não mantém documento de outra pessoa).
+     * PF com CPF válido → preenche; CNPJ / CF sem CPF / inválido → limpa.
+     * Pesquisa/clique sem selecionar não chama este método.
+     */
+    private function syncCpfNotaFromCliente(Person $person): void
+    {
+        $cpfParaNota = PdvNotaClienteService::extrairCpfParaNota(
+            (string) ($person->cpf_cnpj ?? ''),
+            (string) ($person->pessoa_tipo ?? Person::PESSOA_FISICA),
+        );
+
+        $this->cpfNota = $cpfParaNota ?? '';
+    }
+
+    /**
+     * DOM → Livewire no F4 (CPF na Nota + mesma Observação do Pedido).
+     * Sem remorph a cada tecla; chamado no flush antes de F10/atalhos/Voltar.
+     *
+     * @param  bool  $validarCpf  false no Voltar/Esc (preserva texto; F10 valida).
+     */
+    public function flushCpfNotaEObservacoes(
+        string $cpfNota,
+        string $observacoes,
+        bool $validarCpf = true,
+        bool $skipRender = true,
+    ): bool {
+        $raw = trim($cpfNota);
+        $digits = preg_replace('/\D/', '', $raw) ?? '';
+
+        if ($digits === '') {
+            $this->cpfNota = '';
+        } elseif (strlen($digits) === 11 && \App\Support\Erp\DocumentoBrasileiroValidator::isValidCpf($digits)) {
+            $this->cpfNota = PdvNotaClienteService::formatarCpfNota($digits);
+        } else {
+            $this->cpfNota = $raw;
+        }
+
+        $this->observacoes = $this->observacaoPedidoCaixaAlta($observacoes);
+
+        if ($validarCpf && ($msg = (new PdvNotaClienteService())->validaDocumentoCpfNota($this->cpfNota))) {
+            Notification::make()->title($msg)->warning()->send();
+            if ($skipRender) {
+                $this->skipRender();
+            }
+
+            return false;
+        }
+
+        // Garante máscara após validação (vazio permanece vazio).
+        if ($this->cpfNota !== '') {
+            $this->cpfNota = PdvNotaClienteService::formatarCpfNota($this->cpfNota) ?: $this->cpfNota;
+        }
+
+        $this->persistirObservacaoPedidoGravada();
+        $this->persistirCpfNotaNoPayload();
+        if ($skipRender) {
+            $this->skipRender();
+        }
+        $this->dispatch('erp-fv-fin-cpf-synced', value: $this->cpfNota);
+
+        return true;
+    }
+
+    private function persistirCpfNotaNoPayload(): void
+    {
+        if (! $this->pedidoId) {
+            return;
+        }
+
+        $order = ForcaVendasOrder::query()->find($this->pedidoId);
+
+        if (! $order) {
+            return;
+        }
+
+        try {
+            $this->assertContextoEmpresaOperavel();
+            app(ForcaVendasTelaVendaService::class)->assertOrderDaEmpresa($order, (int) $this->vendaEmpresaId);
+            app(ForcaVendasTelaVendaService::class)->assertEditavel($order);
+        } catch (\Throwable) {
+            return;
+        }
+
+        $payload = is_array($order->payload) ? $order->payload : [];
+        $payload['cpf_nota'] = $this->cpfNota !== '' ? $this->cpfNota : null;
+        $order->update(['payload' => $payload]);
     }
 
     private function aplicarProdutoSelecionado(Product $product): void
@@ -3525,63 +5537,65 @@ class ForcaVendasTelaVendaPage extends Page
         $this->fecharSugestoesProduto();
         $this->carregarProdutoNoForm($product);
 
-        // Com Tab. Preço o foco fica no modal; senão segue para a quantidade.
+        // Com Tab. Preço o foco fica no modal; senão skipRender + payload JS (sem remorph).
         if (! $this->tabPrecoItemModalOpen) {
-            $this->dispatch('fv-tela-venda-focus-qtd');
+            if ($this->parseDecimal($this->quantidade) <= 0) {
+                $this->quantidade = '1,000';
+            }
+            $this->recalcularTotalItem();
+            $this->skipRender();
+            $this->dispatchFvItemStaged();
         }
     }
 
+    private function dispatchFvItemStaged(): void
+    {
+        $this->dispatch('fv-tela-venda-item-staged', [
+            'nome' => $this->produtoAtualNome,
+            'codigo' => '',
+            'qtd' => $this->quantidade,
+            'preco' => $this->precoUnitario,
+            'total' => $this->totalItem,
+            'foto' => $this->produtoAtualFoto,
+        ]);
+        $this->dispatch('fv-tela-venda-focus-qtd');
+    }
+
     /**
-     * @return list<array{id: int, codigo: string, nome: string, atual: string, reservado: string, disponivel: string, preco: string}>
+     * Payload para atualizar grade/totais no DOM após inclusão (sem remorph).
+     *
+     * @return array{item: array<string, mixed>, totais: array<string, string>, foto: ?string, nome: string}|null
+     */
+    private function fvItemIncludedPayload(bool $agrupado): ?array
+    {
+        $row = $this->itens[0] ?? null;
+
+        if (! is_array($row)) {
+            return null;
+        }
+
+        return [
+            'item' => $this->fvItemRowPayload($row, $agrupado),
+            'totais' => $this->fvTotaisPayload(),
+            'foto' => $row['foto'] ?? $this->produtoAtualFoto,
+            'nome' => (string) ($row['descricao'] ?? ''),
+        ];
+    }
+
+    /**
+     * Fallback Enter (código sem match exato) — mesmo serviço do GET de pesquisa.
+     *
+     * @return list<array{id: int, codigo: string, nome: string, atual: string, reservado: string, disponivel: string, preco: string, em_promocao?: bool}>
      */
     private function montarSugestoesProduto(string $term): array
     {
-        $term = trim($term);
-
-        if ($term === '') {
-            return [];
-        }
-
-        $like = '%'.$term.'%';
-
-        $produtos = Product::query()
-            ->where('ativo', true)
-            ->where(function ($query) use ($term, $like): void {
-                $query->where('codigo', 'like', $like)
-                    ->orWhere('referencia', 'like', $like)
-                    ->orWhere('codigo_barras', 'like', $like)
-                    ->orWhere('codigo_barras_caixa', 'like', $like)
-                    ->orWhere('descricao', 'like', $like);
-            })
-            ->orderByRaw('CASE WHEN codigo = ? THEN 0 WHEN descricao LIKE ? THEN 1 ELSE 2 END', [$term, $term.'%'])
-            ->orderBy('descricao')
-            ->limit(12)
-            ->get(['id', 'codigo', 'descricao', 'preco_venda']);
-
-        // Saldo físico e reservas no depósito do vendedor (mesmo critério da validação ao incluir item).
-        $reservaService = app(EstoqueReservaService::class);
-        $saldos = app(ProductEstoqueSaldoService::class);
-        $reservas = $reservaService->totaisReservadosAtivos($this->estoqueId);
-
-        return $produtos
-            ->map(function (Product $product) use ($reservas, $reservaService, $saldos): array {
-                $preco = $this->precoNaTabelaSelecionada($product) ?? (float) ($product->preco_venda ?? 0);
-                $atual = $saldos->fisico((int) $product->id, $this->estoqueId);
-                $reservado = (float) ($reservas[$product->id] ?? 0);
-                $disponivel = $reservaService->disponivel($product, null, $this->estoqueId);
-
-                return [
-                    'id' => (int) $product->id,
-                    'codigo' => (string) ($product->codigo ?? ''),
-                    'nome' => (string) ($product->descricao ?? ''),
-                    'atual' => $this->formatQty($atual),
-                    'reservado' => $this->formatQty($reservado),
-                    'disponivel' => $this->formatQty($disponivel),
-                    'preco' => $this->formatMoney($preco),
-                ];
-            })
-            ->values()
-            ->all();
+        return app(\App\Support\ForcaVendas\FvProdutoLookupService::class)->buscar(
+            $term,
+            ErpContext::currentEmpresaId(),
+            $this->vendedorId,
+            $this->estoqueId,
+            $this->tabelaPrecoId,
+        );
     }
 
     private function findExactProduct(string $term): ?Product
@@ -3647,13 +5661,15 @@ class ForcaVendasTelaVendaPage extends Page
         // Mantém foto do último item selecionado via grid; limpa se quiser foco no barcode
         $this->produtoAtualFoto = null;
         $this->produtoAtualId = null;
+        $this->editingItemKey = null;
+        $this->editingItemSnapshot = null;
         $this->fecharSugestoesProduto();
     }
 
     /**
-     * Digitou valor diferente da tabela (ex.: tabela 192, digitou 190 ou 200):
-     * mantém o unitário da tabela e lança a diferença como desconto ou acréscimo.
-     * Se o digitado for igual à tabela, preserva desconto/acréscimo do Ctrl+D.
+     * Contrato Tela de Venda (autorizado): o Valor Unitário digitado é o preço efetivo.
+     * Não converte diferença em relação à tabela em desconto/acréscimo automático.
+     * Desconto/acréscimo só entram via Ctrl+D (valores já na barra) ou linha já ajustada.
      *
      * @return array{0: float, 1: float, 2: float}
      */
@@ -3663,30 +5679,14 @@ class ForcaVendasTelaVendaPage extends Page
         float $desconto,
         float $acrescimo,
     ): array {
-        $lista = $this->parseDecimal($this->precoListaItem);
-
-        if ($lista <= 0 || $qtd <= 0) {
-            return [$digitado, $desconto, $acrescimo];
-        }
-
-        $deltaUnit = round($digitado - $lista, 2);
-
-        // Igual à tabela: mantém ajuste explícito (Ctrl+D), se houver.
-        if (abs($deltaUnit) < 0.005) {
-            return [$lista, $desconto, $acrescimo];
-        }
-
-        // Outro valor digitado: diferença vira desconto/acréscimo (substitui o anterior).
-        if ($deltaUnit < 0) {
-            return [$lista, round(abs($deltaUnit) * $qtd, 2), 0.0];
-        }
-
-        return [$lista, 0.0, round($deltaUnit * $qtd, 2)];
+        // $qtd permanece na assinatura por compatibilidade com os callers.
+        return [$digitado, $desconto, $acrescimo];
     }
 
     /**
-     * Ao mudar o Vlr. unit. para algo ≠ tabela, remove % antigo da edição
-     * para não recalcular desconto em cima do novo valor digitado.
+     * Ao mudar o Vlr. unit. para algo ≠ tabela sugerida, remove ajuste %/R$ da barra
+     * para não manter desconto/acréscimo calculado sobre o preço anterior.
+     * Ctrl+D depois da alteração de preço continua válido.
      */
     private function limparAjustePercentualSePrecoDiferenteDaLista(): void
     {
@@ -3760,6 +5760,7 @@ class ForcaVendasTelaVendaPage extends Page
                 'product_grade_id' => $item['product_grade_id'] ?? null,
                 'quantidade' => (float) $item['quantidade'],
                 'preco_unitario' => (float) $item['preco_unitario'],
+                'preco_manual' => (bool) ($item['preco_manual'] ?? false),
                 'desconto' => round((float) $item['desconto'] + ($descontoRateio[$index] ?? 0), 2),
                 'acrescimo' => round((float) ($item['acrescimo'] ?? 0) + ($acrescimoRateio[$index] ?? 0), 2),
                 'descricao' => (string) $item['descricao'],

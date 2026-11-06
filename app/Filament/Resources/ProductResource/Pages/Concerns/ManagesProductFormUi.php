@@ -40,9 +40,16 @@ trait ManagesProductFormUi
             return;
         }
 
+        $previous = $this->activeEstoqueSubTab;
+
         // Ao sair de Localizações, grava partes já presentes no estado Livewire
         // (o DOM é lido no save; aqui só garante a subaba).
         $this->activeEstoqueSubTab = $tab;
+
+        // Movimentações é só consulta — libera o array ao sair para enxugar o snapshot.
+        if ($previous === 'movimentacoes' && $tab !== 'movimentacoes') {
+            $this->releaseProductMovimentacoesTransientState();
+        }
 
         if ($tab === 'movimentacoes' && method_exists($this, 'loadProductMovimentacoes')) {
             $this->loadProductMovimentacoes($this->record ?? null);
@@ -57,7 +64,10 @@ trait ManagesProductFormUi
             return;
         }
 
+        $previous = $this->activeFormTab;
         $this->activeFormTab = $tab;
+
+        $this->releaseTransientProductTabState($previous, $tab);
 
         if ($tab === 'impostos' && method_exists($this, 'refreshEmpresaImpostoPadraoOnImpostosTab')) {
             $this->refreshEmpresaImpostoPadraoOnImpostosTab();
@@ -65,11 +75,53 @@ trait ManagesProductFormUi
 
         $this->ensureProductTabPayload($tab);
 
-        $this->dispatch('erp-masks-refresh');
+        // Máscaras só onde há inputs mascarados (evita trabalho JS em abas só-leitura).
+        if ($this->productFormTabNeedsMasks($tab)) {
+            $this->dispatch('erp-masks-refresh');
+        }
 
         if ($tab === 'estoques' && blank($this->activeEstoqueSubTab)) {
             $this->activeEstoqueSubTab = 'estoques';
         }
+    }
+
+    /**
+     * Libera temporários de consulta ao sair da aba — nunca limpa grades editáveis
+     * (grade/composicao/imei/lotes) nem rascunhos de preço por empresa.
+     */
+    protected function releaseTransientProductTabState(string $previous, string $next): void
+    {
+        if ($previous === $next) {
+            return;
+        }
+
+        if ($previous === 'ultimos_precos' && method_exists($this, 'releaseProductPriceHistoryTransientState')) {
+            $this->releaseProductPriceHistoryTransientState();
+        }
+
+        if ($previous === 'composicao' && method_exists($this, 'closeCompositionSuggestions')) {
+            $this->closeCompositionSuggestions();
+        }
+
+        if ($previous === 'estoques' && $this->activeEstoqueSubTab === 'movimentacoes' && $next !== 'estoques') {
+            $this->releaseProductMovimentacoesTransientState();
+        }
+    }
+
+    protected function releaseProductMovimentacoesTransientState(): void
+    {
+        if (! property_exists($this, 'productMovimentacoes')) {
+            return;
+        }
+
+        $this->productMovimentacoes = [];
+        $this->productMovimentacoesLoaded = false;
+        $this->movTotal = 0;
+    }
+
+    protected function productFormTabNeedsMasks(string $tab): bool
+    {
+        return ! in_array($tab, ['ultimos_precos', 'tabela_preco'], true);
     }
 
     public function updatedData(mixed $value, string $key): void
@@ -144,7 +196,9 @@ trait ManagesProductFormUi
         $tab = $tabMap[$key] ?? null;
 
         if ($enabled && $tab) {
+            $previous = $this->activeFormTab;
             $this->activeFormTab = $tab;
+            $this->releaseTransientProductTabState($previous, $tab);
             $this->ensureProductTabPayload($tab);
 
             return;
@@ -175,6 +229,10 @@ trait ManagesProductFormUi
 
     protected function loadProductTabPayload(string $tab): void
     {
+        if ($tab === 'estoques' && method_exists($this, 'ensureProductReservasLoaded')) {
+            $this->ensureProductReservasLoaded();
+        }
+
         if ($tab === 'grade' && method_exists($this, 'ensureProductGradesLoaded')) {
             $this->ensureProductGradesLoaded();
         }
@@ -189,6 +247,10 @@ trait ManagesProductFormUi
 
         if ($tab === 'ultimos_precos' && method_exists($this, 'ensureProductPriceHistoriesLoaded')) {
             $this->ensureProductPriceHistoriesLoaded();
+        }
+
+        if ($tab === 'tabela_preco' && method_exists($this, 'ensureProductTabPrecoLoaded')) {
+            $this->ensureProductTabPrecoLoaded();
         }
 
         if ($tab === 'lotes' && method_exists($this, 'loadProductLotes')) {

@@ -38,6 +38,8 @@ final class OsFaturamentoService
         ?array $tabelaPrazoDias = null,
         ?array $chequeNumeros = null,
     ): array {
+        OsFinPerf::mark('svc.faturar.start');
+
         if (in_array($os->situacao, [OrdemServico::SITUACAO_FINALIZADA, OrdemServico::SITUACAO_ENTREGUE, OrdemServico::SITUACAO_CANCELADA], true)) {
             throw new \RuntimeException('Esta OS não pode ser faturada.');
         }
@@ -46,7 +48,8 @@ final class OsFaturamentoService
             throw new \RuntimeException('Informe o cliente da OS.');
         }
 
-        $os->loadMissing('itens.product');
+        $os->loadMissing(['itens.product', 'cliente']);
+        OsFinPerf::mark('svc.load_itens_cliente');
         $total = $this->money($os->total_geral);
 
         if (bccomp($total, '0.00', 2) !== 1) {
@@ -59,17 +62,32 @@ final class OsFaturamentoService
         } catch (\InvalidArgumentException $e) {
             throw new \RuntimeException($e->getMessage(), 0, $e);
         }
+        OsFinPerf::mark('svc.caixa_guard');
 
         $linhas = $this->linhas($pagamentos, $total);
+        OsFinPerf::mark('svc.linhas_pagamento');
         $contasCriadas = [];
 
         DB::transaction(function () use ($os, $linhas, $total, $pagamentos, $tabelaPrazoDias, $chequeNumeros, &$contasCriadas): void {
+            $travada = OrdemServico::query()->whereKey($os->id)->lockForUpdate()->first();
+            OsFinPerf::mark('svc.lock_os');
+
+            if (! $travada instanceof OrdemServico) {
+                throw new \RuntimeException('OS não encontrada.');
+            }
+
+            if (in_array($travada->situacao, [OrdemServico::SITUACAO_FINALIZADA, OrdemServico::SITUACAO_ENTREGUE, OrdemServico::SITUACAO_CANCELADA], true)) {
+                throw new \RuntimeException('Esta OS não pode ser faturada.');
+            }
+
             $documento = 'OS-'.preg_replace('/\D/', '', (string) $os->numero);
             $hoje = ErpTimezone::toLocal()->toDateString();
             $empresaId = $os->empresa_id ? (int) $os->empresa_id : ErpContext::currentEmpresaId();
             app(CaixaAbertoGuard::class)->assertPodeFinalizarVenda($empresaId ? (int) $empresaId : null);
             $baixa = app(ContaReceberBaixaService::class);
             $caixaGeral = (int) CaixaConta::ensureCaixaGeral()->id;
+            $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
+            OsFinPerf::mark('svc.prep_financeiro');
 
             foreach ($linhas as $linha) {
                 $meta = $this->metaPagamento($pagamentos, (int) $linha['forma']->id);
@@ -86,10 +104,13 @@ final class OsFaturamentoService
                     $meta,
                     $tabelaPrazoDias,
                     $chequeNumeros,
+                    $planoVenda,
                 ));
             }
+            OsFinPerf::mark('svc.lancar_pagamentos');
 
             $this->baixarPecas($os, $documento, $empresaId);
+            OsFinPerf::mark('svc.baixar_pecas');
 
             $snapshotPagamentos = $this->montarSnapshotPagamentos(
                 $pagamentos,
@@ -105,15 +126,18 @@ final class OsFaturamentoService
                 'total_geral' => $total,
             ];
 
-            if (\Illuminate\Support\Facades\Schema::hasColumn($os->getTable(), 'faturamento_pagamentos')) {
+            if ($this->osTemColunaFaturamentoPagamentos($os)) {
                 $payload['faturamento_pagamentos'] = $snapshotPagamentos;
             }
 
             $os->forceFill($payload)->save();
+            OsFinPerf::mark('svc.save_os');
 
             // Espelho comercial na Lista de Vendas (sem estoque/financeiro/caixa/comissão).
             app(OsVendaEspelhoService::class)->sincronizarAoFaturar($os, $linhas);
+            OsFinPerf::mark('svc.espelho_venda');
         });
+        OsFinPerf::mark('svc.transaction_done');
 
         return $contasCriadas;
     }
@@ -235,12 +259,13 @@ final class OsFaturamentoService
         array $meta = [],
         ?array $tabelaPrazoDias = null,
         ?array $chequeNumeros = null,
+        ?array $planoVenda = null,
     ): array {
         $movimento = FormaPagamentoDestino::from($forma);
         $label = mb_strtoupper(trim((string) $forma->descricao), 'UTF-8');
         $historico = 'OS '.$os->numero.' ('.$label.')';
         $valorFloat = (float) $valor;
-        $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
+        $planoVenda ??= EmpresaParametros::planoVendaLancamento($empresaId);
 
         ConsumidorFinalGuard::assertPagamentoPermitido(
             $os->relationLoaded('cliente')
@@ -520,6 +545,13 @@ final class OsFaturamentoService
         }
 
         return $out;
+    }
+
+    private function osTemColunaFaturamentoPagamentos(OrdemServico $os): bool
+    {
+        static $cached = null;
+
+        return $cached ??= \Illuminate\Support\Facades\Schema::hasColumn($os->getTable(), 'faturamento_pagamentos');
     }
 
     private function eDinheiro(FormaPagamento $forma): bool

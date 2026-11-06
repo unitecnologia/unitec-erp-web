@@ -1153,6 +1153,12 @@
     padding: 0.75rem;
 }
 
+.erp-os-form-page .erp-form-overlay:has(.erp-form-overlay__panel--os-pessoa) {
+    padding: 0.25rem;
+    align-items: center;
+    overflow: hidden;
+}
+
 .erp-orcamentos-form-page .erp-form-overlay__backdrop,
 .erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__backdrop {
     position: absolute;
@@ -1161,7 +1167,7 @@
 }
 
 .erp-orcamentos-form-page .erp-form-overlay__panel,
-.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel {
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel:not(.erp-form-overlay__panel--os-produto):not(.erp-form-overlay__panel--os-pessoa) {
     position: relative;
     z-index: 1;
     display: flex;
@@ -1187,9 +1193,75 @@
     background: transparent;
 }
 
+/* F8 Produtos na OS: o painel não deve ocupar a viewport inteira (faixa vazia abaixo do rodapé). */
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel--os-produto {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(calc(1280px + 4cm), 98vw);
+    height: auto !important;
+    max-height: calc(100dvh - 1.5rem) !important;
+    min-height: 0;
+    align-self: center;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: var(--erp-radius-lg, 10px);
+}
+
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel--os-produto .erp-form-overlay__iframe {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    background: transparent;
+}
+
+/* F9 Pessoas na OS: o painel não deve ocupar a viewport (vazio entre campos e Gravar/Sair). */
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel--os-pessoa {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(calc(1280px + 4cm), 100%);
+    height: auto;
+    max-height: 100%;
+    min-height: 0;
+    min-width: 0;
+    align-self: center;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: var(--erp-radius-lg, 10px);
+}
+
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel--os-pessoa .erp-form-overlay__iframe {
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent;
+}
+
+@supports not (height: 100dvh) {
+    .erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel--os-produto {
+        max-height: calc(100vh - 1.5rem) !important;
+    }
+}
+
+@supports not (height: 100dvh) {
+    .erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel--os-pessoa {
+        max-height: 100%;
+    }
+}
+
 @supports not (height: 100dvh) {
     .erp-orcamentos-form-page .erp-form-overlay__panel,
-    .erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel {
+    .erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel:not(.erp-form-overlay__panel--os-produto):not(.erp-form-overlay__panel--os-pessoa) {
         height: min(calc(100vh - 5.5rem + 6cm), calc(100vh - 0.4rem)) !important;
         max-height: min(calc(100vh - 5.5rem + 6cm), calc(100vh - 0.4rem)) !important;
     }

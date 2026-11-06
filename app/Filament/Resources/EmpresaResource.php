@@ -93,6 +93,10 @@ class EmpresaResource extends Resource
             ->hidden()
             ->dehydratedWhenHidden();
 
+        $fields[] = TextInput::make(EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA)
+            ->hidden()
+            ->dehydratedWhenHidden();
+
         foreach (EmpresaParametros::impostoFields() as $field => $meta) {
             $fields[] = TextInput::make($field)
                 ->hidden()

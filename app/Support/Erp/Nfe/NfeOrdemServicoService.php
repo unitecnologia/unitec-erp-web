@@ -49,7 +49,8 @@ class NfeOrdemServicoService
      *     meio_pgto: string,
      *     obs_contribuinte: string,
      *     faturas: list<array{numero: string, data_vencimento: string, valor: string}>,
-     *     rows: list<array{product_id: int, quantidade: float, valor_unitario: float, descricao: string, cfop: string, pedido: string}>
+     *     rows: list<array{product_id: int, quantidade: float, valor_unitario: float, descricao: string, cfop: string, pedido: string}>,
+     *     transporte: array<string, mixed>|null
      * }
      */
     public function montarPayload(OrdemServico $ordem): array
@@ -97,6 +98,8 @@ class NfeOrdemServicoService
             throw new RuntimeException('Nenhuma peça da OS possui produto vinculado para NF-e.');
         }
 
+        $transporte = is_array($ordem->transporte ?? null) ? $ordem->transporte : null;
+
         return [
             'ordem_servico_id' => (int) $ordem->id,
             'cliente_id' => (int) $ordem->cliente_id,
@@ -111,6 +114,7 @@ class NfeOrdemServicoService
             'obs_contribuinte' => 'NF-E ORIGINADA DA OS Nº '.$numeroOs.'.',
             'faturas' => [],
             'rows' => $rows,
+            'transporte' => $transporte,
         ];
     }
 

@@ -303,6 +303,192 @@ html:has(.erp-pessoas-form-page.erp-orcamento-embed) {
 }
 
 /*
+ * Overlay F9 da OS: a janela acompanha o conteúdo.
+ * Rolagem vertical só em .erp-pcad__workspace quando a viewport não cabe
+ * (html.erp-os-overlay-embed--capped). Sem compactar campos.
+ */
+html:has(body.erp-os-overlay-embed-body):has(.erp-pessoas-form-page),
+html:has(.erp-pessoas-form-page.erp-os-overlay-embed) {
+    height: auto !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    background: transparent !important;
+}
+
+.fi-body.erp-os-overlay-embed-body:has(.erp-pessoas-form-page),
+.fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    background: transparent !important;
+}
+
+.fi-body.erp-os-overlay-embed-body:has(.erp-pessoas-form-page) .fi-layout,
+.fi-body.erp-os-overlay-embed-body:has(.erp-pessoas-form-page) .fi-main-ctn,
+.fi-body.erp-os-overlay-embed-body:has(.erp-pessoas-form-page) .fi-main,
+.fi-body.erp-os-overlay-embed-body:has(.erp-pessoas-form-page) .fi-main > *,
+.fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-layout,
+.fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-main-ctn,
+.fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-main,
+.fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-main > * {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.fi-page.erp-pessoas-form-page.erp-orcamento-embed.erp-os-overlay-embed {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-page-header-main-ctn,
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-page-main,
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-page-content,
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-sc,
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-sc > .fi-grid-col:has(.erp-pessoas-window),
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-sc > div:has(.erp-pessoas-window),
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-sc-component:has(> .erp-pessoas-window) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .fi-sc > div:has(.erp-pcad__filament-hidden):not(:has(.erp-pessoas-window)),
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pcad__filament-hidden {
+    display: none !important;
+    flex: 0 0 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window__titlebar {
+    flex-shrink: 0 !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window__body {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window__body > .erp-pcad {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pcad__tabs {
+    flex-shrink: 0 !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pcad__workspace {
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pcad__content,
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pcad-form {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window__body > .erp-pcad-form-footer {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    margin-top: 0 !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+}
+
+html.erp-os-overlay-embed--capped:has(.erp-pessoas-form-page.erp-os-overlay-embed),
+html.erp-os-overlay-embed--capped:has(body.erp-os-overlay-embed-body):has(.erp-pessoas-form-page) {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+html.erp-os-overlay-embed--capped .fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed),
+html.erp-os-overlay-embed--capped .fi-body.erp-os-overlay-embed-body:has(.erp-pessoas-form-page),
+html.erp-os-overlay-embed--capped .fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-layout,
+html.erp-os-overlay-embed--capped .fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-main-ctn,
+html.erp-os-overlay-embed--capped .fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-main,
+html.erp-os-overlay-embed--capped .fi-body:has(.erp-pessoas-form-page.erp-os-overlay-embed) .fi-main > *,
+html.erp-os-overlay-embed--capped .fi-page.erp-pessoas-form-page.erp-os-overlay-embed,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-page-header-main-ctn,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-page-main,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-page-content,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-sc,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-sc > .fi-grid-col:has(.erp-pessoas-window),
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-sc > div:has(.erp-pessoas-window),
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .fi-sc-component:has(> .erp-pessoas-window),
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window__body,
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .erp-pessoas-window__body > .erp-pcad {
+    flex: 1 1 0% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+html.erp-os-overlay-embed--capped .erp-pessoas-form-page.erp-os-overlay-embed .erp-pcad__workspace {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+/*
  * Embed PDV (?pdv=1): shell + action-bar sem .erp-pessoas-window.
  * Não esticar o formulário — o overlay já é dimensionado ao conteúdo natural.
  */

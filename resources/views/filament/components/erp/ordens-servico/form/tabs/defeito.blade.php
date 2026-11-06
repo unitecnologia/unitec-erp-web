@@ -43,7 +43,12 @@
                             @click="preview = @js($foto['url'])"
                             title="Clique para ampliar"
                         >
-                            <img src="{{ $foto['url'] }}" alt="Foto da OS" loading="lazy">
+                            <img
+                                src="{{ $foto['url'] }}"
+                                alt="Foto da OS"
+                                loading="lazy"
+                                onerror="this.closest('.erp-os-fotos__item')?.remove()"
+                            >
                         </button>
                         <span class="erp-os-fotos__meta">{{ $foto['em'] }}</span>
                         @if (! $readOnly)

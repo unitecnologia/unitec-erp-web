@@ -3,6 +3,8 @@
 namespace App\Support\Erp\Pdv;
 
 use App\Models\Terminal;
+use App\Support\Erp\EmpresaParametros;
+use App\Support\Erp\ErpContext;
 
 final class PdvFinalizarOperacao
 {
@@ -21,8 +23,10 @@ final class PdvFinalizarOperacao
      */
     public static function botoes(?Terminal $terminal): array
     {
+        $atalhoConcluir = EmpresaParametros::atalhoConcluirVenda(ErpContext::currentEmpresaId());
+
         if ($terminal === null) {
-            return [self::botaoPedido('F10', 'Concluir', true)];
+            return [self::botaoPedido($atalhoConcluir, 'Concluir', true)];
         }
 
         $botoes = [];
@@ -68,14 +72,14 @@ final class PdvFinalizarOperacao
         }
 
         if ($botoes === []) {
-            return [self::botaoPedido('F10', 'Concluir', true)];
+            return [self::botaoPedido($atalhoConcluir, 'Concluir', true)];
         }
 
         if (count($botoes) === 1) {
             $botoes[0]['primary'] = true;
 
             if ($botoes[0]['key'] === self::PEDIDO && $botoes[0]['atalho'] === 'F5') {
-                $botoes[0]['atalho'] = 'F10';
+                $botoes[0]['atalho'] = $atalhoConcluir;
                 $botoes[0]['label'] = 'Concluir';
             }
         }

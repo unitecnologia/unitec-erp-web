@@ -22,7 +22,7 @@ final class OsVendaEspelhoService
      */
     public function sincronizarAoFaturar(OrdemServico $os, array $linhas): ?Venda
     {
-        if (! Schema::hasColumn($os->getTable(), 'venda_id')) {
+        if (! $this->osTemColunaVendaId($os)) {
             return null;
         }
 
@@ -129,7 +129,7 @@ final class OsVendaEspelhoService
 
     private function vendaDaOs(OrdemServico $os): ?Venda
     {
-        if (! Schema::hasColumn($os->getTable(), 'venda_id')) {
+        if (! $this->osTemColunaVendaId($os)) {
             return null;
         }
 
@@ -200,5 +200,12 @@ final class OsVendaEspelhoService
         }
 
         return implode(' + ', $labels);
+    }
+
+    private function osTemColunaVendaId(OrdemServico $os): bool
+    {
+        static $cached = null;
+
+        return $cached ??= Schema::hasColumn($os->getTable(), 'venda_id');
     }
 }

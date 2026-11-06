@@ -7,6 +7,7 @@ use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Mail\FiscalMailService;
+use App\Support\Erp\Mail\SmtpErrorMessage;
 use App\Support\Erp\Nfce\NfceContadorPacoteService;
 use App\Support\Erp\Reports\NfceRelatorioReportService;
 use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
@@ -213,7 +214,7 @@ trait ManagesNfceContadorEmail
 
             Notification::make()
                 ->title('Falha ao enviar o pacote por e-mail.')
-                ->body($exception->getMessage())
+                ->body(SmtpErrorMessage::forClient($exception))
                 ->danger()
                 ->send();
         } finally {

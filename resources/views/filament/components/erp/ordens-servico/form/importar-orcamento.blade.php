@@ -47,7 +47,11 @@
                                     <input
                                         id="erp-os-import-orc-data-de"
                                         type="date"
-                                        wire:model.live="osImportOrcDataDe"
+                                        wire:model.change="osImportOrcDataDe"
+                                        data-erp-date
+                                        data-wire-field="osImportOrcDataDe"
+                                        data-erp-date-wire="iso"
+                                        data-erp-date-initial="{{ $this->osImportOrcDataDe }}"
                                         class="erp-nfe-import-list__input erp-nfe-import-list__input--date"
                                         title="Data inicial"
                                     >
@@ -55,7 +59,11 @@
                                     <input
                                         id="erp-os-import-orc-data-ate"
                                         type="date"
-                                        wire:model.live="osImportOrcDataAte"
+                                        wire:model.change="osImportOrcDataAte"
+                                        data-erp-date
+                                        data-wire-field="osImportOrcDataAte"
+                                        data-erp-date-wire="iso"
+                                        data-erp-date-initial="{{ $this->osImportOrcDataAte }}"
                                         class="erp-nfe-import-list__input erp-nfe-import-list__input--date"
                                         title="Data final"
                                     >

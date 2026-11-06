@@ -156,12 +156,13 @@ class VendaListQueryBuilder
             'cliente:id,nome_razao',
             'vendedor:id,nome',
             'pdvVenda:id,venda_id,numero,origem',
+            'pdvVenda.pagamentos:id,pdv_venda_id,forma,valor',
             'pdvVenda.nfce:id,pdv_venda_id,numero,serie',
             'nfes:id,venda_id,numero,serie,modelo,status',
             'entrega:id,venda_id,status',
             'forcaVendasOrder:id,venda_id,device_uuid,meli_order_id,payload,pedido_id',
             'forcaVendasOrder.pedido:id,numero',
-            'ordemServico:id,venda_id,numero',
+            'ordemServico:id,venda_id,numero,faturamento_pagamentos',
         ]);
 
         if (! $this->applyDefaultOrder) {

@@ -48,7 +48,8 @@ use Illuminate\Support\Facades\Schema;
  * depósito, crédito cliente, troca, nenhum). Também faz o estorno.
  *
  * As contas a receber usam o documento "FV-{orderId}" (e "FV-{orderId}/{n}"
- * quando há mais de uma parcela), mesma convenção da tela Monitor de Vendas.
+ * quando há mais de uma parcela). Em pagamento misto (payload.pagamentos),
+ * cada meio usa "FV-{orderId}/P{k}" (e "/P{k}/{n}" nas parcelas).
  *
  * Caixa (Tela/FV/Monitor): destino via VendaCaixaDestinoResolver
  * (forma → seleção autorizada → Permissões → CAIXA GERAL).
@@ -85,6 +86,18 @@ class ForcaVendasFaturamentoService
 
         if (! $order instanceof ForcaVendasOrder) {
             throw new \RuntimeException('Pedido não encontrado.');
+        }
+
+        // Isolamento multiempresa (acesso): não fatura pedido de outra empresa da sessão.
+        // Não altera regra de baixa/financeiro — apenas bloqueia operação cruzada.
+        if ($order->empresa_id) {
+            $sessaoEmpresaId = ErpContext::currentEmpresaId();
+            if ($sessaoEmpresaId === null || (int) $sessaoEmpresaId !== (int) $order->empresa_id) {
+                throw new \RuntimeException(
+                    'A empresa ativa foi alterada ou não corresponde à empresa do pedido. '
+                    .'Retorne à empresa original antes de faturar.'
+                );
+            }
         }
 
         $empresaGuard = $order->empresa_id
@@ -146,10 +159,26 @@ class ForcaVendasFaturamentoService
 
         if ($pixPago === null) {
             $payloadGuard = is_array($order->payload) ? $order->payload : [];
-            ConsumidorFinalGuard::assertPagamentoPermitido(
-                Person::query()->find((int) $pedido->cliente_id),
-                $this->resolveFormaPagamento($payloadGuard),
-            );
+            $clienteGuard = Person::query()->find((int) $pedido->cliente_id);
+            $linhasGuard = $this->resolverLinhasPagamentoPayload($payloadGuard);
+
+            if ($linhasGuard !== []) {
+                foreach ($linhasGuard as $linhaGuard) {
+                    ConsumidorFinalGuard::assertPagamentoPermitido(
+                        $clienteGuard,
+                        $linhaGuard['forma_model'] ?? [
+                            'forma' => $linhaGuard['forma_label'],
+                            'tipo' => $linhaGuard['tipo'],
+                            'tipo_movimento' => $linhaGuard['tipo_movimento'],
+                        ],
+                    );
+                }
+            } else {
+                ConsumidorFinalGuard::assertPagamentoPermitido(
+                    $clienteGuard,
+                    $this->resolveFormaPagamento($payloadGuard),
+                );
+            }
         }
 
         $empresaId = $order->empresa_id
@@ -832,10 +861,17 @@ class ForcaVendasFaturamentoService
                 $order->pedido->update(['status' => Pedido::STATUS_CANCELADO]);
             }
 
+            $orcamentoId = (int) ($order->orcamento_id ?? 0);
+
             $order->forceFill([
                 'situacao' => ForcaVendasOrder::SITUACAO_CANCELADO,
                 'canceled_at' => now(),
             ])->save();
+
+            if ($orcamentoId > 0) {
+                app(ForcaVendasOrcamentoVinculo::class)
+                    ->devolverAposCancelarDav($orcamentoId, (int) $order->id);
+            }
 
             (new VendasInternasMonitorHookService())->onForcaVendasOrderCancelado($order);
         });
@@ -889,6 +925,7 @@ class ForcaVendasFaturamentoService
      * - à vista dinheiro/PIX/caixa → sessão PDV ou Livro Caixa (sem Contas a Receber)
      * - depósito → Livro Caixa
      * - demais / a prazo → Contas a Receber
+     * - misto (payload.pagamentos): um lançamento por meio com o valor informado
      *
      * @return list<ContaReceber>
      */
@@ -905,25 +942,17 @@ class ForcaVendasFaturamentoService
         }
 
         $payload = is_array($order->payload) ? $order->payload : [];
-        // Uma resolução por pedido (não por parcela): evita N+1 no carnê.
-        $formaModel = $this->resolveFormaPagamento($payload);
         $clienteId = (int) $pedido->cliente_id;
         $diasTabelaCliente = $this->diasTabelaPrazoCliente($clienteId);
-        $baixa = app(ContaReceberBaixaService::class);
         $hoje = ErpTimezone::toLocal()->startOfDay();
         $base = $this->documentoBase($order);
-        $formaLabel = mb_strtoupper(trim((string) (
-            $formaModel?->descricao
-            ?? $payload['forma_pagamento']
-            ?? ($pixPago ? 'PIX' : 'DINHEIRO')
-        )), 'UTF-8');
         $empresaId = $order->empresa_id ? (int) $order->empresa_id : ErpContext::currentEmpresaId();
         $prefixoHist = $this->isTelaVendaErp($order) ? 'VENDA ERP ' : 'VENDA APP ';
         $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
-        $historicoCaixa = $prefixoHist.'FV ('.$formaLabel.') ['.$base.']';
 
-        // PIX pago no app: caixa sem CR.
+        // PIX pago no app: caixa sem CR (valor integral da venda).
         if ($pixPago !== null) {
+            $formaModel = $this->resolveFormaPagamento($payload);
             $this->lancarEntradaCaixaVenda(
                 order: $order,
                 formaModel: $formaModel,
@@ -940,20 +969,249 @@ class ForcaVendasFaturamentoService
             return [];
         }
 
-        $dias = $this->resolverParcelasDias($payload, $formaModel, $diasTabelaCliente);
+        $linhas = $this->resolverLinhasPagamentoPayload($payload);
+
+        // Legado / um único meio: comportamento idêntico ao anterior (valor = total da venda).
+        if ($linhas === [] || count($linhas) === 1) {
+            $linhaUnica = $linhas[0] ?? [
+                'forma_model' => $this->resolveFormaPagamento($payload),
+                'forma_label' => mb_strtoupper(trim((string) (
+                    $payload['forma_pagamento'] ?? 'DINHEIRO'
+                )), 'UTF-8'),
+                'valor' => $total,
+                'tipo' => '',
+                'tipo_movimento' => '',
+            ];
+            if ($linhas === []) {
+                $linhaUnica['valor'] = $total;
+            } else {
+                // Uma linha no payload: lança o total da venda (troco em dinheiro não infla o caixa).
+                $linhaUnica['valor'] = $total;
+            }
+
+            return $this->aplicarLinhaPagamentoFaturamento(
+                order: $order,
+                payload: $payload,
+                linha: $linhaUnica,
+                valorLancar: $total,
+                documentoRoot: $base,
+                clienteId: $clienteId,
+                diasTabelaCliente: $diasTabelaCliente,
+                hoje: $hoje,
+                empresaId: $empresaId,
+                prefixoHist: $prefixoHist,
+                planoVenda: $planoVenda,
+                tagSessao: null,
+            );
+        }
+
+        $soma = round(array_sum(array_map(
+            static fn (array $l): float => (float) $l['valor'],
+            $linhas,
+        )), 2);
+
+        if ($soma + 0.009 < $total) {
+            throw new \RuntimeException(
+                'Soma dos meios de pagamento (R$ '.number_format($soma, 2, ',', '.')
+                .') é menor que o total da venda (R$ '.number_format($total, 2, ',', '.')
+                .'). Ajuste os valores antes de concluir.'
+            );
+        }
+
+        $troco = max(0.0, round($soma - $total, 2));
+        $somaDinheiro = 0.0;
+        foreach ($linhas as $linha) {
+            if ($this->linhaPagamentoEhDinheiro($linha)) {
+                $somaDinheiro += (float) $linha['valor'];
+            }
+        }
+        if ($troco > 0.009 && $somaDinheiro + 0.009 < $troco) {
+            throw new \RuntimeException(
+                'Há excesso de pagamento sem dinheiro correspondente para troco. '
+                .'A venda não foi faturada.'
+            );
+        }
+
+        $criadas = [];
+        $trocoRestante = $troco;
+        $seq = 0;
+
+        foreach ($linhas as $linha) {
+            $seq++;
+            $valorLinha = round((float) $linha['valor'], 2);
+            $valorLancar = $valorLinha;
+
+            if ($this->linhaPagamentoEhDinheiro($linha) && $trocoRestante > 0.009) {
+                $deduz = min($valorLancar, $trocoRestante);
+                $valorLancar = round($valorLancar - $deduz, 2);
+                $trocoRestante = round($trocoRestante - $deduz, 2);
+            }
+
+            if ($valorLancar <= 0.009) {
+                continue;
+            }
+
+            $docRoot = $base.'/P'.$seq;
+            $criadas = array_merge($criadas, $this->aplicarLinhaPagamentoFaturamento(
+                order: $order,
+                payload: $payload,
+                linha: $linha,
+                valorLancar: $valorLancar,
+                documentoRoot: $docRoot,
+                clienteId: $clienteId,
+                diasTabelaCliente: $diasTabelaCliente,
+                hoje: $hoje,
+                empresaId: $empresaId,
+                prefixoHist: $prefixoHist,
+                planoVenda: $planoVenda,
+                tagSessao: 'P'.$seq,
+            ));
+        }
+
+        return $criadas;
+    }
+
+    /**
+     * Normaliza payload.pagamentos (Tela de Venda) ou cai no meio único legado.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array{
+     *   forma_model: ?FormaPagamento,
+     *   forma_label: string,
+     *   valor: float,
+     *   tipo: string,
+     *   tipo_movimento: string
+     * }>
+     */
+    private function resolverLinhasPagamentoPayload(array $payload): array
+    {
+        $raw = $payload['pagamentos'] ?? null;
+        if (! is_array($raw) || $raw === []) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $pag) {
+            if (! is_array($pag)) {
+                continue;
+            }
+
+            $valor = isset($pag['valor']) && is_numeric($pag['valor'])
+                ? round((float) $pag['valor'], 2)
+                : 0.0;
+            if ($valor <= 0.009) {
+                continue;
+            }
+
+            $id = (int) ($pag['forma_pagamento_id'] ?? $pag['id'] ?? 0);
+            $label = mb_strtoupper(trim((string) (
+                $pag['forma_pagamento']
+                ?? $pag['descricao']
+                ?? $pag['forma']
+                ?? ''
+            )), 'UTF-8');
+
+            $formaModel = null;
+            if ($id > 0) {
+                $formaModel = FormaPagamento::query()->find($id);
+            }
+            if (! $formaModel && $label !== '') {
+                $formaModel = FormaPagamento::query()
+                    ->whereRaw('UPPER(TRIM(descricao)) = ?', [$label])
+                    ->orderByDesc('ativo')
+                    ->first();
+            }
+
+            if ($formaModel) {
+                $label = mb_strtoupper(trim((string) $formaModel->descricao), 'UTF-8');
+            }
+
+            if ($label === '') {
+                $label = 'DINHEIRO';
+            }
+
+            $out[] = [
+                'forma_model' => $formaModel,
+                'forma_label' => $label,
+                'valor' => $valor,
+                'tipo' => (string) ($pag['tipo'] ?? $formaModel?->tipo ?? ''),
+                'tipo_movimento' => (string) ($pag['tipo_movimento'] ?? $formaModel?->tipo_movimento ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array{
+     *   forma_model: ?FormaPagamento,
+     *   forma_label: string,
+     *   valor: float,
+     *   tipo: string,
+     *   tipo_movimento: string
+     * }  $linha
+     * @param  list<int>|null  $diasTabelaCliente
+     * @param  array{id: int|null, nome: string|null}|null  $planoVenda
+     * @return list<ContaReceber>
+     */
+    private function aplicarLinhaPagamentoFaturamento(
+        ForcaVendasOrder $order,
+        array $payload,
+        array $linha,
+        float $valorLancar,
+        string $documentoRoot,
+        int $clienteId,
+        ?array $diasTabelaCliente,
+        mixed $hoje,
+        ?int $empresaId,
+        string $prefixoHist,
+        ?array $planoVenda,
+        ?string $tagSessao,
+    ): array {
+        $valorLancar = round($valorLancar, 2);
+        if ($valorLancar <= 0.009) {
+            return [];
+        }
+
+        $formaModel = $linha['forma_model'] ?? null;
+        $formaLabel = (string) ($linha['forma_label'] ?? 'DINHEIRO');
+        $baseOrder = $this->documentoBase($order);
+        $histTag = $tagSessao !== null && $tagSessao !== ''
+            ? $prefixoHist.'FV ('.$formaLabel.') ['.$baseOrder.'] #'.$tagSessao
+            : $prefixoHist.'FV ('.$formaLabel.') ['.$baseOrder.']';
+
+        $baixa = app(ContaReceberBaixaService::class);
+        $isCartao = PdvFinalizarPagamentosHelper::isFormaCartao([
+            'forma' => $formaLabel,
+            'tipo' => (string) ($linha['tipo'] ?? ''),
+            'tipo_movimento' => (string) ($linha['tipo_movimento'] ?? ''),
+        ]);
+
+        // Misto: isola prazo do cartão (canhoto) do carnê/boleto da outra linha.
+        $payloadLinha = $payload;
+        if ($isCartao) {
+            unset($payloadLinha['tabela_prazo_dias'], $payloadLinha['condicao_pagamento']);
+        } else {
+            unset($payloadLinha['cartao_canhoto']);
+        }
+
+        $dias = $this->resolverParcelasDias($payloadLinha, $formaModel, $diasTabelaCliente);
         $n = count($dias);
         $forma = $formaModel
             ? $baixa->mapFormaConta($formaModel)
-            : $this->mapForma((string) ($payload['forma_pagamento'] ?? ''));
+            : $this->mapForma($formaLabel);
 
-        $movimento = FormaPagamentoDestino::from($formaModel);
+        $movimento = FormaPagamentoDestino::from(
+            $formaModel ?? [
+                'tipo_movimento' => (string) ($linha['tipo_movimento'] ?? ''),
+            ]
+        );
 
-        // Crédito cliente / troca / nenhum: sem lançamento financeiro.
         if ($formaModel !== null && FormaPagamentoDestino::semLancamento($movimento)) {
             return [];
         }
 
-        // Caixa: sessão PDV (se aplicável) ou Livro. Depósito: sempre Livro.
         if ($formaModel !== null && (
             FormaPagamentoDestino::vaiParaCaixa($movimento)
             || FormaPagamentoDestino::vaiParaDeposito($movimento)
@@ -961,10 +1219,10 @@ class ForcaVendasFaturamentoService
             $this->lancarEntradaCaixaVenda(
                 order: $order,
                 formaModel: $formaModel,
-                total: $total,
+                total: $valorLancar,
                 data: $hoje->toDateString(),
-                documento: $base,
-                historico: $historicoCaixa,
+                documento: $documentoRoot,
+                historico: $histTag,
                 formaLabel: $formaLabel,
                 empresaId: $empresaId,
                 planoVenda: $planoVenda,
@@ -974,22 +1232,20 @@ class ForcaVendasFaturamentoService
             return [];
         }
 
-        // Contas a receber pelo cadastro.
         if ($formaModel !== null && ! FormaPagamentoDestino::geraContasReceber($movimento)) {
             return [];
         }
 
-        // Legado sem forma cadastrada: à vista dinheiro/PIX → caixa.
         if ($formaModel === null) {
             $aVista = $n === 1 && (int) $dias[0] === 0;
             if ($aVista && in_array($forma, ['dinheiro', ContaReceber::FORMA_PIX], true)) {
                 $this->lancarEntradaCaixaVenda(
                     order: $order,
                     formaModel: null,
-                    total: $total,
+                    total: $valorLancar,
                     data: $hoje->toDateString(),
-                    documento: $base,
-                    historico: $historicoCaixa,
+                    documento: $documentoRoot,
+                    historico: $histTag,
                     formaLabel: $formaLabel !== '' ? $formaLabel : 'DINHEIRO',
                     empresaId: $empresaId,
                     planoVenda: $planoVenda,
@@ -1004,29 +1260,53 @@ class ForcaVendasFaturamentoService
             return [];
         }
 
-        $parcelaBase = floor($total / $n * 100) / 100;
+        $parcelaBase = floor($valorLancar / $n * 100) / 100;
         $criadas = [];
+        $canhoto = $isCartao && is_array($payload['cartao_canhoto'] ?? null)
+            ? $payload['cartao_canhoto']
+            : null;
 
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
-                ? round($total - $parcelaBase * ($n - 1), 2)
+                ? round($valorLancar - $parcelaBase * ($n - 1), 2)
                 : $parcelaBase;
 
-            $documento = $n > 1 ? $base.'/'.($i + 1) : $base;
+            $documento = $n > 1 ? $documentoRoot.'/'.($i + 1) : $documentoRoot;
+            $parcelaLabel = $n > 1 ? ($i + 1).'/'.$n : '1/1';
+            // Único meio: histórico legado. Misto: identifica a forma na linha.
+            $historico = $tagSessao === null
+                ? 'PEDIDO APP FV'.($n > 1 ? ' ('.$parcelaLabel.')' : '')
+                : 'PEDIDO APP FV ('.$formaLabel.')'.($n > 1 ? ' ('.$parcelaLabel.')' : '');
 
-            $payload = [
+            if (is_array($canhoto)) {
+                $extra = array_filter([
+                    trim((string) ($canhoto['maquininha'] ?? '')) !== '' ? 'POS '.$canhoto['maquininha'] : null,
+                    trim((string) ($canhoto['bandeira'] ?? '')) !== '' ? 'BANDEIRA '.$canhoto['bandeira'] : null,
+                    trim((string) ($canhoto['nsu'] ?? '')) !== '' ? 'NSU '.$canhoto['nsu'] : null,
+                    trim((string) ($canhoto['autorizacao'] ?? '')) !== '' ? 'AUT '.$canhoto['autorizacao'] : null,
+                ]);
+                if ($extra !== []) {
+                    $historico .= ' | '.implode(' ', $extra);
+                }
+            }
+
+            $crPayload = [
                 'empresa_id' => $order->empresa_id
                     ? (int) $order->empresa_id
                     : ErpContext::currentEmpresaId(),
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => $hoje,
-                'historico' => 'PEDIDO APP FV'
-                    .($n > 1 ? ' ('.($i + 1).'/'.$n.')' : ''),
+                'historico' => mb_substr($historico, 0, 500),
                 'documento' => $documento,
                 'cliente_id' => $clienteId,
-                'vencimento' => $hoje->copy()->addDays(max(0, $dia)),
+                'vencimento' => $hoje->copy()->addDays(max(0, (int) $dia)),
                 'valor' => $valor,
                 'forma' => $forma,
+                'cartao_nsu' => is_array($canhoto) ? ($canhoto['nsu'] ?? null) : null,
+                'cartao_autorizacao' => is_array($canhoto) ? ($canhoto['autorizacao'] ?? null) : null,
+                'cartao_maquininha' => is_array($canhoto) ? ($canhoto['maquininha'] ?? null) : null,
+                'cartao_bandeira' => is_array($canhoto) ? ($canhoto['bandeira'] ?? null) : null,
+                'cartao_parcela' => is_array($canhoto) ? $parcelaLabel : null,
                 ...ContaReceberJurosCarteira::atributosParaCreate(
                     $forma,
                     $order->empresa_id ? (int) $order->empresa_id : null
@@ -1034,13 +1314,28 @@ class ForcaVendasFaturamentoService
             ];
 
             if (! empty($planoVenda['id'])) {
-                $payload['plano_conta_id'] = (int) $planoVenda['id'];
+                $crPayload['plano_conta_id'] = (int) $planoVenda['id'];
             }
 
-            $criadas[] = ContaReceber::query()->create($payload);
+            $criadas[] = ContaReceber::query()->create($crPayload);
         }
 
         return $criadas;
+    }
+
+    /**
+     * @param  array{forma_label?: string, tipo?: string, forma_model?: ?FormaPagamento}  $linha
+     */
+    private function linhaPagamentoEhDinheiro(array $linha): bool
+    {
+        $tipo = mb_strtolower(trim((string) ($linha['tipo'] ?? $linha['forma_model']?->tipo ?? '')), 'UTF-8');
+        if ($tipo === 'dinheiro') {
+            return true;
+        }
+
+        $label = mb_strtoupper(trim((string) ($linha['forma_label'] ?? '')), 'UTF-8');
+
+        return $label === 'DINHEIRO' || str_contains($label, 'DINHEIRO');
     }
 
     /**
@@ -1063,9 +1358,14 @@ class ForcaVendasFaturamentoService
             return;
         }
 
-        // Idempotência: já lançado (Livro ou sessão) com saldo líquido.
-        if ($this->saldoLiquidoLivroDocumento($documento) > 0.005
-            || $this->saldoLiquidoSessaoDocumento($documento) > 0.005) {
+        $baseOrder = $this->documentoBase($order);
+
+        // Idempotência: Livro pelo documento da linha; sessão pelo [FV-id] + forma
+        // (histórico misto usa [BASE] #Pk — estorno agrupa por forma).
+        if ($this->saldoLiquidoLivroDocumento($documento) > 0.005) {
+            return;
+        }
+        if ($this->saldoLiquidoSessaoForma($baseOrder, $formaLabel, $historico) > 0.005) {
             return;
         }
 
@@ -1102,6 +1402,10 @@ class ForcaVendasFaturamentoService
     private function pedidoTemFormaPagamento(ForcaVendasOrder $order, Pedido $pedido): bool
     {
         $payload = is_array($order->payload) ? $order->payload : [];
+
+        if ($this->resolverLinhasPagamentoPayload($payload) !== []) {
+            return true;
+        }
 
         if ((int) ($payload['forma_pagamento_id'] ?? 0) > 0) {
             return true;
@@ -1330,6 +1634,34 @@ class ForcaVendasFaturamentoService
         $rows = PdvCaixaMovimento::query()
             ->where('historico', 'like', '%['.$documento.']%')
             ->get(['entrada', 'saida']);
+
+        return round((float) $rows->sum('entrada') - (float) $rows->sum('saida'), 2);
+    }
+
+    /**
+     * Saldo líquido na sessão para uma forma (e tag #Pk do misto, se houver no histórico).
+     */
+    private function saldoLiquidoSessaoForma(string $base, string $formaLabel, string $historicoRef): float
+    {
+        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+            return 0.0;
+        }
+
+        $forma = mb_strtoupper(trim($formaLabel), 'UTF-8');
+        if ($forma === '') {
+            $forma = 'DINHEIRO';
+        }
+
+        $query = PdvCaixaMovimento::query()
+            ->where('historico', 'like', '%['.$base.']%')
+            ->whereRaw('UPPER(TRIM(forma_pagamento)) = ?', [$forma]);
+
+        // Misto: histórico contém "#P1" — restringe à mesma tag.
+        if (preg_match('/#(P\d+)\b/', $historicoRef, $m) === 1) {
+            $query->where('historico', 'like', '%#'.$m[1].'%');
+        }
+
+        $rows = $query->get(['entrada', 'saida']);
 
         return round((float) $rows->sum('entrada') - (float) $rows->sum('saida'), 2);
     }
@@ -1698,6 +2030,13 @@ class ForcaVendasFaturamentoService
 
     /**
      * Depósito da empresa da venda; fallback estoque do vendedor.
+     *
+     * PENDÊNCIA FUTURA (não alterar agora — clientes atuais: 1 empresa / 1 depósito):
+     * Reserva/disponível da Tela de Venda usam vendedor.estoque_id, enquanto esta baixa
+     * prioriza estoqueIdParaEmpresa(). Em multi-depósito isso pode divergir.
+     * Correção proposta (quando houver cliente multi-depósito): priorizar vendedor /
+     * payload.estoque_id e só então falhar — sem auto-pick de depósito geral.
+     * Não backfill histórico. Ver relatório Etapa E / pendências finais.
      */
     private function resolveEstoqueId(?int $empresaId, ?Vendedor $vendedor): ?int
     {

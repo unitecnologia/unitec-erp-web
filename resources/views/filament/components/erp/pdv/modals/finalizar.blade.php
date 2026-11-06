@@ -84,29 +84,55 @@
                     @endif
 
                     @if ($this->pdvRateioPessoa)
-                        <div class="erp-pdv-finalizar__split">
-                            <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--split">
-                                <span class="erp-pdv-finalizar__label">Dividir a conta por:</span>
-                                <input
-                                    type="text"
-                                    wire:model.live="finalizarForm.dividir_por"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                    data-mask="integer"
-                                    autocomplete="off"
-                                >
+                        <div
+                            class="erp-pdv-finalizar__split"
+                            data-erp-dividir-conta
+                            data-erp-dividir-total="{{ number_format((float) $this->finalizarTotalVendaValor(), 2, '.', '') }}"
+                            x-data="erpDividirContaStepper({
+                                initial: {{ (int) max(1, (int) ($this->finalizarForm['dividir_por'] ?? 1)) }},
+                                total: {{ (float) $this->finalizarTotalVendaValor() }},
+                                wirePath: 'finalizarForm.dividir_por',
+                            })"
+                        >
+                            <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--split erp-pdv-finalizar__field--dividir">
+                                <span class="erp-pdv-finalizar__label">Dividir</span>
+                                <div class="erp-pdv-finalizar__dividir">
+                                    <input
+                                        id="erp-pdv-dividir-por"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        inputmode="numeric"
+                                        value="{{ (int) max(1, (int) ($this->finalizarForm['dividir_por'] ?? 1)) }}"
+                                        class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num erp-pdv-finalizar__dividir-input"
+                                        x-model.number="pessoas"
+                                        x-on:input="onInput()"
+                                        x-on:blur="onBlur()"
+                                        x-on:keydown.arrow-up.stop.prevent="bump(1)"
+                                        x-on:keydown.arrow-down.stop.prevent="bump(-1)"
+                                        autocomplete="off"
+                                        aria-label="Dividir a conta por quantidade de pessoas"
+                                    >
+                                    <div class="erp-pdv-finalizar__dividir-spinners" aria-hidden="true">
+                                        <button type="button" tabindex="-1" class="erp-pdv-finalizar__dividir-btn" title="Aumentar" x-on:click.prevent="bump(1)">▲</button>
+                                        <button type="button" tabindex="-1" class="erp-pdv-finalizar__dividir-btn" title="Diminuir" x-on:click.prevent="bump(-1)">▼</button>
+                                    </div>
+                                </div>
                             </label>
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--split">
                                 <span class="erp-pdv-finalizar__label">Valor por Pessoa:</span>
                                 <span class="erp-pdv-finalizar__money" aria-live="polite">
                                     <span class="erp-pdv-finalizar__money-rs">R$</span>
-                                    <span class="erp-pdv-finalizar__money-value">{{ $this->finalizarValorPorPessoa }}</span>
+                                    <span class="erp-pdv-finalizar__money-value" x-text="valorTexto">{{ $this->finalizarValorPorPessoa }}</span>
                                 </span>
                             </label>
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total-pagar">
                                 <span class="erp-pdv-finalizar__label">Total à Pagar:</span>
-                                <span class="erp-pdv-finalizar__total-pagar-value" aria-live="polite">
-                                    {{ $this->finalizarTotalAPagar }}
-                                </span>
+                                <span
+                                    class="erp-pdv-finalizar__total-pagar-value"
+                                    data-erp-dividir-total-src
+                                    aria-live="polite"
+                                >{{ $this->finalizarTotalAPagar }}</span>
                             </label>
                         </div>
                     @else
@@ -674,6 +700,7 @@
                 class="erp-pdv-modal__footer erp-pdv-finalizar__footer-actions"
                 data-operacao-unica="{{ $this->pdvFinalizarOperacaoUnica ?? '' }}"
                 data-pix-qr="{{ $this->finalizarTemPixGerarQrcodeComValor() && ! $this->finalizarPixQrConfirmado ? '1' : '0' }}"
+                data-erp-atalho-concluir="{{ \App\Support\Erp\EmpresaParametros::atalhoConcluirVenda() }}"
             >
                 <div class="erp-pdv-finalizar__operacao-botoes">
                     @foreach ($this->pdvFinalizarOperacaoBotoes as $botao)

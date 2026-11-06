@@ -7,6 +7,7 @@ use App\Filament\Resources\EmpresaResource\Pages\Concerns\ErpEmpresaFormPage;
 use App\Models\Empresa;
 use App\Models\User;
 use App\Support\Erp\Boleto\BoletoContaApiDefaults;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\EmpresaVendaProntaBootstrap;
 use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
@@ -80,6 +81,19 @@ class CreateEmpresa extends CreateRecord
         BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
         $this->syncEmpresaNfeEmitentes();
         $this->syncPortalContadorAposSalvar($empresa);
+        EmpresaParametros::gravarAtalhoConcluirVenda(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA]
+                ?? EmpresaParametros::ATALHO_CONCLUIR_VENDA_DEFAULT,
+        );
+        EmpresaParametros::gravarPerguntarImprimirPosVendaTv(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV] ?? false,
+        );
+        EmpresaParametros::gravarPermanecerTelaVendaAposConcluir(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR] ?? false,
+        );
         if (! filter_var($empresa->param_boleto_habilitar ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $empresa->forceFill(['param_boleto_habilitar' => false])->saveQuietly();
         }

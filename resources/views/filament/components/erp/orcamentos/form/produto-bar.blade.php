@@ -38,6 +38,12 @@
                                     >
                                         <span class="erp-fv-tv__suggest-code">{{ $sug['codigo'] }}</span>
                                         <span class="erp-fv-tv__suggest-nome">{{ $sug['descricao'] }}</span>
+                                        <span class="erp-fv-tv__suggest-estoques">
+                                            <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--atual">Atual {{ $sug['atual'] ?? '0,000' }}</span>
+                                            <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--reservado">Res {{ $sug['reservado'] ?? '0,000' }}</span>
+                                            <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--disponivel">Disp {{ $sug['disponivel'] ?? '0,000' }}</span>
+                                        </span>
+                                        <span class="erp-fv-tv__suggest-preco">R$ {{ $sug['preco'] ?? '0,00' }}@if (! empty($sug['em_promocao']))<span class="erp-promo-p" title="Promoção">P</span>@endif</span>
                                     </button>
                                 </li>
                             @endforeach

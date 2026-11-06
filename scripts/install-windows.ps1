@@ -392,6 +392,7 @@ Invoke-Step 'Otimizando configuracao' {
     Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:clear') -AllowFailure | Out-Null
     Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') | Out-Null
     Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('view:cache') | Out-Null
+    Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('unitec:filament-cache', '--force') -AllowFailure | Out-Null
 
     Write-Ok 'Cache de producao gerado.'
 }

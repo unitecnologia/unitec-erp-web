@@ -99,7 +99,9 @@ class OrcamentoListQueryBuilder
 
     protected function buildFilteredQuery(): Builder
     {
-        $query = Orcamento::query()->visivelNaListaOrcamentos();
+        // Cadastro Orçamentos: mostra todos (incl. IMPORTADO com DAV).
+        // Ocultar vínculo FV ativo vale só nos modais de importação (F2/PDV/OS).
+        $query = Orcamento::query();
 
         if ($this->statusFilter !== 'todos') {
             $query->where('status', $this->statusFilter);

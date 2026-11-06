@@ -213,10 +213,48 @@ function syncHighlightToLivewire(page, row) {
     }
 
     try {
-        component.call('highlightRecord', recordKey);
+        const osMeta = collectErpOsRowMeta(page, row);
+
+        if (osMeta) {
+            component.call('highlightRecord', recordKey, osMeta);
+        } else {
+            component.call('highlightRecord', recordKey);
+        }
     } catch (_) {
         // Filament recordAction ainda pode completar o highlight.
     }
+}
+
+/**
+ * Meta da linha de OS (classes da grade) para a barra de ações — evita SQL no render do pai.
+ */
+function collectErpOsRowMeta(page, row) {
+    if (! page || ! row || ! erpListPageHasClass(page, 'erp-os-page')) {
+        return null;
+    }
+
+    const fromAttr = row.getAttribute('data-erp-os-meta');
+
+    if (fromAttr) {
+        try {
+            const parsed = JSON.parse(fromAttr);
+
+            if (parsed && typeof parsed === 'object') {
+                return parsed;
+            }
+        } catch (_) {
+            // fallback pelas classes
+        }
+    }
+
+    return {
+        faturada: row.classList.contains('erp-os-row--faturada'),
+        nfse_pendente: row.classList.contains('erp-os-row--nfse-pendente'),
+        nfse_cliente_incompleto: row.classList.contains('erp-os-row--nfse-cliente-incompleto'),
+        nfe_pendente: row.classList.contains('erp-os-row--nfe-pendente'),
+        nfe_cliente_incompleto: row.classList.contains('erp-os-row--nfe-cliente-incompleto'),
+        nfce_pendente: row.classList.contains('erp-os-row--nfce-pendente'),
+    };
 }
 
 function selectErpListRow(page, row) {

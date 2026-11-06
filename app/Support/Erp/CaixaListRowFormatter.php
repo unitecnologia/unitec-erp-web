@@ -24,13 +24,21 @@ final class CaixaListRowFormatter
         $isFechamento = $evento === 'fechamento' || (bool) $record->getAttribute('livro_fechamento');
         $isVirtual = $isAbertura || $isFechamento;
 
-        $historico = mb_strtoupper(
-            preg_replace('/^\[MANUAL\]\s*/iu', '', (string) ($record->historico ?? '')) ?? '',
-            'UTF-8',
-        );
+        $isGrupo = (bool) $record->getAttribute('caixa_grupo');
+        $historicoTooltip = '';
 
-        if (! $isVirtual) {
-            $historico = self::comSessaoPdv($historico, $record);
+        if ($isGrupo) {
+            $historico = (string) ($record->getAttribute('caixa_grupo_resumo') ?? '');
+            $historicoTooltip = (string) ($record->getAttribute('caixa_grupo_tooltip') ?? '');
+        } else {
+            $historico = CaixaHistoricoExibicao::paraExibicao(
+                (string) ($record->historico ?? ''),
+                $this->pedidosMonitor,
+            );
+
+            if (! $isVirtual) {
+                $historico = self::comSessaoPdv($historico, $record);
+            }
         }
 
         $emissao = match (true) {
@@ -48,6 +56,7 @@ final class CaixaListRowFormatter
         $rowClass = match (true) {
             $isAbertura => ' erp-caixa-row--abertura',
             $isFechamento => ' erp-caixa-row--fechamento',
+            $isGrupo => ' erp-caixa-row--grupo',
             default => '',
         };
 
@@ -56,14 +65,22 @@ final class CaixaListRowFormatter
             $movId = (int) ($record->getAttribute('livro_movimento_id') ?? 0);
             $verItens = $this->formatFechamentoButton($movId);
         } elseif (! $isVirtual) {
-            $verItens = $this->formatViewButton((int) $record->getKey());
+            $qtdGrupo = (int) ($record->getAttribute('caixa_grupo_qtd') ?? 0);
+            $grupoIds = $isGrupo
+                ? array_values(array_map('intval', (array) ($record->getAttribute('caixa_grupo_ids') ?? [])))
+                : [];
+            $verItens = $this->formatViewButton(
+                (int) $record->getKey(),
+                $isGrupo ? 'Ver os '.$qtdGrupo.' lançamentos deste pagamento' : null,
+                $grupoIds,
+            );
         }
 
         return [
             'codigo' => e($isVirtual ? '—' : (string) ($record->codigo ?? '—')),
             'emissao' => e($emissao),
             'documento' => e($documento),
-            'historico' => e($historico !== '' ? $historico : '—'),
+            'historico' => self::htmlHistorico($historico !== '' ? $historico : '—', $historicoTooltip),
             'plano_contas' => $isVirtual
                 ? 'CONFERÊNCIA'
                 : (filled($record->plano_contas) ? e((string) $record->plano_contas) : '—'),
@@ -73,6 +90,17 @@ final class CaixaListRowFormatter
             'ver_itens' => $verItens,
             'row_class' => $rowClass,
         ];
+    }
+
+    private static function htmlHistorico(string $historico, string $tooltip = ''): string
+    {
+        $visivel = e($historico);
+
+        if ($tooltip === '') {
+            return '<span class="erp-caixa-historico" title="'.$visivel.'">'.$visivel.'</span>';
+        }
+
+        return '<span class="erp-caixa-historico erp-caixa-historico--grupo" title="'.e($tooltip).'">'.$visivel.'</span>';
     }
 
     /**
@@ -118,12 +146,20 @@ final class CaixaListRowFormatter
             . '</span>';
     }
 
-    private function formatViewButton(int $lancamentoId): string
+    /**
+     * @param  list<int>  $grupoIds
+     */
+    private function formatViewButton(int $lancamentoId, ?string $title = null, array $grupoIds = []): string
     {
+        $label = $title !== null && $title !== '' ? $title : 'Visualizar lançamento';
+        $payload = $grupoIds !== []
+            ? '{ lancamentoId: '.$lancamentoId.', grupoIds: '.json_encode(array_values($grupoIds)).' }'
+            : '{ lancamentoId: '.$lancamentoId.' }';
+
         return '<span role="button" tabindex="0"'
-            . ' wire:click.stop="$dispatch(\'erp-caixa-open-view\', { lancamentoId: '.$lancamentoId.' })"'
-            . ' wire:keydown.enter.stop="$dispatch(\'erp-caixa-open-view\', { lancamentoId: '.$lancamentoId.' })"'
-            . ' class="erp-caixa__eye-btn" title="Visualizar lançamento" aria-label="Visualizar lançamento">'
+            . ' wire:click.stop="$dispatch(\'erp-caixa-open-view\', '.$payload.')"'
+            . ' wire:keydown.enter.stop="$dispatch(\'erp-caixa-open-view\', '.$payload.')"'
+            . ' class="erp-caixa__eye-btn" title="'.e($label).'" aria-label="'.e($label).'">'
             . '<svg class="erp-caixa__eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"'
             . ' stroke-width="1.75" stroke="currentColor" aria-hidden="true">'
             . '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>'

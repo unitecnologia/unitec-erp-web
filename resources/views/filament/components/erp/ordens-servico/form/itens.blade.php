@@ -1,10 +1,17 @@
 @php
     $readOnly = $readOnly ?? false;
-    $itensTab = $this->itensByActiveTab();
-    $atendentes = $this->atendenteOptions();
-    $showFoto = $this->activeItemTab === 'pecas';
+    $itensAll = $this->itens;
+    $atendentes = $atendentes ?? $this->atendenteOptions;
     $colCount = ($readOnly ? 11 : 12);
-    $tabTotal = count($itensTab);
+    $countServicos = 0;
+    $countPecas = 0;
+    foreach ($itensAll as $rowCount) {
+        if (($rowCount['tipo'] ?? 'P') === 'S') {
+            $countServicos++;
+        } else {
+            $countPecas++;
+        }
+    }
     $tecnicoNome = collect($atendentes)->firstWhere('id', $this->atendenteId)['nome'] ?? '—';
 @endphp
 
@@ -15,7 +22,7 @@
             'erp-os-produto-bar--editing' => $this->editingItemIndex !== null,
         ])>
             <div class="erp-fv-tv__box">
-                <span class="erp-fv-tv__box-legend">
+                <span class="erp-fv-tv__box-legend" x-text="itemTab === 'servicos' ? 'Serviço' : 'Peça'">
                     {{ $this->activeItemTab === 'servicos' ? 'Serviço' : 'Peça' }}
                 </span>
 
@@ -27,64 +34,20 @@
                                 id="os-item-descricao"
                                 class="erp-nfe__input erp-fv-tv__input--barcode"
                                 type="text"
-                                wire:model.live.debounce.200ms="itemProdutoSearch"
-                                wire:focus="openProdutoLookup"
+                                wire:ignore.self
                                 wire:keydown.enter.prevent="confirmarItemProdutoBar($event.target.value)"
                                 wire:keydown.escape.prevent="closeProdutoLookup"
-                                wire:keydown.arrow-up.prevent="moveProdutoSelection(-1)"
-                                wire:keydown.arrow-down.prevent="moveProdutoSelection(1)"
                                 data-erp-os-prod-suggest="1"
+                                data-os-produto-lookup-url="{{ route('erp.os.produtos-lookup') }}"
                                 @disabled($readOnly)
                                 data-erp-uppercase
                                 autocomplete="off"
                                 placeholder="Código, barras ou nome do produto — Enter"
                                 role="combobox"
                                 aria-autocomplete="list"
-                                aria-expanded="{{ $this->produtoLookupOpen && $this->produtoResults !== [] ? 'true' : 'false' }}"
+                                aria-expanded="false"
                             >
-                            @if ($this->produtoLookupOpen && $this->produtoResults !== [])
-                                <ul @class([
-                                    'erp-fv-tv__suggest erp-fv-tv__suggest--produto',
-                                    'erp-os-suggest--pecas' => $this->activeItemTab === 'pecas',
-                                ]) role="listbox" aria-label="Produtos encontrados">
-                                    @foreach ($this->produtoResults as $index => $sug)
-                                        <li wire:key="os-prod-sug-{{ $sug['id'] }}" role="presentation">
-                                            <button
-                                                type="button"
-                                                role="option"
-                                                aria-selected="{{ $this->selectedProdutoIndex === $index ? 'true' : 'false' }}"
-                                                wire:mousedown.prevent="selectProdutoResult({{ $index }})"
-                                                @class([
-                                                    'erp-os-suggest-btn',
-                                                    'is-selected' => $this->selectedProdutoIndex === $index,
-                                                ])
-                                            >
-                                                <span class="erp-fv-tv__suggest-code">{{ $sug['codigo'] }}</span>
-                                                <span class="erp-os-suggest-main">
-                                                    <span class="erp-fv-tv__suggest-nome">{{ $sug['descricao'] }}</span>
-                                                    @if ($this->activeItemTab === 'pecas')
-                                                        <span class="erp-os-suggest-meta">
-                                                            <span class="erp-os-suggest-meta__item">EAN {{ $sug['codigo_barras'] ?? '—' }}</span>
-                                                            <span class="erp-os-suggest-meta__item">IMEI {{ $sug['imei_resumo'] ?? '—' }}</span>
-                                                        </span>
-                                                    @endif
-                                                </span>
-                                                @if ($this->activeItemTab === 'pecas')
-                                                    <span class="erp-fv-tv__suggest-estoques">
-                                                        <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--atual">Atual {{ $sug['atual'] ?? '0,000' }}</span>
-                                                        <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--reservado">Res {{ $sug['reservado'] ?? '0,000' }}</span>
-                                                        <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--disponivel">Disp {{ $sug['disponivel'] ?? '0,000' }}</span>
-                                                    </span>
-                                                @endif
-                                            </button>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @elseif ($this->produtoLookupOpen && filled($this->itemProdutoSearch))
-                                <div class="erp-orc-produto-lookup erp-orc-produto-lookup--empty">
-                                    Nenhum produto encontrado.
-                                </div>
-                            @endif
+                            <div id="os-produto-lookup-root" class="erp-os-produto-lookup-root"></div>
                         </div>
                     </label>
 
@@ -95,8 +58,6 @@
                             class="erp-nfe__input"
                             type="text"
                             wire:model="itemQtdInput"
-                            wire:blur="normalizeItemQtdInput"
-                            wire:keydown.enter.prevent="focoPrecoAposQtd"
                             @disabled($this->itemPendingProductId === null && $this->editingItemIndex === null)
                             inputmode="decimal"
                             autocomplete="off"
@@ -111,9 +72,8 @@
                                 class="erp-nfe__input"
                                 type="text"
                                 wire:model="itemPrecoInput"
-                                wire:keydown.enter.prevent="confirmPendingItemEntry"
                                 @disabled($this->itemPendingProductId === null && $this->editingItemIndex === null)
-                                data-mask="money"
+                                data-mask="money-br"
                                 inputmode="decimal"
                                 autocomplete="off"
                             >
@@ -143,9 +103,17 @@
         </section>
     @endunless
 
-    <div @class(['erp-fv-tv__body', 'erp-os-itens__body', 'erp-os-itens__body--no-foto' => ! $showFoto])>
+    <div
+        class="erp-fv-tv__body erp-os-itens__body"
+        :class="{ 'erp-os-itens__body--no-foto': itemTab !== 'pecas' }"
+        @class(['erp-os-itens__body--no-foto' => $this->activeItemTab !== 'pecas'])
+    >
         <div class="erp-fv-tv__grid-wrap">
-            <table class="erp-fv-tv__grid erp-os-itens__grid-fv">
+            <table
+                class="erp-fv-tv__grid erp-os-itens__grid-fv"
+                :class="{ 'erp-os-itens__grid-fv--pecas': itemTab === 'pecas' }"
+                @class(['erp-os-itens__grid-fv--pecas' => $this->activeItemTab === 'pecas'])
+            >
                 <thead>
                     <tr>
                         @unless ($readOnly)
@@ -165,11 +133,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @php $posInTab = 0; @endphp
-                    @forelse ($itensTab as $index => $item)
+                    @php
+                        $posServicos = 0;
+                        $posPecas = 0;
+                    @endphp
+                    @forelse ($itensAll as $index => $item)
                         @php
-                            $lineNum = $this->resolveItemDisplayNumberInTab($posInTab, $tabTotal);
-                            $posInTab++;
+                            $isServico = ($item['tipo'] ?? 'P') === 'S';
+                            $itemTabKey = $isServico ? 'servicos' : 'pecas';
+                            $tabTotal = $isServico ? $countServicos : $countPecas;
+                            $posInTab = $isServico ? $posServicos : $posPecas;
+                            $lineNum = max(1, $tabTotal - $posInTab);
+                            if ($isServico) {
+                                $posServicos++;
+                            } else {
+                                $posPecas++;
+                            }
                             $qtdVal = \App\Support\Erp\ErpMoney::parseBr($item['qtd'] ?? 0, 3);
                             $precoVal = \App\Support\Erp\ErpMoney::parseBr($item['preco'] ?? 0);
                             $bruto = round($qtdVal * $precoVal, 2);
@@ -179,7 +158,10 @@
                         @endphp
                         <tr
                             wire:key="{{ $item['key'] ?? ('os-item-' . $index) }}"
-                            wire:click="selectItemRow({{ $index }})"
+                            data-os-item-key="{{ $item['key'] ?? ('os-item-' . $index) }}"
+                            data-os-item-index="{{ $index }}"
+                            x-show="itemTab === '{{ $itemTabKey }}'"
+                            x-cloak
                             @unless ($readOnly)
                                 wire:dblclick.stop="startEditItem({{ $index }})"
                             @endunless
@@ -218,10 +200,12 @@
                                         class="erp-fv-tv__cell erp-fv-tv__cell--desc"
                                         title="{{ $item['discriminacao'] ?? '' }}"
                                     >{{ $item['discriminacao'] ?? '' }}</div>
-                                    @if ($this->activeItemTab === 'servicos' && ! $readOnly)
+                                    @if ($isServico && ! $readOnly)
                                         @php($temServicoPrestado = trim((string) ($item['servico_prestado'] ?? '')) !== '')
                                         <button
                                             type="button"
+                                            x-show="itemTab === 'servicos'"
+                                            x-cloak
                                             @class([
                                                 'erp-os-itens__desc-edit',
                                                 'erp-os-itens__desc-edit--filled' => $temServicoPrestado,
@@ -291,45 +275,51 @@
                         </tr>
                     @empty
                         <tr class="erp-fv-tv__empty">
-                            <td colspan="{{ $colCount }}">Nenhum item nesta aba — informe o código e pressione Enter</td>
+                            <td :colspan="itemTab === 'pecas' ? {{ $colCount - 1 }} : {{ $colCount }}">Nenhum item nesta aba — informe o código e pressione Enter</td>
                         </tr>
                     @endforelse
+                    @if ($itensAll !== [])
+                        <tr class="erp-fv-tv__empty" x-show="itemTab === 'servicos' && {{ $countServicos === 0 ? 'true' : 'false' }}" x-cloak>
+                            <td colspan="{{ $colCount }}">Nenhum item nesta aba — informe o código e pressione Enter</td>
+                        </tr>
+                        <tr class="erp-fv-tv__empty" x-show="itemTab === 'pecas' && {{ $countPecas === 0 ? 'true' : 'false' }}" x-cloak>
+                            <td colspan="{{ $colCount - 1 }}">Nenhum item nesta aba — informe o código e pressione Enter</td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>
 
-        @if ($showFoto)
-            <aside class="erp-fv-tv__aside">
-                <div class="erp-fv-tv__foto">
-                    @if ($this->produtoAtualFoto)
-                        <img
-                            src="{{ $this->produtoAtualFoto }}"
-                            alt="{{ $this->produtoAtualNome }}"
-                            onerror="this.style.display='none'; const ph=this.parentElement.querySelector('.erp-fv-tv__foto-empty'); if(ph){ ph.hidden=false; }"
-                        >
-                        <div class="erp-fv-tv__foto-empty" hidden>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                                <rect x="3" y="5" width="18" height="14" rx="2"/>
-                                <circle cx="8.5" cy="10.5" r="1.5"/>
-                                <path d="M21 16l-5-5-4 4-2-2-5 5"/>
-                            </svg>
-                            <span>Foto do produto</span>
-                        </div>
-                    @else
-                        <div class="erp-fv-tv__foto-empty">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                                <rect x="3" y="5" width="18" height="14" rx="2"/>
-                                <circle cx="8.5" cy="10.5" r="1.5"/>
-                                <path d="M21 16l-5-5-4 4-2-2-5 5"/>
-                            </svg>
-                            <span>Foto do produto</span>
-                        </div>
-                    @endif
-                    @if ($this->produtoAtualNome !== '')
-                        <p class="erp-fv-tv__foto-caption">{{ $this->produtoAtualNome }}</p>
-                    @endif
-                </div>
-            </aside>
-        @endif
+        <aside class="erp-fv-tv__aside" x-show="itemTab === 'pecas'" x-cloak>
+            <div class="erp-fv-tv__foto">
+                @if ($this->produtoAtualFoto)
+                    <img
+                        src="{{ $this->produtoAtualFoto }}"
+                        alt="{{ $this->produtoAtualNome }}"
+                        onerror="this.style.display='none'; const ph=this.parentElement.querySelector('.erp-fv-tv__foto-empty'); if(ph){ ph.hidden=false; }"
+                    >
+                    <div class="erp-fv-tv__foto-empty" hidden>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <rect x="3" y="5" width="18" height="14" rx="2"/>
+                            <circle cx="8.5" cy="10.5" r="1.5"/>
+                            <path d="M21 16l-5-5-4 4-2-2-5 5"/>
+                        </svg>
+                        <span>Foto do produto</span>
+                    </div>
+                @else
+                    <div class="erp-fv-tv__foto-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <rect x="3" y="5" width="18" height="14" rx="2"/>
+                            <circle cx="8.5" cy="10.5" r="1.5"/>
+                            <path d="M21 16l-5-5-4 4-2-2-5 5"/>
+                        </svg>
+                        <span>Foto do produto</span>
+                    </div>
+                @endif
+                @if ($this->produtoAtualNome !== '')
+                    <p class="erp-fv-tv__foto-caption">{{ $this->produtoAtualNome }}</p>
+                @endif
+            </div>
+        </aside>
     </div>
 </div>

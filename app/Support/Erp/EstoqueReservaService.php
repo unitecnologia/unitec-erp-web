@@ -44,6 +44,37 @@ final class EstoqueReservaService
             ->all();
     }
 
+    /**
+     * Reservas ativas só dos produtos informados (busca/grade — evita agregar o estoque inteiro).
+     *
+     * @param  list<int>  $productIds
+     * @return array<int, float> product_id => quantidade reservada ativa
+     */
+    public function totaisReservadosAtivosParaProdutos(array $productIds, ?int $estoqueId = null): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $productIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $query = EstoqueReserva::query()
+            ->where('status', EstoqueReserva::STATUS_ATIVA)
+            ->whereIn('product_id', $ids);
+
+        $this->aplicarFiltroEstoque($query, $estoqueId);
+
+        return $query
+            ->groupBy('product_id')
+            ->selectRaw('product_id, SUM(quantidade) as total')
+            ->pluck('total', 'product_id')
+            ->map(fn ($v) => (float) $v)
+            ->all();
+    }
+
     public function reservadoAtivo(int $productId, ?int $estoqueId = null): float
     {
         return $this->reservadoAtivoParaProduto($productId, null, $estoqueId);

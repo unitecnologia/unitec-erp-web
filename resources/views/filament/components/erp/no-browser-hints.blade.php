@@ -6,4 +6,4 @@
     $hintsV = is_file($hintsPath) ? (int) filemtime($hintsPath) : time();
 @endphp
 
-<script src="{{ asset('js/erp-no-browser-hints.js') }}?v={{ $version }}-{{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}-v5-{{ $hintsV }}"></script>
+<script src="{{ asset('js/erp-no-browser-hints.js') }}?v={{ $version }}-{{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}-v8-{{ $hintsV }}"></script>

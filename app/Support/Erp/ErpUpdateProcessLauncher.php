@@ -71,9 +71,10 @@ final class ErpUpdateProcessLauncher
     }
 
     /**
-     * Gera caches Filament em background (não bloqueia o modal de atualização).
+     * Garante cache Filament (idempotente). Preferir o passo síncrono do apply;
+     * este método permanece para reparos/manutenção externos.
      */
-    public static function launchFilamentCaches(string $appPath): bool
+    public static function launchFilamentCaches(string $appPath, bool $force = false): bool
     {
         $appPath = rtrim($appPath, '\\/');
         $php = self::resolvePhpBinary($appPath);
@@ -85,19 +86,28 @@ final class ErpUpdateProcessLauncher
             return false;
         }
 
+        if (! $force && FilamentComponentCache::isPresent($appPath)) {
+            return true;
+        }
+
         File::ensureDirectoryExists(dirname($logFile));
+
+        $args = ['unitec:filament-cache'];
+        if ($force) {
+            $args[] = '--force';
+        }
 
         if (PHP_OS_FAMILY === 'Windows') {
             $batch = $appPath.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'app'
                 .DIRECTORY_SEPARATOR.'private'.DIRECTORY_SEPARATOR.'erp-filament-cache.bat';
             $quote = static fn (string $value): string => str_replace('"', '""', $value);
+            $artisanArgs = 'unitec:filament-cache'.($force ? ' --force' : '');
             File::put($batch, implode("\r\n", [
                 '@echo off',
                 'chcp 65001 >nul',
                 'cd /d "'.$quote($appPath).'"',
                 'echo [%date% %time%] Iniciando caches Filament >> "'.$quote($logFile).'"',
-                '"'.$quote($php).'" -d opcache.enable=0 -d opcache.enable_cli=0 "'.$quote($artisan).'" icons:cache >> "'.$quote($logFile).'" 2>&1',
-                '"'.$quote($php).'" -d opcache.enable=0 -d opcache.enable_cli=0 "'.$quote($artisan).'" filament:cache-components >> "'.$quote($logFile).'" 2>&1',
+                '"'.$quote($php).'" -d opcache.enable=0 -d opcache.enable_cli=0 "'.$quote($artisan).'" '.$artisanArgs.' >> "'.$quote($logFile).'" 2>&1',
                 'echo [%date% %time%] Caches Filament concluidos >> "'.$quote($logFile).'"',
             ])."\r\n");
 
@@ -114,10 +124,10 @@ final class ErpUpdateProcessLauncher
         try {
             Process::path($appPath)
                 ->timeout(null)
-                ->start([$php, '-d', 'opcache.enable=0', '-d', 'opcache.enable_cli=0', $artisan, 'icons:cache']);
-            Process::path($appPath)
-                ->timeout(null)
-                ->start([$php, '-d', 'opcache.enable=0', '-d', 'opcache.enable_cli=0', $artisan, 'filament:cache-components']);
+                ->start(array_merge(
+                    [$php, '-d', 'opcache.enable=0', '-d', 'opcache.enable_cli=0', $artisan],
+                    $args,
+                ));
         } catch (\Throwable) {
             return false;
         }

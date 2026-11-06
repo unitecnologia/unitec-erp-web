@@ -63,8 +63,8 @@ trait ManagesProductEmpresaPrecos
             return;
         }
 
+        // Abertura/troca de empresa: só leitura (resolve). Persistência fica no save via upsert.
         $service = $this->productEmpresaPrecoService();
-        $service->ensureForEmpresa($product, $empresaId);
 
         $prices = $this->productEmpresaPrecosDraft[$empresaId]
             ?? $service->resolve($product, $empresaId);
@@ -262,7 +262,7 @@ trait ManagesProductEmpresaPrecos
         if (isset($this->productEmpresaPrecosDraft[$toEmpresaId])) {
             $prices = $this->productEmpresaPrecosDraft[$toEmpresaId];
         } elseif ($product instanceof Product) {
-            $service->ensureForEmpresa($product, $toEmpresaId);
+            // Sem INSERT na troca de empresa — gravação só no Salvar.
             $prices = $service->resolve($product, $toEmpresaId);
             $this->productEmpresaPrecosDraft[$toEmpresaId] = $prices;
         } else {

@@ -4,7 +4,9 @@ namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
+use App\Support\Erp\CaixaHistoricoExibicao;
 use App\Support\Erp\CaixaListRowFormatter;
+use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
@@ -98,11 +100,20 @@ class MovimentoCaixaReport extends AbstractTabularReport
             }
         }
 
-        $rows = $query->limit(5000)->get()->map(fn (CaixaLancamento $l): array => [
+        $lancamentos = $query->limit(5000)->get();
+        $pedidosMonitor = ContaReceberPedidoExibicao::mapa($lancamentos);
+
+        $rows = $lancamentos->map(fn (CaixaLancamento $l): array => [
             'codigo' => (string) $l->codigo,
             'emissao' => static::formatDate($l->emissao),
-            'documento' => (string) ($l->documento ?? ''),
-            'historico' => CaixaListRowFormatter::comSessaoPdv((string) ($l->historico ?? ''), $l),
+            'documento' => ContaReceberPedidoExibicao::texto((string) ($l->documento ?? ''), $pedidosMonitor),
+            'historico' => CaixaListRowFormatter::comSessaoPdv(
+                CaixaHistoricoExibicao::paraExibicao(
+                    (string) ($l->historico ?? ''),
+                    $pedidosMonitor,
+                ),
+                $l,
+            ),
             'plano' => (string) ($l->planoConta?->descricao ?: $l->plano_contas ?: ''),
             'conta' => (string) ($l->conta?->nome ?? ''),
             'entrada' => static::formatMoney((float) $l->entrada),

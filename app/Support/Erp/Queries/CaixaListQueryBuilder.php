@@ -84,6 +84,14 @@ class CaixaListQueryBuilder
         return (float) $query->sum('entrada') - (float) $query->sum('saida');
     }
 
+    /**
+     * Escopo filtrado da grade (empresa/conta/período/busca) — para checagens de agrupamento.
+     */
+    public function scopedQuery(): Builder
+    {
+        return $this->buildFilteredQuery();
+    }
+
     protected function buildFilteredQuery(): Builder
     {
         $query = $this->buildBaseScopeQuery();
@@ -228,11 +236,18 @@ class CaixaListQueryBuilder
         $query->where(function (Builder $inner) use ($term): void {
             $inner->where('documento', 'like', $term.'%');
 
-            if (preg_match('/^\d+$/', $term) !== 1) {
+            $numeroMonitor = null;
+            if (preg_match('/^\d+$/', $term) === 1) {
+                $numeroMonitor = (int) $term;
+            } elseif (preg_match('/^(TV|FV)-?(\d+)$/i', $term, $m) === 1) {
+                $numeroMonitor = (int) $m[2];
+            }
+
+            if ($numeroMonitor === null || $numeroMonitor <= 0) {
                 return;
             }
 
-            foreach (ContaReceberPedidoExibicao::orderIdsDoNumero((int) $term) as $orderId) {
+            foreach (ContaReceberPedidoExibicao::orderIdsDoNumero($numeroMonitor) as $orderId) {
                 $inner->orWhere('documento', 'FV-'.$orderId)
                     ->orWhere('documento', 'like', 'FV-'.$orderId.'/%');
             }

@@ -747,6 +747,19 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     color: #b91c1c;
 }
 
+.erp-caixa-page .erp-caixa-historico {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+.erp-caixa-page .erp-caixa-row--grupo td {
+    background: color-mix(in srgb, #dbeafe 55%, transparent);
+}
+
 .erp-caixa-page .erp-caixa-row--abertura td {
     background: #eef6ff !important;
     font-weight: 700;
@@ -1277,6 +1290,46 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     color: #64748b;
 }
 
+.erp-caixa-page .erp-caixa-view-modal__membros {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__membro {
+    display: grid;
+    grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.45rem;
+    padding: 0.18rem 0.35rem;
+    border: 1px solid #e8eef6;
+    border-radius: 4px;
+    background: #f8fafc;
+    font-size: 0.7rem;
+    line-height: 1.25;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__membro-cod {
+    font-weight: 700;
+    color: #475569;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__membro-hist {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #0f172a;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__membro-valores {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: #0f172a;
+}
+
 .erp-caixa-page .erp-caixa-view-modal__grid--origem {
     margin-bottom: 0;
 }
@@ -1337,7 +1390,8 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
 .erp-caixa-page .erp-caixa-view-modal__actions {
     display: flex !important;
     width: 100%;
-    justify-content: flex-end !important;
+    justify-content: space-between !important;
+    align-items: center;
     gap: 0.45rem;
     margin: 0;
     padding: 0.45rem 0.55rem !important;
@@ -1349,20 +1403,319 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
 .erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__btn {
     min-width: 5.85rem;
     height: 3rem;
-    border: 1px solid #fca5a5;
     border-radius: var(--erp-radius-md, 8px);
-    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
     color: #fff;
     cursor: pointer;
 }
 
-.erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__btn:hover {
+.erp-caixa-page .erp-caixa-view-modal__btn-itens {
+    margin-right: auto;
+    border: 1px solid #93c5fd;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.erp-caixa-page .erp-caixa-view-modal__btn-itens:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+}
+
+.erp-caixa-page .erp-caixa-view-modal__btn-sair {
+    border: 1px solid #fca5a5;
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+}
+
+.erp-caixa-page .erp-caixa-view-modal__btn-sair:hover {
     background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
 }
 
 .erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__label,
 .erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__label kbd {
     color: #fff;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal {
+    z-index: 460;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal .erp-lookup-modal__backdrop {
+    background: rgb(15 23 42 / 48%);
+    backdrop-filter: blur(2px);
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(56rem, calc(100vw - 1.5rem));
+    max-height: min(42rem, 92vh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #d7e2f0 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    box-shadow:
+        0 24px 48px rgba(15, 23, 42, 0.22),
+        0 2px 8px rgba(15, 52, 96, 0.08) !important;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.95rem 1.1rem 0.85rem;
+    background:
+        linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    border-bottom: 1px solid #dbe5f2;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__title {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__cliente {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+    background: #e8f0fb;
+    color: #1e4b82;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    margin-top: 0.05rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #fff;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__close:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+    background: #f7f9fc;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    margin: 0.85rem 1rem 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__col-item { width: 3.4rem; }
+.erp-caixa-page .erp-caixa-itens-modal__col-codigo { width: 5rem; }
+.erp-caixa-page .erp-caixa-itens-modal__col-produto { width: auto; }
+.erp-caixa-page .erp-caixa-itens-modal__col-qtd { width: 5.5rem; }
+.erp-caixa-page .erp-caixa-itens-modal__col-preco { width: 6.2rem; }
+.erp-caixa-page .erp-caixa-itens-modal__col-desc { width: 5.5rem; }
+.erp-caixa-page .erp-caixa-itens-modal__col-total { width: 6.5rem; }
+
+.erp-caixa-page .erp-caixa-itens-modal__grid th,
+.erp-caixa-page .erp-caixa-itens-modal__grid td {
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid #eef2f7;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__grid tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__grid tbody tr:nth-child(even) td {
+    background: #fafbfd;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__grid tbody tr:hover td {
+    background: #eef5ff;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__num {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    color: #334155;
+    white-space: nowrap;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__center {
+    text-align: center !important;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.55rem;
+    height: 1.55rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: #e8f0fb;
+    color: #1e4b82;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__codigo {
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__produto {
+    color: #0f172a;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__linha-total {
+    color: #0f3460 !important;
+    font-weight: 700;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1rem 1rem;
+    background: #fff;
+    border-top: 1px solid #e8eef6;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__total {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid #c7ddf7;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__total-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #3b6ea5;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__total-value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #0f3460;
+    letter-spacing: -0.01em;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__btn-sair {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-width: 7.2rem;
+    height: 2.55rem;
+    padding: 0 0.95rem;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 6px 14px rgba(220, 38, 38, 0.22);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__btn-sair:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(220, 38, 38, 0.28);
+}
+
+.erp-caixa-page .erp-caixa-itens-modal__btn-sair kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.erp-caixa-page .erp-caixa-itens-modal .erp-lookup-modal__empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
 }
 
 .erp-caixa-page .erp-caixa-money-cell .fi-ta-col {

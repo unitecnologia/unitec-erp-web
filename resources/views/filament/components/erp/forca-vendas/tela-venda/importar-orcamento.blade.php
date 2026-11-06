@@ -6,21 +6,81 @@
                 <h2 id="erp-fv-importar-orc-title">Importar orçamento finalizado</h2>
             </header>
             <div class="erp-pdv-modal__body">
-                <label class="erp-pdv-modal__label" for="erp-fv-importar-orc-search">Número ou cliente</label>
-                <input
-                    id="erp-fv-importar-orc-search"
-                    type="text"
-                    wire:model.live.debounce.150ms="fvImportarOrcamentoSearch"
-                    wire:keydown.enter.prevent="confirmarImportarOrcamento"
-                    wire:keydown.escape.prevent="fecharImportarOrcamento"
-                    wire:keydown.arrow-down.prevent="moveFvImportarOrcamentoSelection(1)"
-                    wire:keydown.arrow-up.prevent="moveFvImportarOrcamentoSelection(-1)"
-                    class="erp-pdv-modal__input"
-                    data-erp-uppercase
-                    autocomplete="off"
-                >
-                <div class="erp-pdv-modal__grid-scroll">
-                    <table class="erp-pdv__grid erp-pdv-modal__grid">
+                <div class="erp-fv-tv-importar__filters">
+                    <label class="erp-fv-tv-importar__field erp-fv-tv-importar__field--numero" for="erp-fv-importar-orc-numero">
+                        <span class="erp-fv-tv-importar__label">Número</span>
+                        <input
+                            id="erp-fv-importar-orc-numero"
+                            type="text"
+                            wire:model.live.debounce.150ms="fvImportarOrcNumero"
+                            wire:keydown.enter.prevent="confirmarImportarOrcamento"
+                            wire:keydown.escape.prevent="fecharImportarOrcamento"
+                            wire:keydown.arrow-down.prevent="moveFvImportarOrcamentoSelection(1)"
+                            wire:keydown.arrow-up.prevent="moveFvImportarOrcamentoSelection(-1)"
+                            class="erp-fv-tv-importar__input"
+                            data-erp-uppercase
+                            autocomplete="off"
+                        >
+                    </label>
+
+                    <label class="erp-fv-tv-importar__field erp-fv-tv-importar__field--cliente" for="erp-fv-importar-orc-cliente">
+                        <span class="erp-fv-tv-importar__label">Cliente</span>
+                        <input
+                            id="erp-fv-importar-orc-cliente"
+                            type="text"
+                            wire:model.live.debounce.150ms="fvImportarOrcCliente"
+                            wire:keydown.enter.prevent="confirmarImportarOrcamento"
+                            wire:keydown.escape.prevent="fecharImportarOrcamento"
+                            wire:keydown.arrow-down.prevent="moveFvImportarOrcamentoSelection(1)"
+                            wire:keydown.arrow-up.prevent="moveFvImportarOrcamentoSelection(-1)"
+                            class="erp-fv-tv-importar__input"
+                            data-erp-uppercase
+                            autocomplete="off"
+                        >
+                    </label>
+
+                    <div class="erp-fv-tv-importar__field erp-fv-tv-importar__field--periodo">
+                        <span class="erp-fv-tv-importar__label">Período</span>
+                        <div class="erp-fv-tv-importar__periodo">
+                            <input
+                                id="erp-fv-importar-orc-data-de"
+                                type="date"
+                                wire:model.change="fvImportarOrcDataDe"
+                                data-erp-date
+                                data-wire-field="fvImportarOrcDataDe"
+                                data-erp-date-wire="iso"
+                                data-erp-date-initial="{{ $this->fvImportarOrcDataDe }}"
+                                wire:keydown.escape.prevent="fecharImportarOrcamento"
+                                class="erp-fv-tv-importar__input erp-fv-tv-importar__input--date"
+                                title="Data inicial"
+                                aria-label="Data inicial"
+                            >
+                            <span class="erp-fv-tv-importar__periodo-sep" aria-hidden="true">até</span>
+                            <input
+                                id="erp-fv-importar-orc-data-ate"
+                                type="date"
+                                wire:model.change="fvImportarOrcDataAte"
+                                data-erp-date
+                                data-wire-field="fvImportarOrcDataAte"
+                                data-erp-date-wire="iso"
+                                data-erp-date-initial="{{ $this->fvImportarOrcDataAte }}"
+                                wire:keydown.escape.prevent="fecharImportarOrcamento"
+                                class="erp-fv-tv-importar__input erp-fv-tv-importar__input--date"
+                                title="Data final"
+                                aria-label="Data final"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="erp-pdv-modal__grid-scroll erp-fv-tv-importar__grid-scroll">
+                    <table class="erp-pdv__grid erp-pdv-modal__grid erp-fv-tv-importar__grid">
+                        <colgroup>
+                            <col class="erp-fv-tv-importar__col-numero">
+                            <col class="erp-fv-tv-importar__col-data">
+                            <col class="erp-fv-tv-importar__col-cliente">
+                            <col class="erp-fv-tv-importar__col-total">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Número</th>
@@ -41,10 +101,10 @@
                                         'erp-pdv__grid-row--selected' => $this->fvImportarOrcamentoSelectedIndex === $index,
                                     ])
                                 >
-                                    <td>{{ $row['numero'] }}</td>
-                                    <td>{{ $row['data'] }}</td>
-                                    <td class="erp-pdv__grid-col-descricao">{{ $row['cliente'] }}</td>
-                                    <td class="erp-pdv__grid-col-num">{{ $row['total'] }}</td>
+                                    <td class="erp-fv-tv-importar__cell-numero">{{ $row['numero'] }}</td>
+                                    <td class="erp-fv-tv-importar__cell-data">{{ $row['data'] }}</td>
+                                    <td class="erp-fv-tv-importar__cell-cliente" title="{{ $row['cliente'] }}">{{ $row['cliente'] }}</td>
+                                    <td class="erp-pdv__grid-col-num erp-fv-tv-importar__cell-total">{{ $row['total'] }}</td>
                                 </tr>
                             @empty
                                 <tr class="erp-pdv__grid-empty">

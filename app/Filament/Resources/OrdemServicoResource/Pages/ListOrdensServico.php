@@ -9,6 +9,7 @@ use App\Filament\Resources\NfeResource;
 use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceClienteEmail;
 use App\Filament\Resources\OrdemServicoResource;
 use App\Filament\Resources\PersonResource;
+use App\Livewire\Erp\OsListTable;
 use App\Models\OrdemServico;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpAccess;
@@ -20,16 +21,16 @@ use App\Support\Erp\Nfse\NfseFromOrdemServico;
 use App\Support\Erp\Nfse\NfseTomadorCadastro;
 use App\Support\Erp\Os\OrdemServicoRetorno;
 use App\Support\Erp\Os\OsReabrirService;
+use App\Support\Erp\OsListRowFormatter;
+use App\Support\Erp\Queries\OsListQueryBuilder;
 use DomainException;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Js;
@@ -114,6 +115,20 @@ class ListOrdensServico extends ListRecords
     #[Locked]
     public string $osClienteFiscalIncompletoAtalho = '';
 
+    /**
+     * Meta da linha selecionada (classes/botões), preenchida no highlight — sem SQL no render.
+     *
+     * @var array{
+     *     faturada?: bool,
+     *     nfse_pendente?: bool,
+     *     nfse_cliente_incompleto?: bool,
+     *     nfe_pendente?: bool,
+     *     nfe_cliente_incompleto?: bool,
+     *     nfce_pendente?: bool
+     * }|null
+     */
+    public ?array $selectedOsMeta = null;
+
     public function mount(): void
     {
         parent::mount();
@@ -138,11 +153,22 @@ class ListOrdensServico extends ListRecords
             $this->periodoAteApplied = $this->periodoAte;
         }
 
+        if ($this->highlightedRecordId) {
+            $this->hydrateSelectedOsMetaFromId((int) $this->highlightedRecordId);
+        }
+
         $this->dispatch(
             'erp-hydrate-os-dates',
             de: $this->periodoDe,
             ate: $this->periodoAte,
         );
+    }
+
+    /**
+     * Grade isolada em OsListTable — evita init/remount da EmbeddedTable do Filament.
+     */
+    public function mountInteractsWithTable(): void
+    {
     }
 
     protected static function erpListPageClass(): string
@@ -185,92 +211,26 @@ class ListOrdensServico extends ListRecords
         return $this->buildListQuery();
     }
 
-    protected function buildListQuery(): Builder
+    protected function listQueryBuilder(): OsListQueryBuilder
     {
-        $query = parent::getTableQuery()
-            ->with([
-                'cliente',
-                'atendente',
-                'nfseAutorizada',
-                'nfseItemAutorizado.nfse',
-                'nfeAutorizada',
-                'nfePecasEmitida',
-                'nfceAutorizada',
-                'nfcePecasEmitida',
-            ]);
-
-        if ($this->statusFilter === OrdemServico::SITUACAO_ABERTA) {
-            $query->whereIn('situacao', [
-                OrdemServico::SITUACAO_ABERTA,
-                OrdemServico::SITUACAO_ANDAMENTO,
-            ]);
-        } elseif ($this->statusFilter === OrdemServico::SITUACAO_FINALIZADA) {
-            $query->whereIn('situacao', [
-                OrdemServico::SITUACAO_FINALIZADA,
-                OrdemServico::SITUACAO_ENTREGUE,
-            ]);
-        } elseif ($this->statusFilter === OrdemServico::SITUACAO_CANCELADA) {
-            $query->where('situacao', OrdemServico::SITUACAO_CANCELADA);
-        }
-
-        if ($de = $this->normalizePeriodDate($this->periodoDeApplied)) {
-            $query->whereDate('data_inicio', '>=', $de);
-        }
-
-        if ($ate = $this->normalizePeriodDate($this->periodoAteApplied)) {
-            $query->whereDate('data_inicio', '<=', $ate);
-        }
-
-        if (filled($this->localSearch)) {
-            $this->applyLocalSearch($query, $this->localSearch);
-        }
-
-        return $query;
+        return new OsListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+        );
     }
 
-    protected function applyLocalSearch(Builder $query, string $term): void
+    protected function buildListQuery(): Builder
     {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $column = in_array($this->searchColumn, ['numero', 'cliente', 'atendente', 'placa', 'equipamento'], true)
-            ? $this->searchColumn
-            : 'cliente';
-
-        $like = '%'.$term.'%';
-
-        match ($column) {
-            'numero' => $query->where(function (Builder $q) use ($like, $term): void {
-                $q->where('numero', 'like', $like);
-                if (is_numeric($term)) {
-                    $q->orWhere('codigo_legado', (int) $term);
-                }
-            }),
-            'cliente' => $query->where(function (Builder $q) use ($like): void {
-                $q->where('nome', 'like', $like)
-                    ->orWhereHas('cliente', fn (Builder $c): Builder => $c->where('nome_razao', 'like', $like));
-            }),
-            'atendente' => $query->whereHas('atendente', fn (Builder $a): Builder => $a->where('nome', 'like', $like)),
-            'placa' => $query->where(function (Builder $q) use ($like): void {
-                $q->where('placa', 'like', $like)->orWhere('placa_veiculo', 'like', $like);
-            }),
-            'equipamento' => $query->where(function (Builder $q) use ($like): void {
-                $q->where('descricao', 'like', $like)
-                    ->orWhere('descricao2', 'like', $like)
-                    ->orWhere('modelo', 'like', $like)
-                    ->orWhere('marca', 'like', $like)
-                    ->orWhere('numero_serie', 'like', $like);
-            }),
-        };
+        return $this->listQueryBuilder()->buildForList();
     }
 
     #[Computed]
     public function filteredTotal(): float
     {
-        return (float) $this->buildListQuery()->sum('total_geral');
+        return $this->listQueryBuilder()->sumFilteredTotal();
     }
 
     public function content(Schema $schema): Schema
@@ -279,7 +239,8 @@ class ListOrdensServico extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.ordens-servico.screen'),
-                EmbeddedTable::make()->columnSpanFull(),
+                View::make('filament.components.erp.ordens-servico.table-host')
+                    ->columnSpanFull(),
                 View::make('filament.components.erp.ordens-servico.footer-total'),
                 View::make('filament.components.erp.ordens-servico.action-bar'),
                 View::make('filament.components.erp.ordens-servico.print-modal'),
@@ -294,6 +255,12 @@ class ListOrdensServico extends ListRecords
                 View::make('filament.components.erp.ordens-servico.os-nfce-fiscal-overlays'),
                 View::make('filament.components.erp.nfce.enviar-modal'),
             ]);
+    }
+
+    #[On('erp-os-open-espelho')]
+    public function onErpOsOpenEspelho(int $ordemId): void
+    {
+        $this->openOrdemServicoEspelho($ordemId);
     }
 
     protected function empresaIdAtiva(): ?int
@@ -330,7 +297,16 @@ class ListOrdensServico extends ListRecords
             return;
         }
 
-        $ordem = $this->ordemSelecionadaParaFiscal();
+        // Impressão: docs fiscais — sem carregar itens/produtos.
+        $ordem = $this->ordemSelecionadaParaFiscal([
+            'cliente',
+            'nfcePecasEmitida',
+            'nfceAutorizada',
+            'nfePecasEmitida',
+            'nfeAutorizada',
+            'nfseAutorizada',
+            'nfseItemAutorizado.nfse',
+        ]);
 
         if ($ordem === null) {
             return;
@@ -502,7 +478,7 @@ class ListOrdensServico extends ListRecords
 
         $this->statusFilter = $filter;
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOsListRefresh();
     }
 
     public function applyPeriodFilter(): void
@@ -535,13 +511,12 @@ class ListOrdensServico extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetPage();
-        $this->resetTable();
+        $this->pushOsListRefresh(resetSort: true);
     }
 
     protected function notifyPeriodFilterResult(): void
     {
-        $count = $this->buildListQuery()->count();
+        $count = $this->listQueryBuilder()->countFiltered();
 
         if ($count === 0) {
             Notification::make()
@@ -585,7 +560,101 @@ class ListOrdensServico extends ListRecords
     {
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOsListRefresh(resetSort: true);
+    }
+
+    public function updatedLocalSearch(): void
+    {
+        $this->clearListSelection();
+        $this->pushOsListRefresh(resetSort: true);
+    }
+
+    public function updatedTableRecordsPerPage(): void
+    {
+        $this->clearListSelection();
+        $this->pushOsListRefresh();
+    }
+
+    public function highlightRecord(int | string $recordId, mixed $meta = null): void
+    {
+        $normalized = $this->normalizeSelectedOsMeta($meta);
+        $this->selectedOsMeta = $normalized;
+        $this->highlightedRecordId = (int) $recordId;
+
+        // Clique sem meta (fallback) ou seleção só por ID: hidrata 1× a partir da grade leve.
+        if ($this->selectedOsMeta === null) {
+            $this->hydrateSelectedOsMetaFromId((int) $recordId);
+        }
+
+        $this->skipRender();
+    }
+
+    public function updatedHighlightedRecordId(mixed $value): void
+    {
+        if ($value === null || $value === '' || (int) $value < 1) {
+            $this->selectedOsMeta = null;
+
+            return;
+        }
+
+        if ($this->selectedOsMeta === null) {
+            $this->hydrateSelectedOsMetaFromId((int) $value);
+        }
+    }
+
+    protected function clearListSelection(): void
+    {
+        $this->highlightedRecordId = null;
+        $this->selectedOsMeta = null;
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushOsListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Compatível com traits (e-mail / NFC-e) que ainda chamam resetTable().
+     */
+    public function resetTable(): void
+    {
+        $this->pushOsListRefresh();
+    }
+
+    protected function pushOsListRefresh(bool $resetSort = false): void
+    {
+        $total = $this->listQueryBuilder()->sumFilteredTotal();
+
+        $this->dispatch(
+            'erp-os-list-refresh',
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+            highlightedRecordId: $this->highlightedRecordId,
+        )->to(OsListTable::class);
+
+        $this->skipRender();
+
+        $resetButtons = $this->highlightedRecordId
+            ? ''
+            : 'document.querySelectorAll(".erp-os-page [data-erp-enable-on-row]").forEach((b) => { b.disabled = true; });'
+                .'document.querySelectorAll(".erp-os-page [data-erp-disable-on-row]").forEach((b) => { b.disabled = false; });'
+                .'document.querySelectorAll(".erp-os-page [data-erp-warn-on-row]").forEach((b) => { b.classList.remove("is-warning"); });';
+
+        $this->js(sprintf(
+            '(() => { const el = document.querySelector(".erp-os-page .erp-orcamentos__total-value"); if (el) el.textContent = %s; %s })()',
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            $resetButtons,
+        ));
     }
 
     public function createOrdem(): void
@@ -597,149 +666,35 @@ class ListOrdensServico extends ListRecords
         $this->redirectErpAdmin(OrdemServicoResource::getUrl('create'));
     }
 
-    /**
-     * @return array<int, string>
-     */
-    protected function erpListRecordClasses(Model $record): array
-    {
-        if (! $record instanceof OrdemServico || ! $this->osFaturada($record)) {
-            return [];
-        }
-
-        $classes = ['erp-os-row--faturada'];
-
-        if (! $record->possuiNfseAutorizada()) {
-            $classes[] = 'erp-os-row--nfse-pendente';
-
-            // Usa o cliente já eager-loaded — sem consulta extra por linha.
-            if (NfseTomadorCadastro::camposFaltantesDoCliente($record->cliente) !== []) {
-                $classes[] = 'erp-os-row--nfse-cliente-incompleto';
-            }
-        }
-
-        // F10 / F11: peças na grade; exclusão mútua NF-e ↔ NFC-e.
-        if ($this->osListaIndicaPecas($record)) {
-            if (! $record->possuiNfePecasEmitida() && ! $record->possuiNfcePecasDocumentada()) {
-                $classes[] = 'erp-os-row--nfe-pendente';
-
-                if (NfeClienteCadastro::camposFaltantesDoCliente($record->cliente) !== []) {
-                    $classes[] = 'erp-os-row--nfe-cliente-incompleto';
-                }
-            }
-
-            if (
-                ! $record->possuiNfePecasEmitida()
-                && ! $record->possuiNfceAutorizada()
-                && ! $this->osClienteTemCnpj($record->cliente)
-            ) {
-                $nfce = $record->nfcePecasEmitida;
-                $denegada = $nfce !== null && (string) $nfce->status === \App\Models\PdvVendaNfce::STATUS_DENEGADA;
-
-                if (! $denegada) {
-                    $classes[] = 'erp-os-row--nfce-pendente';
-                }
-            }
-        }
-
-        return $classes;
-    }
-
     public function osSelecionadaPodeEmitirNfse(): bool
     {
-        $ordem = $this->osSelecionadaFaturadaModel();
-
-        return $ordem !== null && ! $ordem->possuiNfseAutorizada();
+        return (bool) ($this->selectedOsMeta['nfse_pendente'] ?? false);
     }
 
     /**
-     * Amarelo no F7: cadastro incompleto na linha já carregada (sem query extra).
+     * Amarelo no F7: usa meta da linha selecionada (sem SQL no render).
      */
     public function osSelecionadaNfseClienteIncompleto(): bool
     {
-        if (! $this->highlightedRecordId) {
-            return false;
-        }
-
-        try {
-            $records = $this->getTableRecords();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        foreach ($records as $record) {
-            if (! $record instanceof OrdemServico || (int) $record->getKey() !== (int) $this->highlightedRecordId) {
-                continue;
-            }
-
-            if (! $this->osFaturada($record) || $record->possuiNfseAutorizada()) {
-                return false;
-            }
-
-            return NfseTomadorCadastro::camposFaltantesDoCliente($record->cliente) !== [];
-        }
-
-        return false;
+        return (bool) ($this->selectedOsMeta['nfse_cliente_incompleto'] ?? false);
     }
 
     public function osSelecionadaPodeEmitirNfePecas(): bool
     {
-        $ordem = $this->osSelecionadaNaGrade();
-
-        if ($ordem === null) {
-            return false;
-        }
-
-        return $this->osFaturada($ordem)
-            && ! $ordem->possuiNfePecasEmitida()
-            && ! $ordem->possuiNfcePecasDocumentada()
-            && $this->osListaIndicaPecas($ordem);
+        return (bool) ($this->selectedOsMeta['nfe_pendente'] ?? false);
     }
 
     /**
-     * Amarelo no F10: só com peças + cadastro incompleto (dados da grade, sem query extra).
+     * Amarelo no F10: meta da linha selecionada (sem SQL no render).
      */
     public function osSelecionadaNfeClienteIncompleto(): bool
     {
-        $ordem = $this->osSelecionadaNaGrade();
-
-        if (
-            $ordem === null
-            || ! $this->osFaturada($ordem)
-            || $ordem->possuiNfePecasEmitida()
-            || $ordem->possuiNfcePecasDocumentada()
-        ) {
-            return false;
-        }
-
-        if (! $this->osListaIndicaPecas($ordem)) {
-            return false;
-        }
-
-        return NfeClienteCadastro::camposFaltantesDoCliente($ordem->cliente) !== [];
+        return (bool) ($this->selectedOsMeta['nfe_cliente_incompleto'] ?? false);
     }
 
-    /**
-     * OS selecionada a partir dos registros já carregados da grade (sem query).
-     */
-    protected function osSelecionadaNaGrade(): ?OrdemServico
+    public function osSelecionadaPodeEmitirNfcePecas(): bool
     {
-        if (! $this->highlightedRecordId) {
-            return null;
-        }
-
-        try {
-            $records = $this->getTableRecords();
-        } catch (\Throwable) {
-            return null;
-        }
-
-        foreach ($records as $record) {
-            if ($record instanceof OrdemServico && (int) $record->getKey() === (int) $this->highlightedRecordId) {
-                return $record;
-            }
-        }
-
-        return null;
+        return (bool) ($this->selectedOsMeta['nfce_pendente'] ?? false);
     }
 
     /**
@@ -751,24 +706,28 @@ class ListOrdensServico extends ListRecords
             || (float) ($ordem->total_produtos ?? 0) > 0.0001;
     }
 
-    private function osSelecionadaFaturadaModel(): ?OrdemServico
-    {
-        if (! $this->highlightedRecordId) {
-            return null;
-        }
-
-        $ordem = OrdemServico::query()->find($this->highlightedRecordId);
-
-        return $ordem !== null && $this->osFaturada($ordem) ? $ordem : null;
-    }
-
     public function podeAlterarOsSelecionada(): bool
     {
-        return ! $this->osSelecionadaFaturada();
+        return ! $this->osSelecionadaEstaFaturadaParaAcao();
     }
 
+    /**
+     * Estado da barra de ações — só meta da seleção (sem SQL).
+     */
     public function osSelecionadaFaturada(): bool
     {
+        return (bool) ($this->selectedOsMeta['faturada'] ?? false);
+    }
+
+    /**
+     * Checagem no clique (F3): usa meta se válida; senão 1 query pontual.
+     */
+    protected function osSelecionadaEstaFaturadaParaAcao(): bool
+    {
+        if ($this->selectedOsMeta !== null) {
+            return (bool) ($this->selectedOsMeta['faturada'] ?? false);
+        }
+
         if (! $this->highlightedRecordId) {
             return false;
         }
@@ -813,9 +772,11 @@ class ListOrdensServico extends ListRecords
             return;
         }
 
-        $ordem = OrdemServico::query()->find($id);
+        $ordem = $this->ordemDaEmpresa($id);
 
         if (! $ordem) {
+            Notification::make()->title('Ordem de serviço não encontrada.')->warning()->send();
+
             return;
         }
 
@@ -876,9 +837,11 @@ class ListOrdensServico extends ListRecords
 
     private function executarCancelamentoOrdem(int $id): void
     {
-        $ordem = OrdemServico::query()->find($id);
+        $ordem = $this->ordemDaEmpresa($id);
 
         if (! $ordem) {
+            Notification::make()->title('Ordem de serviço não encontrada.')->warning()->send();
+
             return;
         }
 
@@ -954,9 +917,7 @@ class ListOrdensServico extends ListRecords
         $empresaId = ErpContext::currentEmpresaId();
 
         return OrdemServico::query()
-            ->when($empresaId !== null, fn ($query) => $query->where(function ($query) use ($empresaId): void {
-                $query->whereNull('empresa_id')->orWhere('empresa_id', $empresaId);
-            }))
+            ->daEmpresaAtiva($empresaId)
             ->find($id);
     }
 
@@ -1173,14 +1134,17 @@ class ListOrdensServico extends ListRecords
         );
     }
 
-    protected function ordemSelecionadaParaFiscal(): ?OrdemServico
+    /**
+     * @param  list<string>  $with
+     */
+    protected function ordemSelecionadaParaFiscal(array $with = []): ?OrdemServico
     {
         $empresaId = ErpContext::currentEmpresaId();
+        $relations = $with !== [] ? $with : $this->ordemFiscalWithItens();
+
         $ordem = OrdemServico::query()
-            ->with(['cliente', 'itens.product', 'nfcePecasEmitida', 'nfceAutorizada', 'nfePecasEmitida'])
-            ->when($empresaId !== null, fn ($query) => $query->where(function ($query) use ($empresaId): void {
-                $query->whereNull('empresa_id')->orWhere('empresa_id', $empresaId);
-            }))
+            ->with($relations)
+            ->daEmpresaAtiva($empresaId)
             ->find($this->highlightedRecordId);
 
         if ($ordem === null) {
@@ -1188,5 +1152,62 @@ class ListOrdensServico extends ListRecords
         }
 
         return $ordem;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function ordemFiscalWithItens(): array
+    {
+        return [
+            'cliente',
+            'itens.product',
+            'nfcePecasEmitida',
+            'nfceAutorizada',
+            'nfePecasEmitida',
+            'nfeAutorizada',
+            'nfseAutorizada',
+            'nfseItemAutorizado.nfse',
+        ];
+    }
+
+    /**
+     * @param  mixed  $meta
+     * @return array{
+     *     faturada: bool,
+     *     nfse_pendente: bool,
+     *     nfse_cliente_incompleto: bool,
+     *     nfe_pendente: bool,
+     *     nfe_cliente_incompleto: bool,
+     *     nfce_pendente: bool
+     * }|null
+     */
+    protected function normalizeSelectedOsMeta(mixed $meta): ?array
+    {
+        if (! is_array($meta)) {
+            return null;
+        }
+
+        return [
+            'faturada' => (bool) ($meta['faturada'] ?? false),
+            'nfse_pendente' => (bool) ($meta['nfse_pendente'] ?? false),
+            'nfse_cliente_incompleto' => (bool) ($meta['nfse_cliente_incompleto'] ?? false),
+            'nfe_pendente' => (bool) ($meta['nfe_pendente'] ?? false),
+            'nfe_cliente_incompleto' => (bool) ($meta['nfe_cliente_incompleto'] ?? false),
+            'nfce_pendente' => (bool) ($meta['nfce_pendente'] ?? false),
+        ];
+    }
+
+    protected function hydrateSelectedOsMetaFromId(int $id): void
+    {
+        $ordem = (new OsListQueryBuilder)->buildForList()->whereKey($id)->first();
+
+        if (! $ordem instanceof OrdemServico) {
+            $this->selectedOsMeta = null;
+
+            return;
+        }
+
+        $this->selectedOsMeta = app(OsListRowFormatter::class)->selectionMeta($ordem);
     }
 }

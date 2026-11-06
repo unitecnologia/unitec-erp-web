@@ -364,109 +364,26 @@
                 <span>Código / barras / nome</span>
                 <div
                     class="erp-fv-tv__barcode-wrap"
-                    x-data="{
-                        ativo: 0,
-                        itens() {
-                            const lista = this.$refs.lista;
-                            return lista ? lista.querySelectorAll('[role=option]') : [];
-                        },
-                        mover(d) {
-                            const itens = this.itens();
-                            const total = itens.length;
-                            if (total === 0) return;
-                            const atual = itens[this.ativo];
-                            if (atual) {
-                                atual.classList.remove('is-selected');
-                                atual.setAttribute('aria-selected', 'false');
-                            }
-                            this.ativo = Math.max(0, Math.min(total - 1, this.ativo + d));
-                            const prox = itens[this.ativo];
-                            if (prox) {
-                                prox.classList.add('is-selected');
-                                prox.setAttribute('aria-selected', 'true');
-                                prox.scrollIntoView({ block: 'nearest' });
-                            }
-                        },
-                        confirmar() {
-                            const itens = this.itens();
-                            const el = itens[this.ativo] || null;
-                            const id = el ? Number(el.dataset.id || 0) : 0;
-                            if (id > 0) {
-                                $wire.selecionarProduto(id);
-                                return;
-                            }
-                            $wire.confirmarCodigoProduto();
-                        },
-                        reset() {
-                            this.ativo = 0;
-                        },
-                        marcar(i) {
-                            const itens = this.itens();
-                            const prev = itens[this.ativo];
-                            if (prev) {
-                                prev.classList.remove('is-selected');
-                                prev.setAttribute('aria-selected', 'false');
-                            }
-                            this.ativo = i;
-                            const cur = itens[this.ativo];
-                            if (cur) {
-                                cur.classList.add('is-selected');
-                                cur.setAttribute('aria-selected', 'true');
-                            }
-                        }
-                    }"
-                    x-on:erp-fv-produto-sugestoes-ready.window="reset()"
+                    data-fv-produto-lookup-url="{{ route('erp.fv.produtos-lookup') }}"
+                    data-fv-vendedor-id="{{ $this->vendedorId ?? '' }}"
+                    data-fv-estoque-id="{{ $this->estoqueId ?? '' }}"
+                    data-fv-tabela-preco-id="{{ $this->tabelaPrecoId ?? '' }}"
                 >
                     <input
                         id="fv-tv-barcode"
                         class="erp-nfe__input erp-fv-tv__input--barcode"
                         type="text"
                         x-ref="barcode"
-                        wire:model.live.debounce.200ms="codigoBarras"
-                        wire:keydown.escape.prevent="fecharSugestoesProduto"
-                        x-on:keydown.enter.prevent="confirmar()"
-                        x-on:keydown.arrow-down.prevent="mover(1)"
-                        x-on:keydown.arrow-up.prevent="mover(-1)"
+                        wire:ignore.self
+                        value="{{ $this->codigoBarras }}"
                         autocomplete="off"
                         placeholder="Código, barras ou nome do produto — Enter"
                         role="combobox"
                         aria-autocomplete="list"
-                        aria-expanded="{{ $this->produtoSugestoesOpen && $this->produtoSugestoes !== [] ? 'true' : 'false' }}"
+                        aria-expanded="false"
                         aria-controls="fv-tv-produto-sugestoes"
                     >
-                    @if ($this->produtoSugestoesOpen && $this->produtoSugestoes !== [])
-                        <ul
-                            id="fv-tv-produto-sugestoes"
-                            class="erp-fv-tv__suggest erp-fv-tv__suggest--produto"
-                            role="listbox"
-                            aria-label="Produtos encontrados"
-                            x-ref="lista"
-                        >
-                            @foreach ($this->produtoSugestoes as $index => $sug)
-                                <li wire:key="fv-tv-prod-sug-{{ $sug['id'] }}" role="presentation">
-                                    <button
-                                        type="button"
-                                        id="fv-tv-produto-sug-{{ $index }}"
-                                        role="option"
-                                        data-id="{{ $sug['id'] }}"
-                                        aria-selected="{{ $index === 0 ? 'true' : 'false' }}"
-                                        wire:click="selecionarProduto({{ $sug['id'] }})"
-                                        x-on:mouseenter="marcar({{ $index }})"
-                                        @class(['is-selected' => $index === 0])
-                                    >
-                                        <span class="erp-fv-tv__suggest-code">{{ $sug['codigo'] }}</span>
-                                        <span class="erp-fv-tv__suggest-nome">{{ $sug['nome'] }}</span>
-                                        <span class="erp-fv-tv__suggest-estoques">
-                                            <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--atual">Atual {{ $sug['atual'] }}</span>
-                                            <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--reservado">Res {{ $sug['reservado'] }}</span>
-                                            <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--disponivel">Disp {{ $sug['disponivel'] }}</span>
-                                        </span>
-                                        <span class="erp-fv-tv__suggest-preco">R$ {{ $sug['preco'] }}</span>
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
+                    <div id="fv-tv-produto-lookup-root" class="erp-fv-tv__produto-lookup-root" wire:ignore></div>
                 </div>
             </label>
 
@@ -477,9 +394,9 @@
                     class="erp-nfe__input"
                     type="text"
                     x-ref="qtd"
-                    wire:model.live="quantidade"
-                    wire:keydown.enter.prevent="focoPrecoAposQtd"
+                    wire:model="quantidade"
                     inputmode="decimal"
+                    autocomplete="off"
                 >
             </label>
 
@@ -491,9 +408,10 @@
                         class="erp-nfe__input"
                         type="text"
                         x-ref="preco"
-                        wire:model.live="precoUnitario"
-                        wire:keydown.enter.prevent="adicionarItem"
+                        wire:model="precoUnitario"
+                        data-mask="money-br"
                         inputmode="decimal"
+                        autocomplete="off"
                     >
                     <button
                         type="button"
@@ -508,7 +426,7 @@
 
             <label class="erp-fv-tv__field erp-fv-tv__field--money erp-fv-tv__field--total-item">
                 <span>Total item</span>
-                <input class="erp-nfe__input erp-fv-tv__input--total" type="text" value="{{ $this->totalItem }}" readonly>
+                <input id="fv-tv-total-item" class="erp-nfe__input erp-fv-tv__input--total" type="text" value="{{ $this->totalItem }}" readonly>
             </label>
         </div>
     </div>
@@ -532,7 +450,7 @@
                     <th class="erp-fv-tv__col-idx" data-erp-csort-key="numero" data-erp-csort-type="number">#</th>
                     <th class="erp-fv-tv__col-cod" data-erp-csort-key="codigo" data-erp-csort-type="text">Código</th>
                     <th data-erp-csort-key="produto" data-erp-csort-type="text">Produto</th>
-                    <th class="erp-fv-tv__col-num" data-erp-csort-key="quantidade" data-erp-csort-type="number">Qtde</th>
+                    <th class="erp-fv-tv__col-num erp-fv-tv__col-qtd" data-erp-csort-key="quantidade" data-erp-csort-type="number">Qtde</th>
                     <th class="erp-fv-tv__col-num" data-erp-csort-key="preco_unitario" data-erp-csort-type="money">Vlr. unit.</th>
                     @if ($exibirCustoGrade)
                         <th class="erp-fv-tv__col-num erp-fv-tv__col-custo" data-erp-csort-key="custo" data-erp-csort-type="money">Custo</th>
@@ -547,14 +465,15 @@
                 @forelse ($this->itens as $i => $item)
                     <tr
                         wire:key="fv-item-{{ $item['key'] }}"
+                        data-fv-item-key="{{ $item['key'] }}"
                         class="{{ $this->itemSelecionado === $i ? 'is-selected' : '' }}"
-                        wire:click="selecionarItem({{ $i }})"
+                        wire:click="selecionarItemByKey('{{ $item['key'] }}')"
                     >
                         <td class="erp-fv-tv__col-del">
                             <button
                                 type="button"
                                 class="erp-fv-tv__del-btn"
-                                wire:click.stop="pedirConfirmacaoExcluirItemPorIndice({{ $i }})"
+                                wire:click.stop="pedirConfirmacaoExcluirItemPorKey('{{ $item['key'] }}')"
                                 title="Excluir item"
                                 aria-label="Excluir item {{ $i + 1 }}"
                             >
@@ -577,10 +496,10 @@
                             <div
                                 class="erp-fv-tv__cell erp-fv-tv__cell--desc erp-fv-tv__cell--pull"
                                 title="Duplo clique: voltar para a barra de inclusão"
-                                wire:dblclick.stop="puxarItemParaInclusao({{ $i }})"
+                                wire:dblclick.stop="puxarItemParaInclusaoByKey('{{ $item['key'] }}')"
                             >{{ $item['descricao'] }}</div>
                         </td>
-                        <td class="erp-fv-tv__col-num">
+                        <td class="erp-fv-tv__col-num erp-fv-tv__col-qtd">
                             <div class="erp-fv-tv__cell erp-fv-tv__cell--num">{{ $this->formatQty($item['quantidade']) }}</div>
                         </td>
                         <td class="erp-fv-tv__col-num">
@@ -629,6 +548,66 @@
                 @endforelse
             </tbody>
         </table>
+        {{-- Template para o 1º item via JS (sem remorph). wire:ignore — não hidrata Livewire. --}}
+        <template id="erp-fv-tv-row-template" wire:ignore data-fv-has-custo="{{ $exibirCustoGrade ? '1' : '0' }}">
+            <tr data-fv-item-key="">
+                <td class="erp-fv-tv__col-del">
+                    <button type="button" class="erp-fv-tv__del-btn" title="Excluir item" aria-label="Excluir item">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18"/>
+                            <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                            <path d="M10 11v6"/>
+                            <path d="M14 11v6"/>
+                        </svg>
+                    </button>
+                </td>
+                <td class="erp-fv-tv__col-idx"><div class="erp-fv-tv__cell erp-fv-tv__cell--center">1</div></td>
+                <td class="erp-fv-tv__col-cod"><div class="erp-fv-tv__cell erp-fv-tv__cell--center"></div></td>
+                <td>
+                    <div class="erp-fv-tv__cell erp-fv-tv__cell--desc erp-fv-tv__cell--pull" title="Duplo clique: voltar para a barra de inclusão"></div>
+                </td>
+                <td class="erp-fv-tv__col-num erp-fv-tv__col-qtd"><div class="erp-fv-tv__cell erp-fv-tv__cell--num"></div></td>
+                <td class="erp-fv-tv__col-num">
+                    <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                        <span class="erp-fv-tv__money-rs">R$</span>
+                        <span class="erp-fv-tv__money-val">0,00</span>
+                    </div>
+                </td>
+                @if ($exibirCustoGrade)
+                    <td class="erp-fv-tv__col-num erp-fv-tv__col-custo">
+                        <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                            <span class="erp-fv-tv__money-rs">R$</span>
+                            <span class="erp-fv-tv__money-val">0,00</span>
+                        </div>
+                    </td>
+                @endif
+                <td class="erp-fv-tv__col-num">
+                    <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                        <span class="erp-fv-tv__money-rs">R$</span>
+                        <span class="erp-fv-tv__money-val">0,00</span>
+                    </div>
+                </td>
+                <td class="erp-fv-tv__col-num">
+                    <div class="erp-fv-tv__cell erp-fv-tv__cell--money erp-fv-tv__val-acr">
+                        <span class="erp-fv-tv__money-rs">R$</span>
+                        <span class="erp-fv-tv__money-val">0,00</span>
+                    </div>
+                </td>
+                <td class="erp-fv-tv__col-num">
+                    <div class="erp-fv-tv__cell erp-fv-tv__cell--money erp-fv-tv__val-desc">
+                        <span class="erp-fv-tv__money-rs">R$</span>
+                        <span class="erp-fv-tv__money-val">0,00</span>
+                    </div>
+                </td>
+                <td class="erp-fv-tv__col-num erp-fv-tv__val-liq">
+                    <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                        <span class="erp-fv-tv__money-rs">R$</span>
+                        <span class="erp-fv-tv__money-val">0,00</span>
+                    </div>
+                </td>
+            </tr>
+        </template>
     </div>
 
     <aside class="erp-fv-tv__aside">
@@ -650,23 +629,23 @@
             @endif
         </div>
 
-        <div class="erp-fv-tv__totais">
+        <div class="erp-fv-tv__totais" data-fv-totais>
             <div class="erp-fv-tv__totais-head">Resumo</div>
             <div class="erp-fv-tv__total-row">
                 <span>Total bruto</span>
-                <strong>{{ $this->formatMoney($this->totalBruto) }}</strong>
+                <strong data-fv-total="bruto">{{ $this->formatMoney($this->totalBruto) }}</strong>
             </div>
             <div class="erp-fv-tv__total-row">
                 <span>Acréscimos</span>
-                <strong class="erp-fv-tv__val-acr">{{ $this->formatMoney($this->totalAcrescimosItens) }}</strong>
+                <strong class="erp-fv-tv__val-acr" data-fv-total="acrescimos">{{ $this->formatMoney($this->totalAcrescimosItens) }}</strong>
             </div>
             <div class="erp-fv-tv__total-row">
                 <span>Descontos</span>
-                <strong class="erp-fv-tv__val-desc">{{ $this->formatMoney($this->totalDescontosItens) }}</strong>
+                <strong class="erp-fv-tv__val-desc" data-fv-total="descontos">{{ $this->formatMoney($this->totalDescontosItens) }}</strong>
             </div>
             <div class="erp-fv-tv__total-row erp-fv-tv__total-row--liq">
                 <span>Total líquido</span>
-                <strong>R$ {{ $this->formatMoney($this->totalLiquido()) }}</strong>
+                <strong data-fv-total="liquido">R$ {{ $this->formatMoney($this->totalLiquido()) }}</strong>
             </div>
             @if ((bool) (\App\Support\Erp\ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_mais_opcoes ?? false))
                 <div class="erp-fv-tv__mais-opcoes">
@@ -675,7 +654,7 @@
                     ])
                 </div>
             @endif
-            <div class="erp-fv-tv__itens-count">{{ count($this->itens) }} {{ count($this->itens) === 1 ? 'item' : 'itens' }}</div>
+            <div class="erp-fv-tv__itens-count" data-fv-itens-count>{{ $this->rotuloQuantidadeItens() }}</div>
         </div>
     </aside>
 </div>

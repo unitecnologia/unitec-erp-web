@@ -21,6 +21,16 @@ trait ManagesProductUltimosPrecos
 
     public bool $priceHistoryHydrated = false;
 
+    /**
+     * Histórico é só leitura — libera do snapshot ao sair da aba.
+     * lastSaved* permanece (gravação de histórico no save).
+     */
+    protected function releaseProductPriceHistoryTransientState(): void
+    {
+        $this->priceHistoryRows = [];
+        $this->priceHistoryHydrated = false;
+    }
+
     protected function captureLastSavedProductPrices(?Product $product): void
     {
         if (! $product) {
@@ -98,10 +108,28 @@ trait ManagesProductUltimosPrecos
         $this->syncProductImeis($product);
         $this->syncProductEmpresaPrecos($product);
         $this->recordProductPriceHistoryIfChanged($product);
-        $this->loadProductGrades($product);
-        $this->loadProductCompositions($product);
-        $this->loadProductPriceTableItems($product);
-        $this->loadProductImeis($product);
-        $this->loadProductPriceHistories($product);
+        // Atualiza baseline de preços mesmo sem a aba aberta (evita histórico duplicado no próximo F5).
+        $this->captureLastSavedProductPrices($product);
+
+        // Recarrega só o que a UI já tinha aberto — não hidrata abas só para "zerar" estado.
+        if ($this->productGradesHydrated) {
+            $this->loadProductGrades($product);
+        }
+
+        if ($this->productCompositionsHydrated) {
+            $this->loadProductCompositions($product);
+        }
+
+        if ($this->productTabPrecoHydrated) {
+            $this->loadProductPriceTableItems($product);
+        }
+
+        if ($this->productImeisHydrated) {
+            $this->loadProductImeis($product);
+        }
+
+        if ($this->priceHistoryHydrated) {
+            $this->loadProductPriceHistories($product);
+        }
     }
 }

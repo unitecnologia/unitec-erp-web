@@ -5,9 +5,12 @@
  * Estratégia: autocomplete one-time-code + name aleatório + readonly até interação.
  *
  * Opt-out pontual: data-erp-allow-browser-hints="1" no campo ou ancestral.
+ *
+ * v8: morph/mutations escaneiam só o subtree alterado (sem full-DOM a cada clique).
+ * Full scan permanece em load inicial e livewire:navigated.
  */
 (function initErpNoBrowserHints() {
-    const VERSION = 'v7-date-no-readonly';
+    const VERSION = 'v8-scoped-morph-scan';
 
     if (window.__erpNoBrowserHintsVersion === VERSION) {
         return;
@@ -18,6 +21,10 @@
     const IGNORE_INPUT_TYPES = new Set([
         'hidden', 'submit', 'button', 'reset', 'image', 'checkbox', 'radio', 'file', 'range', 'color',
     ]);
+
+    /** @type {Set<Element>} */
+    const pendingRoots = new Set();
+    let scheduled = false;
 
     function randomToken() {
         return 'erp-' + Math.random().toString(36).slice(2, 10);
@@ -211,36 +218,57 @@
         root.querySelectorAll('form, input, textarea, select').forEach(hardenField);
     }
 
-    function run() {
+    function runFullScan() {
+        pendingRoots.clear();
         scan(document.documentElement);
     }
 
-    let scheduled = false;
+    function flushPendingScans() {
+        scheduled = false;
+        const roots = Array.from(pendingRoots);
+        pendingRoots.clear();
 
-    function scheduleScan(root) {
-        if (root && root !== document.documentElement) {
+        for (const root of roots) {
+            if (! root.isConnected) {
+                continue;
+            }
+
             scan(root);
         }
+    }
+
+    /**
+     * Agenda scan apenas do subtree informado (morph / nós novos).
+     * Agrupa no mesmo frame; não dispara full-DOM.
+     */
+    function scheduleScan(root) {
+        if (! root || root.nodeType !== 1) {
+            return;
+        }
+
+        pendingRoots.add(root);
 
         if (scheduled) {
             return;
         }
 
         scheduled = true;
-
-        window.requestAnimationFrame(() => {
-            scheduled = false;
-            run();
-        });
+        window.requestAnimationFrame(flushPendingScans);
     }
 
-    document.addEventListener('DOMContentLoaded', run);
-    document.addEventListener('livewire:navigated', run);
+    document.addEventListener('DOMContentLoaded', runFullScan);
+    document.addEventListener('livewire:navigated', runFullScan);
 
     document.addEventListener('livewire:init', () => {
         if (! window.Livewire?.hook) {
             return;
         }
+
+        // Evita hooks duplicados se o script for reavaliado com VERSION nova.
+        if (window.__erpNoBrowserHintsLivewireBound === VERSION) {
+            return;
+        }
+        window.__erpNoBrowserHintsLivewireBound = VERSION;
 
         window.Livewire.hook('morph.updated', ({ el }) => {
             scheduleScan(el);
@@ -267,7 +295,7 @@
         const startObserver = () => {
             if (document.body) {
                 observer.observe(document.body, { childList: true, subtree: true });
-                run();
+                runFullScan();
             }
         };
 
@@ -278,5 +306,5 @@
         }
     }
 
-    run();
+    runFullScan();
 })();

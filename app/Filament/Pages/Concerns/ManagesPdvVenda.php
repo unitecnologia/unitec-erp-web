@@ -182,21 +182,21 @@ trait ManagesPdvVenda
     }
 
     /**
-     * Define um atalho de letra Ãºnico para a forma de pagamento.
+     * Define um atalho único para a forma de pagamento (letra ou tecla F cadastrada).
      *
      * @param  array<int, string>  $usados
      */
     protected function resolveAtalhoForma(string $atalho, string $descricao, array &$usados): string
     {
-        $atalho = mb_strtoupper(trim($atalho), 'UTF-8');
+        $cadastrado = \App\Support\Erp\FormaPagamentoAtalho::cadastradoUtilizavel($atalho, $usados);
 
-        if ($atalho !== '' && mb_strlen($atalho, 'UTF-8') === 1 && ! in_array($atalho, $usados, true)) {
-            $usados[] = $atalho;
+        if ($cadastrado !== null) {
+            $usados[] = $cadastrado;
 
-            return $atalho;
+            return $cadastrado;
         }
 
-        // Tenta cada letra A-Z da descriÃ§Ã£o; depois o alfabeto completo.
+        // Fallback: letra da descrição / alfabeto (não grava no cadastro).
         $candidatos = preg_split('//u', $descricao, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $candidatos = array_merge($candidatos, str_split('ABCDEFGHIJKLMNOPQRSTUVWXYZ'));
 

@@ -68,7 +68,7 @@ class ErpPageAssets
         'forca-vendas-aparelhos' => ['css/erp-forca-vendas.css'],
         'vendas-internas-aparelhos' => ['css/erp-forca-vendas.css'],
         'forca-vendas-monitor' => ['css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-forca-vendas.css', 'css/erp-orcamentos.css', 'css/erp-form-ui.css', 'css/erp-fv-monitor.css', 'css/erp-fv-monitor-envio.css'],
-        'forca-vendas-tela-venda' => ['css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-forca-vendas.css', 'css/erp-fv-tela-venda.css'],
+        'forca-vendas-tela-venda' => ['css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-forca-vendas.css', 'css/erp-fv-tela-venda.css', 'css/erp-form-ui.css'],
         'expedicao-controle' => ['css/erp-nfe.css', 'css/erp-expedicao.css'],
         'expedicao-bipagem' => ['css/erp-nfe.css', 'css/erp-expedicao.css'],
         'cargas-romaneio' => ['css/erp-nfe.css', 'css/erp-cargas.css', 'css/erp-form-ui.css'],

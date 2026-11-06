@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Erp;
 
+use App\Support\Erp\CaixaListAgrupamentoVisual;
 use App\Support\Erp\CaixaListRowFormatter;
 use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\ErpTableSort;
@@ -114,7 +115,10 @@ class CaixaListTable extends Component
 
         $paginator = $query->paginate($this->perPage);
 
-        return $this->comLinhasVirtuaisLivro($paginator);
+        return $this->comAgrupamentoVisual(
+            $this->comLinhasVirtuaisLivro($paginator),
+            $builder,
+        );
     }
 
     protected function comLinhasVirtuaisLivro(LengthAwarePaginator $paginator): LengthAwarePaginator
@@ -137,6 +141,28 @@ class CaixaListTable extends Component
         $items = $paginator->getCollection();
         $paginator->setCollection(
             CaixaLivroAberturaDisplay::mesclarVirtuaisNaGrade($items, $virtuais)
+        );
+
+        return $paginator;
+    }
+
+    /**
+     * Colapsa pagamentos da mesma OS/TV/FV na página atual (só apresentação).
+     * Só agrupa chave completa no escopo filtrado (sem totais parciais na paginação).
+     */
+    protected function comAgrupamentoVisual(
+        LengthAwarePaginator $paginator,
+        CaixaListQueryBuilder $builder,
+    ): LengthAwarePaginator {
+        /** @var Collection $items */
+        $items = $paginator->getCollection();
+        $completas = CaixaListAgrupamentoVisual::chavesCompletasNaPagina(
+            $items,
+            $builder->scopedQuery(),
+        );
+        $pedidosMonitor = ContaReceberPedidoExibicao::mapa($items);
+        $paginator->setCollection(
+            CaixaListAgrupamentoVisual::aplicar($items, $completas, $pedidosMonitor),
         );
 
         return $paginator;

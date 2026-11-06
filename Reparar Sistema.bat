@@ -138,6 +138,7 @@ cd /d "%APP%"
 REM packages.php pode ter ficado com Laravel\Pail (DEV) apos update — rediscover de novo limpo
 del /F /Q "%APP%\bootstrap\cache\packages.php" "%APP%\bootstrap\cache\services.php" >nul 2>&1
 "%PHPEXE%" artisan package:discover >nul 2>&1
+"%PHPEXE%" artisan unitec:filament-cache --force >nul 2>&1
 
 echo [5/8] Ajustando .env (debug para capturar erro)...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
@@ -203,6 +204,7 @@ if errorlevel 1 (
 REM Limpa cache do indicador BD (PendingMigrationsGuard) + config
 "%PHPEXE%" artisan optimize:clear >nul 2>&1
 "%PHPEXE%" artisan config:cache >nul 2>&1
+"%PHPEXE%" artisan unitec:filament-cache --force >nul 2>&1
 
 echo [8/8] Testando login...
 timeout /t 2 /nobreak >nul

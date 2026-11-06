@@ -179,6 +179,7 @@ trait ManagesOrdemServicoNfcePecas
         $this->cancelarOsNfceEmitirModal();
 
         $ordem = OrdemServico::query()
+            ->daEmpresaAtiva()
             ->with(['cliente', 'itens.product', 'empresa', 'nfcePecasEmitida', 'nfePecasEmitida'])
             ->find($ordemId);
 
@@ -212,33 +213,17 @@ trait ManagesOrdemServicoNfcePecas
         $this->resetTable();
     }
 
+    /**
+     * Preferir override na página da listagem (meta da linha, sem SQL).
+     * Mantido como fallback seguro se a página não sobrescrever.
+     */
     public function osSelecionadaPodeEmitirNfcePecas(): bool
     {
-        $ordem = $this->osSelecionadaNaGrade();
-
-        if ($ordem === null || ! $this->osFaturada($ordem)) {
-            return false;
+        if (property_exists($this, 'selectedOsMeta') && is_array($this->selectedOsMeta)) {
+            return (bool) ($this->selectedOsMeta['nfce_pendente'] ?? false);
         }
 
-        if ($ordem->possuiNfePecasEmitida() || $ordem->possuiNfceAutorizada()) {
-            return false;
-        }
-
-        if (! $this->osListaIndicaPecas($ordem)) {
-            return false;
-        }
-
-        if ($this->osClienteTemCnpj($ordem->cliente)) {
-            return false;
-        }
-
-        $nfce = $ordem->nfcePecasEmitida;
-
-        if ($nfce instanceof PdvVendaNfce && (string) $nfce->status === PdvVendaNfce::STATUS_DENEGADA) {
-            return false;
-        }
-
-        return true;
+        return false;
     }
 
     /**

@@ -5,14 +5,44 @@ namespace App\Support\Erp\Queries;
 use App\Models\Empresa;
 use App\Models\EstoqueReserva;
 use App\Models\Product;
+use App\Models\ProductEstoqueSaldo;
 use App\Support\Erp\ErpSearchFieldSelection;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ProductListQueryBuilder
 {
+    public const ESTOQUE_AGG_ALIAS = 'erp_est_agg';
+
+    /**
+     * Colunas da grade / filtros / ordenação da listagem (sem SELECT *).
+     *
+     * @var list<string>
+     */
+    public const LIST_COLUMNS = [
+        'id',
+        'codigo',
+        'referencia',
+        'codigo_barras',
+        'descricao',
+        'grupo',
+        'preco_venda',
+        'estoque',
+        'estoque_minimo',
+        'localizacao',
+        'validade',
+        'lote',
+        'ativo',
+    ];
+
+    protected bool $estoqueAggJoined = false;
+
+    protected ?int $estoqueAggEstoqueId = null;
+
     public function __construct(
         public string $statusFilter = 'ativos',
         public string $searchColumn = 'descricao',
@@ -69,6 +99,95 @@ class ProductListQueryBuilder
 
     public function build(): Builder
     {
+        return $this->buildListQuery(includeEstoqueAggForDisplay: true);
+    }
+
+    /**
+     * Contagens Ativos / Inativos / Todos em uma única agregação (mesmos filtros de busca).
+     *
+     * @return array{ativos: int, inativos: int, todos: int}
+     */
+    public function countByStatus(): array
+    {
+        $previousStatus = $this->statusFilter;
+        $this->statusFilter = 'todos';
+
+        $query = $this->buildFilteredBaseQuery(includeEstoqueAgg: $this->needsEstoqueEmpresaAggForFilters());
+        $productsTable = $query->getModel()->getTable();
+        $prefix = $query->getConnection()->getTablePrefix();
+        $ativoCol = $prefix.$productsTable.'.ativo';
+
+        $this->statusFilter = $previousStatus;
+
+        $base = $query->toBase();
+        $base->orders = null;
+        $base->unionOrders = null;
+        $base->columns = null;
+        $base->bindings['select'] = [];
+
+        $row = $base->selectRaw(
+            "COALESCE(SUM(CASE WHEN {$ativoCol} = 1 THEN 1 ELSE 0 END), 0) as ativos, "
+            ."COALESCE(SUM(CASE WHEN {$ativoCol} = 0 THEN 1 ELSE 0 END), 0) as inativos, "
+            .'COUNT(*) as todos'
+        )->first();
+
+        return [
+            'ativos' => (int) ($row->ativos ?? 0),
+            'inativos' => (int) ($row->inativos ?? 0),
+            'todos' => (int) ($row->todos ?? 0),
+        ];
+    }
+
+    /**
+     * COUNT da paginação sem JOIN de estoque de display.
+     * Só agrega saldos quando a busca/filtro realmente depende de estoque por empresa.
+     */
+    public function countForPagination(): int
+    {
+        $query = $this->buildFilteredBaseQuery(
+            includeEstoqueAgg: $this->needsEstoqueEmpresaAggForFilters()
+        );
+
+        $base = $query->toBase();
+        $base->orders = null;
+        $base->unionOrders = null;
+
+        return (int) $base->count();
+    }
+
+    /**
+     * Query só com filtros (sem colunas da grade / sem JOIN de estoque para exibição).
+     */
+    protected function buildFilteredBaseQuery(bool $includeEstoqueAgg): Builder
+    {
+        $estoqueService = app(ProductEstoqueSaldoService::class);
+        $empresaId = $this->empresa !== null ? (int) $this->empresa->id : 0;
+        $usaEstoqueEmpresa = $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null);
+
+        $query = Product::query();
+        $productsTable = $query->getModel()->getTable();
+        $this->estoqueAggJoined = false;
+        $this->estoqueAggEstoqueId = null;
+
+        $query->select("{$productsTable}.id");
+
+        if ($includeEstoqueAgg && $usaEstoqueEmpresa) {
+            $estoqueId = $estoqueService->estoqueIdParaEmpresa($empresaId);
+            if ($estoqueId !== null) {
+                $this->applyEstoqueEmpresaAggJoin($query, $estoqueId);
+            }
+        }
+
+        return $this->applyFiltersAndOrder(
+            $query,
+            $estoqueService,
+            $empresaId,
+            $usaEstoqueEmpresa && $this->estoqueAggJoined,
+        );
+    }
+
+    protected function buildListQuery(bool $includeEstoqueAggForDisplay): Builder
+    {
         $estoqueService = app(ProductEstoqueSaldoService::class);
         $empresaId = $this->empresa !== null ? (int) $this->empresa->id : 0;
         $usaEstoqueEmpresa = $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null);
@@ -76,6 +195,10 @@ class ProductListQueryBuilder
 
         $query = Product::query();
         $productsTable = $query->getModel()->getTable();
+        $this->estoqueAggJoined = false;
+        $this->estoqueAggEstoqueId = null;
+
+        $listSelect = $this->qualifiedListColumns($productsTable);
 
         // A grade pagina primeiro e soma reservas só dos IDs da página.
         // O JOIN agregado varre todas as reservas em todo COUNT/SELECT da pesquisa.
@@ -85,26 +208,129 @@ class ProductListQueryBuilder
             $reservasAliasSql = $prefix.$reservasAlias;
 
             $query->leftJoinSub($this->reservaSumQuery($estoqueId), $reservasAlias, function ($join) use ($productsTable, $reservasAlias): void {
-                // Alias sem prefixo: o query builder prefixa sozinho no JOIN/ON.
                 $join->on("{$reservasAlias}.product_id", '=', "{$productsTable}.id");
             })
-                ->addSelect("{$productsTable}.*")
-                ->addSelect(\Illuminate\Support\Facades\DB::raw(
-                    // DB::raw NÃO recebe prefixo automático — usar alias já prefixado.
+                ->select($listSelect)
+                ->addSelect(DB::raw(
                     "COALESCE({$reservasAliasSql}.estoque_reservado_sum, 0) as estoque_reservado_sum"
                 ));
         } else {
-            // addSelect do saldo substitui o * implícito se a query ainda não tem colunas.
-            $query->select("{$productsTable}.*");
+            $query->select($listSelect);
         }
 
-        // empresaPrecos: só no ProductResource::table modifyQueryUsing — evita eager duplo.
+        // empresaPrecos: só no ProductListTable / ProductResource — evita eager duplo.
 
-        if ($usaEstoqueEmpresa) {
-            $estoqueService->applyEstoqueEmpresaSelect($query, $empresaId);
+        if ($usaEstoqueEmpresa && $estoqueId !== null
+            && ($includeEstoqueAggForDisplay || $this->needsEstoqueEmpresaAggForFilters())) {
+            $this->applyEstoqueEmpresaAggJoin($query, $estoqueId);
         }
 
         return $this->applyFiltersAndOrder($query, $estoqueService, $empresaId, $usaEstoqueEmpresa);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function qualifiedListColumns(string $productsTable): array
+    {
+        return array_map(
+            static fn (string $column): string => "{$productsTable}.{$column}",
+            self::LIST_COLUMNS,
+        );
+    }
+
+    /**
+     * LEFT JOIN agregado 1:1 (GROUP BY product_id) — mesma semântica de
+     * {@see ProductEstoqueSaldoService::sqlEstoqueEmpresaExpression()} sem subqueries correlacionadas.
+     */
+    protected function applyEstoqueEmpresaAggJoin(Builder $query, int $estoqueId): void
+    {
+        if ($this->estoqueAggJoined) {
+            return;
+        }
+
+        $productsTable = $query->getModel()->getTable();
+        $prefix = $query->getConnection()->getTablePrefix();
+        $alias = self::ESTOQUE_AGG_ALIAS;
+        $aliasSql = $prefix.$alias;
+        $productsSql = $prefix.$productsTable;
+
+        $query->leftJoinSub(
+            $this->estoqueEmpresaAggQuery($estoqueId),
+            $alias,
+            function ($join) use ($productsTable, $alias): void {
+                $join->on("{$alias}.product_id", '=', "{$productsTable}.id");
+            }
+        );
+
+        $expr = $this->estoqueEmpresaAtualSqlFromAgg($productsSql, $aliasSql);
+        $query->addSelect(DB::raw("{$expr} as estoque_empresa_atual"));
+
+        $this->estoqueAggJoined = true;
+        $this->estoqueAggEstoqueId = $estoqueId;
+    }
+
+    protected function estoqueEmpresaAggQuery(int $estoqueId): QueryBuilder
+    {
+        $saldosTable = (new ProductEstoqueSaldo)->getTable();
+
+        return DB::table($saldosTable)
+            ->selectRaw(
+                'product_id, '
+                .'SUM(CASE WHEN estoque_id = ? THEN quantidade ELSE NULL END) as saldo_loja, '
+                .'COALESCE(SUM(quantidade), 0) as soma_depositos',
+                [$estoqueId]
+            )
+            ->groupBy('product_id');
+    }
+
+    /**
+     * Expressão equivalente à correlacionada, usando colunas do JOIN agregado.
+     */
+    protected function estoqueEmpresaAtualSqlFromAgg(string $productsSql, string $aggAliasSql): string
+    {
+        $saldoLoja = "{$aggAliasSql}.saldo_loja";
+        $somaDepositos = "COALESCE({$aggAliasSql}.soma_depositos, 0)";
+        $naoDistribuido = "(CASE WHEN {$productsSql}.estoque > {$somaDepositos} THEN {$productsSql}.estoque - {$somaDepositos} ELSE 0 END)";
+
+        return "(CASE
+  WHEN {$saldoLoja} IS NOT NULL THEN {$saldoLoja} + {$naoDistribuido}
+  WHEN {$somaDepositos} > 0 THEN 0
+  ELSE {$productsSql}.estoque
+END)";
+    }
+
+    /**
+     * SQL de estoque da empresa para WHERE/ORDER — prioriza JOIN; fallback correlacionado.
+     */
+    protected function estoqueEmpresaExpressionForFilters(
+        ProductEstoqueSaldoService $estoqueService,
+        int $empresaId,
+    ): string {
+        if ($this->estoqueAggJoined) {
+            $prefix = Product::query()->getConnection()->getTablePrefix();
+            $productsSql = $prefix.(new Product)->getTable();
+            $aggAliasSql = $prefix.self::ESTOQUE_AGG_ALIAS;
+
+            return $this->estoqueEmpresaAtualSqlFromAgg($productsSql, $aggAliasSql);
+        }
+
+        return $estoqueService->sqlEstoqueEmpresaExpression(
+            $estoqueService->estoqueIdParaEmpresa($empresaId)
+        );
+    }
+
+    protected function needsEstoqueEmpresaAggForFilters(): bool
+    {
+        if ($this->estoqueFilter !== 'todos') {
+            return true;
+        }
+
+        if (! filled($this->localSearch)) {
+            return false;
+        }
+
+        return in_array('estoque', $this->activeSearchColumns(), true);
     }
 
     /**
@@ -162,6 +388,8 @@ class ProductListQueryBuilder
         $empresaId = $this->empresa !== null ? (int) $this->empresa->id : 0;
         $usaEstoqueEmpresa = $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null);
         $productsTable = (new Product)->getTable();
+        $this->estoqueAggJoined = false;
+        $this->estoqueAggEstoqueId = null;
 
         $query = Product::query()->select([
             "{$productsTable}.id",
@@ -180,7 +408,10 @@ class ProductListQueryBuilder
         ]);
 
         if ($usaEstoqueEmpresa) {
-            $estoqueService->applyEstoqueEmpresaSelect($query, $empresaId);
+            $estoqueId = $estoqueService->estoqueIdParaEmpresa($empresaId);
+            if ($estoqueId !== null) {
+                $this->applyEstoqueEmpresaAggJoin($query, $estoqueId);
+            }
         }
 
         return $this->applyFiltersAndOrder($query, $estoqueService, $empresaId, $usaEstoqueEmpresa);
@@ -192,9 +423,11 @@ class ProductListQueryBuilder
         int $empresaId,
         bool $usaEstoqueEmpresa,
     ): Builder {
+        $productsTable = $query->getModel()->getTable();
+
         match ($this->statusFilter) {
-            'ativos' => $query->where('ativo', true),
-            'inativos' => $query->where('ativo', false),
+            'ativos' => $query->where("{$productsTable}.ativo", true),
+            'inativos' => $query->where("{$productsTable}.ativo", false),
             default => $query,
         };
 
@@ -248,19 +481,20 @@ class ProductListQueryBuilder
     {
         $usaEstoqueEmpresa = $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null);
 
+        $productsTable = $query->getModel()->getTable();
+
         if ($usaEstoqueEmpresa) {
-            $estoqueId = $estoqueService->estoqueIdParaEmpresa($empresaId);
-            $expr = $estoqueService->sqlEstoqueEmpresaExpression($estoqueId);
-            $productsTable = $estoqueService->tabelaProductsSql();
+            $expr = $this->estoqueEmpresaExpressionForFilters($estoqueService, $empresaId);
+            $productsTableSql = $estoqueService->tabelaProductsSql();
 
             match ($this->estoqueFilter) {
                 'positivo' => $query->whereRaw("{$expr} > 0"),
                 'negativo' => $query->whereRaw("{$expr} < 0"),
                 'zero' => $query->whereRaw("{$expr} = 0"),
                 'critico' => $query
-                    ->where('ativo', true)
-                    ->where('estoque_minimo', '>', 0)
-                    ->whereRaw("{$expr} < {$productsTable}.estoque_minimo"),
+                    ->where("{$productsTable}.ativo", true)
+                    ->where("{$productsTable}.estoque_minimo", '>', 0)
+                    ->whereRaw("{$expr} < {$productsTableSql}.estoque_minimo"),
                 default => null,
             };
 
@@ -268,9 +502,9 @@ class ProductListQueryBuilder
         }
 
         match ($this->estoqueFilter) {
-            'positivo' => $query->where('estoque', '>', 0),
-            'negativo' => $query->where('estoque', '<', 0),
-            'zero' => $query->where('estoque', '=', 0),
+            'positivo' => $query->where("{$productsTable}.estoque", '>', 0),
+            'negativo' => $query->where("{$productsTable}.estoque", '<', 0),
+            'zero' => $query->where("{$productsTable}.estoque", '=', 0),
             'critico' => $query->estoqueCritico(),
             default => null,
         };
@@ -311,22 +545,24 @@ class ProductListQueryBuilder
         $parte = $this->pesquisaPorParte() ? '%' : '';
 
         if ($column === 'estoque' && $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null)) {
-            $expr = $estoqueService->sqlEstoqueEmpresaExpression($estoqueService->estoqueIdParaEmpresa($empresaId));
+            $expr = $this->estoqueEmpresaExpressionForFilters($estoqueService, $empresaId);
             $query->whereRaw("{$expr} >= ?", [$this->parseDecimal($term)]);
 
             return;
         }
 
+        $productsTable = $query->getModel()->getTable();
+
         match ($column) {
-            'codigo' => $query->where('codigo', $term),
-            'referencia' => $query->where('referencia', 'like', $parte . $term . '%'),
-            'codigo_barras' => $query->where('codigo_barras', 'like', $term . '%'),
-            'descricao' => self::whereDescricaoPartes($query, 'descricao', $term),
+            'codigo' => $query->where("{$productsTable}.codigo", $term),
+            'referencia' => $query->where("{$productsTable}.referencia", 'like', $parte . $term . '%'),
+            'codigo_barras' => $query->where("{$productsTable}.codigo_barras", 'like', $term . '%'),
+            'descricao' => self::whereDescricaoPartes($query, "{$productsTable}.descricao", $term),
             'grupo' => $this->applyGrupoSearch($query, $term),
-            'preco_venda' => $query->where('preco_venda', '>=', $this->parseDecimal($term)),
-            'estoque' => $query->where('estoque', '>=', $this->parseDecimal($term)),
-            'localizacao' => $query->where('localizacao', 'like', $parte . $term . '%'),
-            default => $query->where('descricao', 'like', $parte . $term . '%'),
+            'preco_venda' => $query->where("{$productsTable}.preco_venda", '>=', $this->parseDecimal($term)),
+            'estoque' => $query->where("{$productsTable}.estoque", '>=', $this->parseDecimal($term)),
+            'localizacao' => $query->where("{$productsTable}.localizacao", 'like', $parte . $term . '%'),
+            default => $query->where("{$productsTable}.descricao", 'like', $parte . $term . '%'),
         };
     }
 
@@ -338,7 +574,8 @@ class ProductListQueryBuilder
             return;
         }
 
-        $query->where('grupo', $term);
+        $productsTable = $query->getModel()->getTable();
+        $query->where("{$productsTable}.grupo", $term);
     }
 
     protected function applyValidadePeriodo(Builder $query): void
@@ -354,18 +591,21 @@ class ProductListQueryBuilder
             [$de, $ate] = [$ate, $de];
         }
 
+        $productsTable = $query->getModel()->getTable();
+
         if ($de !== null) {
-            $query->whereDate('validade', '>=', $de);
+            $query->whereDate("{$productsTable}.validade", '>=', $de);
         }
 
         if ($ate !== null) {
-            $query->whereDate('validade', '<=', $ate);
+            $query->whereDate("{$productsTable}.validade", '<=', $ate);
         }
     }
 
     /**
      * Descrição: cada palavra em qualquer parte do texto, sem diferenciar maiúsculas.
      * Mesmo critério de Nome/Razão em Pessoas. Acentos seguem o collation da coluna.
+     * Palavras mais longas primeiro (AND) — mesmos resultados, permite falhar cedo no motor.
      */
     public static function whereDescricaoPartes(Builder $query, string $column, string $searchTerm): void
     {
@@ -375,6 +615,11 @@ class ProductListQueryBuilder
         if ($terms === false || $terms === []) {
             return;
         }
+
+        usort(
+            $terms,
+            static fn (string $a, string $b): int => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8')
+        );
 
         foreach ($terms as $word) {
             $query->where($column, 'like', '%'.$word.'%');
@@ -393,7 +638,8 @@ class ProductListQueryBuilder
             ? '%' . $term . '%'
             : $term . '%';
 
-        $query->where('grupo', 'like', $pattern);
+        $productsTable = $query->getModel()->getTable();
+        $query->where("{$productsTable}.grupo", 'like', $pattern);
     }
 
     protected function pesquisaPorParte(): bool

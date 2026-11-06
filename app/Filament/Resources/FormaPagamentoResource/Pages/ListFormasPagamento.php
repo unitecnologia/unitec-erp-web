@@ -11,6 +11,7 @@ use App\Filament\Resources\FormaPagamentoResource\Pages\Concerns\ManagesFormaPag
 use App\Models\CaixaConta;
 use App\Models\FormaPagamento;
 use App\Models\TabelaPrazo;
+use App\Support\Erp\FormaPagamentoAtalho;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -141,6 +142,33 @@ class ListFormasPagamento extends ListRecords
             ->all();
     }
 
+    /**
+     * Opções do select Atalho (consulta o banco a cada render — ocupados vêm disabled).
+     *
+     * @return list<array{value: string, label: string, disabled: bool}>
+     */
+    public function atalhoSelectOptions(): array
+    {
+        return FormaPagamentoAtalho::opcoesSelectDetalhadas(
+            FormaPagamentoAtalho::normalizar($this->form['atalho'] ?? null),
+            $this->formId,
+        );
+    }
+
+    /**
+     * Fingerprint para remount do &lt;select&gt; (Livewire morph costuma perder disabled em &lt;option&gt;).
+     */
+    public function atalhoSelectOptionsKey(): string
+    {
+        $parts = [];
+
+        foreach ($this->atalhoSelectOptions() as $opt) {
+            $parts[] = $opt['value'].':'.($opt['disabled'] ? '1' : '0').':'.$opt['label'];
+        }
+
+        return substr(sha1(implode('|', $parts).'#'.(string) ($this->formId ?? 0)), 0, 16);
+    }
+
     public function createFormaPagamento(): void
     {
         if ($this->showForm) {
@@ -185,7 +213,7 @@ class ListFormasPagamento extends ListRecords
             'modo_prazo' => FormaPagamento::normalizeModoPrazo(
                 (string) ($record->modo_prazo ?? FormaPagamento::MODO_PRAZO_TABELA)
             ),
-            'atalho' => $record->atalho,
+            'atalho' => FormaPagamentoAtalho::normalizar($record->atalho),
             'tipo_movimento' => \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
                 (string) ($record->tipo_movimento ?: 'nenhum')
             ),
@@ -242,7 +270,24 @@ class ListFormasPagamento extends ListRecords
             'form.max_parcelas' => 'nº máximo de parcelas',
             'form.modo_prazo' => 'forma de definir o prazo',
             'form.conta_destino_id' => 'conta de destino',
+            'form.atalho' => 'atalho',
         ])['form'];
+
+        $atalhoNormalizado = FormaPagamentoAtalho::normalizar($data['atalho'] ?? null);
+        $ativo = (bool) ($this->form['ativo'] ?? false);
+        $apareceVenda = (bool) ($this->form['aparece_venda'] ?? false);
+        $erroAtalho = FormaPagamentoAtalho::validarParaForma(
+            $atalhoNormalizado,
+            $ativo,
+            $apareceVenda,
+            $this->formId,
+        );
+
+        if ($erroAtalho !== null) {
+            $this->addError('form.atalho', $erroAtalho);
+
+            return;
+        }
 
         $payload = [
             'codigo' => (int) $data['codigo'],
@@ -253,7 +298,7 @@ class ListFormasPagamento extends ListRecords
             'prazo_cartao' => (int) ($data['prazo_cartao'] ?? 0),
             'max_parcelas' => (int) ($data['max_parcelas'] ?? 0),
             'intervalo_parcelas' => (int) ($data['intervalo_parcelas'] ?? 0),
-            'atalho' => $data['atalho'] ? mb_strtoupper(trim($data['atalho']), 'UTF-8') : null,
+            'atalho' => $atalhoNormalizado !== '' ? $atalhoNormalizado : null,
             'tipo_movimento' => \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
                 (string) ($data['tipo_movimento'] ?? 'nenhum')
             ),
@@ -357,6 +402,15 @@ class ListFormasPagamento extends ListRecords
             $avisos[] = 'Conta de Destino definida: ela pode prevalecer sobre o caixa padrão do usuário/vendedor.';
         }
 
+        foreach (FormaPagamentoAtalho::avisosInconsistencia(
+            $this->form['atalho'] ?? null,
+            (bool) ($this->form['ativo'] ?? false),
+            (bool) ($this->form['aparece_venda'] ?? false),
+            $this->formId,
+        ) as $avisoAtalho) {
+            $avisos[] = $avisoAtalho;
+        }
+
         return array_values(array_unique($avisos));
     }
 
@@ -393,7 +447,7 @@ class ListFormasPagamento extends ListRecords
             'max_parcelas' => 1,
             'intervalo_parcelas' => 30,
             'modo_prazo' => FormaPagamento::MODO_PRAZO_TABELA,
-            'atalho' => null,
+            'atalho' => FormaPagamentoAtalho::SEM_ATALHO,
             'tipo_movimento' => 'nenhum',
             'ativo' => true,
             'usa_tef' => false,

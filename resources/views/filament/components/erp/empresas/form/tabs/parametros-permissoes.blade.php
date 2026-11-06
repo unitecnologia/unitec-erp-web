@@ -46,6 +46,45 @@
                     </select>
                 </div>
             @endif
+            @if ($groupKey === 'pdv')
+                @php
+                    $atalhoConcluir = EmpresaParametros::atalhoConcluirVendaField();
+                    $atalhoConcluirSelecionado = EmpresaParametros::normalizarAtalhoConcluirVenda(
+                        $this->data[\App\Support\Erp\EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA] ?? null,
+                    );
+                    $atalhoConcluirOptions = \App\Support\Erp\FormaPagamentoAtalho::opcoesSelectConcluirDetalhadas(
+                        $atalhoConcluirSelecionado,
+                    );
+                @endphp
+                <div class="erp-empresas-parametros__atalho-concluir-row">
+                    <label class="erp-pcad-form__label" for="param-param_pdv_atalho_concluir_venda">
+                        {{ $atalhoConcluir['label'] }}
+                        <span
+                            class="erp-produtos-impostos__label--hint"
+                            title="{{ $atalhoConcluir['hint'] }}"
+                            role="img"
+                            aria-label="{{ $atalhoConcluir['hint'] }}"
+                        ></span>
+                    </label>
+                    <select
+                        id="param-param_pdv_atalho_concluir_venda"
+                        wire:key="emp-pdv-atalho-concluir-{{ $atalhoConcluirSelecionado }}"
+                        wire:model.live="data.param_pdv_atalho_concluir_venda"
+                        class="erp-pcad-form__select erp-empresas-parametros__atalho-concluir-select"
+                    >
+                        @foreach ($atalhoConcluirOptions as $opt)
+                            <option
+                                value="{{ $opt['value'] }}"
+                                @if ($atalhoConcluirSelecionado === $opt['value']) selected @endif
+                                @if (! empty($opt['disabled'])) disabled @endif
+                            >{{ $opt['label'] }}</option>
+                        @endforeach
+                    </select>
+                    @error('data.param_pdv_atalho_concluir_venda')
+                        <p class="erp-pcad-form__error">{{ $message }}</p>
+                    @enderror
+                </div>
+            @endif
             <div class="erp-empresas-parametros__checks">
                 @foreach ($grouped[$groupKey] ?? [] as $field => $meta)
                     @if ($meta['tri'] ?? false)

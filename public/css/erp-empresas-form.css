@@ -950,6 +950,43 @@
     margin-top: 0.45rem;
 }
 
+/* Atalho Concluir: label + (?) + select na mesma linha (~100–120px). */
+.erp-empresas-parametros__atalho-concluir-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin-top: 0.45rem;
+    margin-bottom: 0.15rem;
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__atalho-concluir-row .erp-pcad-form__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: left;
+    white-space: nowrap;
+    color: #000;
+}
+
+.erp-empresas-parametros__atalho-concluir-select {
+    width: 7.25rem; /* ~116px */
+    min-width: 6.5rem;
+    max-width: 7.5rem;
+    min-height: 1.7rem;
+    font-size: 0.72rem;
+    flex: 0 0 auto;
+}
+
+.erp-empresas-parametros__atalho-concluir-row .erp-pcad-form__error {
+    flex-basis: 100%;
+    margin: 0;
+}
+
 .erp-empresas-parametros__checks .erp-pcad__check--disabled {
     opacity: 0.55;
     cursor: not-allowed;

@@ -30,6 +30,7 @@ use App\Support\Erp\Orcamento\OrcamentoPrecoService;
 use App\Support\Erp\Orcamento\OrcamentoTotaisService;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Erp\ProductTabelaPrecoService;
+use App\Support\Erp\Promocao\ProdutoPromocaoIndicador;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -2152,8 +2153,9 @@ trait ErpOrcamentoFormPage
             app(ProductTabelaPrecoService::class)->carregarItens($produtos);
         }
 
+        $promoIndicador = app(ProdutoPromocaoIndicador::class);
         $this->produtoResults = $produtos
-            ->map(function (Product $product) use ($reservas, $precoService): array {
+            ->map(function (Product $product) use ($reservas, $precoService, $promoIndicador): array {
                 $atual = array_key_exists('estoque_empresa_atual', $product->getAttributes())
                     ? (float) $product->getAttribute('estoque_empresa_atual')
                     : (float) ($product->estoque ?? 0);
@@ -2169,6 +2171,7 @@ trait ErpOrcamentoFormPage
                     'reservado' => ErpMoney::formatBr($reservado, 3),
                     'disponivel' => ErpMoney::formatBr($disponivel, 3),
                     'preco' => ErpMoney::formatBr($preco, 2),
+                    'em_promocao' => $promoIndicador->paraPrecoExibido($product, $preco),
                 ];
             })
             ->all();

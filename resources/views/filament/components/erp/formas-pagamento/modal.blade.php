@@ -67,10 +67,31 @@
                             </label>
                             @error('form.tipo') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
+                            @php
+                                $atalhoSelecionado = \App\Support\Erp\FormaPagamentoAtalho::normalizar(
+                                    $this->form['atalho'] ?? null,
+                                );
+                                $atalhoOptions = $this->atalhoSelectOptions();
+                                $atalhoOptionsKey = $this->atalhoSelectOptionsKey();
+                            @endphp
                             <label class="erp-fpgto-field">
                                 <span class="erp-fpgto-field__label">Atalho</span>
-                                <input type="text" maxlength="5" wire:model="form.atalho" class="erp-fpgto-field__input erp-fpgto-field__input--code">
+                                {{-- wire:key remonta o select: morph do Livewire remove disabled de <option> --}}
+                                <select
+                                    wire:key="fpgto-atalho-{{ $this->formId ?? 'new' }}-{{ $atalhoOptionsKey }}"
+                                    wire:model="form.atalho"
+                                    class="erp-fpgto-field__input erp-fpgto-field__input--code"
+                                >
+                                    @foreach ($atalhoOptions as $opt)
+                                        <option
+                                            value="{{ $opt['value'] }}"
+                                            @if ($atalhoSelecionado === (string) $opt['value']) selected @endif
+                                            @if (! empty($opt['disabled'])) disabled @endif
+                                        >{{ $opt['label'] }}</option>
+                                    @endforeach
+                                </select>
                             </label>
+                            @error('form.atalho') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
                         </fieldset>
 
                         <fieldset class="erp-fpgto-fieldset">

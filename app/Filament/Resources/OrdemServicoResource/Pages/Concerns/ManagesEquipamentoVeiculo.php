@@ -425,6 +425,13 @@ trait ManagesEquipamentoVeiculo
             return;
         }
 
+        // Mesma regra de buscarEquipamentoCadastrado (< 2 chars não abre) — evita remorph no focus.
+        if (mb_strlen(mb_strtoupper(trim($this->descricao), 'UTF-8')) < 2) {
+            $this->skipRender();
+
+            return;
+        }
+
         $this->buscarEquipamentoCadastrado();
     }
 

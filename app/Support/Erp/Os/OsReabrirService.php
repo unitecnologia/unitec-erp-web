@@ -188,14 +188,27 @@ final class OsReabrirService
                 $payload = array_merge($payload, $this->limpezaFaturamento($travada));
             }
 
+            $orcamentoIdVinculado = filled($travada->orcamento_id) ? (int) $travada->orcamento_id : 0;
+
             $travada->forceFill($payload)->save();
 
             $espelho = app(OsVendaEspelhoService::class);
 
             if ($situacaoFinal === OrdemServico::SITUACAO_ABERTA) {
                 $espelho->marcarAberta($travada);
+
+                if ($orcamentoIdVinculado > 0) {
+                    app(OsOrcamentoVinculo::class)
+                        ->garantirImportadoAoReabrirOs($orcamentoIdVinculado);
+                }
             } elseif ($situacaoFinal === OrdemServico::SITUACAO_CANCELADA) {
                 $espelho->marcarCancelada($travada);
+
+                // Mantém orcamento_id na OS cancelada; devolve FECHADO só se não houver outro uso.
+                if ($orcamentoIdVinculado > 0) {
+                    app(OsOrcamentoVinculo::class)
+                        ->devolverAposCancelarOs($orcamentoIdVinculado, (int) $travada->id);
+                }
             }
 
             return $resumo;

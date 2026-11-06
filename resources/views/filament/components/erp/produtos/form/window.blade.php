@@ -87,7 +87,5 @@
         @include('filament.components.erp.produtos.form.shell')
     </div>
 
-    @if ($isStandaloneFullscreen || $this->embedsInPdv)
-        @include('filament.components.erp.produtos.form.action-bar')
-    @endif
+    @include('filament.components.erp.produtos.form.action-bar')
 </div>

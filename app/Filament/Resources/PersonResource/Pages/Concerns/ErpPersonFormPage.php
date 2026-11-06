@@ -81,6 +81,10 @@ trait ErpPersonFormPage
             $classes[] = 'erp-orcamento-embed';
         }
 
+        if ($this->embedsInOsOverlay) {
+            $classes[] = 'erp-os-overlay-embed';
+        }
+
         return $classes;
     }
 
@@ -327,6 +331,10 @@ trait ErpPersonFormPage
     {
         if ($this->embedsInPdv) {
             return $this->getPersonListRedirectUrl();
+        }
+
+        if ($this->embedsInOsOverlay) {
+            return PersonResource::getUrl('create') . '?tipo=clientes&orcamento=1&os_embed=1';
         }
 
         if ($this->embedsInOrcamento) {

@@ -325,6 +325,7 @@ trait ManagesOrdemServicoFaturamentoParcelas
     {
         $this->osTabelasPrazoListaAberta = false;
         $this->osSelectedTabelaPredefinidaIndex = null;
+        $this->osTabelasPrazoPredefinidas = [];
         $this->dispatch('erp-os-focus-finalizar-parcelas');
     }
 
@@ -356,18 +357,22 @@ trait ManagesOrdemServicoFaturamentoParcelas
     {
         if (isset($this->osTabelasPrazoPredefinidas[$index])) {
             $this->osSelectedTabelaPredefinidaIndex = $index;
+            $this->skipOsRenderWithLookupHighlight('tabela', $index);
         }
     }
 
     public function moveOsTabelaPredefinidaSelection(int $delta): void
     {
         if ($this->osTabelasPrazoPredefinidas === []) {
+            $this->skipRender();
+
             return;
         }
 
         $count = count($this->osTabelasPrazoPredefinidas);
         $index = ($this->osSelectedTabelaPredefinidaIndex ?? 0) + $delta;
         $this->osSelectedTabelaPredefinidaIndex = max(0, min($count - 1, $index));
+        $this->skipOsRenderWithLookupHighlight('tabela', $this->osSelectedTabelaPredefinidaIndex);
     }
 
     public function aplicarOsTabelaPrazoPredefinida(): void
@@ -442,18 +447,22 @@ trait ManagesOrdemServicoFaturamentoParcelas
     {
         if (isset($this->osParcelasRows[$index])) {
             $this->osSelectedParcelaIndex = $index;
+            $this->skipOsRenderWithLookupHighlight('parcela', $index);
         }
     }
 
     public function moveOsParcelaSelection(int $delta): void
     {
         if ($this->osParcelasRows === []) {
+            $this->skipRender();
+
             return;
         }
 
         $count = count($this->osParcelasRows);
         $index = ($this->osSelectedParcelaIndex ?? 0) + $delta;
         $this->osSelectedParcelaIndex = max(0, min($count - 1, $index));
+        $this->skipOsRenderWithLookupHighlight('parcela', $this->osSelectedParcelaIndex);
     }
 
     public function excluirOsParcelaCrediario(): void

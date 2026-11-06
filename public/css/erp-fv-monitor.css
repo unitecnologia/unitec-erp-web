@@ -732,6 +732,14 @@
     border-radius: var(--erp-radius-md, 8px) var(--erp-radius-md, 8px) 0 0;
 }
 
+/* Grade de itens/pagamentos: altura fixa (não encolhe com poucos itens). */
+.erp-fv-mon__panel--itens .erp-fv-mon__table-wrap,
+.erp-fv-mon__panel--lado .erp-fv-mon__table-wrap {
+    height: calc(170px + 1mm);
+    min-height: calc(170px + 1mm);
+    max-height: calc(170px + 1mm);
+}
+
 .erp-fv-mon__table {
     width: 100%;
     border-collapse: collapse;
@@ -748,7 +756,7 @@
     text-align: left;
     padding: 0 0.55rem;
     line-height: 1.05;
-    border-right: 1px solid rgb(255 255 255 / 25%);
+    border-right: 1px solid rgb(255 255 255 / 40%);
     border-bottom: 1px solid var(--erp-border, #94a3b8);
     white-space: nowrap;
 }
@@ -764,9 +772,14 @@
 .erp-fv-mon__table tbody td {
     padding: 0.02rem 0.55rem;
     line-height: 1.1;
+    border-right: 1px solid #b8c8d8;
     border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
     color: var(--erp-text, #0f172a);
     white-space: nowrap;
+}
+
+.erp-fv-mon__table tbody td:last-child {
+    border-right: none;
 }
 
 .erp-fv-mon__table tbody tr:nth-child(even) td {
@@ -810,30 +823,59 @@
 }
 
 .erp-fv-mon__th--code,
-.erp-fv-mon__td--code {
+.erp-fv-mon__td--code,
+.erp-fv-mon__th--barras,
+.erp-fv-mon__td--barras,
+.erp-fv-mon__th--item,
+.erp-fv-mon__td--item {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
-/* Código do produto: estreito; Cód. Barras permanece com --code sem largura fixa. */
+/* # | Código | Cód. Barras | … | Qtde */
+.erp-fv-mon__panel--itens .erp-fv-mon__th--item,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--item,
 .erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(1),
 .erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(1) {
+    width: 2rem;
+    max-width: 2rem;
+    text-align: center;
+    padding-inline: 0.08rem !important;
+}
+
+.erp-fv-mon__panel--itens .erp-fv-mon__th--item,
+.erp-fv-mon__panel--itens .erp-fv-mon__table thead th:nth-child(1) {
+    color: var(--erp-text-on-brand, #fff) !important;
+    font-weight: 700;
+}
+
+.erp-fv-mon__panel--itens .erp-fv-mon__th--code,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--code,
+.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(2),
+.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(2) {
     width: 4.5rem;
     max-width: 4.5rem;
     text-align: center;
 }
 
-.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(2),
-.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(2) {
-    width: 8.5rem;
-    max-width: 8.5rem;
+.erp-fv-mon__panel--itens .erp-fv-mon__th--barras,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--barras,
+.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(3),
+.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(3) {
+    width: 6.4rem;
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    padding-inline: 0.28rem 0.2rem;
 }
 
-.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(4),
-.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(4) {
-    width: calc(3.4rem + 0.3cm);
-    max-width: calc(3.4rem + 0.3cm);
+.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(5),
+.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(5) {
+    width: 3.6rem;
+    max-width: 3.6rem;
     min-width: 0;
+    padding-inline: 0.2rem;
 }
 
 /* Larguras monetárias por classe (coluna Custo opcional não quebra nth-child). */
@@ -888,6 +930,7 @@
 }
 
 .erp-fv-mon__foot-count {
+    display: inline-block;
     min-width: 2.5rem;
     padding: 0 0.4rem;
     border: 1px solid var(--erp-border-light, #c7d5e8);
@@ -898,11 +941,30 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Soma na mesma linha do rodapé (PEDIDO/DAV), alinhada sob Qtde via JS. */
+.erp-fv-mon__foot--itens {
+    position: relative;
+    min-height: 1.35rem;
+}
+
+.erp-fv-mon__foot-qtd-sum {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    box-sizing: border-box;
+    text-align: right;
+    z-index: 1;
+    pointer-events: none;
+}
+
 .erp-fv-mon__foot-end {
     margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 1rem;
+    position: relative;
+    z-index: 2;
 }
 
 .erp-fv-mon__foot-pedido {

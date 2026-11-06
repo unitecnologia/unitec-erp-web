@@ -143,6 +143,7 @@ class Empresa extends Model
         $casts['param_ui_density'] = 'string';
         $casts['param_monitor_vendas_desconto_reais_item_modo'] = 'string';
         $casts['param_vendas_internas_tipos_venda'] = 'string';
+        $casts[EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA] = 'string';
 
         return $casts;
     }

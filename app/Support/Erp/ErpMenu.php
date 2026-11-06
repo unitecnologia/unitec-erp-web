@@ -5,7 +5,6 @@ namespace App\Support\Erp;
 use App\Filament\Pages\ImpressaoEtiquetasNovoPage;
 use App\Filament\Pages\ConfigFiscaisPage;
 use App\Filament\Pages\TabelaIcmsPage;
-use App\Filament\Pages\ForcaVendasTelaVendaPage;
 use App\Filament\Pages\PermissoesPage;
 use App\Filament\Pages\TrocarEmpresaPage;
 use App\Filament\Resources\ForcaVendasMonitorResource;
@@ -393,7 +392,6 @@ class ErpMenu
         return [
             ...$items,
             static::link('Lista de Vendas', VendaResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-shopping-bag', iconColor: 'erp-menu-bar__icon--red'),
-            static::link('Tela de Venda', ForcaVendasTelaVendaPage::getUrl(), permission: 'vendas.access', icon: 'heroicon-o-device-phone-mobile', iconColor: 'erp-menu-bar__icon--teal'),
             static::link('Monitor de Vendas', ForcaVendasMonitorResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-computer-desktop', iconColor: 'erp-menu-bar__icon--green'),
             static::link('Devolução de Venda', DevolucaoVendaResource::getUrl('index'), permission: 'devolucoes_venda.access', icon: 'heroicon-o-arrow-uturn-left', iconColor: 'erp-menu-bar__icon--amber'),
         ];

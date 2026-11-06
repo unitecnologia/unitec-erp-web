@@ -8,6 +8,7 @@ use App\Models\Nfe;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
@@ -234,11 +235,11 @@ class ForcaVendasMonitorResource extends Resource
                     ->label('Meio Pgto')
                     ->state(fn (ForcaVendasOrder $record): string => self::meioPagamentoLabel($record))
                     ->formatStateUsing(function (string $state, ForcaVendasOrder $record): string {
-                        // Misto: "Dinheiro +" na grade; title com todos os meios.
-                        $completo = $state;
-                        $visivel = self::meioPagamentoLabelCompacto($completo);
-                        $title = ($visivel !== $completo && $completo !== '—')
-                            ? ' title="'.e($completo).'"'
+                        $exibicao = self::meioPagamentoExibicao($record);
+                        $visivel = $exibicao['visivel'];
+                        $tooltip = $exibicao['tooltip'];
+                        $title = ($tooltip !== '' && $tooltip !== $visivel)
+                            ? ' title="'.e($tooltip).'"'
                             : '';
                         $inner = e($visivel);
 
@@ -545,9 +546,59 @@ class ForcaVendasMonitorResource extends Resource
         return round((float) ($payload['frete'] ?? 0), 2);
     }
 
-    public static function meioPagamentoLabel(ForcaVendasOrder $record): string
+    /**
+     * Linhas de pagamento da venda (payload.pagamentos ou cabeçalho legado).
+     * Sem SQL — só dados já carregados no registro.
+     *
+     * @return list<array{nome: string, valor: float|null}>
+     */
+    public static function meioPagamentoLinhas(ForcaVendasOrder $record): array
     {
         $payload = is_array($record->payload) ? $record->payload : [];
+        $raw = $payload['pagamentos'] ?? null;
+
+        if (is_array($raw) && $raw !== []) {
+            $linhas = [];
+
+            foreach ($raw as $pag) {
+                if (! is_array($pag)) {
+                    continue;
+                }
+
+                $nome = mb_strtoupper(trim((string) (
+                    $pag['descricao']
+                    ?? $pag['forma_pagamento']
+                    ?? $pag['forma']
+                    ?? ''
+                )), 'UTF-8');
+
+                $valor = null;
+                if (isset($pag['valor']) && is_numeric($pag['valor'])) {
+                    $v = round((float) $pag['valor'], 2);
+                    if ($v > 0.009) {
+                        $valor = $v;
+                    } else {
+                        continue;
+                    }
+                } elseif ($nome === '') {
+                    continue;
+                }
+
+                if ($nome === '') {
+                    $nome = 'DINHEIRO';
+                }
+
+                $linhas[] = [
+                    'nome' => $nome,
+                    'valor' => $valor,
+                ];
+            }
+
+            if ($linhas !== []) {
+                return $linhas;
+            }
+        }
+
         $forma = trim((string) (
             $payload['forma_pagamento']
             ?? $record->pedido?->forma_pagamento
@@ -555,11 +606,35 @@ class ForcaVendasMonitorResource extends Resource
         ));
 
         if ($forma === '') {
-            return '—';
+            return [];
         }
 
-        $chave = mb_strtoupper($forma, 'UTF-8');
-        $chave = str_replace(['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'], ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'], $chave);
+        // Legado / cabeçalho misto: "DINHEIRO / PIX" ou "DINHEIRO + PIX".
+        $partes = preg_split('/\s*(?:\/|\+)\s*/u', $forma) ?: [];
+        $linhas = [];
+
+        foreach ($partes as $parte) {
+            $nome = mb_strtoupper(trim((string) $parte), 'UTF-8');
+            if ($nome === '') {
+                continue;
+            }
+            $linhas[] = [
+                'nome' => $nome,
+                'valor' => null,
+            ];
+        }
+
+        return $linhas;
+    }
+
+    public static function meioPagamentoRotuloAmigavel(string $nome): string
+    {
+        $chave = mb_strtoupper(trim($nome), 'UTF-8');
+        $chave = str_replace(
+            ['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'],
+            ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'],
+            $chave,
+        );
 
         return match ($chave) {
             'DINHEIRO' => 'Dinheiro',
@@ -567,12 +642,75 @@ class ForcaVendasMonitorResource extends Resource
             'POS DEBITO' => 'POS Débito',
             'POS CREDITO' => 'POS Crédito',
             'CREDIARIO' => 'Crediário',
-            default => $forma,
+            default => trim($nome) !== '' ? trim($nome) : '—',
         };
     }
 
     /**
-     * Exibição compacta na grade: um meio só; mistos → "Dinheiro +" (tooltip com a lista completa).
+     * Texto completo (compatível com filtros/export): "Dinheiro / PIX".
+     */
+    public static function meioPagamentoLabel(ForcaVendasOrder $record): string
+    {
+        $linhas = self::meioPagamentoLinhas($record);
+
+        if ($linhas === []) {
+            return '—';
+        }
+
+        $nomes = [];
+        foreach ($linhas as $linha) {
+            $nomes[] = self::meioPagamentoRotuloAmigavel($linha['nome']);
+        }
+
+        return implode(' / ', $nomes);
+    }
+
+    /**
+     * Grade: um meio; misto → "Dinheiro +". Tooltip: todos os meios (+ valores se persistidos).
+     *
+     * @return array{visivel: string, tooltip: string}
+     */
+    public static function meioPagamentoExibicao(ForcaVendasOrder $record): array
+    {
+        $linhas = self::meioPagamentoLinhas($record);
+
+        if ($linhas === []) {
+            return ['visivel' => '—', 'tooltip' => ''];
+        }
+
+        $primeiro = self::meioPagamentoRotuloAmigavel($linhas[0]['nome']);
+        $misto = count($linhas) > 1;
+        $visivel = $misto ? $primeiro.' +' : $primeiro;
+
+        $temValor = false;
+        foreach ($linhas as $linha) {
+            if ($linha['valor'] !== null) {
+                $temValor = true;
+                break;
+            }
+        }
+
+        $tooltipLinhas = [];
+        foreach ($linhas as $linha) {
+            $nome = mb_strtoupper(trim($linha['nome']), 'UTF-8');
+            if ($temValor && $linha['valor'] !== null) {
+                $tooltipLinhas[] = $nome.' — R$ '.ErpMoney::formatBr((float) $linha['valor']);
+            } else {
+                $tooltipLinhas[] = $nome;
+            }
+        }
+
+        // title HTML: quebra de linha leve (Chrome/Edge).
+        $tooltip = implode("\n", $tooltipLinhas);
+
+        return [
+            'visivel' => $visivel,
+            'tooltip' => $tooltip,
+        ];
+    }
+
+    /**
+     * Exibição compacta a partir do texto completo (legado / testes).
      */
     public static function meioPagamentoLabelCompacto(string $labelCompleto): string
     {
@@ -581,21 +719,37 @@ class ForcaVendasMonitorResource extends Resource
             return $label === '' ? '—' : $label;
         }
 
-        if (! str_contains($label, ' + ')) {
+        if (! preg_match('/\s*(?:\/|\+)\s*/u', $label)) {
             return $label;
         }
 
-        $primeiro = trim(explode(' + ', $label, 2)[0]);
+        $partes = preg_split('/\s*(?:\/|\+)\s*/u', $label) ?: [];
+        $primeiro = trim((string) ($partes[0] ?? ''));
 
-        return $primeiro === '' ? $label : $primeiro.' +';
+        if ($primeiro === '') {
+            return $label;
+        }
+
+        return count($partes) > 1 ? $primeiro.' +' : $primeiro;
     }
 
     public static function meioPagamentoEhPix(ForcaVendasOrder $record): bool
     {
-        $label = mb_strtoupper(self::meioPagamentoLabel($record), 'UTF-8');
+        $linhas = self::meioPagamentoLinhas($record);
+        $temPix = false;
 
-        if ($label === '—' || ! str_contains($label, 'PIX')) {
-            return false;
+        foreach ($linhas as $linha) {
+            if (str_contains(mb_strtoupper($linha['nome'], 'UTF-8'), 'PIX')) {
+                $temPix = true;
+                break;
+            }
+        }
+
+        if (! $temPix) {
+            $label = mb_strtoupper(self::meioPagamentoLabel($record), 'UTF-8');
+            if ($label === '—' || ! str_contains($label, 'PIX')) {
+                return false;
+            }
         }
 
         if (! $record->relationLoaded('empresa') || ! (bool) ($record->empresa?->param_pix_habilitar ?? false)) {

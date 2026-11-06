@@ -24,6 +24,11 @@ class CreatePerson extends CreateRecord
             $this->embedsInOrcamento = true;
         }
 
+        if (request()->boolean('os_embed')) {
+            $this->embedsInOsOverlay = true;
+            $this->embedsInOrcamento = true;
+        }
+
         parent::mount();
 
         ErpScreen::set('Cadastro de Pessoas');
@@ -81,6 +86,10 @@ class CreatePerson extends CreateRecord
     {
         if ($this->embedsInPdv) {
             return $this->getPersonListRedirectUrl();
+        }
+
+        if ($this->embedsInOsOverlay) {
+            return static::getResource()::getUrl('create') . '?tipo=clientes&orcamento=1&os_embed=1';
         }
 
         if ($this->embedsInOrcamento) {

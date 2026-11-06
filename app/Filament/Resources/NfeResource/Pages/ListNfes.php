@@ -627,6 +627,7 @@ class ListNfes extends ListRecords
             $this->nfeForm['obs_contribuinte'] = mb_strtoupper((string) $payload['obs_contribuinte'], 'UTF-8');
             $this->nfeModalFaturas = $payload['faturas'];
             $this->nfeModalRows = $payload['rows'];
+            $this->aplicarTransporteDePedidoFv(is_array($payload['transporte'] ?? null) ? $payload['transporte'] : null);
             $this->recalculateNfeTotais();
         } catch (\Throwable $exception) {
             $this->closeNfeModal();

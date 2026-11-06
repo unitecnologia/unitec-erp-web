@@ -58,6 +58,9 @@ trait ErpProductFormPage
     use ManagesProductLotes;
     use ManagesProductExitConfirm;
 
+    /** Trava de gravação na mesma requisição (F5/clique duplo). Não vai no snapshot Livewire. */
+    protected bool $productSaveInFlight = false;
+
     public function getHeading(): string | Htmlable | null
     {
         return null;
@@ -109,6 +112,10 @@ trait ErpProductFormPage
             $classes[] = 'erp-orcamento-embed';
         }
 
+        if ($this->embedsInOsOverlay) {
+            $classes[] = 'erp-os-overlay-embed';
+        }
+
         if ($this->embedsInNotaFornecedor) {
             $classes[] = 'erp-orcamento-embed';
         }
@@ -118,15 +125,12 @@ trait ErpProductFormPage
 
     public function content(Schema $schema): Schema
     {
-        // Standalone e PDV: rodapé dentro da janela (altura controlada).
-        // Orçamento/nota: action-bar externo como antes.
+        // Rodapé Salvar/Sair sempre dentro da janela (standalone, PDV, overlay OS/orçamento).
+        // Action-bar solto no schema empurrava os botões para o topo do iframe quando
+        // o corpo do form colapsava, e deixava faixa vazia abaixo deles.
         $components = [
             View::make('filament.components.erp.produtos.form.window'),
         ];
-
-        if ($this->embedsInOrcamento || $this->embedsInNotaFornecedor) {
-            $components[] = View::make('filament.components.erp.produtos.form.action-bar');
-        }
 
         $components[] = Form::make([EmbeddedSchema::make('form')])
             ->id('form')
@@ -140,67 +144,81 @@ trait ErpProductFormPage
 
     public function saveForm(?string $localizacaoFormatted = null): void
     {
-        $this->productPhotoDownloadFailureNotified = false;
-
-        if ($localizacaoFormatted !== null) {
-            $this->applyLocalizacaoFormatted($localizacaoFormatted);
+        // Protege contra F5/clique duplo na mesma requisição Livewire.
+        if ($this->productSaveInFlight) {
+            return;
         }
 
-        $this->syncProductFormDataBeforeSave();
+        $this->productSaveInFlight = true;
+        $this->productPhotoDownloadFailureNotified = false;
 
         try {
-            $formData = $this->mergeLivewireFormData($this->form->getState());
-            $formData = $this->validateAndNormalizeProductBeforeSave($formData);
-            $this->form->fill($formData);
+            if ($localizacaoFormatted !== null) {
+                $this->applyLocalizacaoFormatted($localizacaoFormatted);
+            }
 
-            if ($this instanceof EditRecord) {
-                $this->save();
-            } else {
-                if ($this->promptDuplicateConfirmIfNeeded($formData)) {
+            $this->syncProductFormDataBeforeSave();
+
+            try {
+                $formData = $this->mergeLivewireFormData($this->form->getState());
+                $formData = $this->validateAndNormalizeProductBeforeSave($formData);
+                // Um único fill antes do create/save do Filament (sem fill prévio em syncBeforeSave).
+                $this->form->fill($formData);
+
+                if ($this instanceof EditRecord) {
+                    $this->save();
+                } else {
+                    if ($this->promptDuplicateConfirmIfNeeded($formData)) {
+                        return;
+                    }
+
+                    /** @var CreateRecord $this */
+                    $this->create();
+                }
+
+                $this->data = $this->formatProductFormDataForDisplay($formData);
+                // Composição pode ter recalculado preços no afterSave — não sobrescrever com o formData antigo.
+                $this->syncDerivedPricesFromRecordIntoData();
+                $this->captureProductFormBaseline();
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $message = $this->formatProductValidationMessage($exception);
+
+                Notification::make()
+                    ->title('Não foi possível gravar o produto.')
+                    ->body($message)
+                    ->danger()
+                    ->send();
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($this->handleProductUniqueConstraintViolation($exception)) {
                     return;
                 }
 
-                /** @var CreateRecord $this */
-                $this->create();
+                report($exception);
+
+                Notification::make()
+                    ->title('Não foi possível gravar o produto.')
+                    ->body('Já existe um produto com estes dados.')
+                    ->danger()
+                    ->send();
+            } catch (\Illuminate\Database\QueryException $exception) {
+                report($exception);
+
+                Notification::make()
+                    ->title('Não foi possível gravar o produto.')
+                    ->body($this->mensagemErroGravacaoProduto($exception))
+                    ->danger()
+                    ->send();
+            } catch (\Throwable $exception) {
+                report($exception);
+
+                Notification::make()
+                    ->title('Não foi possível gravar o produto.')
+                    ->body('Não foi possível concluir a gravação. Tente novamente.')
+                    ->danger()
+                    ->send();
             }
-
-            $this->data = $this->formatProductFormDataForDisplay($formData);
-        } catch (\Illuminate\Validation\ValidationException $exception) {
-            $message = $this->formatProductValidationMessage($exception);
-
-            Notification::make()
-                ->title('Não foi possível gravar o produto.')
-                ->body($message)
-                ->danger()
-                ->send();
-        } catch (UniqueConstraintViolationException $exception) {
-            if ($this->handleProductUniqueConstraintViolation($exception)) {
-                return;
-            }
-
-            report($exception);
-
-            Notification::make()
-                ->title('Não foi possível gravar o produto.')
-                ->body('Já existe um produto com estes dados.')
-                ->danger()
-                ->send();
-        } catch (\Illuminate\Database\QueryException $exception) {
-            report($exception);
-
-            Notification::make()
-                ->title('Não foi possível gravar o produto.')
-                ->body($this->mensagemErroGravacaoProduto($exception))
-                ->danger()
-                ->send();
-        } catch (\Throwable $exception) {
-            report($exception);
-
-            Notification::make()
-                ->title('Não foi possível gravar o produto.')
-                ->body('Não foi possível concluir a gravação. Tente novamente.')
-                ->danger()
-                ->send();
+        } finally {
+            $this->productSaveInFlight = false;
         }
     }
 
@@ -253,7 +271,7 @@ trait ErpProductFormPage
 
         $this->syncLocalizacaoFromParts();
         $this->recalculateProductPricesBeforeSave();
-        $this->form->fill($this->data);
+        // Sem form->fill aqui: mergeLivewireFormData prioriza $this->data no save.
     }
 
     /**
@@ -390,17 +408,52 @@ trait ErpProductFormPage
         return $merged;
     }
 
+    /**
+     * Pós-gravação leve: sem getState + format + fill completos.
+     * O saveForm já formata $this->data; aqui só refresca UI derivada.
+     */
+    protected function refreshProductFormAfterSave(): void
+    {
+        $this->refreshProductFotoPreviewUrl();
+
+        if (($this->productReservasHydrated ?? false) && method_exists($this, 'loadProductReservas')) {
+            $this->loadProductReservas($this->record instanceof Product ? $this->record : null);
+        }
+    }
+
+    /**
+     * Mantido por compatibilidade — preferir refreshProductFormAfterSave no afterSave.
+     */
     protected function syncProductFormData(): void
     {
-        $state = $this->form->getState();
+        $this->refreshProductFormAfterSave();
 
-        $state = $this->formatProductFormDataForDisplay($state);
+        if (is_array($this->data)) {
+            $this->data = $this->formatProductFormDataForDisplay($this->data);
+        }
 
-        $this->data = $state;
-        $this->form->fill($state);
-        $this->refreshProductFotoPreviewUrl();
-        $this->loadProductReservas($this->record ?? null);
+        $this->syncDerivedPricesFromRecordIntoData();
         $this->captureProductFormBaseline();
+    }
+
+    /**
+     * Após sync de composição, o produto no DB pode ter novos preços de kit.
+     *
+     * @return void
+     */
+    protected function syncDerivedPricesFromRecordIntoData(): void
+    {
+        if (! is_array($this->data) || ! $this->record instanceof Product) {
+            return;
+        }
+
+        if (! ($this->productCompositionsHydrated ?? false) || ! ($this->record->is_composicao ?? false)) {
+            return;
+        }
+
+        foreach (['preco_compra', 'preco_custo', 'preco_venda'] as $field) {
+            $this->data[$field] = $this->formatBrDecimal($this->record->{$field} ?? 0, 2);
+        }
     }
 
     /**
@@ -861,8 +914,15 @@ trait ErpProductFormPage
      *
      * @return \Illuminate\Support\Collection<int, \App\Models\Empresa>
      */
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Empresa>|null */
+    protected $productFormEmpresasMemo = null;
+
     public function productFormEmpresas()
     {
+        if ($this->productFormEmpresasMemo !== null) {
+            return $this->productFormEmpresasMemo;
+        }
+
         $user = auth()->user();
         $query = \App\Models\Empresa::query()
             ->where('ativo', true)
@@ -873,7 +933,7 @@ trait ErpProductFormPage
             $query->whereIn('id', $ids !== [] ? $ids : [0]);
         }
 
-        return $query->get(['id', 'nome', 'codigo']);
+        return $this->productFormEmpresasMemo = $query->get(['id', 'nome', 'codigo']);
     }
 
     public function switchProductFormEmpresa(int|string|null $empresaId): void

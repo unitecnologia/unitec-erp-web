@@ -318,6 +318,22 @@ class Product extends Model
 
     public static function nextCodigo(): string
     {
+        $connection = static::query()->getConnection();
+        $driver = $connection->getDriverName();
+
+        // MySQL 8+: extrai só dígitos no SQL (mesmo critério do pluck + preg_replace).
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            try {
+                $max = static::query()
+                    ->selectRaw("MAX(CAST(REGEXP_REPLACE(codigo, '[^0-9]', '') AS UNSIGNED)) as max_codigo")
+                    ->value('max_codigo');
+
+                return (string) (((int) ($max ?? 0)) + 1);
+            } catch (\Throwable) {
+                // Fallback abaixo (MySQL antigo / SQL mode).
+            }
+        }
+
         $max = static::query()
             ->pluck('codigo')
             ->map(fn (string $codigo): int => (int) preg_replace('/\D/', '', $codigo))

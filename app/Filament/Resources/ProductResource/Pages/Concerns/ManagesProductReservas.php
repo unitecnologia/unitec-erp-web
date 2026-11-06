@@ -6,9 +6,9 @@ use App\Models\Estoque;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\ErpSchema;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\ProductEstoqueSaldoService;
-use Illuminate\Support\Facades\Schema;
 
 trait ManagesProductReservas
 {
@@ -19,11 +19,25 @@ trait ManagesProductReservas
 
     public string $productEstoqueDisponivelLabel = '0';
 
+    public bool $productReservasHydrated = false;
+
+    protected function ensureProductReservasLoaded(): void
+    {
+        if ($this->productReservasHydrated) {
+            return;
+        }
+
+        $product = ($this->record ?? null) instanceof Product ? $this->record : null;
+        $this->loadProductReservas($product);
+    }
+
     /**
      * @return list<array{key: string, nome: string, atual: string, reservado: string, disponivel: string, condicional: string, previsto: string}>
      */
     public function getProductEstoquePosicoesProperty(): array
     {
+        $this->ensureProductReservasLoaded();
+
         $atualFallback = $this->parseBrDecimal($this->data['estoque'] ?? 0, 3);
         $reservado = $this->parseBrDecimal($this->productEstoqueReservadoLabel, 3);
 
@@ -34,7 +48,7 @@ trait ManagesProductReservas
         $empresaIds = $this->productEstoqueEmpresaIds($empresaAtivaId);
 
         $estoques = collect();
-        if ($empresaIds !== [] && Schema::hasTable('estoques')) {
+        if ($empresaIds !== [] && ErpSchema::hasTable('estoques')) {
             $estoques = Estoque::query()
                 ->with(['empresa:id,codigo,nome'])
                 ->whereIn('empresa_id', $empresaIds)
@@ -152,6 +166,8 @@ trait ManagesProductReservas
 
     protected function loadProductReservas(?Product $product): void
     {
+        $this->productReservasHydrated = true;
+
         if ($product === null || ! $product->exists) {
             $this->productReservasAtivas = [];
             $this->productEstoqueReservadoLabel = $this->formatBrDecimal(0, 3);

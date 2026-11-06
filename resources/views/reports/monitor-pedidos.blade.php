@@ -185,6 +185,12 @@
         }
 
         function closePreview() {
+            // Overlay interno (TV Listar Vendas / embeds): fecha sem navegar a aba pai.
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'erp-monitor-pedidos-preview-close' }, '*');
+                return;
+            }
+
             // F6 abre em nova aba (window.open): fechar sem remountar a lista do opener.
             if (window.opener && ! window.opener.closed) {
                 window.close();

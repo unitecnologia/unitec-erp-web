@@ -117,4 +117,39 @@ final class PromocaoPrecoService
 
         return array_values($byProduct);
     }
+
+    /**
+     * Preço de campanha em lote (uma consulta). Marca precoPromocaoLote em cada produto.
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>  $produtos
+     */
+    public function hidratarLote($produtos, ?int $empresaId = null): void
+    {
+        if ($produtos->isEmpty()) {
+            return;
+        }
+
+        $empresaId ??= ErpContext::currentEmpresaId();
+        $mins = collect();
+
+        if ($empresaId && $empresaId > 0) {
+            $hoje = Carbon::today()->toDateString();
+            $mins = PromocaoItem::query()
+                ->selectRaw('product_id, MIN(preco_promocao) as preco_promocao')
+                ->whereIn('product_id', $produtos->modelKeys())
+                ->whereHas('promocao', function ($query) use ($empresaId, $hoje): void {
+                    $query->where('empresa_id', $empresaId)
+                        ->where('ativa', true)
+                        ->whereDate('data_inicio', '<=', $hoje)
+                        ->whereDate('data_fim', '>=', $hoje);
+                })
+                ->groupBy('product_id')
+                ->pluck('preco_promocao', 'product_id');
+        }
+
+        foreach ($produtos as $product) {
+            $min = $mins->get($product->id) ?? $mins->get((string) $product->id);
+            $product->setRelation('precoPromocaoLote', $min === null ? null : (float) $min);
+        }
+    }
 }

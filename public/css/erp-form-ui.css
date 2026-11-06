@@ -12,7 +12,7 @@
 }
 
 /* Viewport modal — layout compartilhado (todos os cadastros) */
-.fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)),
+.fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)):not(:has(.erp-os-overlay-embed)),
 .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed)),
 .fi-body:has(.erp-empresas-form-page),
 .fi-body:has(.erp-terminais-form-page),
@@ -96,7 +96,7 @@
     background: transparent !important;
 }
 
-.fi-body:has(.erp-form-page:not(.erp-pdv-embed)):not(:has(.erp-terminais-form-page)):not(:has(.erp-orcamentos-form-page)):not(:has(.erp-empresas-form-page)):not(:has(.erp-produtos-form-page:not(.erp-pdv-embed))) .fi-main {
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)):not(:has(.erp-terminais-form-page)):not(:has(.erp-orcamentos-form-page)):not(:has(.erp-empresas-form-page)):not(:has(.erp-produtos-form-page:not(.erp-pdv-embed))):not(:has(.erp-os-overlay-embed)) .fi-main {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -884,6 +884,36 @@
     background: #fff;
     border-width: 2px;
     border-style: solid;
+}
+
+.erp-aviso-modal__btn:focus {
+    outline: none;
+}
+
+.erp-aviso-modal__btn:focus-visible {
+    outline: 3px solid rgba(30, 90, 158, 0.45);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18);
+}
+
+.erp-aviso-modal--info .erp-aviso-modal__btn--secondary:focus-visible {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    color: var(--erp-brand-primary-dark, #0f3460);
+    background: #eef4fb;
+}
+
+/* TV impressão pós-venda: foco inicial é programático — :focus-visible não pinta.
+   Usa o estado :focus real (mesmo anel azul do Tab/setas). */
+.erp-fv-imprimir-pos-venda .erp-aviso-modal__btn:focus {
+    outline: 3px solid rgba(30, 90, 158, 0.45);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18);
+}
+
+.erp-fv-imprimir-pos-venda.erp-aviso-modal--info .erp-aviso-modal__btn--secondary:focus {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    color: var(--erp-brand-primary-dark, #0f3460);
+    background: #eef4fb;
 }
 
 .erp-aviso-modal__hint {

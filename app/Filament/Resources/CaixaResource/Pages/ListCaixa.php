@@ -841,9 +841,9 @@ class ListCaixa extends ListRecords
     }
 
     #[On('erp-caixa-open-view')]
-    public function onErpCaixaOpenView(int $lancamentoId): void
+    public function onErpCaixaOpenView(int $lancamentoId, array $grupoIds = []): void
     {
-        $this->openCaixaView($lancamentoId);
+        $this->openCaixaView($lancamentoId, $grupoIds);
     }
 
     #[On('erp-caixa-open-fechamento')]

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\OrdemServicoResource\Pages\Concerns;
 
 use App\Models\OrdemServico;
-use App\Support\Erp\ErpContext;
 use App\Support\Erp\Os\OrdemServicoEspelhoService;
 use Filament\Notifications\Notification;
 
@@ -18,11 +17,8 @@ trait ManagesOrdemServicoEspelhoModal
 
     public function openOrdemServicoEspelho(int $ordemId): void
     {
-        $empresaId = ErpContext::currentEmpresaId();
         $ordem = OrdemServico::query()
-            ->when($empresaId !== null, fn ($query) => $query->where(function ($query) use ($empresaId): void {
-                $query->whereNull('empresa_id')->orWhere('empresa_id', $empresaId);
-            }))
+            ->daEmpresaAtiva()
             ->find($ordemId);
 
         if (! $ordem instanceof OrdemServico) {

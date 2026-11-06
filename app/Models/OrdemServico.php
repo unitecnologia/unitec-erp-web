@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\Os\OsMeioPagamentoExibicao;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -22,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'problema', 'observacoes', 'laudo',
     'subtotal', 'subtotal_pecas', 'subtotal_servicos',
     'vl_desc_pecas', 'vl_desc_servicos', 'desc_perc_pecas', 'desc_perc_servicos',
-    'total_servicos', 'total_produtos', 'total_geral', 'faturamento_pagamentos',
+    'total_servicos', 'total_produtos', 'total_geral', 'faturamento_pagamentos', 'transporte',
     'envio_whats_status', 'path_pdf_whats', 'numero_whatsapp',
 ])]
 class OrdemServico extends Model
@@ -56,6 +60,59 @@ class OrdemServico extends Model
     public function situacaoLabel(): string
     {
         return static::situacaoLabels()[$this->situacao] ?? mb_strtoupper((string) $this->situacao, 'UTF-8');
+    }
+
+    /**
+     * Empresa ativa da sessão (lista, URL e ações).
+     * OS sem empresa (legado) só entra na empresa-sede do usuário — não em todas.
+     */
+    public function scopeDaEmpresaAtiva(Builder $query, ?int $empresaId = null): Builder
+    {
+        $empresaId ??= ErpContext::currentEmpresaId();
+
+        if ($empresaId === null || $empresaId <= 0) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        $column = $query->getModel()->getTable().'.empresa_id';
+
+        return $query->where(function (Builder $inner) use ($column, $empresaId): void {
+            $inner->where($column, $empresaId);
+
+            if (self::empresaSedeDoLegado($empresaId)) {
+                $inner->orWhereNull($column);
+            }
+        });
+    }
+
+    /**
+     * Legado sem empresa_id só é tratado na empresa padrão do usuário (cadastro).
+     */
+    public static function empresaSedeDoLegado(?int $empresaId = null): bool
+    {
+        $empresaId ??= ErpContext::currentEmpresaId();
+        $sede = Auth::user()?->empresa_id;
+
+        return $empresaId !== null && filled($sede) && (int) $sede === (int) $empresaId;
+    }
+
+    public function pertenceAEmpresaAtiva(?int $empresaAtiva = null): bool
+    {
+        $empresaAtiva ??= ErpContext::currentEmpresaId();
+
+        if ($empresaAtiva === null || $empresaAtiva <= 0) {
+            return false;
+        }
+
+        if (! ErpContext::userCanAccessEmpresa((int) $empresaAtiva)) {
+            return false;
+        }
+
+        if (filled($this->empresa_id)) {
+            return (int) $this->empresa_id === (int) $empresaAtiva;
+        }
+
+        return self::empresaSedeDoLegado($empresaAtiva);
     }
 
     public function clienteNome(): string
@@ -102,6 +159,23 @@ class OrdemServico extends Model
 
     public static function nextNumero(): string
     {
+        // Regra original: max numérico dos dígitos de `numero` + 1 (ignora prefixos;
+        // zeros à esquerda não alteram o valor; '9' < '100' numericamente).
+        // MySQL 8+ / MariaDB 10.0.5+ (REGEXP_REPLACE); fallback PHP se indisponível.
+        try {
+            $driver = static::query()->getConnection()->getDriverName();
+
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                $max = static::query()->toBase()
+                    ->selectRaw("MAX(CAST(REGEXP_REPLACE(COALESCE(numero, ''), '[^0-9]', '') AS UNSIGNED)) as max_num")
+                    ->value('max_num');
+
+                return (string) (((int) $max) + 1);
+            }
+        } catch (\Throwable) {
+            // SQLite / driver antigo: cai no fallback PHP.
+        }
+
         $max = static::query()
             ->pluck('numero')
             ->map(fn (?string $numero): int => (int) preg_replace('/\D/', '', (string) $numero))
@@ -299,33 +373,20 @@ class OrdemServico extends Model
     }
 
     /**
-     * Resumo dos meios de pagamento gravados no faturamento (lista).
+     * Rótulo compacto na listagem: "Dinheiro" ou "Dinheiro +".
+     * Detalhe completo fica no tooltip ({@see meioPagamentoTooltip()}).
      */
     public function meioPagamentoLista(): string
     {
-        $raw = $this->faturamento_pagamentos;
+        return OsMeioPagamentoExibicao::exibicao($this)['visivel'];
+    }
 
-        if (! is_array($raw) || $raw === []) {
-            return '—';
-        }
-
-        $formas = [];
-
-        foreach ($raw as $item) {
-            if (! is_array($item)) {
-                continue;
-            }
-
-            $forma = mb_strtoupper(trim((string) ($item['forma'] ?? '')), 'UTF-8');
-
-            if ($forma === '' || in_array($forma, $formas, true)) {
-                continue;
-            }
-
-            $formas[] = $forma;
-        }
-
-        return $formas === [] ? '—' : implode(' + ', $formas);
+    /**
+     * Tooltip da coluna Meio de Pag.: meios (+ valores quando persistidos no snapshot).
+     */
+    public function meioPagamentoTooltip(): string
+    {
+        return OsMeioPagamentoExibicao::exibicao($this)['tooltip'];
     }
 
     public function enviouEmail(): bool
@@ -439,6 +500,7 @@ class OrdemServico extends Model
             'total_produtos' => 'decimal:2',
             'total_geral' => 'decimal:2',
             'faturamento_pagamentos' => 'array',
+            'transporte' => 'array',
         ];
     }
 }

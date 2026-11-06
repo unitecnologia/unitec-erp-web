@@ -130,6 +130,17 @@ trait ErpEmpresaFormPage
                 ],
             );
 
+            $erroAtalhoConcluir = \App\Support\Erp\FormaPagamentoAtalho::validarParaConcluir(
+                $this->data[\App\Support\Erp\EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA]
+                    ?? \App\Support\Erp\EmpresaParametros::ATALHO_CONCLUIR_VENDA_DEFAULT,
+            );
+
+            if ($erroAtalhoConcluir !== null) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'data.'.\App\Support\Erp\EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA => $erroAtalhoConcluir,
+                ]);
+            }
+
             if ($this instanceof EditRecord) {
                 // Commit do banco primeiro; efeitos colaterais (WhatsApp/.env/e-mail) depois do redirect controlado.
                 $this->save(shouldRedirect: false, shouldSendSavedNotification: true);
@@ -504,6 +515,28 @@ trait ErpEmpresaFormPage
             $data[$tiposVendaVi] = EmpresaParametros::normalizarVendasInternasTiposVenda($data[$tiposVendaVi]);
         }
 
+        $atalhoConcluir = EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA;
+        if (array_key_exists($atalhoConcluir, $data)) {
+            $data[$atalhoConcluir] = EmpresaParametros::normalizarAtalhoConcluirVenda($data[$atalhoConcluir]);
+        }
+
+        // Sem coluna no banco: não manda no UPDATE (evita SQL error); persiste em afterSave via JSON.
+        if (
+            array_key_exists($atalhoConcluir, $data)
+            && ! \App\Support\Erp\ErpSchema::hasColumn((new \App\Models\Empresa)->getTable(), $atalhoConcluir)
+        ) {
+            unset($data[$atalhoConcluir]);
+        }
+
+        foreach (EmpresaParametros::permissionFieldsJsonFallback() as $jsonField) {
+            if (
+                array_key_exists($jsonField, $data)
+                && ! \App\Support\Erp\ErpSchema::hasColumn((new \App\Models\Empresa)->getTable(), $jsonField)
+            ) {
+                unset($data[$jsonField]);
+            }
+        }
+
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true || ! array_key_exists($field, $data)) {
                 continue;
@@ -704,6 +737,17 @@ trait ErpEmpresaFormPage
 
         $this->data['param_monitor_vendas_desconto_reais_item_modo'] = EmpresaParametros::normalizarDescontoReaisItemModo(
             $this->data['param_monitor_vendas_desconto_reais_item_modo'] ?? null,
+        );
+
+        $empresaIdAtalho = (int) ($this->record?->getKey() ?? 0);
+        $this->data[EmpresaParametros::COLUMN_ATALHO_CONCLUIR_VENDA] = EmpresaParametros::atalhoConcluirVenda(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
+        $this->data[EmpresaParametros::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV] = EmpresaParametros::perguntarImprimirPosVendaTv(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
+        $this->data[EmpresaParametros::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR] = EmpresaParametros::permanecerTelaVendaAposConcluir(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
         );
 
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {

@@ -6,7 +6,9 @@ use App\Models\ForcaVendasOrder;
 use App\Models\Pedido;
 use App\Models\Venda;
 use App\Support\Erp\Boleto\Api\BoletoApi;
+use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\ForcaVendas\ForcaVendasOrcamentoVinculo;
 use App\Support\VendasInternas\VendasInternasMonitorHookService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -235,7 +237,8 @@ final class ForcaVendasMonitorCancelamentoService
     }
 
     /**
-     * Pedido ainda sem venda: só situação e status do DAV. Sem estoque, caixa ou financeiro.
+     * Pedido ainda sem venda: cancela DAV e libera reservas ativas.
+     * Sem baixa física, caixa ou financeiro (pedido nunca faturado).
      */
     private function cancelarSemVenda(ForcaVendasOrder $order): void
     {
@@ -257,14 +260,26 @@ final class ForcaVendasMonitorCancelamentoService
 
             $locked->load('pedido');
 
+            // Mesma liberação de cancelarPendente (FaturamentoService): evita reserva ativa órfã.
+            (new EstoqueReservaService())->liberarPedido($locked);
+
             if ($locked->pedido && $locked->pedido->status !== Pedido::STATUS_CANCELADO) {
                 $locked->pedido->update(['status' => Pedido::STATUS_CANCELADO]);
             }
+
+            $orcamentoId = (int) ($locked->orcamento_id ?? 0);
 
             $locked->forceFill([
                 'situacao' => ForcaVendasOrder::SITUACAO_CANCELADO,
                 'canceled_at' => now(),
             ])->save();
+
+            if ($orcamentoId > 0) {
+                app(ForcaVendasOrcamentoVinculo::class)
+                    ->devolverAposCancelarDav($orcamentoId, (int) $locked->id);
+            }
+
+            (new VendasInternasMonitorHookService())->onForcaVendasOrderCancelado($locked);
         });
     }
 }

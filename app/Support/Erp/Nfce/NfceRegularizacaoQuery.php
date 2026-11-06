@@ -332,7 +332,7 @@ final class NfceRegularizacaoQuery
         $fv = ErpSchema::hasTable('forca_vendas_orders')
             ? DB::table('forca_vendas_orders')
                 ->whereIn('venda_id', $ids)
-                ->get(['venda_id', 'device_uuid', 'meli_order_id'])
+                ->get(['venda_id', 'device_uuid', 'meli_order_id', 'payload'])
                 ->keyBy('venda_id')
             : collect();
 
@@ -383,7 +383,7 @@ final class NfceRegularizacaoQuery
                 $vendedor = trim((string) ($record->vendedor_nome ?? ''));
             }
 
-            $edicao = self::consumidorEditavel($record, $pdvRow, $consumidorFinal);
+            $edicao = self::consumidorEditavel($record, $pdvRow, $consumidorFinal, $fvRow);
 
             $rows[] = [
                 'id' => $id,
@@ -465,7 +465,7 @@ final class NfceRegularizacaoQuery
      *
      * @return array{person_id: int|null, nome: string, cpf: string}
      */
-    private static function consumidorEditavel(object $record, ?object $pdvRow, bool $consumidorFinal): array
+    private static function consumidorEditavel(object $record, ?object $pdvRow, bool $consumidorFinal, ?object $fvRow = null): array
     {
         $pdvPessoaFinal = $pdvRow === null
             || $pdvRow->pdv_person_id === null
@@ -483,6 +483,18 @@ final class NfceRegularizacaoQuery
         }
 
         $cpf = self::formatarCpf($pdvRow->cpf_nota ?? null);
+
+        // F4 Tela de Venda: CPF na Nota do payload (só CPF; CNPJ não entra).
+        if ($cpf === '' && $fvRow !== null) {
+            $payload = $fvRow->payload ?? null;
+            if (is_string($payload)) {
+                $payload = json_decode($payload, true) ?: [];
+            }
+            if (is_array($payload)) {
+                $cpf = self::formatarCpf($payload['cpf_nota'] ?? null);
+            }
+        }
+
         if ($cpf === '' && ! $consumidorFinal) {
             $cpf = self::formatarCpf($record->cliente_documento ?? null);
         }

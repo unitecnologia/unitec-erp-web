@@ -822,6 +822,15 @@
     width: 9.5% !important;
 }
 
+.erp-vendas-page .erp-vendas-meio-pag {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
 .erp-vendas-page .fi-ta-header-cell:nth-child(9),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(9),
 .erp-vendas-page .fi-ta-header-cell-total,

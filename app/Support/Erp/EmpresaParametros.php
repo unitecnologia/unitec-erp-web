@@ -5,9 +5,28 @@ namespace App\Support\Erp;
 use App\Models\PlanoConta;
 use App\Models\Empresa;
 use App\Support\ContadorCloud\ContadorCloudHttpHelper;
+use Illuminate\Support\Facades\Storage;
 
 final class EmpresaParametros
 {
+    public const ATALHO_CONCLUIR_VENDA_DEFAULT = 'F10';
+
+    public const COLUMN_ATALHO_CONCLUIR_VENDA = 'param_pdv_atalho_concluir_venda';
+
+    /** Pergunta se deseja imprimir comprovante após concluir na Tela de Venda (TV). Sem migration: JSON por empresa. */
+    public const COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV = 'param_pdv_perguntar_imprimir_pos_venda_tv';
+
+    /** Permanece na TV após faturar e inicia nova venda (não volta ao Monitor). Sem migration: JSON por empresa. */
+    public const COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR = 'param_pdv_permanecer_tela_venda_apos_concluir';
+
+    /**
+     * Teclas F compatíveis com Concluir no PDV ERP e na Tela de Venda,
+     * sem desativar atalhos fixos nem reservar teclas de meios de pagamento (F3/F4).
+     *
+     * @var list<string>
+     */
+    public const ATALHOS_CONCLUIR_VENDA_PERMITIDOS = ['F7', 'F9', 'F10'];
+
     /**
      * Campos numéricos do topo (3 colunas na tela Delphi).
      *
@@ -95,6 +114,24 @@ final class EmpresaParametros
             'param_pdv_ativar_som' => ['label' => 'Ativar Som no PDV (bip ao incluir item)', 'default' => false],
             'param_pdv_nfce_descricao_completa' => ['label' => 'NFC-e: Descrição Completa dos Itens (sem abreviar)', 'default' => false],
             'param_pdv_carga_auto' => ['label' => 'Carga Automática do PDV Offline', 'default' => true],
+            // Sem coluna no banco: UI no grupo PDV + JSON em storage (igual atalho concluir).
+            self::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV => [
+                'label' => 'Perguntar se deseja imprimir após concluir venda (TV)',
+                'hint' => 'Somente Tela de Venda web. Após faturar com sucesso, pergunta se deseja imprimir o comprovante. Desmarcado: volta ao Monitor sem perguntar.',
+                'default' => false,
+                'json_fallback' => true,
+            ],
+            self::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR => [
+                'label' => 'Permanecer na Tela de Venda após concluir',
+                'hint' => 'Somente Tela de Venda web. Após faturar com sucesso, inicia uma nova venda na mesma tela (foco no produto) em vez de voltar ao Monitor. Combina com a pergunta de impressão.',
+                'default' => false,
+                'json_fallback' => true,
+            ],
+            // Coluna param_geral_* (legado); UI no grupo PDV via permissionGroupForField().
+            'param_geral_rateio_pessoa_pdv' => [
+                'label' => 'Mostrar divisão da conta por pessoa no fechamento',
+                'default' => true,
+            ],
 
             'param_geral_informar_gtin' => ['label' => 'Informar GTIN', 'default' => false],
             'param_geral_desconto_prod_promocao' => ['label' => 'Dar Desconto Prod. Promoção', 'default' => false],
@@ -107,7 +144,6 @@ final class EmpresaParametros
                 'hint' => 'Marcado: cartão entra no caixa como se já tivesse caído. Desmarcado: cartão vai para Contas a Receber até a operadora depositar.',
                 'default' => false,
             ],
-            'param_geral_rateio_pessoa_pdv' => ['label' => 'Mostra Rateio por pessoa no PDV', 'default' => true],
             'param_geral_perguntar_replicar_preco_filiais' => [
                 'label' => 'Perguntar ao replicar preço nas filiais',
                 'default' => false,
@@ -1558,7 +1594,7 @@ final class EmpresaParametros
     public static function permissionGroups(): array
     {
         return [
-            'pdv' => 'Ajustes no PDV',
+            'pdv' => 'Ajustes do PDV e Telas de Vendas',
             'geral' => 'Ajustes Gerais',
             'fiscal' => 'Ajustes Fiscais',
             'forca_vendas' => 'Força de Vendas',
@@ -1568,10 +1604,258 @@ final class EmpresaParametros
     }
 
     /**
+     * Atalho de tecla para CONCLUIR na finalização (PDV ERP + Tela de Venda).
+     * Padrão F10. Persistência: coluna empresas se existir; senão JSON em storage
+     * (sem migration — escopo empresa).
+     *
+     * @return array{label: string, hint: string, default: string, options: array<string, string>}
+     */
+    public static function atalhoConcluirVendaField(): array
+    {
+        return [
+            'label' => 'Atalho para Concluir Venda',
+            'hint' => 'Tecla exibida no botão Concluir (PDV e Tela de Venda). Padrão F10. Opções: F7, F9 e F10. Só essa tecla conclui — sem F7 paralelo por legado. Em F9, a Transportadora fica só no clique. Meios de pagamento não usam F3/F4 (fiscais PDV), F8 (PDV/OS) nem F9 (Transportadora).',
+            'default' => self::ATALHO_CONCLUIR_VENDA_DEFAULT,
+            'options' => [
+                'F10' => 'F10 (padrão)',
+                'F7' => 'F7',
+                'F9' => 'F9',
+            ],
+        ];
+    }
+
+    /**
+     * Opções do select Concluir (rótulos). Preferir opcoesSelectConcluirDetalhadas na UI.
+     *
+     * @return array<string, string>
+     */
+    public static function atalhoConcluirVendaOptionsComConflitos(?int $empresaId = null): array
+    {
+        $options = [];
+
+        foreach (FormaPagamentoAtalho::opcoesSelectConcluirDetalhadas(
+            self::atalhoConcluirVenda($empresaId),
+            $empresaId,
+        ) as $opt) {
+            $options[$opt['value']] = $opt['label'];
+        }
+
+        return $options;
+    }
+
+    public static function normalizarAtalhoConcluirVenda(mixed $valor): string
+    {
+        $key = strtoupper(trim((string) $valor));
+
+        return in_array($key, self::ATALHOS_CONCLUIR_VENDA_PERMITIDOS, true)
+            ? $key
+            : self::ATALHO_CONCLUIR_VENDA_DEFAULT;
+    }
+
+    public static function atalhoConcluirVenda(?int $empresaId = null): string
+    {
+        $default = self::ATALHO_CONCLUIR_VENDA_DEFAULT;
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return $default;
+        }
+
+        if (ErpSchema::hasColumn((new Empresa)->getTable(), self::COLUMN_ATALHO_CONCLUIR_VENDA)) {
+            $valor = Empresa::query()
+                ->whereKey($empresaId)
+                ->value(self::COLUMN_ATALHO_CONCLUIR_VENDA);
+
+            if ($valor !== null && trim((string) $valor) !== '') {
+                return self::normalizarAtalhoConcluirVenda($valor);
+            }
+        }
+
+        $fromFile = self::lerAtalhoConcluirVendaDoArquivo($empresaId);
+
+        return $fromFile !== null
+            ? self::normalizarAtalhoConcluirVenda($fromFile)
+            : $default;
+    }
+
+    public static function gravarAtalhoConcluirVenda(int $empresaId, mixed $valor): string
+    {
+        $atalho = self::normalizarAtalhoConcluirVenda($valor);
+        $empresaId = (int) $empresaId;
+
+        if ($empresaId <= 0) {
+            return $atalho;
+        }
+
+        if (ErpSchema::hasColumn((new Empresa)->getTable(), self::COLUMN_ATALHO_CONCLUIR_VENDA)) {
+            Empresa::query()
+                ->whereKey($empresaId)
+                ->update([self::COLUMN_ATALHO_CONCLUIR_VENDA => $atalho]);
+        }
+
+        self::gravarEmpresaParamNoArquivo($empresaId, 'atalho_concluir_venda', $atalho);
+
+        return $atalho;
+    }
+
+    /**
+     * TV: perguntar se deseja imprimir comprovante após faturar (não altera PDV/OS).
+     */
+    public static function perguntarImprimirPosVendaTv(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV,
+            $empresaId,
+        );
+    }
+
+    public static function gravarPerguntarImprimirPosVendaTv(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV,
+            $empresaId,
+            $valor,
+        );
+    }
+
+    /**
+     * TV: permanecer na tela após faturar e abrir nova venda (não altera PDV/OS).
+     */
+    public static function permanecerTelaVendaAposConcluir(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR,
+            $empresaId,
+        );
+    }
+
+    public static function gravarPermanecerTelaVendaAposConcluir(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR,
+            $empresaId,
+            $valor,
+        );
+    }
+
+    private static function lerPermissionBoolJson(string $coluna, ?int $empresaId = null): bool
+    {
+        $default = (bool) (self::permissionFields()[$coluna]['default'] ?? false);
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return $default;
+        }
+
+        if (ErpSchema::hasColumn((new Empresa)->getTable(), $coluna)) {
+            $valor = Empresa::query()->whereKey($empresaId)->value($coluna);
+
+            if ($valor !== null) {
+                return (bool) $valor;
+            }
+        }
+
+        $fromFile = self::lerEmpresaParamDoArquivo($empresaId, $coluna);
+
+        if ($fromFile === null) {
+            return $default;
+        }
+
+        return filter_var($fromFile, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private static function gravarPermissionBoolJson(string $coluna, int $empresaId, mixed $valor): bool
+    {
+        $ligado = filter_var($valor, FILTER_VALIDATE_BOOLEAN);
+        $empresaId = (int) $empresaId;
+
+        if ($empresaId <= 0) {
+            return $ligado;
+        }
+
+        if (ErpSchema::hasColumn((new Empresa)->getTable(), $coluna)) {
+            Empresa::query()->whereKey($empresaId)->update([$coluna => $ligado]);
+        }
+
+        self::gravarEmpresaParamNoArquivo($empresaId, $coluna, $ligado);
+
+        return $ligado;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function permissionFieldsJsonFallback(): array
+    {
+        $out = [];
+
+        foreach (self::permissionFields() as $field => $meta) {
+            if (($meta['json_fallback'] ?? false) === true) {
+                $out[] = $field;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function arquivoEmpresaParams(int $empresaId): string
+    {
+        return 'erp/empresa-params/'.$empresaId.'.json';
+    }
+
+    private static function lerEmpresaParamsArquivo(int $empresaId): array
+    {
+        $path = self::arquivoEmpresaParams($empresaId);
+
+        if (! Storage::disk('local')->exists($path)) {
+            return [];
+        }
+
+        try {
+            $raw = Storage::disk('local')->get($path);
+            $data = is_string($raw) ? json_decode($raw, true) : null;
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($data) ? $data : [];
+    }
+
+    private static function lerEmpresaParamDoArquivo(int $empresaId, string $chave): mixed
+    {
+        $data = self::lerEmpresaParamsArquivo($empresaId);
+
+        return $data[$chave] ?? null;
+    }
+
+    private static function lerAtalhoConcluirVendaDoArquivo(int $empresaId): ?string
+    {
+        $data = self::lerEmpresaParamsArquivo($empresaId);
+        $valor = $data['atalho_concluir_venda'] ?? $data[self::COLUMN_ATALHO_CONCLUIR_VENDA] ?? null;
+
+        return is_string($valor) || is_numeric($valor) ? (string) $valor : null;
+    }
+
+    private static function gravarEmpresaParamNoArquivo(int $empresaId, string $chave, mixed $valor): void
+    {
+        $data = self::lerEmpresaParamsArquivo($empresaId);
+        $data[$chave] = $valor;
+
+        Storage::disk('local')->put(
+            self::arquivoEmpresaParams($empresaId),
+            (string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+        );
+    }
+
+    /**
      * @return list<string>
      */
     public static function permissionGroupForField(string $field): string
     {
+        if ($field === 'param_geral_rateio_pessoa_pdv') {
+            return 'pdv';
+        }
+
         if (str_starts_with($field, 'param_pdv_')) {
             return 'pdv';
         }
@@ -1688,6 +1972,7 @@ final class EmpresaParametros
 
         $defaults['param_monitor_vendas_desconto_reais_item_modo'] = self::monitorVendasDescontoReaisItemModoField()['default'];
         $defaults['param_vendas_internas_tipos_venda'] = self::vendasInternasTiposVendaField()['default'];
+        $defaults[self::COLUMN_ATALHO_CONCLUIR_VENDA] = self::atalhoConcluirVendaField()['default'];
 
         foreach (self::moduleEnableFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];

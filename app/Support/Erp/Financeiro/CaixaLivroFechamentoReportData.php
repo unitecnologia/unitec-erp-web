@@ -6,6 +6,7 @@ use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
 use App\Models\CaixaLivroMovimento;
 use App\Models\Empresa;
+use App\Support\Erp\CaixaHistoricoExibicao;
 use App\Support\Erp\Compra\CompraDanfeReportService;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Pdv\PdvNfceCancelamentoProtocoloService;
@@ -250,7 +251,7 @@ final class CaixaLivroFechamentoReportData
             }
             $out[] = [
                 'emissao' => optional($l->emissao)?->format('d/m/Y') ?? '—',
-                'historico' => mb_strtoupper(trim((string) ($l->historico ?: '—')), 'UTF-8'),
+                'historico' => CaixaHistoricoExibicao::paraExibicao((string) ($l->historico ?: '—')) ?: '—',
                 'documento' => mb_strtoupper($doc !== '' ? $doc : '—', 'UTF-8'),
                 'entrada' => round((float) $l->entrada, 2),
                 'saida' => round((float) $l->saida, 2),
@@ -274,7 +275,7 @@ final class CaixaLivroFechamentoReportData
             }
             $out[] = [
                 'emissao' => optional($l->emissao)?->format('d/m/Y') ?? '—',
-                'historico' => mb_strtoupper(trim((string) ($l->historico ?: 'TRANSFERÊNCIA')), 'UTF-8'),
+                'historico' => CaixaHistoricoExibicao::paraExibicao((string) ($l->historico ?: 'TRANSFERÊNCIA')) ?: 'TRANSFERÊNCIA',
                 'documento' => mb_strtoupper($doc, 'UTF-8'),
                 'entrada' => round((float) $l->entrada, 2),
                 'saida' => round((float) $l->saida, 2),

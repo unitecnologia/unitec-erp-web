@@ -12,12 +12,21 @@
     </button>
     <button
         type="button"
-        wire:click="gravarPedidoPendente"
         wire:loading.attr="disabled"
-        wire:target="gravarPedidoPendente"
+        wire:target="gravarPedidoPendente,confirmSairSalvarPendente"
         class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--pendente"
         data-erp-key="F3"
         title="Gravar pedido como pendente (sem meio de pagamento)"
+        x-on:click="
+            window.erpFvTvBeginAuthorizedLeave?.();
+            if (window.__erpFvTvIncluding || window.__erpFvTvTabelaUpdating || $wire.tabelaProgressOpen || $wire.gravando) { return; }
+            if (window.__erpFvTvEditing) {
+                const v = window.erpFvTvBarValues?.() || {};
+                $wire.gravarPedidoPendente(false, v.qtd ?? null, v.preco ?? null);
+            } else {
+                $wire.gravarPedidoPendente();
+            }
+        "
     >
         <span class="erp-fv-tv-btn__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
@@ -32,13 +41,51 @@
             <span wire:loading wire:target="gravarPedidoPendente">Gravando…</span>
         </span>
     </button>
-    <button type="button" wire:click="irParaFinalizacao" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--ok" data-erp-key="F4">
+    <button
+        type="button"
+        wire:loading.attr="disabled"
+        wire:target="irParaFinalizacao"
+        class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--ok"
+        data-erp-key="F4"
+        x-on:click="
+            if (window.__erpFvTvIncluding || window.__erpFvTvTabelaUpdating || $wire.tabelaProgressOpen || $wire.gravando) { return; }
+            if (window.__erpFvTvEditing) {
+                const v = window.erpFvTvBarValues?.() || {};
+                $wire.irParaFinalizacao(v.qtd ?? null, v.preco ?? null);
+            } else {
+                $wire.irParaFinalizacao();
+            }
+        "
+    >
         <span class="erp-fv-tv-btn__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 13l4 4L19 7"/>
             </svg>
         </span>
-        <span class="erp-nfe-actions__label"><kbd>F4</kbd> Fechar</span>
+        <span class="erp-nfe-actions__label">
+            <kbd>F4</kbd>
+            <span wire:loading.remove wire:target="irParaFinalizacao">Fechar</span>
+            <span wire:loading wire:target="irParaFinalizacao">Abrindo…</span>
+        </span>
+    </button>
+
+    <button
+        type="button"
+        wire:click="abrirListarVendas"
+        class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--listar"
+        title="Listar vendas do dia (Tela de Venda)"
+    >
+        <span class="erp-fv-tv-btn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 6h13"/>
+                <path d="M8 12h13"/>
+                <path d="M8 18h13"/>
+                <path d="M3 6h.01"/>
+                <path d="M3 12h.01"/>
+                <path d="M3 18h.01"/>
+            </svg>
+        </span>
+        <span class="erp-nfe-actions__label">Listar Vendas</span>
     </button>
 
     <button type="button" wire:click="abrirObservacaoPedido" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--obs" title="Observação do pedido">
@@ -53,7 +100,14 @@
         <span class="erp-nfe-actions__label">Observação do pedido</span>
     </button>
 
-    <button type="button" wire:click="sair" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--exit">
+    <button
+        type="button"
+        wire:click="sair"
+        wire:loading.attr="disabled"
+        wire:target="sair,confirmSairSalvarPendente,gravarPedidoPendente"
+        class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--exit"
+        title="Sair"
+    >
         <span class="erp-fv-tv-btn__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

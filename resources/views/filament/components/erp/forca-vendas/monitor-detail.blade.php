@@ -4,13 +4,17 @@
     $pagamentos = $this->pagamentosSelecionado;
     $exibirCustoGrade = $this->exibirCustoProdutoGrade;
     $custosGrade = $exibirCustoGrade ? $this->custosUnitariosGrade : [];
-    $colspanItens = $exibirCustoGrade ? 10 : 9;
+    $colspanItens = $exibirCustoGrade ? 11 : 10;
 
     $fmtNum = fn (float $v): string => number_format($v, 2, ',', '.');
-    $fmtQtd = fn (float $v): string => rtrim(rtrim(number_format($v, 3, ',', '.'), '0'), ',');
+    // Mesmo padrão da Tela de Venda: 3 casas (ex.: 1,000).
+    $fmtQtd = fn (float $v): string => number_format($v, 3, ',', '.');
 
     $totItens = array_sum(array_map(fn ($i) => (float) $i['total'], $itens));
+    // Soma das Qtde das linhas (já consolida agrupamentos na quantidade da linha).
+    $totQtd = array_sum(array_map(fn ($i) => (float) ($i['quantidade'] ?? 0), $itens));
     $totPag = array_sum(array_map(fn ($p) => (float) $p['valor'], $pagamentos));
+    $temItens = $itens !== [];
 @endphp
 
 <div class="erp-fv-mon__detail">
@@ -26,8 +30,9 @@
                 <table class="erp-fv-mon__table">
                     <thead>
                         <tr>
+                            <th class="erp-fv-mon__th--item" data-erp-csort-key="item" data-erp-csort-type="number">#</th>
                             <th class="erp-fv-mon__th--code" data-erp-csort-key="codigo" data-erp-csort-type="text">Código</th>
-                            <th class="erp-fv-mon__th--code" data-erp-csort-key="codigo_barras" data-erp-csort-type="text">Cód. Barras</th>
+                            <th class="erp-fv-mon__th--barras" data-erp-csort-key="codigo_barras" data-erp-csort-type="text">Cód. Barras</th>
                             <th data-erp-csort-key="produto" data-erp-csort-type="text">Produto</th>
                             <th class="erp-fv-mon__th--num" data-erp-csort-key="quantidade" data-erp-csort-type="number">Qtde</th>
                             <th class="erp-fv-mon__th--money erp-fv-mon__th--vlr" data-erp-csort-key="preco_unitario" data-erp-csort-type="money">Vlr Unit.</th>
@@ -41,10 +46,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($itens as $item)
+                        @forelse ($itens as $idx => $item)
                             <tr>
+                                <td class="erp-fv-mon__td--item">{{ $idx + 1 }}</td>
                                 <td class="erp-fv-mon__td--code">{{ $item['codigo'] ?: '—' }}</td>
-                                <td class="erp-fv-mon__td--code">{{ $item['codigo_barras'] ?: '—' }}</td>
+                                <td class="erp-fv-mon__td--barras">{{ $item['codigo_barras'] ?: '—' }}</td>
                                 <td>{{ $item['descricao'] }}</td>
                                 <td class="erp-fv-mon__td--num">{{ $fmtQtd($item['quantidade']) }}</td>
                                 <td class="erp-fv-mon__td--money erp-fv-mon__td--vlr">
@@ -91,8 +97,14 @@
                     </tbody>
                 </table>
             </div>
-            <footer class="erp-fv-mon__foot">
-                <span class="erp-fv-mon__foot-count">{{ count($itens) }}</span>
+            <footer class="erp-fv-mon__foot erp-fv-mon__foot--itens" data-erp-fv-mon-foot-itens>
+                @if ($temItens)
+                    <span
+                        class="erp-fv-mon__foot-count erp-fv-mon__foot-qtd-sum"
+                        data-erp-fv-mon-qtd-sum
+                        title="Soma das quantidades"
+                    >{{ $fmtQtd($totQtd) }}</span>
+                @endif
                 <span class="erp-fv-mon__foot-end">
                     @if ((bool) (\App\Support\Erp\ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_mais_opcoes ?? false))
                         <span class="erp-fv-mon__foot-mais">
@@ -167,3 +179,50 @@
         </section>
     </div>
 </div>
+
+@once
+    <script>
+        (function () {
+            if (window.__erpFvMonQtdSumAlignBound) {
+                return;
+            }
+            window.__erpFvMonQtdSumAlignBound = true;
+
+            function alignFvMonQtdSum() {
+                document.querySelectorAll('.erp-fv-mon__panel--itens').forEach((panel) => {
+                    const foot = panel.querySelector('[data-erp-fv-mon-foot-itens]');
+                    const sum = panel.querySelector('[data-erp-fv-mon-qtd-sum]');
+                    const th = panel.querySelector('thead th[data-erp-csort-key="quantidade"]');
+                    if (! foot || ! sum || ! th) {
+                        return;
+                    }
+                    const footRect = foot.getBoundingClientRect();
+                    const thRect = th.getBoundingClientRect();
+                    const left = Math.max(0, thRect.left - footRect.left);
+                    sum.style.left = left + 'px';
+                    sum.style.width = Math.max(0, thRect.width) + 'px';
+                });
+            }
+
+            window.__erpFvMonAlignQtdSum = alignFvMonQtdSum;
+
+            document.addEventListener('DOMContentLoaded', alignFvMonQtdSum);
+            window.addEventListener('resize', alignFvMonQtdSum);
+            document.addEventListener('livewire:navigated', alignFvMonQtdSum);
+            document.addEventListener('livewire:init', () => {
+                Livewire.hook('morph.updated', () => {
+                    window.requestAnimationFrame(alignFvMonQtdSum);
+                });
+            });
+
+            document.addEventListener('scroll', (event) => {
+                if (event.target?.closest?.('.erp-fv-mon__panel--itens .erp-fv-mon__table-wrap')) {
+                    alignFvMonQtdSum();
+                }
+            }, true);
+
+            window.setTimeout(alignFvMonQtdSum, 50);
+            window.setTimeout(alignFvMonQtdSum, 250);
+        })();
+    </script>
+@endonce

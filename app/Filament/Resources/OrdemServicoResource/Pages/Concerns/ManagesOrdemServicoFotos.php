@@ -50,10 +50,12 @@ trait ManagesOrdemServicoFotos
     {
         $path = trim((string) $img->caminho);
 
-        if ($path === '' || ! Storage::disk('public')->exists($path)) {
+        if ($path === '') {
             return null;
         }
 
+        // Evita Storage::exists (I/O em disco) a cada hidratação/remorph — URL quebrada
+        // é tratada no Blade com onerror. Comportamento de listagem preservado.
         return [
             'id' => (int) $img->id,
             'url' => Storage::disk('public')->url($path),

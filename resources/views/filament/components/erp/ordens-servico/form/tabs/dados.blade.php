@@ -53,7 +53,7 @@
             <label class="erp-os-form-label" for="os-atendente">Técnico</label>
             <select id="os-atendente" wire:model.live="atendenteId" @disabled($readOnly) class="erp-os-form-select">
                 <option value="">Selecione...</option>
-                @foreach ($this->atendenteOptions() as $atendente)
+                @foreach ($this->atendenteOptions as $atendente)
                     <option value="{{ $atendente['id'] }}">{{ $atendente['nome'] }}</option>
                 @endforeach
             </select>
@@ -86,19 +86,36 @@
     </div>
 </div>
 
-<div class="erp-os-panel erp-os-panel--fill">
+{{-- Serviços/Peças: troca visual local (Alpine); Livewire só limpa barra quando necessário. --}}
+<div
+    class="erp-os-panel erp-os-panel--fill"
+    x-data="{ itemTab: @entangle('activeItemTab') }"
+>
     <div class="erp-os-item-tabs">
         <button
             type="button"
-            wire:click="setActiveItemTab('servicos')"
-            @class(['erp-os-item-tab', 'erp-os-item-tab--active' => $this->activeItemTab === 'servicos'])
+            data-erp-os-item-tab="servicos"
+            @click="if (itemTab !== 'servicos') { itemTab = 'servicos'; $wire.setActiveItemTab('servicos') }"
+            :class="{ 'erp-os-item-tab--active': itemTab === 'servicos' }"
+            @class([
+                'erp-os-item-tab',
+                'erp-os-item-tab--active' => $this->activeItemTab === 'servicos',
+            ])
         >Serviços</button>
         <button
             type="button"
-            wire:click="setActiveItemTab('pecas')"
-            @class(['erp-os-item-tab', 'erp-os-item-tab--active' => $this->activeItemTab === 'pecas'])
+            data-erp-os-item-tab="pecas"
+            @click="if (itemTab !== 'pecas') { itemTab = 'pecas'; $wire.setActiveItemTab('pecas') }"
+            :class="{ 'erp-os-item-tab--active': itemTab === 'pecas' }"
+            @class([
+                'erp-os-item-tab',
+                'erp-os-item-tab--active' => $this->activeItemTab === 'pecas',
+            ])
         >Peças</button>
     </div>
 
-    @include('filament.components.erp.ordens-servico.form.itens', ['readOnly' => $readOnly])
+    @include('filament.components.erp.ordens-servico.form.itens', [
+        'readOnly' => $readOnly,
+        'atendentes' => $this->atendenteOptions,
+    ])
 </div>

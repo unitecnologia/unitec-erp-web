@@ -411,34 +411,115 @@ html:has(body.erp-orcamento-embed-body) {
 }
 
 .erp-produtos-form-page.erp-orcamento-embed .fi-sc > div:has(> .erp-produtos-window) {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
 }
 
-.erp-produtos-form-page.erp-orcamento-embed .fi-sc > div:has(> .erp-produtos-pcad__footer) {
-    flex: 0 0 auto;
-    flex-shrink: 0;
+/*
+ * NÃO usar :has(.erp-pcad__filament-hidden) sem excluir a janela:
+ * no schema Filament o form oculto pode ser irmão da janela no MESMO
+ * wrapper — display:none escondia os campos e deixava só título/botões.
+ */
+.erp-produtos-form-page.erp-orcamento-embed .fi-sc > div:has(.erp-pcad__filament-hidden):not(:has(.erp-produtos-window)) {
+    flex: 0 0 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    pointer-events: none !important;
 }
 
 .erp-produtos-form-page.erp-orcamento-embed .erp-produtos-window {
-    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
     height: 100%;
     max-height: none;
+    min-height: 0;
     border: 1px solid #8fa8c8 !important;
-    border-bottom: none !important;
-    border-radius: var(--erp-radius-lg, 10px) var(--erp-radius-lg, 10px) 0 0 !important;
+    border-radius: var(--erp-radius-lg, 10px) !important;
     box-shadow: none !important;
     background: linear-gradient(165deg, #c8d9ec 0%, #d4e2f2 40%, #dce8f4 100%) !important;
     overflow: hidden;
 }
 
-.erp-produtos-form-page.erp-orcamento-embed .fi-sc > div:has(> .erp-produtos-pcad__footer) .erp-produtos-pcad__footer {
+.erp-produtos-form-page.erp-orcamento-embed .erp-produtos-window__body,
+.erp-produtos-form-page.erp-orcamento-embed .erp-produtos-window__body > .erp-produtos-pcad,
+.erp-produtos-form-page.erp-orcamento-embed .erp-produtos-window__body > .erp-pcad {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.erp-produtos-form-page.erp-orcamento-embed .erp-produtos-window > .erp-produtos-pcad__footer {
+    flex: 0 0 auto;
     border-radius: 0 0 var(--erp-radius-lg, 10px) var(--erp-radius-lg, 10px) !important;
-    border: 1px solid var(--erp-brand-primary-dark, #0f3460) !important;
-    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35)) !important;
+    border: none !important;
+    border-top: 1px solid var(--erp-brand-primary-dark, #0f3460) !important;
+    box-shadow: none !important;
+}
+
+/*
+ * Overlay F8 da OS: html/body do iframe não preenchem 100% da viewport do iframe.
+ * Sem isso, o fundo #c8d9ec aparece como faixa abaixo de Salvar/Sair.
+ * Só aplica com erp-os-overlay-embed (não altera cadastro do menu nem orçamento).
+ */
+html:has(body.erp-os-overlay-embed-body) {
+    height: auto !important;
+    min-height: 0 !important;
+    background: transparent !important;
+}
+
+.fi-body.erp-os-overlay-embed-body,
+.fi-body:has(.erp-produtos-form-page.erp-os-overlay-embed) {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+}
+
+.fi-body.erp-os-overlay-embed-body .fi-layout,
+.fi-body.erp-os-overlay-embed-body .fi-main-ctn,
+.fi-body.erp-os-overlay-embed-body .fi-main,
+.fi-body.erp-os-overlay-embed-body .fi-main > *,
+.fi-body:has(.erp-produtos-form-page.erp-os-overlay-embed) .fi-layout,
+.fi-body:has(.erp-produtos-form-page.erp-os-overlay-embed) .fi-main-ctn,
+.fi-body:has(.erp-produtos-form-page.erp-os-overlay-embed) .fi-main,
+.fi-body:has(.erp-produtos-form-page.erp-os-overlay-embed) .fi-main > * {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.fi-page.erp-produtos-form-page.erp-orcamento-embed.erp-os-overlay-embed {
+    height: auto !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+}
+
+.erp-produtos-form-page.erp-os-overlay-embed .fi-page-header-main-ctn,
+.erp-produtos-form-page.erp-os-overlay-embed .fi-page-main,
+.erp-produtos-form-page.erp-os-overlay-embed .fi-page-content,
+.erp-produtos-form-page.erp-os-overlay-embed .fi-sc,
+.erp-produtos-form-page.erp-os-overlay-embed .fi-sc > div:has(> .erp-produtos-window) {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+}
+
+.erp-produtos-form-page.erp-os-overlay-embed .erp-produtos-window {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-height: none;
 }
 
 /* Embed no overlay do PDV — uma superfície só no iframe (sem “modal no modal”) */

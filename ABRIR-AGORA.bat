@@ -96,6 +96,7 @@ cd /d "%APP%"
 "%PHPEXE%" artisan optimize:clear >nul 2>&1
 "%PHPEXE%" artisan migrate --force
 "%PHPEXE%" artisan config:cache >nul 2>&1
+"%PHPEXE%" artisan unitec:filament-cache --force >nul 2>&1
 
 echo [4] Subindo servicos...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^

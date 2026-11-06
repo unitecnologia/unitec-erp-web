@@ -26,13 +26,18 @@ class EditProduct extends EditRecord
         ErpScreen::set('Cadastro de Produtos');
         $this->ensureProductFormEmpresaId();
 
-        $this->syncProductFormData();
+        // Um único format+fill (evita syncProductFormData + fill duplicados na abertura).
+        $this->data = $this->formatProductFormDataForDisplay($this->form->getState());
         $this->applyEmpresaPrecosToFormData($this->record);
         $this->hydrateNcmDescricaoFromCatalog(fillForm: false);
         $this->form->fill($this->data);
+        $this->refreshProductFotoPreviewUrl();
         $this->mountProductPhoto();
-        $this->loadProductPriceTableItems($this->record);
         $this->captureLastSavedProductPrices($this->record instanceof Product ? $this->record : null);
+
+        // Tab preço / grade / etc. sob demanda; aba ativa (padrão Estoque) carrega só o necessário.
+        $this->ensureProductTabPayload($this->activeFormTab);
+
         $this->captureProductFormBaseline();
     }
 
@@ -53,11 +58,17 @@ class EditProduct extends EditRecord
     protected function afterSave(): void
     {
         $this->syncProductChildRecords($this->record);
-        $this->syncProductFormData();
+        // Sem syncProductFormData completo (getState + fill + reservas sempre).
+        $this->refreshProductFormAfterSave();
 
-        if ($this->record) {
-            app(\App\Support\Erp\ProductLoteService::class)->garantirLoteInicial($this->record->fresh());
-            $this->loadProductLotes($this->record->fresh());
+        if ($this->record instanceof Product) {
+            // Um único uso do record já persistido — evita 2× fresh().
+            app(\App\Support\Erp\ProductLoteService::class)->garantirLoteInicial($this->record);
+
+            // Lotes só na UI se a aba estiver aberta (gravação de lote é modal próprio).
+            if ($this->activeFormTab === 'lotes') {
+                $this->loadProductLotes($this->record);
+            }
         }
 
         Notification::make()

@@ -5,6 +5,8 @@ namespace App\Filament\Resources\OrdemServicoResource\Pages\Concerns;
 use App\Models\Orcamento;
 use App\Models\Person;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use App\Support\Erp\Os\OrcamentoOsImportacao;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Str;
@@ -40,8 +42,9 @@ trait ManagesOrdemServicoImportarOrcamento
 
         $this->osImportOrcNumero = '';
         $this->osImportOrcCliente = '';
-        $this->osImportOrcDataDe = '';
-        $this->osImportOrcDataAte = '';
+        $mes = ErpTimezone::toLocal();
+        $this->osImportOrcDataDe = $mes->copy()->startOfMonth()->toDateString();
+        $this->osImportOrcDataAte = $mes->copy()->endOfMonth()->toDateString();
         $this->refreshOsImportOrcamentoResults();
         $this->osImportOrcamentoOpen = true;
     }
@@ -100,8 +103,10 @@ trait ManagesOrdemServicoImportarOrcamento
         $dataDe = $this->dataFiltroOsImport($this->osImportOrcDataDe);
         $dataAte = $this->dataFiltroOsImport($this->osImportOrcDataAte);
 
-        $query = Orcamento::query()
-            ->visivelNaListaOrcamentos()
+        // Somente elegíveis para nova importação (OS/PDV/DAV/NF-e) — filtros Nº/Cliente/Período intactos.
+        $query = OrcamentoFaturamentoGuard::aplicarNaoFaturados(
+            Orcamento::query()->visivelNaListaOrcamentos()
+        )
             ->with(['cliente:id,nome_razao'])
             ->where('status', Orcamento::STATUS_FECHADO)
             ->whereHas('itens')
@@ -157,18 +162,22 @@ trait ManagesOrdemServicoImportarOrcamento
     {
         if (isset($this->osImportOrcamentoResults[$index])) {
             $this->osImportOrcamentoSelectedIndex = $index;
+            $this->skipOsRenderWithLookupHighlight('import', $index);
         }
     }
 
     public function moveOsImportOrcamentoSelection(int $delta): void
     {
         if ($this->osImportOrcamentoResults === []) {
+            $this->skipRender();
+
             return;
         }
 
         $count = count($this->osImportOrcamentoResults);
         $index = ($this->osImportOrcamentoSelectedIndex ?? 0) + $delta;
         $this->osImportOrcamentoSelectedIndex = max(0, min($count - 1, $index));
+        $this->skipOsRenderWithLookupHighlight('import', $this->osImportOrcamentoSelectedIndex);
     }
 
     public function confirmarImportarOrcamentoOs(): void
@@ -197,8 +206,22 @@ trait ManagesOrdemServicoImportarOrcamento
             return;
         }
 
-        $orcamento = Orcamento::query()
-            ->visivelNaListaOrcamentos()
+        $motivoFaturado = OrcamentoFaturamentoGuard::motivoFaturado($orcamentoId);
+
+        if ($motivoFaturado !== null) {
+            Notification::make()
+                ->title('Orçamento indisponível para importação.')
+                ->body($motivoFaturado)
+                ->warning()
+                ->send();
+            $this->refreshOsImportOrcamentoResults();
+
+            return;
+        }
+
+        $orcamento = OrcamentoFaturamentoGuard::aplicarNaoFaturados(
+            Orcamento::query()->visivelNaListaOrcamentos()
+        )
             ->with(['itens.product', 'cliente'])
             ->where('status', Orcamento::STATUS_FECHADO)
             ->find($orcamentoId);
@@ -225,7 +248,7 @@ trait ManagesOrdemServicoImportarOrcamento
 
         $notification = Notification::make()
             ->title('Orçamento nº '.$orcamento->numero.' importado.')
-            ->body(count($mapeado['linhas']).' item(ns). O orçamento original não foi alterado.');
+            ->body(count($mapeado['linhas']).' item(ns). Status IMPORTADO só ao gravar a OS.');
 
         if ($tinhaItens) {
             $notification->body(
