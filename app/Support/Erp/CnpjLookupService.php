@@ -3,15 +3,24 @@
 namespace App\Support\Erp;
 
 use App\Support\Erp\License\LicencaHttpClient;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class CnpjLookupService
 {
     private const CACHE_TTL_DAYS = 30;
+
+    /** Timeout total por provider — paralelo evita somar 3× na tela. */
+    private const HTTP_TIMEOUT_SECONDS = 4;
+
+    private const HTTP_CONNECT_TIMEOUT_SECONDS = 2;
 
     /** @var list<string> */
     private array $providerErrors = [];
@@ -46,8 +55,8 @@ class CnpjLookupService
     protected function http(): PendingRequest
     {
         return Http::withOptions(LicencaHttpClient::options())
-            ->timeout(8)
-            ->connectTimeout(5)
+            ->timeout(self::HTTP_TIMEOUT_SECONDS)
+            ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
             ->acceptJson();
     }
 
@@ -61,14 +70,19 @@ class CnpjLookupService
 
         $merged = [];
 
-        $merged = $this->mergeFields($merged, $this->fetchOpenCnpj($cnpj));
-        $merged = $this->mergeFields($merged, $this->fetchBrasilApi($cnpj));
-
-        if (blank($merged['rg_ie'] ?? null)) {
-            $merged = $this->mergeFields($merged, $this->fetchCnpjWs($cnpj));
+        foreach ($this->fetchProvidersInParallel($cnpj) as $fields) {
+            $merged = $this->mergeFields($merged, $fields);
         }
 
         if (blank($merged['nome_razao'] ?? null)) {
+            if ($this->providerErrors !== []) {
+                Log::warning('erp.cnpj.lookup.falha', [
+                    'cnpj' => $cnpj,
+                    'providers' => $this->providerErrors,
+                    'not_found' => $this->sawNotFound,
+                ]);
+            }
+
             if ($this->providerErrors !== [] && ! $this->sawNotFound) {
                 throw new RuntimeException(
                     'Não foi possível consultar o CNPJ agora. Verifique a conexão com a internet e tente novamente.'
@@ -82,14 +96,68 @@ class CnpjLookupService
     }
 
     /**
+     * Consulta OpenCNPJ, BrasilAPI e cnpj.ws em paralelo (pior caso ≈ 1 timeout, não 3).
+     *
+     * @return list<array<string, string|null>>
+     */
+    protected function fetchProvidersInParallel(string $cnpj): array
+    {
+        $options = LicencaHttpClient::options();
+
+        try {
+            /** @var array<string, Response|Throwable> $responses */
+            $responses = Http::pool(fn (Pool $pool): array => [
+                $pool->as('opencnpj')
+                    ->withOptions($options)
+                    ->timeout(self::HTTP_TIMEOUT_SECONDS)
+                    ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                    ->acceptJson()
+                    ->get("https://api.opencnpj.org/{$cnpj}"),
+                $pool->as('brasilapi')
+                    ->withOptions($options)
+                    ->timeout(self::HTTP_TIMEOUT_SECONDS)
+                    ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                    ->acceptJson()
+                    ->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}"),
+                $pool->as('cnpjws')
+                    ->withOptions($options)
+                    ->timeout(self::HTTP_TIMEOUT_SECONDS)
+                    ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                    ->acceptJson()
+                    ->get("https://publica.cnpj.ws/cnpj/{$cnpj}"),
+            ]);
+        } catch (Throwable $exception) {
+            $this->providerErrors[] = 'pool: '.$exception->getMessage();
+
+            // Fallback sequencial curto se o pool falhar por completo (ambiente/cURL).
+            return [
+                $this->fetchOpenCnpj($cnpj),
+                $this->fetchBrasilApi($cnpj),
+                $this->fetchCnpjWs($cnpj),
+            ];
+        }
+
+        return [
+            $this->mapProviderResponse('opencnpj', $responses['opencnpj'] ?? null, fn (array $payload): array => $this->mapOpenCnpj($payload)),
+            $this->mapProviderResponse('brasilapi', $responses['brasilapi'] ?? null, fn (array $payload): array => $this->mapBrasilApi($payload)),
+            $this->mapProviderResponse('cnpj.ws', $responses['cnpjws'] ?? null, fn (array $payload): array => $this->mapCnpjWs($payload)),
+        ];
+    }
+
+    /**
+     * @param  callable(array<string, mixed>): array<string, string|null>  $mapper
      * @return array<string, string|null>
      */
-    protected function fetchOpenCnpj(string $cnpj): array
+    protected function mapProviderResponse(string $provider, mixed $response, callable $mapper): array
     {
-        try {
-            $response = $this->http()->get("https://api.opencnpj.org/{$cnpj}");
-        } catch (\Throwable $exception) {
-            $this->providerErrors[] = 'opencnpj: '.$exception->getMessage();
+        if ($response instanceof Throwable) {
+            $this->providerErrors[] = $provider.': '.$response->getMessage();
+
+            return [];
+        }
+
+        if (! $response instanceof Response) {
+            $this->providerErrors[] = $provider.': resposta inválida';
 
             return [];
         }
@@ -101,15 +169,31 @@ class CnpjLookupService
         }
 
         if (! $response->successful()) {
-            $this->providerErrors[] = 'opencnpj: HTTP '.$response->status();
+            $this->providerErrors[] = $provider.': HTTP '.$response->status();
 
             return [];
         }
 
-        /** @var array<string, mixed> $payload */
+        /** @var array<string, mixed>|null $payload */
         $payload = $response->json();
 
-        return $this->mapOpenCnpj(is_array($payload) ? $payload : []);
+        return $mapper(is_array($payload) ? $payload : []);
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    protected function fetchOpenCnpj(string $cnpj): array
+    {
+        try {
+            $response = $this->http()->get("https://api.opencnpj.org/{$cnpj}");
+        } catch (Throwable $exception) {
+            $this->providerErrors[] = 'opencnpj: '.$exception->getMessage();
+
+            return [];
+        }
+
+        return $this->mapProviderResponse('opencnpj', $response, fn (array $payload): array => $this->mapOpenCnpj($payload));
     }
 
     /**
@@ -119,28 +203,13 @@ class CnpjLookupService
     {
         try {
             $response = $this->http()->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}");
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $this->providerErrors[] = 'brasilapi: '.$exception->getMessage();
 
             return [];
         }
 
-        if ($response->status() === 404) {
-            $this->sawNotFound = true;
-
-            return [];
-        }
-
-        if (! $response->successful()) {
-            $this->providerErrors[] = 'brasilapi: HTTP '.$response->status();
-
-            return [];
-        }
-
-        /** @var array<string, mixed> $payload */
-        $payload = $response->json();
-
-        return $this->mapBrasilApi(is_array($payload) ? $payload : []);
+        return $this->mapProviderResponse('brasilapi', $response, fn (array $payload): array => $this->mapBrasilApi($payload));
     }
 
     /**
@@ -150,28 +219,13 @@ class CnpjLookupService
     {
         try {
             $response = $this->http()->get("https://publica.cnpj.ws/cnpj/{$cnpj}");
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $this->providerErrors[] = 'cnpj.ws: '.$exception->getMessage();
 
             return [];
         }
 
-        if ($response->status() === 404) {
-            $this->sawNotFound = true;
-
-            return [];
-        }
-
-        if (! $response->successful()) {
-            $this->providerErrors[] = 'cnpj.ws: HTTP '.$response->status();
-
-            return [];
-        }
-
-        /** @var array<string, mixed> $payload */
-        $payload = $response->json();
-
-        return $this->mapCnpjWs(is_array($payload) ? $payload : []);
+        return $this->mapProviderResponse('cnpj.ws', $response, fn (array $payload): array => $this->mapCnpjWs($payload));
     }
 
     /**

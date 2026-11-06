@@ -87,6 +87,7 @@ trait ManagesPersonLookup
             ->title('Pessoa jurídica encontrada')
             ->body($body)
             ->success()
+            ->duration(3500)
             ->send();
 
         if (filled($this->data['cep'] ?? null) && ! CepLookupService::isValidIbgeCode($this->data['cidade_codigo'] ?? null)) {
