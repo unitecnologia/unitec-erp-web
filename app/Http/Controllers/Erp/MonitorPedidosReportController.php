@@ -26,6 +26,9 @@ class MonitorPedidosReportController extends Controller
         abort_unless($user, 403);
 
         $empresaId = (int) (ErpContext::currentEmpresaId() ?? session('erp_empresa_id') ?? $user->empresa_id ?? 0);
+        // Fail-closed: sem empresa válida não imprime (evita vazamento cross-empresa).
+        abort_if($empresaId <= 0, 403);
+
         $orderIds = $this->parseIds($request, 'ids');
         $vendaIds = $this->parseIds($request, 'venda_ids');
         $cargaIds = $this->parseIds($request, 'carga_ids');
@@ -33,9 +36,8 @@ class MonitorPedidosReportController extends Controller
 
         abort_if($orderIds === [] && $vendaIds === [], 404);
 
-        $empresa = $empresaId > 0
-            ? Empresa::query()->find($empresaId)
-            : $user->empresa;
+        $empresa = Empresa::query()->find($empresaId);
+        abort_unless($empresa, 403);
 
         $ordenacao = MonitorPedidosReport::normalizeOrdenacao($request->query('ord'));
 
@@ -50,7 +52,7 @@ class MonitorPedidosReportController extends Controller
         if ($cargaIds !== []) {
             $cargas = Carga::query()
                 ->whereIn('id', $cargaIds)
-                ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+                ->where('empresa_id', $empresaId)
                 ->orderBy('numero')
                 ->get(['id', 'numero']);
 
@@ -86,14 +88,14 @@ class MonitorPedidosReportController extends Controller
         $blocos = $vendaIds !== []
             ? MonitorPedidosReport::buildBlocosFromVendas(
                 $vendaIds,
-                $empresaId > 0 ? $empresaId : null,
+                $empresaId,
                 $cargaNumeroByVendaId,
                 $impValorLiquido,
                 $ordenacao,
             )
             : MonitorPedidosReport::buildBlocos(
                 $orderIds,
-                $empresaId > 0 ? $empresaId : null,
+                $empresaId,
                 $impValorLiquido,
                 $ordenacao,
             );

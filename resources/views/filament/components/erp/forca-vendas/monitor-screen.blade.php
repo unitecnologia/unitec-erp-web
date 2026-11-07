@@ -42,6 +42,14 @@
                 poll() {
                     this.s = 5;
                     if (this.busy) return;
+                    // Não compete com faturar/cancelar/reabrir/lote/clonar.
+                    if (this.$wire.faturarProgressOpen
+                        || this.$wire.cancelarProgressOpen
+                        || this.$wire.reabrirProgressOpen
+                        || this.$wire.nfeLoteProgressOpen
+                        || this.$wire.clonarProgressOpen) {
+                        return;
+                    }
                     this.busy = true;
                     this.$wire.pollRefresh().finally(() => { this.busy = false; });
                 },

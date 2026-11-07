@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Nfe;
 
+use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\NfeFatura;
@@ -39,6 +40,8 @@ final class NfeVendaLoteEmissionService
         $nfeIdCriada = null;
 
         try {
+            $this->assertVendaDoMonitorEmpresaAtiva($venda);
+
             $emitente = $empresaEmitenteId && $empresaEmitenteId > 0
                 ? Empresa::query()->find((int) $empresaEmitenteId)
                 : null;
@@ -84,10 +87,35 @@ final class NfeVendaLoteEmissionService
     }
 
     /**
+     * Garante que a venda pertence a um pedido do Monitor da empresa da sessão.
+     * Emitente multi-empresa pode diferir; o pedido/venda da grade não.
+     */
+    private function assertVendaDoMonitorEmpresaAtiva(Venda $venda): void
+    {
+        $vendaId = (int) $venda->id;
+
+        if ($vendaId <= 0) {
+            throw new RuntimeException('Venda inválida para emissão de NF-e.');
+        }
+
+        $permitida = ForcaVendasMonitorResource::ordersQuery()
+            ->where('venda_id', $vendaId)
+            ->exists();
+
+        if (! $permitida) {
+            throw new RuntimeException(
+                'A venda não pertence à empresa ativa do Monitor. A emissão foi bloqueada.'
+            );
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function criarRascunho(Venda $venda, array $payload, ?int $empresaEmitenteId = null): Nfe
     {
+        $this->assertVendaDoMonitorEmpresaAtiva($venda);
+
         $empresaId = $empresaEmitenteId && $empresaEmitenteId > 0
             ? (int) $empresaEmitenteId
             : (int) (ErpContext::currentEmpresaId()

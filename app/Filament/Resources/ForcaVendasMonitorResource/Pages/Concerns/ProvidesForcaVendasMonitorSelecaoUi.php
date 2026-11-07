@@ -174,8 +174,10 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         }
 
         $documento = $this->documentoReceber($order);
+        $empresaId = (int) ($order->empresa_id ?? ErpContext::currentEmpresaId() ?? 0);
 
         $contas = ContaReceber::query()
+            ->when($empresaId > 0, fn (Builder $q) => $q->where('empresa_id', $empresaId))
             ->where(fn (Builder $q) => $q
                 ->where('documento', $documento)
                 ->orWhere('documento', 'like', $documento.'/%'))
@@ -476,6 +478,8 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             return $disabled;
         }
 
+        // venda_id já veio de ordersQuery(); não filtrar nfe.empresa_id
+        // (emitente multi-empresa pode diferir da empresa do pedido).
         $nfe = Nfe::query()
             ->where('venda_id', $vendaId)
             ->where('status', Nfe::STATUS_ABERTA)

@@ -207,6 +207,16 @@ class ListForcaVendasMonitor extends ListRecords
     #[Locked]
     public int $pollRenderizadoEm = 0;
 
+    /** Cache dos totais do rodapé (evita recomputar no force-render de NF/PIX). */
+    #[Locked]
+    public string $totaisCacheKey = '';
+
+    /**
+     * @var array{desconto: float, acrescimo: float, bruto: float, liquido: float, qtd: int}
+     */
+    #[Locked]
+    public array $totaisCachePayload = [];
+
     /**
      * Mudanças em dados relacionados (NF-e/NFC-e, PIX) não alteram o pedido;
      * a grade é renderizada ao menos nesse intervalo mesmo sem mudança na assinatura.
@@ -344,6 +354,7 @@ class ListForcaVendasMonitor extends ListRecords
 
     /**
      * Filtro dedicado de plataforma/canal de venda (ao lado do filtro unificado).
+     * Predicados alinhados a ForcaVendasMonitorResource::plataformaLabel().
      */
     protected function aplicarFiltroPlataforma(Builder $query): void
     {
@@ -353,32 +364,42 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        if ($plataforma === 'mobile') {
-            return;
-        }
+        $origem = "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem'))";
+        $isTela = "(device_uuid = 'monitor-web' OR {$origem} LIKE 'monitor_tela_venda%')";
+        $isMeli = "(meli_order_id IS NOT NULL OR {$origem} = 'mercado_livre')";
+        $isVi = "{$origem} = 'vendas_internas'";
+        $isErp = "{$origem} = 'scv'";
 
         if ($plataforma === 'vi') {
-            $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) = 'vendas_internas'");
-
-            return;
-        }
-
-        if ($plataforma === 'fv') {
-            // Exclui SCV (rótulo ERP) para o filtro "Força de Vendas" bater com a coluna.
-            $query->where(function (Builder $q): void {
-                $q->whereNull('payload')
-                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) IS NULL")
-                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) NOT IN ('vendas_internas', 'mercado_livre', 'scv')");
-            });
+            $query->whereRaw($isVi);
 
             return;
         }
 
         if ($plataforma === 'meli') {
-            $query->where(function (Builder $q): void {
-                $q->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) = 'mercado_livre'")
-                    ->orWhereNotNull('meli_order_id');
-            });
+            $query->whereRaw($isMeli);
+
+            return;
+        }
+
+        if ($plataforma === 'erp') {
+            $query->whereRaw($isErp);
+
+            return;
+        }
+
+        if ($plataforma === 'tela') {
+            $query->whereRaw($isTela);
+
+            return;
+        }
+
+        // Vendas Mobile / Força de Vendas = app (exclui ERP/SCV, Tela, VI e ML).
+        if ($plataforma === 'mobile' || $plataforma === 'fv') {
+            $query->whereRaw("NOT {$isMeli}")
+                ->whereRaw("NOT {$isVi}")
+                ->whereRaw("NOT {$isErp}")
+                ->whereRaw("NOT {$isTela}");
 
             return;
         }
@@ -485,18 +506,62 @@ class ListForcaVendasMonitor extends ListRecords
                 break;
 
             case 'tt_bruto':
+                // Espelha totalBruto(): subtotal − acréscimo + desconto (fontes das células).
                 $num = $this->parseNumeroFiltro($valor);
-                $query->whereHas('pedido', fn (Builder $s) => $s->where('subtotal', '>=', $num));
+                $prefix = DB::getTablePrefix();
+                $orders = $prefix.$query->getModel()->getTable();
+                $pedidos = $prefix.(new Pedido)->getTable();
+                $itens = $prefix.(new \App\Models\PedidoItem)->getTable();
+                $query->whereRaw(
+                    '(COALESCE((SELECT p.subtotal FROM '.$pedidos.' p WHERE p.id = '.$orders.'.pedido_id), '.$orders.'.total)
+                        - GREATEST(
+                            COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT('.$orders.'.payload, \'$.acrescimo_valor\')) AS DECIMAL(15,2)), 0),
+                            COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT('.$orders.'.payload, \'$.frete\')) AS DECIMAL(15,2)), 0)
+                        )
+                        + CASE
+                            WHEN COALESCE((SELECT SUM(i.desconto) FROM '.$itens.' i WHERE i.pedido_id = '.$orders.'.pedido_id), 0) > 0
+                                THEN COALESCE((SELECT SUM(i.desconto) FROM '.$itens.' i WHERE i.pedido_id = '.$orders.'.pedido_id), 0)
+                            ELSE COALESCE((SELECT p.desconto_valor FROM '.$pedidos.' p WHERE p.id = '.$orders.'.pedido_id), 0)
+                          END
+                    ) >= ?',
+                    [$num]
+                );
                 break;
 
             case 'desconto':
+                // Espelha totalDesconto(): soma dos itens se > 0; senão cabeçalho.
                 $num = $this->parseNumeroFiltro($valor);
-                $query->whereHas('pedido', fn (Builder $s) => $s->where('desconto_valor', '>=', $num));
+                $prefix = DB::getTablePrefix();
+                $orders = $prefix.$query->getModel()->getTable();
+                $itens = $prefix.(new \App\Models\PedidoItem)->getTable();
+                $pedidos = $prefix.(new Pedido)->getTable();
+                $query->where(function (Builder $q) use ($num, $itens, $pedidos, $orders): void {
+                    $q->whereRaw(
+                        '(SELECT COALESCE(SUM(i.desconto), 0) FROM '.$itens.' i WHERE i.pedido_id = '.$orders.'.pedido_id) >= ?',
+                        [$num]
+                    )->orWhere(function (Builder $cab) use ($num, $itens, $pedidos, $orders): void {
+                        $cab->whereRaw(
+                            '(SELECT COALESCE(SUM(i.desconto), 0) FROM '.$itens.' i WHERE i.pedido_id = '.$orders.'.pedido_id) <= 0'
+                        )->whereRaw(
+                            'COALESCE((SELECT p.desconto_valor FROM '.$pedidos.' p WHERE p.id = '.$orders.'.pedido_id), 0) >= ?',
+                            [$num]
+                        );
+                    });
+                });
                 break;
 
             case 'acrescimo':
+                // Espelha totalAcrescimo(): acrescimo_valor, senão frete (itens[] só no PHP da célula).
                 $num = $this->parseNumeroFiltro($valor);
-                $query->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.frete')) AS DECIMAL(15,2)) >= ?", [$num]);
+                $query->where(function (Builder $q) use ($num): void {
+                    $q->whereRaw(
+                        'CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, \'$.acrescimo_valor\')) AS DECIMAL(15,2)) >= ?',
+                        [$num]
+                    )->orWhereRaw(
+                        'CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, \'$.frete\')) AS DECIMAL(15,2)) >= ?',
+                        [$num]
+                    );
+                });
                 break;
         }
     }
@@ -578,13 +643,27 @@ class ListForcaVendasMonitor extends ListRecords
 
     /**
      * Totais do rodapé da grade (todos os registros filtrados, não só a página).
+     * Reutiliza cache quando a assinatura do filtro/pedidos não mudou (poll force NF/PIX).
      *
      * @return array{desconto: float, acrescimo: float, bruto: float, liquido: float, qtd: int}
      */
     #[Computed]
     public function totaisFiltrados(): array
     {
-        return ForcaVendasMonitorTotaisAggregator::fromQuery($this->getTableQuery());
+        $key = $this->pollAssinatura;
+
+        if ($key !== '' && $key === $this->totaisCacheKey && $this->totaisCachePayload !== []) {
+            return $this->totaisCachePayload;
+        }
+
+        $totais = ForcaVendasMonitorTotaisAggregator::fromQuery($this->getTableQuery());
+
+        if ($key !== '') {
+            $this->totaisCacheKey = $key;
+            $this->totaisCachePayload = $totais;
+        }
+
+        return $totais;
     }
 
     #[Computed]
@@ -799,6 +878,8 @@ class ListForcaVendasMonitor extends ListRecords
     protected function clearListSelection(): void
     {
         // Trait InteractsWithErpListPage (não usar parent:: — ListRecords não tem o método).
+        // Zera flags E seleção em lote — evita ações sobre IDs fora do filtro atual.
+        $this->selecionados = [];
         $this->highlightedRecordId = null;
         $this->pushSelecaoToDetalhePanel();
     }
@@ -1018,12 +1099,26 @@ class ListForcaVendasMonitor extends ListRecords
     {
         return [
             'mobile' => 'Vendas Mobile',
-            'vi' => 'Vendas Internas',
             'fv' => 'Força de Vendas',
+            'tela' => 'Tela de Vendas',
+            'erp' => 'ERP',
+            'vi' => 'Vendas Internas',
             'meli' => 'Mercado Livre',
             'ifood' => 'Ifood',
             'ecommerce' => 'Ecommerce',
         ];
+    }
+
+    /**
+     * True enquanto há overlay operacional (poll não deve remontar a grade).
+     */
+    public function monitorOperacaoEmAndamento(): bool
+    {
+        return $this->faturarProgressOpen
+            || $this->cancelarProgressOpen
+            || $this->reabrirProgressOpen
+            || $this->nfeLoteProgressOpen
+            || $this->clonarProgressOpen;
     }
 
     /**
@@ -1032,6 +1127,12 @@ class ListForcaVendasMonitor extends ListRecords
      */
     public function pollRefresh(): void
     {
+        if ($this->monitorOperacaoEmAndamento()) {
+            $this->skipRender();
+
+            return;
+        }
+
         $assinatura = $this->lerAssinaturaPedidos();
 
         if ($this->pollAssinatura === '') {
@@ -1042,14 +1143,17 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        if ($assinatura['hash'] === $this->pollAssinatura
+        $mesmaAssinatura = $assinatura['hash'] === $this->pollAssinatura;
+
+        if ($mesmaAssinatura
             && (time() - $this->pollRenderizadoEm) < self::POLL_RENDER_FORCADO_SEGUNDOS) {
             $this->skipRender();
 
             return;
         }
 
-        $this->aplicarAtualizacaoTabela($assinatura);
+        // Mesma assinatura: só atualiza colunas derivadas (NF/PIX) — totais vêm do cache.
+        $this->aplicarAtualizacaoTabela($assinatura, syncDetalhe: ! $mesmaAssinatura);
     }
 
     /**
@@ -1059,6 +1163,8 @@ class ListForcaVendasMonitor extends ListRecords
     {
         parent::resetTable();
 
+        $this->totaisCacheKey = '';
+        $this->totaisCachePayload = [];
         $this->guardarAssinaturaPedidos($this->lerAssinaturaPedidos());
     }
 
@@ -1068,17 +1174,59 @@ class ListForcaVendasMonitor extends ListRecords
      */
     protected function atualizarTabelaMantendoPagina(): void
     {
-        $this->aplicarAtualizacaoTabela($this->lerAssinaturaPedidos());
+        $this->totaisCacheKey = '';
+        $this->totaisCachePayload = [];
+        $this->aplicarAtualizacaoTabela($this->lerAssinaturaPedidos(), syncDetalhe: true);
     }
 
     /**
      * @param  array{hash: string, total: int}  $assinatura
      */
-    private function aplicarAtualizacaoTabela(array $assinatura): void
+    private function aplicarAtualizacaoTabela(array $assinatura, bool $syncDetalhe = false): void
     {
         $this->guardarAssinaturaPedidos($assinatura);
         $this->ajustarPaginaAoTotal($assinatura['total']);
         $this->flushCachedTableRecords();
+        $this->podarSelecaoOrfa();
+
+        if ($syncDetalhe || $this->highlightedRecordId !== null) {
+            $this->pushSelecaoToDetalhePanel();
+        }
+    }
+
+    /**
+     * Remove da seleção IDs que não pertencem mais à empresa ativa.
+     */
+    private function podarSelecaoOrfa(): void
+    {
+        if ($this->selecionados === [] && $this->highlightedRecordId === null) {
+            return;
+        }
+
+        $ids = collect($this->selecionados)
+            ->map(fn ($id): int => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($this->highlightedRecordId) {
+            $ids->push((int) $this->highlightedRecordId);
+        }
+
+        $validos = ForcaVendasMonitorResource::ordersQuery()
+            ->whereIn('id', $ids->unique()->all())
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+
+        $this->selecionados = array_values(array_filter(
+            $this->selecionados,
+            fn (mixed $id): bool => in_array((string) $id, $validos, true),
+        ));
+
+        if ($this->highlightedRecordId !== null
+            && ! in_array((string) $this->highlightedRecordId, $validos, true)) {
+            $this->highlightedRecordId = null;
+        }
     }
 
     /**
@@ -1271,6 +1419,10 @@ class ListForcaVendasMonitor extends ListRecords
      */
     public function faturarSelecionados(): void
     {
+        if ($this->faturarProgressOpen) {
+            return;
+        }
+
         $orders = $this->pedidosSelecionados();
 
         if ($orders->isEmpty()) {
@@ -1320,10 +1472,6 @@ class ListForcaVendasMonitor extends ListRecords
 
                 return;
             }
-        }
-
-        if ($this->faturarProgressOpen) {
-            return;
         }
 
         $this->faturarFila = [];
@@ -2062,98 +2210,38 @@ class ListForcaVendasMonitor extends ListRecords
         ];
     }
 
+    /**
+     * Endpoint legado desativado: gerava ContaReceber/faturamento fora do
+     * ForcaVendasFaturamentoService. Use Faturar na barra de ações.
+     */
     public function recebimento(): void
     {
-        $order = $this->pedidoSelecionadoOuAvisa();
-
-        if (! $order) {
-            return;
-        }
-
-        if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO) {
-            $this->avisa('Pedido cancelado não pode gerar recebimento.', 'warning');
-
-            return;
-        }
-
-        if (! $order->cliente_id) {
-            $this->avisa('Pedido sem cliente para lançar a receber.', 'warning');
-
-            return;
-        }
-
-        $documento = $this->documentoReceber($order);
-
-        $jaExiste = ContaReceber::query()
-            ->where(fn (Builder $q) => $q
-                ->where('documento', $documento)
-                ->orWhere('documento', 'like', $documento . '/%'))
-            ->exists();
-
-        if ($jaExiste) {
-            $this->avisa('Este pedido já possui título a receber.', 'info');
-
-            return;
-        }
-
-        $forma = $this->formaContaReceber($order);
-
-        try {
-            $dias = $this->diasParcelas($order);
-        } catch (\RuntimeException $e) {
-            $this->avisa($e->getMessage(), 'warning');
-
-            return;
-        }
-
-        $parcelas = count($dias);
-        $total = round((float) $order->total, 2);
-        $empresaId = $order->empresa_id ? (int) $order->empresa_id : ErpContext::currentEmpresaId();
-        $planoContaId = EmpresaParametros::planoVendaId($empresaId);
-
-        // Distribui o total entre as parcelas, jogando o resto de centavos na última.
-        $valorBase = floor(($total / $parcelas) * 100) / 100;
-
-        foreach (array_values($dias) as $i => $dia) {
-            $valorParcela = ($i === $parcelas - 1)
-                ? round($total - ($valorBase * ($parcelas - 1)), 2)
-                : $valorBase;
-
-            $payload = [
-                'empresa_id' => $order->empresa_id ? (int) $order->empresa_id : null,
-                'numero' => ContaReceber::nextNumero(),
-                'emissao' => Carbon::today(),
-                'historico' => 'PEDIDO APP FV'
-                    . ($parcelas > 1 ? ' (' . ($i + 1) . '/' . $parcelas . ')' : ''),
-                'documento' => $parcelas > 1 ? $documento . '/' . ($i + 1) : $documento,
-                'cliente_id' => $order->cliente_id,
-                'vencimento' => Carbon::today()->addDays(max(0, $dia)),
-                'valor' => $valorParcela,
-                'forma' => $forma,
-                ...ContaReceberJurosCarteira::atributosParaCreate(
-                    $forma,
-                    $order->empresa_id ? (int) $order->empresa_id : null
-                ),
-            ];
-
-            if ($planoContaId) {
-                $payload['plano_conta_id'] = $planoContaId;
-            }
-
-            ContaReceber::query()->create($payload);
-        }
-
-        $order->update([
-            'situacao' => ForcaVendasOrder::SITUACAO_FATURADO,
-            'faturado_at' => now(),
-        ]);
-
         $this->avisa(
-            $parcelas > 1
-                ? "Faturado: {$parcelas} parcelas a receber geradas."
-                : 'Título a receber gerado.',
-            'success'
+            'Operação desativada. Use o botão Faturar para gerar o financeiro oficialmente.',
+            'warning',
         );
+    }
+
+    /**
+     * @param  list<int>  $vendaIds
+     * @return list<int>
+     */
+    private function vendaIdsPermitidosDoMonitor(array $vendaIds): array
+    {
+        $vendaIds = array_values(array_unique(array_filter(array_map('intval', $vendaIds))));
+
+        if ($vendaIds === []) {
+            return [];
+        }
+
+        return ForcaVendasMonitorResource::ordersQuery()
+            ->whereIn('venda_id', $vendaIds)
+            ->whereNotNull('venda_id')
+            ->pluck('venda_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function emitirNfeDoBotao(): void
@@ -2230,10 +2318,17 @@ class ListForcaVendasMonitor extends ListRecords
      */
     public function iniciarNfeLote(array $vendaIds, ?int $empresaEmitenteId = null): void
     {
+        if ($this->nfeLoteProgressOpen) {
+            return;
+        }
+
         $vendaIds = array_values(array_filter(array_map('intval', $vendaIds)));
 
+        // Não confiar nos IDs recebidos: só vendas ligadas a pedidos da empresa ativa.
+        $vendaIds = $this->vendaIdsPermitidosDoMonitor($vendaIds);
+
         if (count($vendaIds) < 2) {
-            Notification::make()->title('Selecione ao menos duas vendas para o lote.')->warning()->send();
+            Notification::make()->title('Selecione ao menos duas vendas da empresa ativa para o lote.')->warning()->send();
 
             return;
         }
@@ -2332,9 +2427,13 @@ class ListForcaVendasMonitor extends ListRecords
         $vendaId = (int) $this->nfeLoteFilaVendaIds[$this->nfeLoteFilaIndex];
         $this->nfeLoteAtual = $this->nfeLoteFilaIndex + 1;
 
-        $venda = Venda::query()
-            ->with(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.pedido'])
-            ->find($vendaId);
+        // Revalida empresa a cada item (props Livewire públicas podem ser adulteradas).
+        $venda = null;
+        if ($this->vendaIdsPermitidosDoMonitor([$vendaId]) !== []) {
+            $venda = Venda::query()
+                ->with(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.pedido'])
+                ->find($vendaId);
+        }
 
         $davLabel = null;
 
@@ -2344,7 +2443,7 @@ class ListForcaVendasMonitor extends ListRecords
                 'venda_id' => $vendaId,
                 'nfe_id' => null,
                 'numero' => null,
-                'erro' => 'Venda #'.$vendaId.' não encontrada.',
+                'erro' => 'Venda #'.$vendaId.' não encontrada na empresa ativa.',
             ];
         } else {
             $davLabel = (string) ($venda->forcaVendasOrder?->pedido?->numero
@@ -2448,9 +2547,21 @@ class ListForcaVendasMonitor extends ListRecords
             return null;
         }
 
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+
+        if ($empresaId <= 0) {
+            return null;
+        }
+
         $exists = \App\Models\Nfe::query()
             ->whereKey($nfeId)
             ->where('status', \App\Models\Nfe::STATUS_ABERTA)
+            ->where(function ($q) use ($empresaId): void {
+                $q->where('empresa_id', $empresaId)
+                    ->orWhereIn('venda_id', ForcaVendasMonitorResource::ordersQuery()
+                        ->whereNotNull('venda_id')
+                        ->select('venda_id'));
+            })
             ->exists();
 
         return $exists ? $nfeId : null;

@@ -59,9 +59,13 @@ final class MonitorPedidosReport
             return [];
         }
 
+        if ($empresaId === null || $empresaId <= 0) {
+            return [];
+        }
+
         $orders = ForcaVendasOrder::query()
             ->whereIn('id', $orderIds)
-            ->when($empresaId !== null && $empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->where('empresa_id', $empresaId)
             ->with([
                 'cliente',
                 'vendedor',
@@ -136,9 +140,13 @@ final class MonitorPedidosReport
             return [];
         }
 
+        if ($empresaId === null || $empresaId <= 0) {
+            return [];
+        }
+
         $vendas = Venda::query()
             ->whereIn('id', $vendaIds)
-            ->when($empresaId !== null && $empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->where('empresa_id', $empresaId)
             ->with([
                 'cliente',
                 'vendedor',
@@ -149,7 +157,7 @@ final class MonitorPedidosReport
 
         $ordersByVenda = ForcaVendasOrder::query()
             ->whereIn('venda_id', $vendaIds)
-            ->when($empresaId !== null && $empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->where('empresa_id', $empresaId)
             ->with('pedido:id,observacoes')
             ->get()
             ->keyBy(static fn (ForcaVendasOrder $order): int => (int) $order->venda_id);
@@ -673,9 +681,13 @@ final class MonitorPedidosReport
             return collect();
         }
 
+        if ($empresaId === null || $empresaId <= 0) {
+            return collect();
+        }
+
         return ForcaVendasOrder::query()
             ->whereIn('id', $orderIds)
-            ->when($empresaId !== null && $empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->where('empresa_id', $empresaId)
             ->where(function ($q): void {
                 $q->where(function ($inner): void {
                     $inner->whereNotNull('pedido_id')->where('pedido_id', '>', 0);

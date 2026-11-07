@@ -60,10 +60,12 @@ class ForcaVendasMonitorResource extends Resource
 
     /**
      * Query para ações/lookups do Monitor (respeita empresa ativa).
+     * Sempre restringe a `tipo=pedido` (orçamentos ficam em outra tela).
      */
     public static function ordersQuery(): Builder
     {
-        return self::constrainEmpresaAtiva(static::getModel()::query());
+        return self::constrainEmpresaAtiva(static::getModel()::query())
+            ->where('tipo', 'pedido');
     }
 
     /**
