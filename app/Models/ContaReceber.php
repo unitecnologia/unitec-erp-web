@@ -86,12 +86,17 @@ class ContaReceber extends Model
 
     public static function nextNumero(): string
     {
-        $max = static::query()
-            ->pluck('numero')
-            ->map(fn (string $numero): int => (int) preg_replace('/\D/', '', $numero))
-            ->max();
+        return app(\App\Support\Erp\ContaReceberNumeroService::class)->proximo();
+    }
 
-        return str_pad((string) (($max ?? 0) + 1), 6, '0', STR_PAD_LEFT);
+    /**
+     * Reserva N números consecutivos (1 lock) para geração de parcelas.
+     *
+     * @return list<string>
+     */
+    public static function nextNumeros(int $quantidade): array
+    {
+        return app(\App\Support\Erp\ContaReceberNumeroService::class)->reservar($quantidade);
     }
 
     public static function calcularSaldo(float $valor, float $desconto, float $juros, float $valorRecebido, float $multa = 0): float

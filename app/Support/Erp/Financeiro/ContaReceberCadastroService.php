@@ -84,6 +84,7 @@ class ContaReceberCadastroService
             $planoContaId,
         ): array {
             $criadas = [];
+            $numeros = ContaReceber::nextNumeros($parcelas);
 
             for ($i = 0; $i < $parcelas; $i++) {
                 $documento = $documentoBase;
@@ -95,7 +96,7 @@ class ContaReceberCadastroService
 
                 $criadas[] = ContaReceber::query()->create([
                     'empresa_id' => ErpContext::currentEmpresaId(),
-                    'numero' => ContaReceber::nextNumero(),
+                    'numero' => $numeros[$i],
                     'emissao' => $emissao->toDateString(),
                     'historico' => $historico !== '' ? $historico : null,
                     'documento' => $documento !== '' ? $documento : null,

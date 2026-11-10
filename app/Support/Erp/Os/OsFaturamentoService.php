@@ -388,6 +388,7 @@ final class OsFaturamentoService
         $label = mb_strtoupper(trim((string) $forma->descricao), 'UTF-8');
         $emissao = Carbon::parse($hoje)->startOfDay();
         $criadas = [];
+        $numeros = ContaReceber::nextNumeros($n);
 
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
@@ -410,7 +411,7 @@ final class OsFaturamentoService
 
             $payload = [
                 'empresa_id' => $empresaId,
-                'numero' => ContaReceber::nextNumero(),
+                'numero' => $numeros[$i],
                 'emissao' => $hoje,
                 'historico' => $historico,
                 'documento' => $n > 1 ? $documentoBase.'-'.($i + 1) : $documentoBase,

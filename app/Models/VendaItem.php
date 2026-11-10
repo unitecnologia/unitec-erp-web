@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Schema;
 
 class VendaItem extends Model
 {
@@ -22,7 +22,7 @@ class VendaItem extends Model
     protected static function booted(): void
     {
         static::creating(static function (VendaItem $item): void {
-            if (! Schema::hasColumn('venda_itens', 'comissao_pct')) {
+            if (! ErpSchema::hasColumn('venda_itens', 'comissao_pct')) {
                 return;
             }
 
@@ -37,17 +37,19 @@ class VendaItem extends Model
 
     /**
      * % vigente do produto no momento da venda (0 se não paga comissão adicional).
+     *
+     * @param  Product|null  $product  Produto já carregado (evita N+1 no faturamento).
      */
-    public static function snapshotComissaoPct(int $productId): float
+    public static function snapshotComissaoPct(int $productId, ?Product $product = null): float
     {
         if ($productId <= 0
-            || ! Schema::hasColumn('products', 'comissao_pct')
-            || ! Schema::hasColumn('products', 'paga_comissao')
+            || ! ErpSchema::hasColumn('products', 'comissao_pct')
+            || ! ErpSchema::hasColumn('products', 'paga_comissao')
         ) {
             return 0.0;
         }
 
-        $product = Product::query()
+        $product ??= Product::query()
             ->whereKey($productId)
             ->first(['paga_comissao', 'comissao_pct']);
 

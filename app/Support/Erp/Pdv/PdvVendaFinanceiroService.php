@@ -150,6 +150,8 @@ final class PdvVendaFinanceiroService
         $vinculo = $this->temVinculoPdvVenda() ? ['pdv_venda_id' => $pdvVendaId] : [];
         $planoContaId = EmpresaParametros::planoVendaId($empresaId);
 
+        $numeros = ContaReceber::nextNumeros($n);
+
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
                 ? round($total - $parcelaBase * ($n - 1), 2)
@@ -182,7 +184,7 @@ final class PdvVendaFinanceiroService
 
             $payload = [
                 'empresa_id' => $empresaId,
-                'numero' => ContaReceber::nextNumero(),
+                'numero' => $numeros[$i],
                 'emissao' => $hoje,
                 'historico' => mb_substr($historico, 0, 500),
                 'documento' => $n > 1 ? $documentoBase.'/'.($i + 1) : $documentoBase,

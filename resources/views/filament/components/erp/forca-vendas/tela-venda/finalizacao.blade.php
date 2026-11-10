@@ -62,9 +62,22 @@
     "
     x-on:erp-fv-focus-finalizar-parcelas.window="
         $nextTick(() => {
-            const el = document.getElementById('erp-fv-parcelas-qtd');
-            el?.focus();
-            el?.select?.();
+            // skipRender não remonta HTML: Alpine x-show + sync local dos inputs.
+            const overlay = document.querySelector('.erp-fv-fin .erp-pdv-parcelas-overlay');
+            if (overlay && $wire.fvTabelaPrazoConsulta) {
+                overlay.removeAttribute('x-cloak');
+                if (window.getComputedStyle(overlay).display === 'none') {
+                    overlay.style.display = 'flex';
+                }
+            }
+            const qtd = document.getElementById('erp-fv-parcelas-qtd');
+            const intervalo = document.getElementById('erp-fv-parcelas-intervalo');
+            const total = document.getElementById('erp-fv-parcelas-total');
+            if (qtd && $wire.fvParcelasQtd != null) qtd.value = String($wire.fvParcelasQtd);
+            if (intervalo && $wire.fvParcelasIntervalo != null) intervalo.value = String($wire.fvParcelasIntervalo);
+            if (total && $wire.fvParcelasModalTotal != null) total.value = String($wire.fvParcelasModalTotal);
+            qtd?.focus();
+            qtd?.select?.();
         })
     "
     x-on:erp-fv-focus-finalizar-tabelas-predefinidas.window="

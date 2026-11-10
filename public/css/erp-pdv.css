@@ -936,6 +936,11 @@
     background: rgb(15 23 42 / 42%);
 }
 
+/* Alpine x-cloak: esconde overlay/parcelas até o x-show aplicar (evita flash). */
+.erp-fv-fin [x-cloak] {
+    display: none !important;
+}
+
 .erp-pdv-canhoto {
     width: min(52rem, 100%);
     max-height: min(94%, 38rem);

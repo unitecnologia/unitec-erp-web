@@ -36,6 +36,17 @@ trait ManagesForcaVendasTelaVendaParcelas
 
     public ?int $fvSelectedTabelaPredefinidaIndex = null;
 
+    /** Espelho UI do modal (Alpine lê sem remorph da Tela de Venda). */
+    public string $fvParcelasModalTotal = '0,00';
+
+    public string $fvParcelasModalTotalParcelas = '';
+
+    public bool $fvParcelasUiTravado = false;
+
+    public bool $fvParcelasPodeTabela = false;
+
+    public bool $fvParcelasShowCheque = false;
+
     public function getFvTabelaPrazoEmConsultaProperty(): bool
     {
         return $this->fvTabelaPrazoConsulta;
@@ -143,6 +154,23 @@ trait ManagesForcaVendasTelaVendaParcelas
         $this->fvTabelasPrazoListaAberta = false;
         $this->fvTabelasPrazoPredefinidas = [];
         $this->fvSelectedTabelaPredefinidaIndex = null;
+        $this->fvParcelasModalTotal = '0,00';
+        $this->fvParcelasModalTotalParcelas = '';
+        $this->fvParcelasUiTravado = false;
+        $this->fvParcelasPodeTabela = false;
+        $this->fvParcelasShowCheque = false;
+    }
+
+    /**
+     * Atualiza flags/totais lidos pelo Alpine do modal (funcionam com skipRender).
+     */
+    protected function syncFvParcelasModalUi(): void
+    {
+        $this->fvParcelasModalTotal = ErpMoney::formatBr($this->fvCrediarioTotalValor);
+        $this->fvParcelasModalTotalParcelas = $this->fvParcelasTotalLabel;
+        $this->fvParcelasUiTravado = $this->fvPrazoCarneTravado();
+        $this->fvParcelasPodeTabela = $this->fvPodeEscolherTabelaPrazo();
+        $this->fvParcelasShowCheque = $this->fvParcelasEhCheque;
     }
 
     /** Ao ir para meio à vista: remove prazo/canhoto da UI (não afeta histórico financeiro). */
@@ -193,6 +221,9 @@ trait ManagesForcaVendasTelaVendaParcelas
         $this->fvSelectedTabelaPredefinidaIndex = null;
         $this->fvTabelaPrazoConsulta = true;
         $this->fvSelectedParcelaIndex = $this->fvParcelasRows !== [] ? 0 : null;
+        $this->syncFvParcelasModalUi();
+        // skipRender: modal já está no DOM (x-show + x-for); evita remorph da grade.
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-finalizar-parcelas');
 
         return false;
@@ -352,6 +383,8 @@ trait ManagesForcaVendasTelaVendaParcelas
     public function gerarFvParcelasCrediario(): void
     {
         if ($this->fvPrazoCarneTravado()) {
+            $this->skipRender();
+
             return;
         }
 
@@ -371,6 +404,8 @@ trait ManagesForcaVendasTelaVendaParcelas
 
         $this->gerarFvParcelasCrediarioPorDias($dias);
         $this->fvSelectedParcelaIndex = 0;
+        $this->syncFvParcelasModalUi();
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-finalizar-parcelas');
     }
 
@@ -394,6 +429,7 @@ trait ManagesForcaVendasTelaVendaParcelas
 
         $this->fvTabelasPrazoListaAberta = true;
         $this->fvSelectedTabelaPredefinidaIndex = 0;
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-finalizar-tabelas-predefinidas');
     }
 
@@ -401,6 +437,7 @@ trait ManagesForcaVendasTelaVendaParcelas
     {
         $this->fvTabelasPrazoListaAberta = false;
         $this->fvSelectedTabelaPredefinidaIndex = null;
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-finalizar-parcelas');
     }
 
@@ -428,6 +465,7 @@ trait ManagesForcaVendasTelaVendaParcelas
     {
         if (isset($this->fvTabelasPrazoPredefinidas[$index])) {
             $this->fvSelectedTabelaPredefinidaIndex = $index;
+            $this->skipRender();
         }
     }
 
@@ -440,6 +478,7 @@ trait ManagesForcaVendasTelaVendaParcelas
         $count = count($this->fvTabelasPrazoPredefinidas);
         $index = ($this->fvSelectedTabelaPredefinidaIndex ?? 0) + $delta;
         $this->fvSelectedTabelaPredefinidaIndex = max(0, min($count - 1, $index));
+        $this->skipRender();
     }
 
     public function aplicarFvTabelaPrazoPredefinida(): void
@@ -472,6 +511,8 @@ trait ManagesForcaVendasTelaVendaParcelas
         $this->fvSelectedParcelaIndex = 0;
         $this->fvTabelasPrazoListaAberta = false;
         $this->fvSelectedTabelaPredefinidaIndex = null;
+        $this->syncFvParcelasModalUi();
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-finalizar-parcelas');
     }
 
@@ -518,6 +559,7 @@ trait ManagesForcaVendasTelaVendaParcelas
     {
         if (isset($this->fvParcelasRows[$index])) {
             $this->fvSelectedParcelaIndex = $index;
+            $this->skipRender();
         }
     }
 
@@ -530,11 +572,14 @@ trait ManagesForcaVendasTelaVendaParcelas
         $count = count($this->fvParcelasRows);
         $index = ($this->fvSelectedParcelaIndex ?? 0) + $delta;
         $this->fvSelectedParcelaIndex = max(0, min($count - 1, $index));
+        $this->skipRender();
     }
 
     public function excluirFvParcelaCrediario(): void
     {
         if ($this->fvPrazoCarneTravado()) {
+            $this->skipRender();
+
             return;
         }
 
@@ -542,6 +587,7 @@ trait ManagesForcaVendasTelaVendaParcelas
 
         if ($index === null || ! isset($this->fvParcelasRows[$index])) {
             Notification::make()->title('Selecione a parcela para excluir.')->warning()->send();
+            $this->skipRender();
 
             return;
         }
@@ -558,6 +604,8 @@ trait ManagesForcaVendasTelaVendaParcelas
         $this->fvSelectedParcelaIndex = $rows === []
             ? null
             : min($index, count($rows) - 1);
+        $this->syncFvParcelasModalUi();
+        $this->skipRender();
     }
 
     public function cancelarFvTabelaPrazoConsulta(): void
@@ -575,6 +623,7 @@ trait ManagesForcaVendasTelaVendaParcelas
         $this->fvTabelaPrazoConsulta = false;
         $this->fvTabelasPrazoListaAberta = false;
         $this->fvSelectedParcelaIndex = null;
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-pagamento', index: $this->selectedPagamentoIndex ?? 0);
     }
 
@@ -586,6 +635,7 @@ trait ManagesForcaVendasTelaVendaParcelas
                 ->body('Informe Parcelas/Intervalo e pressione F2 | Gerar.')
                 ->warning()
                 ->send();
+            $this->skipRender();
 
             return;
         }
@@ -598,6 +648,7 @@ trait ManagesForcaVendasTelaVendaParcelas
 
         if ($dias === []) {
             Notification::make()->title('Parcelas inválidas.')->warning()->send();
+            $this->skipRender();
 
             return;
         }
@@ -613,12 +664,14 @@ trait ManagesForcaVendasTelaVendaParcelas
                 ->body('Parcelas: R$ '.ErpMoney::formatBr($soma).' / A prazo: R$ '.ErpMoney::formatBr($total))
                 ->warning()
                 ->send();
+            $this->skipRender();
 
             return;
         }
 
         $this->tabelaPrazoDias = implode(',', $dias);
         $this->fvTabelaPrazoConsulta = false;
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-finalizar-ok');
     }
 }

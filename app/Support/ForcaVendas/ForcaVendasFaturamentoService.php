@@ -136,7 +136,7 @@ class ForcaVendasFaturamentoService
             throw new \RuntimeException('Pedido sem DAV para faturar.');
         }
 
-        $pedido->loadMissing('itens');
+        $pedido->loadMissing(['itens.product']);
 
         $abertura = ErpTimezone::toLocal($order->dataAberturaAt());
         $fechamento = ErpTimezone::toLocal(now());
@@ -352,10 +352,16 @@ class ForcaVendasFaturamentoService
             ? \App\Models\Empresa::query()->find($empresaId)
             : null;
 
+        // 1 query de produtos para N itens (estoque + comissão sem N+1).
+        $pedido->loadMissing(['itens.product']);
+
         foreach ($pedido->itens as $item) {
             if (! $item->product_id) {
                 continue;
             }
+
+            /** @var Product|null $product */
+            $product = $item->product;
 
             $vendaItem = VendaItem::query()->create([
                 'venda_id' => $venda->id,
@@ -363,9 +369,9 @@ class ForcaVendasFaturamentoService
                 'quantidade' => $item->quantidade,
                 'valor_item' => $item->preco_unitario,
                 'total' => $item->total,
+                // Preserva regra do creating(); evita SELECT products por item.
+                'comissao_pct' => VendaItem::snapshotComissaoPct((int) $item->product_id, $product),
             ]);
-
-            $product = Product::query()->find($item->product_id);
 
             if ($product) {
                 $stock->baixaItemVenda(
@@ -1266,6 +1272,9 @@ class ForcaVendasFaturamentoService
             ? $payload['cartao_canhoto']
             : null;
 
+        // 1 lock / N parcelas — evita N× pluck + corrida no UNIQUE(numero).
+        $numeros = ContaReceber::nextNumeros($n);
+
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
                 ? round($valorLancar - $parcelaBase * ($n - 1), 2)
@@ -1294,7 +1303,7 @@ class ForcaVendasFaturamentoService
                 'empresa_id' => $order->empresa_id
                     ? (int) $order->empresa_id
                     : ErpContext::currentEmpresaId(),
-                'numero' => ContaReceber::nextNumero(),
+                'numero' => $numeros[$i],
                 'emissao' => $hoje,
                 'historico' => mb_substr($historico, 0, 500),
                 'documento' => $documento,

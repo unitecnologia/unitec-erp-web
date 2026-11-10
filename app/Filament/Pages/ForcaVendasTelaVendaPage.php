@@ -2242,7 +2242,17 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $this->flushValoresPagamento($valores, $index, skipRender: false);
+        if (! isset($this->meiosPagamento[$index])) {
+            $this->flushValoresPagamento($valores, $index, skipRender: true);
+
+            return;
+        }
+
+        $meioPreview = $this->meiosPagamento[$index];
+        // Cartão ainda depende do remorph do canhoto; carnê abre via Alpine + skipRender.
+        $abreCartao = PdvFinalizarPagamentosHelper::isFormaCartao($meioPreview);
+
+        $this->flushValoresPagamento($valores, $index, skipRender: ! $abreCartao);
 
         if (! isset($this->meiosPagamento[$index])) {
             $this->skipRender();
@@ -2253,7 +2263,7 @@ class ForcaVendasTelaVendaPage extends Page
         $meio = $this->meiosPagamento[$index];
         $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
 
-        if ($valor > 0.009 && PdvFinalizarPagamentosHelper::isFormaCartao($meio)) {
+        if ($valor > 0.009 && $abreCartao) {
             $this->finalizarCartaoCanhotoConfirmado = false;
             $this->finalizarCartaoParcelasRows = [];
             $this->ensureCartaoCanhoto();
@@ -2302,6 +2312,9 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        // Flush sem skipRender: falhas de cliente/CPF/pagamento ainda remorpham e
+        // exibem Notification + estado digitado. Só após validações OK evitamos
+        // remorph da grade durante o faturamento (PC fraco).
         $this->flushValoresPagamento($valores, $selectedIndex, skipRender: false);
 
         if (! $this->sincronizarClienteFinalizacaoBusca($clienteBusca, skipRender: false)) {
@@ -2312,6 +2325,8 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        // Estado já sincronizado; faturar + redirect/notify sem remontar a grade.
+        $this->skipRender();
         $this->faturarPedido();
     }
 
@@ -2402,6 +2417,7 @@ class ForcaVendasTelaVendaPage extends Page
             $this->fvParcelasRows = [];
 
             if (! $this->ensureFvTabelaPrazoCrediario()) {
+                // Modal aberto (ou bloqueio) já com skipRender em abrirFvParcelasCrediario.
                 return;
             }
         } elseif ($valor > 0) {
@@ -2872,17 +2888,36 @@ class ForcaVendasTelaVendaPage extends Page
                 $dadosGravar['condicao_pagamento'] = null;
             }
 
-            $order = $this->gravarPedidoComIdempotencia($svc, $user, $dadosGravar, $existente);
+            $order = $this->gravarPedidoComIdempotencia(
+                $svc,
+                $user,
+                $dadosGravar,
+                $existente,
+                $faturar
+                    ? function (ForcaVendasOrder $orderGravado) use ($existente): void {
+                        if (! $existente) {
+                            $this->pedidoId = (int) $orderGravado->id;
+                        }
 
-            if (! $existente) {
-                $this->pedidoId = (int) $order->id;
-            }
+                        if ($orderGravado->orcamento_id) {
+                            $this->orcamentoOrigemId = (int) $orderGravado->orcamento_id;
+                        }
 
-            if ($order->orcamento_id) {
-                $this->orcamentoOrigemId = (int) $order->orcamento_id;
-            }
+                        // Mantém o Cache::lock durante estoque + CR (anti duplo F10).
+                        $this->finalizarFaturamento($orderGravado);
+                    }
+                    : null,
+            );
 
             if (! $faturar) {
+                if (! $existente) {
+                    $this->pedidoId = (int) $order->id;
+                }
+
+                if ($order->orcamento_id) {
+                    $this->orcamentoOrigemId = (int) $order->orcamento_id;
+                }
+
                 Notification::make()
                     ->title($existente ? 'Pedido atualizado.' : 'Pedido gravado.')
                     ->body('DAV Nº '.$order->pedido?->numero.' — aguardando faturamento no monitor.')
@@ -2894,8 +2929,6 @@ class ForcaVendasTelaVendaPage extends Page
 
                 return;
             }
-
-            $this->finalizarFaturamento($order);
         } catch (\Throwable $e) {
             $this->gravando = false;
             Notification::make()
@@ -4734,25 +4767,37 @@ class ForcaVendasTelaVendaPage extends Page
      * Update (existente) usa lockForUpdate no service; o Cache::lock ainda serializa
      * double-submit da mesma tela.
      *
+     * Quando $aposGravar é informado (F10/faturar), o callback roda AINDA com o lock
+     * — evita segundo request entrar no faturamento enquanto o primeiro baixa estoque/CR.
+     *
      * @param  array<string, mixed>  $data
+     * @param  (callable(ForcaVendasOrder): void)|null  $aposGravar
      */
     private function gravarPedidoComIdempotencia(
         ForcaVendasTelaVendaService $svc,
         \App\Models\User $user,
         array $data,
         ?ForcaVendasOrder $existente,
+        ?callable $aposGravar = null,
     ): ForcaVendasOrder {
         $uuid = trim((string) ($data['uuid'] ?? $this->operacaoUuid));
         $empresaId = (int) ($this->vendaEmpresaId ?? 0);
         $lockKey = 'fv-tv-gravar:'.(int) $user->id.':'.$empresaId.':'.$uuid;
-        $lock = Cache::lock($lockKey, 25);
+        // Faturar (estoque + N parcelas CR) pode passar de 25s em pedidos grandes.
+        $lockTtl = $aposGravar !== null ? 120 : 25;
+        $lock = Cache::lock($lockKey, $lockTtl);
 
         if (! $lock->get()) {
             throw new \RuntimeException('A gravação desta venda já está em andamento. Aguarde.');
         }
 
         try {
-            return $svc->gravarPedido($user, $data, $existente);
+            $order = $svc->gravarPedido($user, $data, $existente);
+            if ($aposGravar !== null) {
+                $aposGravar($order);
+            }
+
+            return $order;
         } finally {
             $lock->release();
         }
@@ -5295,6 +5340,8 @@ class ForcaVendasTelaVendaPage extends Page
             // Preserva tabelaPrazoDias negociado (app/pedido); só regenera a grade.
             $this->fvParcelasRows = [];
             $this->ensureFvTabelaPrazoCrediario();
+
+            return;
         }
     }
 
@@ -5480,9 +5527,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         if ($validarCpf && ($msg = (new PdvNotaClienteService())->validaDocumentoCpfNota($this->cpfNota))) {
             Notification::make()->title($msg)->warning()->send();
-            if ($skipRender) {
-                $this->skipRender();
-            }
+            // Falha: nunca skipRender — o input/CPF precisa refletir no DOM.
 
             return false;
         }
