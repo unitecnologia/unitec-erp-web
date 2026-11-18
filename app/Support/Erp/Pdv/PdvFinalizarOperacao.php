@@ -114,20 +114,25 @@ final class PdvFinalizarOperacao
     }
 
     /**
-     * Pedido: pergunta impressão antes de fechar.
-     * NFC-e Transmitir pergunta depois da autorização (com progress bar).
-     * Com "Perguntar Imprimir" desmarcado no terminal, não pergunta: imprime direto.
+     * Confirmação ANTES de gravar (legado Pedido). Mantido por compatibilidade;
+     * o PDV pergunta depois da venda via solicitaConfirmacaoImpressaoApos().
      */
     public static function solicitaConfirmacaoImpressao(string $operacao, bool $perguntarImprimir = true): bool
     {
-        return $perguntarImprimir && $operacao === self::PEDIDO;
+        return false;
     }
 
+    /**
+     * Após gravar a venda: NFC-e, Pedido e Finalizar.
+     * Com "Perguntar Imprimir" desmarcado no terminal, não pergunta: imprime direto.
+     */
     public static function solicitaConfirmacaoImpressaoApos(string $operacao, bool $perguntarImprimir = true): bool
     {
         return $perguntarImprimir && in_array($operacao, [
+            self::PEDIDO,
             self::NFCE_TRANSMITIR,
             self::NFCE_CONTINGENCIA,
+            self::FINALIZAR,
         ], true);
     }
 

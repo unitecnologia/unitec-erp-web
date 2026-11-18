@@ -1,10 +1,11 @@
 @if ($this->rhFuncionarioModalOpen)
     <div
         class="erp-lookup-modal erp-contador-form-modal erp-rh-funcionario-form-modal"
-        wire:keydown.escape.window="closeRhFuncionarioModal"
+        wire:keydown.escape.window="requestCloseRhFuncionarioModal"
         wire:keydown.f5.window.prevent="saveRhFuncionario"
     >
-        <div class="erp-lookup-modal__backdrop" wire:click="closeRhFuncionarioModal"></div>
+        {{-- Clique fora NÃO fecha: evita perda acidental dos dados. --}}
+        <div class="erp-lookup-modal__backdrop" aria-hidden="true"></div>
 
         <div
             class="erp-lookup-modal__window erp-contador-form-modal__window erp-rh-func-modal"
@@ -13,10 +14,11 @@
             aria-labelledby="erp-rh-funcionario-form-title"
             x-data="{ tab: 'ident' }"
             @erp-rh-func-goto-tab.window="tab = ($event.detail?.tab ?? 'ident')"
+            @erp-rh-func-focus-form.window="$nextTick(() => { const el = $root.querySelector('#erp-rh-func-nome'); el?.focus(); el?.select?.(); })"
         >
             <div class="erp-lookup-modal__titlebar">
                 <span id="erp-rh-funcionario-form-title">Cadastro de Funcionário</span>
-                <button type="button" class="erp-lookup-modal__close" wire:click="closeRhFuncionarioModal" title="Fechar">✕</button>
+                <button type="button" class="erp-lookup-modal__close" wire:click="requestCloseRhFuncionarioModal" title="Fechar">✕</button>
             </div>
 
             <nav class="erp-rh-func-modal__tabs" role="tablist" aria-label="Seções do cadastro">
@@ -44,7 +46,7 @@
                             </label>
                             <label class="erp-rh-func-modal__field erp-rh-func-modal__field--grow">
                                 <span>Nome <em class="erp-rh-func-modal__req">*</em></span>
-                                <input type="text" wire:model="rhFuncionarioForm.nome" class="erp-rh-func-modal__input" data-erp-uppercase maxlength="120" autofocus required>
+                                <input id="erp-rh-func-nome" type="text" wire:model="rhFuncionarioForm.nome" class="erp-rh-func-modal__input" data-erp-uppercase maxlength="120" autofocus required>
                             </label>
                             <label class="erp-rh-func-modal__field erp-rh-func-modal__field--check">
                                 <span>Situação</span>
@@ -350,7 +352,7 @@
                     <span class="erp-pcad-actions__label" wire:loading.remove wire:target="saveRhFuncionario"><kbd>F5</kbd> | Gravar</span>
                     <span class="erp-pcad-actions__label" wire:loading wire:target="saveRhFuncionario">Salvando…</span>
                 </button>
-                <button type="button" wire:click="closeRhFuncionarioModal" class="erp-pcad-actions__btn" data-erp-key="Escape">
+                <button type="button" wire:click="requestCloseRhFuncionarioModal" class="erp-pcad-actions__btn" data-erp-key="Escape">
                     <span class="erp-pcad-actions__icon erp-pcad-actions__icon--exit">✕</span>
                     <span class="erp-pcad-actions__label"><kbd>ESC</kbd> | Sair</span>
                 </button>
@@ -358,5 +360,6 @@
         </div>
     </div>
 
+    @include('filament.components.erp.rh-funcionarios.exit-confirm-modal')
     @include('filament.components.erp.form-scripts')
 @endif

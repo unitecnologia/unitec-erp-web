@@ -90,19 +90,16 @@ final class NfceListRowFormatter
         ];
 
         if ($showSituacao) {
-            $situacao = $record->situacaoSefazLabel()
-                .(filled($record->motivo_rejeicao) ? ' — '.trim((string) $record->motivo_rejeicao) : '');
-            $situacaoShort = mb_strlen($situacao, 'UTF-8') > 90
-                ? mb_substr($situacao, 0, 90, 'UTF-8').'…'
-                : $situacao;
+            $situacao = $record->situacaoSefazResumo();
+            $motivoCompleto = trim((string) ($record->motivo_rejeicao ?? ''));
             $danger = in_array((string) $record->status, [
                 PdvVendaNfce::STATUS_REJEITADA,
                 PdvVendaNfce::STATUS_DENEGADA,
                 PdvVendaNfce::STATUS_DUPLICIDADE,
             ], true);
             $cells['situacao'] = $danger
-                ? '<span class="text-danger-600 dark:text-danger-400" title="'.e(trim((string) ($record->motivo_rejeicao ?? ''))).'">'.e($situacaoShort).'</span>'
-                : '<span title="'.e(trim((string) ($record->motivo_rejeicao ?? ''))).'">'.e($situacaoShort).'</span>';
+                ? '<span class="text-danger-600 dark:text-danger-400" title="'.e($motivoCompleto).'">'.e($situacao).'</span>'
+                : '<span title="'.e($motivoCompleto).'">'.e($situacao).'</span>';
         }
 
         return $cells;

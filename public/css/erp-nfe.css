@@ -525,6 +525,11 @@
     table-layout: fixed;
 }
 
+/* NF-e 55: preserva larguras fixas (chave/protocolo) ao incluir Série — scroll horizontal se precisar. */
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-table {
+    min-width: 92rem;
+}
+
 .erp-nfe-page .fi-ta-header-cell {
     padding: calc(0.28rem - 0.5mm) 0.22rem !important;
     line-height: 1.15 !important;
@@ -794,7 +799,7 @@
     overflow: hidden;
 }
 
-/* ── Larguras de colunas NF-e (flag + número + OS/DAV + datas + … + histórico — não aplicar na NFC-e) ─ */
+/* ── Larguras NF-e: flag + número + série + Ped/OS + datas + … + histórico (não NFC-e) ─ */
 
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(1),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -812,8 +817,19 @@
     max-width: 5rem;
 }
 
+/* Série: coluna nova, estreita — não comprime as demais. */
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(3),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-serie,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-serie {
+    width: 3rem !important;
+    min-width: 3rem !important;
+    max-width: 3.25rem !important;
+    white-space: nowrap;
+}
+
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(4),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(4),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-npedido,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-npedido {
     width: 5rem;
@@ -821,17 +837,17 @@
     white-space: nowrap;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(4),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(4),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(5),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(5) {
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(6),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) {
     width: 5.75rem;
     max-width: 6.25rem;
 }
 
 /* Cliente: única coluna flexível — absorve o espaço livre da grade. */
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(6),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(7),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-cliente\.nome-razao,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao {
     width: auto !important;
@@ -840,9 +856,9 @@
     overflow: hidden;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-col,
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-text,
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-text-item,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-col,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-text,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-text-item,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao .fi-ta-col,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao .fi-ta-text,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao .fi-ta-text-item {
@@ -854,8 +870,8 @@
     white-space: nowrap !important;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(7),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(8),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(8),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-chave,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-chave {
     width: calc(46ch + 1cm) !important;
@@ -877,8 +893,8 @@
     letter-spacing: 0.01em;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(8),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(9),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(9),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-protocolo,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-protocolo {
     width: 17ch !important;
@@ -900,24 +916,24 @@
     font-variant-numeric: tabular-nums;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(9),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(10),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(10),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-finalidade,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-finalidade {
     width: 7.5rem;
     max-width: 8.5rem;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(10),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(10),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(11),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(11),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-status,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-status {
     width: 5.75rem;
     max-width: 6.5rem;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(11),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(11),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(12),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(12),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-total,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-total {
     width: 6.5rem;
@@ -925,8 +941,8 @@
 }
 
 /* Visualizar (olho): largura fixa 38px — sem sobra (table-layout:fixed). */
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(12),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(12),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(13),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(13),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-historico,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-historico {
     width: 38px !important;
@@ -7076,7 +7092,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.55rem 0.75rem;
-    width: fit-content;
+    width: calc(100% - 1.3rem);
     max-width: calc(100% - 1.3rem);
     box-sizing: border-box;
 }
@@ -7084,6 +7100,10 @@
 .erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso {
     flex: 1 1 18rem;
     min-width: 14rem;
+    max-width: min(46rem, 100%);
+    margin-left: auto;
+    max-height: min(6.5rem, 22vh);
+    overflow: auto;
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
@@ -7104,12 +7124,16 @@
 .erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso__motivo {
     font-size: 0.74rem;
     font-weight: 600;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso__ajuda {
     font-size: 0.72rem;
     font-weight: 500;
     color: #a16207;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde,

@@ -2,6 +2,7 @@
     $actionWire = $actionWirePrefix ?? '';
     $nfeBtn = $this->nfeEmitirEstado;
     $nfeAbrirBtn = $this->nfeAbrirEstado;
+    $nfceBtn = $this->nfceEmitirEstado;
     $faturarBtn = $this->faturarEstado;
     $reabrirBtn = $this->reabrirEstado;
     $telaVendaBtn = $this->telaVendaEstado;
@@ -102,14 +103,20 @@
         </span>
         <span class="erp-nfe-actions__label">{{ $nfeAbrirBtn['label'] ?? 'Abrir NF-e' }}</span>
     </button>
-    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
+    <button
+        type="button"
+        wire:click="{{ $actionWire }}emitirNfceDoBotao"
+        class="erp-nfe-actions__btn"
+        @disabled(! ($nfceBtn['enabled'] ?? false) || ($this->nfceImprimirConfirmOpen ?? false) || ($this->nfceTransmitindo ?? false))
+        title="{{ $nfceBtn['title'] ?? 'Emitir NFC-e do pedido faturado' }}"
+    >
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z"/>
                 <path d="M9 8h6M9 12h6"/>
             </svg>
         </span>
-        <span class="erp-nfe-actions__label">Emitir NFC-e</span>
+        <span class="erp-nfe-actions__label">{{ $nfceBtn['label'] ?? 'Emitir NFC-e' }}</span>
     </button>
 
     <button

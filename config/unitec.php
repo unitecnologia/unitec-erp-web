@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.266',
+    'versao' => '6.4.1.275',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -172,6 +172,45 @@ return [
         env('UNITEC_ENTREGAS_AUTO_APPROVE', env('APP_ENV') === 'local' ? 'true' : 'false'),
         FILTER_VALIDATE_BOOL
     ),
+
+    /*
+    | SuperTEF no PDV (débito integrado).
+    | Padrão: desligado para clientes. Em APP_ENV=local (DEV) allow_local libera
+    | somente se o terminal tiver SuperTEF ativo + chave + POS + token SH.
+    | Nunca republicar com enabled=true sem pedido explícito.
+    */
+    'supertef_pdv' => [
+        'enabled' => filter_var(env('UNITEC_SUPERTEF_PDV', false), FILTER_VALIDATE_BOOL),
+        'allow_local' => filter_var(env('UNITEC_SUPERTEF_PDV_ALLOW_LOCAL', true), FILTER_VALIDATE_BOOL),
+        'poll_seconds' => max(4, (int) env('UNITEC_SUPERTEF_PDV_POLL_SECONDS', 4)),
+    ],
+
+    /*
+    | Scope TEF / Conexão Tech (2º provedor eletrônico).
+    | Padrão: desligado. sdk_available=false até documentação + SDK oficiais.
+    | Nunca republicar com enabled=true sem pedido explícito e homologação.
+    */
+    'scope_tef_pdv' => [
+        'enabled' => filter_var(env('UNITEC_SCOPE_TEF_PDV', false), FILTER_VALIDATE_BOOL),
+        'allow_local' => filter_var(env('UNITEC_SCOPE_TEF_PDV_ALLOW_LOCAL', true), FILTER_VALIDATE_BOOL),
+        'sdk_available' => filter_var(env('UNITEC_SCOPE_TEF_SDK_AVAILABLE', false), FILTER_VALIDATE_BOOL),
+        'poll_seconds' => max(4, (int) env('UNITEC_SCOPE_TEF_PDV_POLL_SECONDS', 4)),
+    ],
+
+    /*
+    | Conciliação Bancária — C2 OFX + C3 manual 1:1 + C4B sugestões PIX (serviço).
+    | Candidatos / sugestões só sob demanda. Sem polling. Sem mount.
+    */
+    'conciliacao' => [
+        'ofx_max_bytes' => max(64 * 1024, (int) env('UNITEC_OFX_MAX_BYTES', 8 * 1024 * 1024)),
+        'ofx_batch_size' => max(50, min(500, (int) env('UNITEC_OFX_BATCH_SIZE', 200))),
+        'ofx_extensions' => ['ofx', 'qfx'],
+        'c3_date_window_days' => max(0, min(15, (int) env('UNITEC_C3_DATE_WINDOW_DAYS', 3))),
+        'c3_candidates_per_page' => max(5, min(50, (int) env('UNITEC_C3_CANDIDATES_PER_PAGE', 10))),
+        'c3_candidates_max' => max(10, min(100, (int) env('UNITEC_C3_CANDIDATES_MAX', 50))),
+        'c4b_date_window_days' => max(0, min(15, (int) env('UNITEC_C4B_DATE_WINDOW_DAYS', 3))),
+        'c4b_candidates_max' => max(5, min(50, (int) env('UNITEC_C4B_CANDIDATES_MAX', 20))),
+    ],
 ];
 
 

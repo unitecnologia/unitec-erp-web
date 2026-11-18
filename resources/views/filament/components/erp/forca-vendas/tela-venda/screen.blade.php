@@ -200,7 +200,14 @@
 
             if (canhotoOpen) {
                 if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelFinalizarCartaoCanhoto(); return; }
-                if ($event.key === 'F2') { $event.preventDefault(); $wire.gerarParcelasCartaoCanhoto(); return; }
+                // À vista: sem etapa de parcelas — F2 não gera.
+                if ($event.key === 'F2') {
+                    $event.preventDefault();
+                    if (! $wire.fvCanhotoOcultarParcelas) {
+                        $wire.gerarParcelasCartaoCanhoto();
+                    }
+                    return;
+                }
                 if ($event.key === 'F7') { $event.preventDefault(); $wire.concluirCartaoCanhoto(); return; }
                 return;
             }
@@ -310,8 +317,21 @@
                 return;
             }
         }
-        if (descontoOpen) {
-            if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharModalDescontoItem(); }
+        // Preferir DOM: $wire.descontoModalOpen pode atrasar após abrir/fechar.
+        const descontoModal = document.querySelector('.erp-desconto-item-modal');
+        if (descontoOpen || descontoModal) {
+            if ($event.key === 'Escape') {
+                $event.preventDefault();
+                $event.stopPropagation();
+                $wire.fecharModalDescontoItem();
+                return;
+            }
+            if ($event.key === 'Enter') {
+                $event.preventDefault();
+                $event.stopPropagation();
+                // Único caminho: Alpine do modal (evita Enter duplicado).
+                window.erpDescontoItemModalAplicar?.();
+            }
             return;
         }
         if ($event.key === 'F2') { $event.preventDefault(); $wire.abrirImportarOrcamento(); return; }
@@ -462,7 +482,13 @@
             document.getElementById('fv-tv-produto-sug-' + i)?.scrollIntoView({ block: 'nearest' });
         })
     "
-    x-on:erp-fv-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-fv-desconto-preco'); el?.focus(); el?.select?.(); })"
+    x-on:erp-fv-focus-vendedor.window="$nextTick(() => {
+        const btn = document.getElementById('fv-tv-vendedor-btn');
+        if (!btn) return;
+        btn.focus();
+        btn.click();
+    })"
+    x-on:erp-fv-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-fv-desconto-pct'); el?.removeAttribute('readonly'); el?.focus(); el?.select?.(); })"
     x-on:erp-fv-focus-obs-pedido.window="$nextTick(() => { const el = document.getElementById('erp-fv-obs-pedido'); el?.focus(); })"
     x-on:erp-fv-focus-excluir-item-sim.window="$nextTick(() => document.getElementById('erp-fv-excluir-sim')?.focus())"
     x-on:erp-fv-focus-importar-orcamento.window="$nextTick(() => { const el = document.getElementById('erp-fv-importar-orc-numero'); el?.focus(); el?.select?.(); })"
@@ -485,7 +511,23 @@
         })
     "
 >
-    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen || $this->boletoContaPickOpen || $this->observacaoPedidoModalOpen || $this->observacaoClienteModalOpen || $this->tabPrecoItemModalOpen || $this->fvSairConfirmOpen || $this->fvImprimirPosVendaOpen || filled($this->boletoSucessoDetalhe) ? 'is-dimmed' : '' }}">
+    <div
+        class="erp-nfe erp-fv-tv"
+        x-bind:class="{
+            'is-dimmed': $wire.etapa === 'finalizacao'
+                || !!$wire.fvImprimirPosVendaOpen
+                || !!$wire.descontoModalOpen
+                || !!$wire.excluirItemModalOpen
+                || !!$wire.fvImportarOrcamentoOpen
+                || !!$wire.margemModalOpen
+                || !!$wire.boletoContaPickOpen
+                || !!$wire.observacaoPedidoModalOpen
+                || !!$wire.observacaoClienteModalOpen
+                || !!$wire.tabPrecoItemModalOpen
+                || !!$wire.fvSairConfirmOpen
+                || !!(typeof $wire.boletoSucessoDetalhe === 'string' && $wire.boletoSucessoDetalhe)
+        }"
+    >
         @include('filament.components.erp.forca-vendas.tela-venda.venda')
     </div>
 
@@ -692,6 +734,134 @@
         };
 
         /**
+         * Desconto/acréscimo do F4: % ↔ R$, total, restante e troco no DOM.
+         * Sem Livewire por tecla. O par e o total só vão ao servidor no flush (F10 / Esc / carnê).
+         */
+        window.erpFvAjusteParse = function (raw) {
+            const cleaned = String(raw ?? '').replace(/[^\d.,]/g, '');
+            return window.erpFvParseMoneyBr(cleaned);
+        };
+
+        window.erpFvAjusteEl = function (root, kind) {
+            return root?.querySelector?.('[data-erp-fv-ajuste="' + kind + '"]') ?? null;
+        };
+
+        window.erpFvCollectAjustePayload = function () {
+            const root = document.querySelector('.erp-fv-fin');
+            const read = (kind) => {
+                const el = window.erpFvAjusteEl(root, kind);
+                return el ? String(el.value || '') : '';
+            };
+            if (! root || ! window.erpFvAjusteEl(root, 'desconto-pct')) {
+                return null;
+            }
+            return {
+                desconto_pct: read('desconto-pct'),
+                desconto_valor: read('desconto-valor'),
+                acrescimo_pct: read('acrescimo-pct'),
+                acrescimo_valor: read('acrescimo-valor'),
+            };
+        };
+
+        window.erpFvRecalcAjusteLocal = function (sourceKind, opts) {
+            const root = document.querySelector('.erp-fv-fin');
+            if (! root) return;
+            const baseAttr = root.querySelector('[data-erp-fv-ajuste-base]')?.getAttribute('data-erp-fv-ajuste-base');
+            const base = Number.isFinite(Number(baseAttr)) ? Number(baseAttr) : 0;
+            const pctDesc = window.erpFvAjusteEl(root, 'desconto-pct');
+            const valDesc = window.erpFvAjusteEl(root, 'desconto-valor');
+            const pctAcr = window.erpFvAjusteEl(root, 'acrescimo-pct');
+            const valAcr = window.erpFvAjusteEl(root, 'acrescimo-valor');
+            if (! pctDesc || ! valDesc || ! pctAcr || ! valAcr) return;
+
+            const format = window.erpFvFormatMoneyBr;
+            if (sourceKind === 'desconto-pct') {
+                valDesc.value = format((base * window.erpFvAjusteParse(pctDesc.value)) / 100);
+            } else if (sourceKind === 'desconto-valor') {
+                const desc = window.erpFvAjusteParse(valDesc.value);
+                pctDesc.value = base > 0 ? format((desc / base) * 100) : '0,00';
+            } else if (sourceKind === 'acrescimo-pct') {
+                valAcr.value = format((base * window.erpFvAjusteParse(pctAcr.value)) / 100);
+            } else if (sourceKind === 'acrescimo-valor') {
+                const acr = window.erpFvAjusteParse(valAcr.value);
+                pctAcr.value = base > 0 ? format((acr / base) * 100) : '0,00';
+            }
+
+            const descValor = window.erpFvAjusteParse(valDesc.value);
+            const descPct = window.erpFvAjusteParse(pctDesc.value);
+            const acrValor = window.erpFvAjusteParse(valAcr.value);
+            const acrPct = window.erpFvAjusteParse(pctAcr.value);
+            const descEfetivo = descValor > 0
+                ? Math.min(descValor, Math.max(0, base))
+                : (descPct > 0 ? (base * descPct) / 100 : 0);
+            const acrEfetivo = acrValor > 0
+                ? acrValor
+                : (acrPct > 0 ? (base * acrPct) / 100 : 0);
+            const total = Math.round((base + acrEfetivo - descEfetivo) * 100) / 100;
+
+            root.querySelectorAll('[data-erp-fv-total-pagar]').forEach((el) => {
+                el.textContent = format(total);
+            });
+            const split = root.querySelector('[data-erp-dividir-conta]');
+            if (split) {
+                split.setAttribute('data-erp-dividir-total', total.toFixed(2));
+            }
+
+            if (! opts || opts.rebalance !== false) {
+                window.erpFvRebalancePagamentoAposAjuste?.(root, total);
+            }
+            window.erpFvUpdateFinTotaisUi(root);
+        };
+
+        /** Igual a sincronizarPagamentoAposAjustePedido: só mexe na forma se já houver valor informado. */
+        window.erpFvRebalancePagamentoAposAjuste = function (root, total) {
+            const rows = window.erpFvPayRows(root);
+            if (! rows.length) return;
+            let informado = 0;
+            rows.forEach((_, i) => {
+                informado += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
+            });
+            if (informado <= 0) return;
+
+            let index = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--selected'));
+            if (index < 0) {
+                index = Number.isInteger(window.__erpFvPayNav?.index) ? window.__erpFvPayNav.index : 0;
+            }
+            const row = rows[index];
+            if (! row) return;
+
+            const paint = (i, valorNum) => {
+                const input = document.getElementById('erp-fv-finalizar-valor-' + i);
+                const tr = rows[i];
+                if (! input) return;
+                const texto = window.erpFvFormatMoneyBr(valorNum);
+                if (input.value !== texto) {
+                    input.value = texto;
+                    delete input.dataset.erpMaskSynced;
+                }
+                tr?.classList.toggle('erp-pdv-finalizar__pay-row--filled', valorNum > 0.009);
+            };
+
+            let outros = 0;
+            rows.forEach((_, i) => {
+                if (i === index) return;
+                outros += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
+            });
+            const restanteLinha = Math.max(0, Math.round((total - outros) * 100) / 100);
+
+            if (row.getAttribute('data-fv-a-prazo') === '1') {
+                const totalPositivo = Math.max(0, total);
+                const valorFinal = restanteLinha > 0 ? Math.min(restanteLinha, totalPositivo) : totalPositivo;
+                rows.forEach((_, i) => {
+                    paint(i, i === index ? valorFinal : 0);
+                });
+                return;
+            }
+
+            paint(index, restanteLinha);
+        };
+
+        /**
          * Fonte única da seleção durante navegação por setas.
          * Setas NÃO chamam Livewire — respostas atrasadas não podem mover o destaque.
          */
@@ -889,7 +1059,13 @@
             if (wire && valorFinal > 0.009 && (precisaParcelas || cartao)) {
                 const payload = window.erpFvCollectValoresPayload();
                 try {
-                    Promise.resolve(window.erpFvCall(wire, 'aplicarPagamentoLocalEEspeciais', payload, index)).catch(() => null);
+                    Promise.resolve(window.erpFvCall(
+                        wire,
+                        'aplicarPagamentoLocalEEspeciais',
+                        payload,
+                        index,
+                        window.erpFvCollectAjustePayload?.() || {}
+                    )).catch(() => null);
                 } catch (e) { /* ignore */ }
             }
             return true;
@@ -919,7 +1095,14 @@
             if (especial && wire) {
                 const payload = window.erpFvCollectValoresPayload();
                 try {
-                    Promise.resolve(window.erpFvCall(wire, 'confirmarValorPagamentoLinhaComFlush', payload, idx, raw)).catch(() => null);
+                    Promise.resolve(window.erpFvCall(
+                        wire,
+                        'confirmarValorPagamentoLinhaComFlush',
+                        payload,
+                        idx,
+                        raw,
+                        window.erpFvCollectAjustePayload?.() || {}
+                    )).catch(() => null);
                 } catch (e) { /* ignore */ }
                 return;
             }
@@ -960,17 +1143,52 @@
             window.__erpFvConcluirLock = true;
             window.erpFvSetConcluirBusy(true);
 
+            // Fecha o modal na hora (Celeron): se falhar, remorph/restauração devolve.
+            const finRoot = document.querySelector('.erp-fv-fin');
+            if (finRoot && finRoot.getAttribute('data-erp-fv-fin-closing') !== '1') {
+                finRoot.setAttribute('data-erp-fv-fin-closing', '1');
+                finRoot.style.display = 'none';
+                finRoot.setAttribute('aria-hidden', 'true');
+            }
+
+            const restoreFinIfStillOpen = () => {
+                const leftover = document.querySelector('.erp-fv-fin[data-erp-fv-fin-closing="1"]');
+                if (! leftover || ! leftover.isConnected) return;
+                let etapa = '';
+                try {
+                    const comp = window.erpFvResolveFinComponent(wire);
+                    etapa = comp?.get?.('etapa') || '';
+                } catch (e) { /* ignore */ }
+                if (etapa === 'finalizacao') {
+                    leftover.style.display = '';
+                    leftover.removeAttribute('aria-hidden');
+                    leftover.removeAttribute('data-erp-fv-fin-closing');
+                    window.erpFvSetConcluirBusy(false);
+                }
+            };
+
             return Promise.resolve(
-                window.erpFvCall(wire, 'faturarPedidoComFlush', payload, selectedIndex, clienteBusca, cpfNota, observacoes)
+                window.erpFvCall(
+                    wire,
+                    'faturarPedidoComFlush',
+                    payload,
+                    selectedIndex,
+                    clienteBusca,
+                    cpfNota,
+                    observacoes,
+                    window.erpFvCollectAjustePayload?.() || {}
+                )
             )
                 .then(() => {
                     queueMicrotask(() => {
-                        if (document.querySelector('.erp-fv-fin')) {
+                        restoreFinIfStillOpen();
+                        if (document.querySelector('.erp-fv-fin:not([data-erp-fv-fin-closing="1"])')) {
                             window.erpFvSetConcluirBusy(false);
                         }
                     });
                 })
                 .catch((err) => {
+                    restoreFinIfStillOpen();
                     window.erpFvSetConcluirBusy(false);
                     try { console.warn('[fv-fin] falha ao concluir', err); } catch (e) { /* ignore */ }
                 })
@@ -979,14 +1197,25 @@
                 });
         };
 
+        /** Overlay presente no DOM (x-show) só conta se estiver visível. */
+        window.erpFvIsVisibleEl = function (el) {
+            if (! el || ! el.isConnected) return false;
+            if (el.hasAttribute('x-cloak')) return false;
+            if (el.getAttribute('aria-hidden') === 'true') return false;
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+            return el.getClientRects().length > 0;
+        };
+
         /** Esc/Voltar/X: fecha visual na hora; 1 sync (etapa=venda). */
         window.erpFvFecharFinalizacaoInstantaneo = function (wire) {
             if (window.__erpFvFinClosing) return Promise.resolve();
             const root = document.querySelector('.erp-fv-fin');
             if (! root || root.getAttribute('data-erp-fv-fin-closing') === '1') return Promise.resolve();
 
+            let comp = null;
             try {
-                const comp = window.erpFvResolveFinComponent(wire);
+                comp = window.erpFvResolveFinComponent(wire);
                 if (comp?.get?.('gravando') || (! window.erpFvIsLivewireComponent(wire) && wire?.gravando)) {
                     return Promise.resolve();
                 }
@@ -995,14 +1224,37 @@
             if (document.querySelector('.erp-fv-transporte-modal')) {
                 return Promise.resolve(window.erpFvCall(wire, 'fecharFvTransporteModal')).catch(() => null);
             }
-            if (root.querySelector('.erp-pdv-parcelas-overlay') || document.querySelector('#erp-fv-parcelas-tabelas')) {
-                if (document.querySelector('#erp-fv-parcelas-tabelas')) {
+
+            // Parcelas ficam SEMPRE no DOM (x-show). Nao usar só querySelector —
+            // senão Esc/Voltar chama cancelarFvTabelaPrazoConsulta (no-op) e o F4 nao fecha.
+            const parcelasOverlay = root.querySelector('.erp-pdv-parcelas-overlay');
+            const tabelasPrazo = document.querySelector('#erp-fv-parcelas-tabelas');
+            const parcelasAbertas = (() => {
+                try {
+                    if (comp?.get?.('fvTabelaPrazoConsulta')) return true;
+                } catch (e) { /* ignore */ }
+                try {
+                    if (! window.erpFvIsLivewireComponent(wire) && wire?.fvTabelaPrazoConsulta) return true;
+                } catch (e) { /* ignore */ }
+                return window.erpFvIsVisibleEl(parcelasOverlay);
+            })();
+            if (parcelasAbertas || window.erpFvIsVisibleEl(tabelasPrazo)) {
+                if (window.erpFvIsVisibleEl(tabelasPrazo) || (comp?.get?.('fvTabelasPrazoListaAberta'))) {
                     return Promise.resolve(window.erpFvCall(wire, 'fecharFvTabelasPrazoPredefinidas')).catch(() => null);
                 }
                 return Promise.resolve(window.erpFvCall(wire, 'cancelarFvTabelaPrazoConsulta')).catch(() => null);
             }
-            if (document.querySelector('.erp-pdv-canhoto-overlay')) {
-                // Canhoto aberto: Esc fecha só o canhoto (fluxo TV).
+            // Overlay sempre no DOM (x-show): só fecha se realmente aberto.
+            const canhotoAberto = (() => {
+                try {
+                    if (comp?.get?.('finalizarCartaoCanhotoAberta')) return true;
+                } catch (e) { /* ignore */ }
+                try {
+                    if (! window.erpFvIsLivewireComponent(wire) && wire?.finalizarCartaoCanhotoAberta) return true;
+                } catch (e) { /* ignore */ }
+                return false;
+            })();
+            if (canhotoAberto) {
                 return Promise.resolve(window.erpFvCall(wire, 'cancelFinalizarCartaoCanhoto')).catch(() => null);
             }
 
@@ -1022,7 +1274,15 @@
             window.__erpFvPayNav = { index: 0, focusEpoch: 0, navigating: false, concluirFocused: false };
 
             return Promise.resolve(
-                window.erpFvCall(wire, 'voltarParaVendaComFlush', payload, selectedIndex, cpfNota, observacoes)
+                window.erpFvCall(
+                    wire,
+                    'voltarParaVendaComFlush',
+                    payload,
+                    selectedIndex,
+                    cpfNota,
+                    observacoes,
+                    window.erpFvCollectAjustePayload?.() || {}
+                )
             )
                 .then(() => {
                     const leftover = document.querySelector('.erp-fv-fin[data-erp-fv-fin-closing="1"]');
@@ -1066,6 +1326,48 @@
             window.erpFvApplyPagamentoSelection(next, { focus: true, fromServer: false });
         };
 
+        if (! window.__erpFvAjusteInputBound) {
+            window.__erpFvAjusteInputBound = true;
+
+            const isAjusteInput = (el) => el instanceof HTMLInputElement
+                && !! el.closest?.('.erp-fv-fin__ajuste')
+                && (el.dataset?.erpFvAjuste || el.closest('.erp-fv-fin'));
+
+            const selecionarAjuste = (el) => {
+                if (! isAjusteInput(el)) return;
+                el.removeAttribute('readonly');
+                try {
+                    el.select();
+                } catch (_) {
+                    // ignore
+                }
+            };
+
+            // Clique/foco: valor já selecionado (mesmo padrão do CPF / valor pagamento).
+            document.addEventListener('focusin', (event) => selecionarAjuste(event.target), true);
+            document.addEventListener('mouseup', (event) => {
+                const el = event.target;
+                if (! isAjusteInput(el)) return;
+                event.preventDefault();
+                selecionarAjuste(el);
+            }, true);
+
+            document.addEventListener('input', (event) => {
+                const el = event.target;
+                if (! (el instanceof HTMLInputElement) || ! el.dataset?.erpFvAjuste) return;
+                if (! el.closest('.erp-fv-fin')) return;
+                // Bubble: money-br já formatou o campo antes de recalcular o par.
+                window.erpFvRecalcAjusteLocal?.(el.dataset.erpFvAjuste);
+            });
+
+            document.addEventListener('blur', (event) => {
+                const el = event.target;
+                if (! (el instanceof HTMLInputElement) || ! el.dataset?.erpFvAjuste) return;
+                if (! el.closest('.erp-fv-fin')) return;
+                window.erpFvRecalcAjusteLocal?.(el.dataset.erpFvAjuste);
+            }, false);
+        }
+
         document.addEventListener('input', (event) => {
             const el = event.target;
             if (! (el instanceof HTMLInputElement)) return;
@@ -1076,6 +1378,31 @@
             row?.classList.toggle('erp-pdv-finalizar__pay-row--filled', window.erpFvParseMoneyBr(el.value) > 0.009);
             window.erpFvUpdateFinTotaisUi(root);
         }, true);
+
+        (() => {
+            let pending = false;
+            const schedule = () => {
+                if (pending) return;
+                pending = true;
+                queueMicrotask(() => {
+                    pending = false;
+                    if (document.querySelector('.erp-fv-fin [data-erp-fv-ajuste]')) {
+                        window.erpFvRecalcAjusteLocal?.(null, { rebalance: false });
+                    }
+                });
+            };
+            const bind = () => {
+                if (! window.Livewire || typeof window.Livewire.hook !== 'function') return;
+                if (window.__erpFvAjusteMorphHook) return;
+                window.__erpFvAjusteMorphHook = true;
+                window.Livewire.hook('morph.updated', ({ el }) => {
+                    if (! el?.querySelector?.('[data-erp-fv-total-pagar]') && ! el?.matches?.('[data-erp-fv-total-pagar]')) return;
+                    schedule();
+                });
+            };
+            bind();
+            document.addEventListener('livewire:init', bind);
+        })();
 
         window.erpFvFlushPagamentosToWire = function (wire) {
             if (! wire || typeof wire.flushValoresPagamento !== 'function') {
@@ -1235,6 +1562,8 @@
 
         window.erpFvImprimirPosVendaFocusDefault = () => {
             window.__erpFvImprimirPosVendaBusy = false;
+            window.__erpFvImprimirPosVendaOpening = false;
+            window.__erpFvImprimirPosVendaOpened = false;
             const list = btns();
             if (!list.length) return;
             const nao = list.find((el) => el.dataset.erpFvImprimirBtn === 'nao') || list[list.length - 1];
@@ -1273,6 +1602,49 @@
             const nao = list.find((el) => el.dataset.erpFvImprimirBtn === 'nao') || list[list.length - 1];
             activateOnce(nao);
         };
+
+        /**
+         * Abre o comprovante no mesmo gesto do clique (antes de qualquer round-trip Livewire).
+         * URL já está em $wire.fvImprimirPosVendaUrl desde o pós-F10.
+         * Não abortar por __erpFvImprimirPosVendaBusy: o Enter seta busy e depois dispara click.
+         */
+        window.erpFvImprimirPosVendaAbrirAgora = ($wire, modo) => {
+            if (! $wire || $wire.fvImprimirPosVendaProcessando) {
+                return;
+            }
+            if (window.__erpFvImprimirPosVendaOpening) {
+                return;
+            }
+            window.__erpFvImprimirPosVendaOpening = true;
+            window.__erpFvImprimirPosVendaBusy = true;
+
+            const url = String($wire.fvImprimirPosVendaUrl || '').trim();
+            if (! url) {
+                window.__erpFvImprimirPosVendaOpening = false;
+                $wire.dispensarImprimirPosVenda();
+                return;
+            }
+
+            let win = null;
+            try {
+                win = window.open(url, '_blank');
+            } catch (e) {
+                win = null;
+            }
+
+            if (! win || win.closed) {
+                window.__erpFvImprimirPosVendaOpening = false;
+                if (modo === 'manual' && ! $wire.fvAposConcluirPermanecer) {
+                    window.location.assign(url);
+                    return;
+                }
+                $wire.marcarPopupImpressaoBloqueado();
+                return;
+            }
+
+            window.__erpFvImprimirPosVendaOpened = true;
+            $wire.finalizarAposPerguntaImprimir();
+        };
     })();
 </script>
 @php
@@ -1282,7 +1654,10 @@
     $fvGuardJsVersion = is_file($fvGuardJsPath) ? (string) filemtime($fvGuardJsPath) : '1';
     $fvEnterJsPath = public_path('js/erp-fv-tela-venda-enter.js');
     $fvEnterJsVersion = is_file($fvEnterJsPath) ? (string) filemtime($fvEnterJsPath) : '1';
+    $fvDescontoJsPath = public_path('js/erp-desconto-item-modal.js');
+    $fvDescontoJsVersion = is_file($fvDescontoJsPath) ? (string) filemtime($fvDescontoJsPath) : '1';
 @endphp
+<script src="{{ asset('js/erp-desconto-item-modal.js') }}?v={{ $fvDescontoJsVersion }}"></script>
 <script src="{{ asset('js/erp-fv-tela-venda-guard.js') }}?v={{ $fvGuardJsVersion }}" defer></script>
 <script src="{{ asset('js/erp-fv-tela-venda-enter.js') }}?v={{ $fvEnterJsVersion }}" defer></script>
 <script src="{{ asset('js/erp-fv-tela-venda-lookup.js') }}?v={{ $fvLookupJsVersion }}" defer></script>

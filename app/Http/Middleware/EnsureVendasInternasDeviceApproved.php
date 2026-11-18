@@ -51,6 +51,7 @@ class EnsureVendasInternasDeviceApproved
         }
 
         $device->forceFill(['last_seen_at' => now()])->save();
+        $request->attributes->set('vi_device', $device);
 
         return $next($request);
     }

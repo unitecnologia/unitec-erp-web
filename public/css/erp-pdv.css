@@ -1086,6 +1086,19 @@
     color: #475569;
 }
 
+.erp-pdv-supertef-pulse {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: 2px solid #94a3b8;
+    border-top-color: #0f2744;
+    animation: erp-pdv-supertef-spin 0.8s linear infinite;
+}
+
+@keyframes erp-pdv-supertef-spin {
+    to { transform: rotate(360deg); }
+}
+
 .erp-pdv-pix-qr__erro {
     margin: 0;
     padding: 0.55rem 0.7rem;
@@ -2247,7 +2260,7 @@
 .erp-pdv-finalizar__confirm {
     position: absolute;
     inset: 0;
-    z-index: 6;
+    z-index: 300;
     display: grid;
     place-items: center;
     background: rgba(0, 0, 0, 0.2);
@@ -4011,6 +4024,25 @@
     width: 100%;
 }
 
+.erp-pdv-modal__grid tbody tr.erp-pdv__grid-row:not(.erp-pdv__grid-empty) {
+    cursor: pointer;
+}
+
+.erp-pdv-modal__grid tbody tr.erp-pdv__grid-row--selected td {
+    background: #93c5fd;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-pdv-modal__grid tbody tr.erp-pdv__grid-row:not(.erp-pdv__grid-row--selected):not(.erp-pdv__grid-empty):hover td {
+    background: #dbeafe;
+}
+
+.erp-pdv-reimprimir-nfce-grid .erp-pdv-reimprimir-nfce-grid__status {
+    width: 8.5rem;
+    min-width: 8.5rem;
+    white-space: nowrap;
+}
+
 .erp-pdv-vendedor-list,
 .erp-pdv-serial-list {
     max-height: 12rem;
@@ -4874,6 +4906,37 @@
     color: #16a34a;
 }
 
+.erp-pdv-desconto__dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+    margin: 0.55rem 0 0.15rem;
+}
+
+.erp-pdv-desconto__dual-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+}
+
+.erp-pdv-desconto__dual-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.01em;
+}
+
+.erp-desconto-item-modal .erp-pdv-desconto__valor-input {
+    font-size: 1.25rem;
+}
+
+@media (max-width: 520px) {
+    .erp-pdv-desconto__dual {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* F5 Importar Ã¢â‚¬â€ menu de tipos */
 
 .erp-pdv-modal__window--importar-menu {
@@ -5197,8 +5260,9 @@
     text-align: center;
 }
 
+/* Acima do overlay fiscal (280) e boletos (400–450) — Senão Sim/Não some atrás. */
 .erp-pdv-imprimir-pos-venda {
-    z-index: 290;
+    z-index: 500 !important;
 }
 
 /* â”€â”€ F11 Remover itens (estilo ERP desktop, sem â€œflutuarâ€) â”€â”€ */
@@ -8421,4 +8485,23 @@
     .erp-pdv-menu-fiscal-id__rows .is-endereco dd {
         white-space: normal;
     }
+}
+
+
+/* SuperTEF crédito — seletor compacto de parcelas na finalização */
+.erp-pdv-finalizar__supertef-parc {
+  display: inline-flex;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+.erp-pdv-finalizar__parc-select {
+  max-width: 8.5rem;
+  height: 1.45rem;
+  padding: 0 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #0f172a;
 }

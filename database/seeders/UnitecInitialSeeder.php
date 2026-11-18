@@ -6,6 +6,7 @@ use App\Models\BoletoContaApi;
 use App\Models\Empresa;
 use App\Models\ErpProfile;
 use App\Models\OperacaoFiscal;
+use App\Models\PlanoConta;
 use App\Models\User;
 use App\Models\VendasParametro;
 use App\Support\Erp\EmpresaVendaProntaBootstrap;
@@ -19,9 +20,20 @@ use Illuminate\Support\Facades\Storage;
 
 class UnitecInitialSeeder extends Seeder
 {
+    /**
+     * Códigos padrão do plano de contas (mesmos da migration / incluir-planos-contas).
+     *
+     * @var array<string, array{codigo: int, dc: string}>
+     */
+    public const PLANO_CONTA_PARAM_DEFAULTS = [
+        'param_plano_conta_venda_id' => ['codigo' => 101, 'dc' => 'C'],
+        'param_plano_conta_compra_id' => ['codigo' => 201, 'dc' => 'D'],
+        'param_plano_conta_taxa_cartao_id' => ['codigo' => 209, 'dc' => 'D'],
+    ];
+
     public function run(): void
     {
-        // Instalação padrão: fiscal oficial + USUARIO + empresa Unitec (snapshot) pronta.
+        // Dump oficial já traz USUARIO + empresa provisória; este seeder é o fallback.
         $this->call(ProductAuxiliarySeeder::class);
         $this->call(FiscalTabelasPadraoSeeder::class);
 
@@ -54,20 +66,38 @@ class UnitecInitialSeeder extends Seeder
             ],
         );
 
+        $operacionalKeys = [
+            'pdv.access',
+            'pdv.print',
+            'vendas.access',
+            'vendas.print',
+            'pessoas.access',
+            'produtos.access',
+        ];
+
         $caixaProfile = ErpProfile::query()->where('nome', 'CAIXA')->first();
 
         if ($caixaProfile) {
-            ErpAccess::syncProfilePermissions($caixaProfile, [
-                'pdv.access',
-                'pdv.print',
-                'vendas.access',
-                'vendas.print',
-                'pessoas.access',
-                'produtos.access',
-            ]);
+            ErpAccess::syncProfilePermissions($caixaProfile, $operacionalKeys);
         }
 
-        self::seedEmpresaInstalador();
+        // Operador de loja/produção (sem admin): mesmas chaves do CAIXA, perfil distinto.
+        ErpProfile::query()->updateOrCreate(
+            ['nome' => 'OPERADOR'],
+            [
+                'descricao' => 'Operador operacional (PDV/vendas) sem acesso administrativo',
+                'is_system' => true,
+            ],
+        );
+
+        $operadorProfile = ErpProfile::query()->where('nome', 'OPERADOR')->first();
+        if ($operadorProfile) {
+            ErpAccess::syncProfilePermissions($operadorProfile, $operacionalKeys);
+        }
+
+        if (is_file(database_path('data/instalador/empresa_unitec.json'))) {
+            self::seedEmpresaInstalador();
+        }
     }
 
     /**
@@ -81,6 +111,8 @@ class UnitecInitialSeeder extends Seeder
         if ($empresaData === []) {
             throw new \RuntimeException('Snapshot do instalador sem dados de empresa.');
         }
+
+        $empresaData = self::sanitizeEmpresaPlanoContaIds($empresaData);
 
         $logoRelative = self::installEmpresaLogo($empresaData);
         if ($logoRelative !== null) {
@@ -117,6 +149,55 @@ class UnitecInitialSeeder extends Seeder
     public static function seedDemoEmpresa(): Empresa
     {
         return self::seedEmpresaInstalador();
+    }
+
+    /**
+     * Resolve FKs de plano pelos códigos oficiais; null se o plano ainda não existir.
+     * Evita falha de FK quando o fallback seed roda sem planos_contas populado.
+     *
+     * @param  array<string, mixed>  $empresaData
+     * @return array<string, mixed>
+     */
+    public static function sanitizeEmpresaPlanoContaIds(array $empresaData): array
+    {
+        if (! Schema::hasTable('planos_contas')) {
+            foreach (array_keys(self::PLANO_CONTA_PARAM_DEFAULTS) as $column) {
+                unset($empresaData[$column]);
+            }
+
+            return $empresaData;
+        }
+
+        foreach (self::PLANO_CONTA_PARAM_DEFAULTS as $column => $match) {
+            if (! Schema::hasColumn('empresas', $column)) {
+                unset($empresaData[$column]);
+
+                continue;
+            }
+
+            $resolvedId = PlanoConta::query()
+                ->where('codigo', $match['codigo'])
+                ->where('dc', $match['dc'])
+                ->where('ativo', true)
+                ->value('id');
+
+            if ($resolvedId) {
+                $empresaData[$column] = (int) $resolvedId;
+
+                continue;
+            }
+
+            $candidateId = (int) ($empresaData[$column] ?? 0);
+            if ($candidateId > 0 && PlanoConta::query()->whereKey($candidateId)->exists()) {
+                $empresaData[$column] = $candidateId;
+
+                continue;
+            }
+
+            $empresaData[$column] = null;
+        }
+
+        return $empresaData;
     }
 
     /**

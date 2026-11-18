@@ -18,10 +18,9 @@ class EmpresaMonitorVendasDescontoReaisItemModoTest extends TestCase
         $field = EmpresaParametros::monitorVendasDescontoReaisItemModoField();
 
         $this->assertSame('Desconto em R$ nos itens', $field['label']);
-        $this->assertSame(
-            'Define se o desconto informado em R$ no item será aplicado em cada unidade ou uma única vez sobre o total da linha.',
-            $field['hint'],
-        );
+        $this->assertStringContainsString('Por unidade', implode(' ', $field['options']));
+        $this->assertStringContainsString('cada unidade', $field['hint']);
+        $this->assertStringContainsString('total da linha', $field['hint']);
         $this->assertSame('unitario', $field['default']);
         $this->assertSame([
             'unitario' => 'Por unidade',

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\VendasInternas;
 
 use App\Models\VendasInternasDevice;
+use App\Models\VendasInternasDeviceReset;
+use App\Support\VendasInternas\VendasInternasDeviceResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -80,6 +82,64 @@ class DeviceController
             'pairing_code' => $device->pairing_code,
             'device_name' => $device->device_name,
         ]);
+    }
+
+    /**
+     * Reset da base local autorizado pelo retaguarda (consulta na próxima conexão).
+     */
+    public function resetStatus(Request $request, VendasInternasDeviceResetService $resets): JsonResponse
+    {
+        $uuid = $this->deviceUuidDaRequisicao($request);
+        $reset = $resets->pendente($uuid);
+
+        if ($reset === null) {
+            return response()->json(['pending' => false]);
+        }
+
+        return response()->json([
+            'pending' => true,
+            'reset_uuid' => $reset->uuid,
+            'authorized_at' => $reset->authorized_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * O app confirma que apagou a base local. Só o próprio aparelho conclui.
+     */
+    public function resetConcluir(Request $request, string $reset, VendasInternasDeviceResetService $resets): JsonResponse
+    {
+        $request->validate([
+            'device_uuid' => ['nullable', 'string', 'max:100'],
+            'app_version' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $result = $resets->concluir(
+            $reset,
+            $this->deviceUuidDaRequisicao($request),
+            $request->input('app_version'),
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'message' => 'Reset não encontrado ou não pertence a este aparelho.',
+                'code' => 'reset_'.$result['erro'],
+            ], $result['erro'] === 'nao_encontrado' ? 404 : 409);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'status' => VendasInternasDeviceReset::STATUS_CONCLUIDO,
+            'ja_concluido' => $result['ja_concluido'] ?? false,
+        ]);
+    }
+
+    private function deviceUuidDaRequisicao(Request $request): string
+    {
+        $header = trim((string) $request->header('X-VI-Device', ''));
+
+        return $header !== ''
+            ? $header
+            : trim((string) $request->input('device_uuid', $request->query('device_uuid', '')));
     }
 
     private function generateCode(): string

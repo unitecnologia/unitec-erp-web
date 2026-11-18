@@ -9,11 +9,14 @@ use App\Filament\Resources\EmpresaResource;
 use App\Models\Empresa;
 use App\Models\PlanoConta;
 use App\Rules\DocumentoBrasileiroValido;
+use App\Support\Erp\Audit\ErpOperacaoAuditoria;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Fiscal\ImpostoPadraoSugestoes;
+use App\Support\Pix\PixContaBancariaVinculo;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\EmbeddedSchema;
@@ -141,9 +144,39 @@ trait ErpEmpresaFormPage
                 ]);
             }
 
+            $this->assertPixContaBancariaVinculo();
+
             if ($this instanceof EditRecord) {
                 // Commit do banco primeiro; efeitos colaterais (WhatsApp/.env/e-mail) depois do redirect controlado.
+                /** @var Empresa $empresaAntes */
+                $empresaAntes = $this->getRecord();
+                $snapshotAntes = ErpOperacaoAuditoria::somente(
+                    $empresaAntes->getAttributes(),
+                    ErpOperacaoAuditoria::camposEmpresaCriticos(),
+                );
+
                 $this->save(shouldRedirect: false, shouldSendSavedNotification: true);
+
+                $empresaDepois = $empresaAntes->fresh() ?? $empresaAntes;
+                $snapshotDepois = ErpOperacaoAuditoria::somente(
+                    $empresaDepois->getAttributes(),
+                    ErpOperacaoAuditoria::camposEmpresaCriticos(),
+                );
+                $mudancas = ErpOperacaoAuditoria::diffCampos($snapshotAntes, $snapshotDepois);
+
+                if ($mudancas !== []) {
+                    app(ErpOperacaoLogService::class)->registrar(
+                        operacao: 'ALTERAR_EMPRESA_PARAMETROS',
+                        resumo: 'Parâmetros da empresa #'.($empresaDepois->codigo ?: $empresaDepois->id).' alterados ('.count($mudancas).' campo(s)).',
+                        origem: 'empresa',
+                        documentoTipo: 'empresa',
+                        documentoId: (int) $empresaDepois->id,
+                        documentoNumero: (string) ($empresaDepois->codigo ?: $empresaDepois->id),
+                        detalhes: ['campos' => $mudancas],
+                        empresaId: (int) $empresaDepois->id,
+                    );
+                }
+
                 $this->runEmpresaPostSaveSideEffects();
                 $this->redirectErpAdmin($this->getEmpresaListRedirectUrl());
 
@@ -461,7 +494,61 @@ trait ErpEmpresaFormPage
             }
         }
 
+        $contaField = EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID;
+        if (array_key_exists($contaField, $data)) {
+            $contaId = PixContaBancariaVinculo::normalizarId($data[$contaField]);
+            $empresaId = (int) ($record->getKey() ?: 0);
+            $habilitado = filter_var($data['param_pix_habilitar'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+            if ($contaId === null) {
+                $data[$contaField] = null;
+            } elseif ($empresaId > 0 && ! PixContaBancariaVinculo::contaValidaParaEmpresa($empresaId, $contaId)) {
+                if ($habilitado) {
+                    $data[$contaField] = $contaId;
+                } else {
+                    $data[$contaField] = null;
+                }
+            } else {
+                $data[$contaField] = $contaId;
+            }
+        }
+
         return $data;
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function pixContasBancariasOptions(): array
+    {
+        $empresaId = (int) ($this->record?->getKey() ?? 0);
+        $selecionada = PixContaBancariaVinculo::normalizarId($this->data[EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID] ?? null);
+
+        return PixContaBancariaVinculo::opcoesParaEmpresa($empresaId > 0 ? $empresaId : null, $selecionada);
+    }
+
+    protected function assertPixContaBancariaVinculo(): void
+    {
+        $habilitado = filter_var($this->data['param_pix_habilitar'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $contaId = PixContaBancariaVinculo::normalizarId($this->data[EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID] ?? null);
+        $empresaId = (int) ($this->record?->getKey() ?? 0);
+
+        if (! $habilitado) {
+            $this->data[EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID] = $contaId;
+
+            return;
+        }
+
+        $erro = PixContaBancariaVinculo::mensagemSeInvalido($empresaId, $contaId, true);
+        if ($erro === null) {
+            $this->data[EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID] = $contaId;
+
+            return;
+        }
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'data.'.EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID => $erro,
+        ]);
     }
 
     /**
@@ -578,6 +665,11 @@ trait ErpEmpresaFormPage
             } elseif (($meta['type'] ?? '') === 'decimal') {
                 $data[$field] = BrDecimal::parse($data[$field] ?? 0, $meta['decimals'] ?? 2);
             }
+        }
+
+        $contaPixField = EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID;
+        if (array_key_exists($contaPixField, $data)) {
+            $data[$contaPixField] = PixContaBancariaVinculo::normalizarId($data[$contaPixField]);
         }
 
         foreach (EmpresaParametros::planoContaFields() as $field => $meta) {
@@ -749,6 +841,21 @@ trait ErpEmpresaFormPage
         $this->data[EmpresaParametros::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR] = EmpresaParametros::permanecerTelaVendaAposConcluir(
             $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
         );
+        $this->data[EmpresaParametros::COLUMN_MONITOR_PEDIDOS_DUAS_VIAS] = EmpresaParametros::monitorPedidosImprimirDuasVias(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
+        $this->data[EmpresaParametros::COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4] = EmpresaParametros::monitorPedidosImprimirMeiaFolhaA4(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
+        $this->data[EmpresaParametros::COLUMN_PEDIDO_CABECALHO_EMPRESA] = EmpresaParametros::pedidoExibirCabecalhoEmpresa(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
+        $this->data[EmpresaParametros::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO] = EmpresaParametros::forcaVendasAlterarPrecoUnitario(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
+        $this->data[EmpresaParametros::COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA] = EmpresaParametros::solicitarVendedorCadaVenda(
+            $empresaIdAtalho > 0 ? $empresaIdAtalho : null,
+        );
 
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true) {
@@ -808,6 +915,10 @@ trait ErpEmpresaFormPage
             $value = $this->data[$field] ?? null;
             $this->data[$field] = filled($value) ? (string) (int) $value : '';
         }
+
+        $contaPix = EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID;
+        $contaPixId = PixContaBancariaVinculo::normalizarId($this->data[$contaPix] ?? null);
+        $this->data[$contaPix] = $contaPixId ? (string) $contaPixId : '';
 
         foreach (array_keys(EmpresaParametros::nfseFields()) as $field) {
             if (! array_key_exists($field, $this->data) || $this->data[$field] === null) {

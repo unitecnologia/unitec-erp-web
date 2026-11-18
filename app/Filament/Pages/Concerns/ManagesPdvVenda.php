@@ -13,12 +13,14 @@ use App\Models\ClienteCreditoMovimentacao;
 use App\Models\VendasParametro;
 use App\Support\Erp\Balanca\BalancaEtiquetaLayout;
 use App\Support\Erp\ConsumidorFinalGuard;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\Erp\Pdv\PdvMesaSessao;
 use App\Support\Erp\Pdv\PdvNotaClienteService;
 use App\Support\Erp\Pdv\PdvProductSearchRanking;
+use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Pdv\PdvVendaNfceService;
 use App\Support\Erp\Pdv\TerminalResolver;
 use App\Support\Fiscal\NfceTerminalSequencia;
@@ -26,6 +28,7 @@ use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
 trait ManagesPdvVenda
@@ -34,6 +37,7 @@ trait ManagesPdvVenda
     use ManagesPdvFinalizarTabelaPrazo;
     use ManagesPdvFinalizarCartaoCanhoto;
     use ManagesPdvPixQrcode;
+    use ManagesPdvSuperTef;
 
     /** @var array<int, array<string, mixed>> */
     public array $cupomItens = [];
@@ -134,8 +138,10 @@ trait ManagesPdvVenda
         $formas = \App\Models\FormaPagamento::query()
             ->where('ativo', true)
             ->where('aparece_venda', true)
+            ->with(['tabelasPrazo' => static fn ($q) => $q->orderBy('ordem')->select(['id', 'forma_pagamento_id', 'dias', 'ordem'])])
             ->orderBy('codigo')
             ->get([
+                'id',
                 'descricao',
                 'atalho',
                 'tipo',
@@ -144,13 +150,19 @@ trait ManagesPdvVenda
                 'max_parcelas',
                 'prazo_cartao',
                 'intervalo_parcelas',
+                'modo_prazo',
                 'gerar_qrcode_pdv',
+                'usa_super_tef',
+                'usa_pos',
+                'considerar_a_vista',
+                'nfce',
             ]);
 
         if ($formas->isEmpty()) {
             return $this->fallbackFinalizarPagamentos();
         }
 
+        $superTefOk = $this->pdvConfig()->usaSuperTefDebito();
         $usados = [];
         $pagamentos = [];
 
@@ -161,9 +173,15 @@ trait ManagesPdvVenda
                 continue;
             }
 
+            $usaSuperTef = (bool) ($forma->usa_super_tef ?? false);
+            // Cliente / produção: forma SuperTEF some se o gate/terminal não estiver pronto.
+            if ($usaSuperTef && ! $superTefOk) {
+                continue;
+            }
+
             $atalho = $this->resolveAtalhoForma((string) $forma->atalho, $descricao, $usados);
 
-            $pagamentos[] = [
+            $row = [
                 'forma' => $descricao,
                 'atalho' => $atalho,
                 'tipo' => (string) ($forma->tipo ?? ''),
@@ -172,10 +190,32 @@ trait ManagesPdvVenda
                 'max_parcelas' => max(1, (int) ($forma->max_parcelas ?: 1)),
                 'prazo_cartao' => max(0, (int) ($forma->prazo_cartao ?: 0)),
                 'intervalo_parcelas' => max(0, (int) ($forma->intervalo_parcelas ?: 30)),
+                'modo_prazo' => \App\Models\FormaPagamento::normalizeModoPrazo($forma->modo_prazo ?? null),
                 'gerar_qrcode_pdv' => (bool) ($forma->gerar_qrcode_pdv ?? false),
+                'usa_super_tef' => $usaSuperTef,
+                'usa_pos' => (bool) ($forma->usa_pos ?? false),
+                'considerar_a_vista' => (bool) ($forma->considerar_a_vista ?? false),
+                'nfce' => (bool) ($forma->nfce ?? false),
                 'valor' => '0,00',
                 'credito_cliente_linha' => (string) ($forma->tipo_movimento ?? '') === 'credito_cliente',
             ];
+
+            // SuperTEF Crédito: modo/tabelas da forma alimentam o overlay de parcelas (canhoto).
+            if ($usaSuperTef && PdvFinalizarPagamentosHelper::isFormaSuperTefCredito($row)) {
+                $tabelas = [];
+                foreach ($forma->tabelasPrazo ?? [] as $tab) {
+                    $tabelas[] = [
+                        'id' => (int) $tab->id,
+                        'dias' => (string) $tab->dias,
+                        'ordem' => (int) ($tab->ordem ?? 0),
+                    ];
+                }
+                $row['tabelas_prazo'] = $tabelas;
+                $row['supertef_parcelas'] = '1';
+                $row['supertef_condicao'] = 'fin:1';
+            }
+
+            $pagamentos[] = $row;
         }
 
         return $pagamentos !== [] ? $pagamentos : $this->fallbackFinalizarPagamentos();
@@ -306,6 +346,7 @@ trait ManagesPdvVenda
         $this->resetFinalizarTabelaPrazo();
         $this->resetFinalizarCartaoCanhoto();
         $this->resetFinalizarPixQrcode();
+        $this->resetFinalizarSuperTef();
         $this->sincronizarTabelaPrazoComCliente();
     }
 
@@ -580,7 +621,17 @@ trait ManagesPdvVenda
             return;
         }
 
-        if (PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber($pagamentos[$index])) {
+        if (PdvFinalizarPagamentosHelper::isFormaSuperTefCredito($pagamentos[$index])) {
+            $this->finalizarCartaoCanhotoConfirmado = false;
+            $this->finalizarCartaoParcelasRows = [];
+            if (ErpMoney::parseBr($pagamentos[$index]['valor'] ?? '0') > 0) {
+                $this->ensureSuperTefCreditoParcelas();
+            }
+
+            return;
+        }
+
+        if (PdvFinalizarPagamentosHelper::precisaCanhotoPosManual($pagamentos[$index])) {
             $this->finalizarCartaoCanhotoConfirmado = false;
             $this->finalizarCartaoParcelasRows = [];
             $this->ensureCartaoCanhoto();
@@ -607,7 +658,15 @@ trait ManagesPdvVenda
             }
         }
 
-        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber($pagamento)) {
+        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaSuperTefCredito($pagamento)) {
+            $this->finalizarCartaoCanhotoConfirmado = false;
+
+            if (! $this->ensureSuperTefCreditoParcelas()) {
+                return;
+            }
+        }
+
+        if ($valor > 0 && PdvFinalizarPagamentosHelper::precisaCanhotoPosManual($pagamento)) {
             $this->finalizarCartaoCanhotoConfirmado = false;
 
             if (! $this->ensureCartaoCanhoto()) {
@@ -801,6 +860,7 @@ trait ManagesPdvVenda
         $this->pdvPreviewProductName = null;
         session()->forget('erp.pdv.cupom');
         $this->forgetCupomIniciadoEm();
+        $this->esquecerVendedorDaVenda();
         $this->clearImportSession($liberarImportacao);
 
         if ($this->pdvHotPathEnabled ?? false) {
@@ -2148,14 +2208,18 @@ trait ManagesPdvVenda
 
         if (! $productSerialId) {
             foreach ($this->cupomItens as $index => $item) {
+                // Desconto/acréscimo "total da linha" não deve ser reescalado por agrupamento.
+                if (! empty($item['desconto_linha_fixo']) || ! empty($item['acrescimo_linha_fixo'])) {
+                    continue;
+                }
+
                 if ((int) ($item['product_id'] ?? 0) === (int) $product->id
                     && (int) ($item['product_grade_id'] ?? 0) === (int) ($productGradeId ?? 0)
                     && empty($item['product_serial_id'])
                     && round((float) ($item['preco'] ?? 0), 2) === round($preco, 2)
                     && (int) ($item['price_table_id'] ?? 0) === (int) ($priceTableId ?? 0)) {
                     $novaQuantidade = round((float) ($item['quantidade'] ?? 0) + $quantidade, 3);
-                    $this->cupomItens[$index]['quantidade'] = $novaQuantidade;
-                    $this->cupomItens[$index]['total'] = round($novaQuantidade * $preco, 2);
+                    $this->cupomItens[$index] = $this->pdvRecalcularItemPorQuantidade($item, $novaQuantidade);
 
                     return (int) $index;
                 }
@@ -2181,6 +2245,9 @@ trait ManagesPdvVenda
             'tabela_nivel' => $nivel,
             'desconto' => 0.0,
             'acrescimo' => 0.0,
+            'desconto_linha_fixo' => false,
+            'acrescimo_linha_fixo' => false,
+            'ajuste_linha_fixo' => 0.0,
             'total' => round($quantidade * $preco, 2),
         ];
 
@@ -2301,6 +2368,14 @@ trait ManagesPdvVenda
             return;
         }
 
+        // Parâmetro ligado: pede o vendedor ao abrir o fechamento.
+        // Desconto, acréscimo e pagamento ficam na tela seguinte e não reabrem a escolha.
+        if (\App\Support\Erp\EmpresaParametros::solicitarVendedorCadaVenda()) {
+            $this->abrirSelecaoVendedorDaVenda();
+
+            return;
+        }
+
         $this->resetFinalizarForm();
         $this->openPdvModal('finalizar');
         $this->dispatch('erp-pdv-focus-finalizar');
@@ -2365,6 +2440,24 @@ trait ManagesPdvVenda
             return;
         }
 
+        if ($this->finalizarSuperTefConfirmNovaCobranca) {
+            $this->voltarConfirmacaoNovaCobrancaSuperTef();
+
+            return;
+        }
+
+        if ($this->finalizarSuperTefResolverAberta) {
+            $this->voltarResolverPagamentoAnteriorSuperTef();
+
+            return;
+        }
+
+        if ($this->finalizarSuperTefAberta) {
+            $this->cancelFinalizarSuperTef();
+
+            return;
+        }
+
         $this->finalizarConfirmSair = true;
         $this->dispatch('erp-pdv-finalizar-sair-opened');
     }
@@ -2396,30 +2489,84 @@ trait ManagesPdvVenda
 
     public function confirmFinalizarComOperacao(string $operacao): void
     {
-        if (! PdvFinalizarOperacao::operacaoPermitida($this->pdvConfig()->terminal(), $operacao)) {
+        $operacao = $this->resolverOperacaoFinalizarPdv($operacao);
+
+        if (! $this->operacaoFinalizarPermitidaPdv($operacao)) {
             $this->notifyPdvError('Operação não permitida para este terminal.');
 
             return;
         }
 
         $this->finalizarPixPendingOperacao = $operacao;
+        $this->finalizarSuperTefPendingOperacao = $operacao;
 
         if (! $this->validarPreCondicoesFinalizarVenda()) {
             return;
         }
 
         $this->finalizarPixPendingOperacao = null;
+        $this->finalizarSuperTefPendingOperacao = null;
 
-        if (PdvFinalizarOperacao::solicitaConfirmacaoImpressao($operacao, $this->pdvConfig()->perguntarImprimir())) {
-            $this->finalizarOperacaoPendente = $operacao;
-            $this->finalizarConfirmImprimir = true;
-            $this->dispatch('erp-pdv-hide-fiscal-progress');
-            $this->dispatch('erp-pdv-finalizar-imprimir-opened');
+        // Sempre grava a venda primeiro; Sim/Não de impressão abre depois (pdvConfirmImprimirPosVenda).
+        $this->executarFinalizarComOperacao($operacao, true);
+    }
 
-            return;
+    /**
+     * Forma marcada "NFC-e (PDV)" com valor: transmite NFC-e sem perguntar Pedido vs NFC-e.
+     */
+    protected function exigeNfceAutomaticaPdv(): bool
+    {
+        return PdvFinalizarPagamentosHelper::exigeNfceAutomatica($this->finalizarPagamentos);
+    }
+
+    protected function resolverOperacaoFinalizarPdv(string $operacao): string
+    {
+        if ($this->exigeNfceAutomaticaPdv()) {
+            return PdvFinalizarOperacao::NFCE_TRANSMITIR;
         }
 
-        $this->executarFinalizarComOperacao($operacao, true);
+        return $operacao;
+    }
+
+    protected function operacaoFinalizarPermitidaPdv(string $operacao): bool
+    {
+        if (PdvFinalizarOperacao::operacaoPermitida($this->pdvConfig()->terminal(), $operacao)) {
+            return true;
+        }
+
+        // Auto NFC-e pode transmitir mesmo sem botão F4 no terminal.
+        return $operacao === PdvFinalizarOperacao::NFCE_TRANSMITIR
+            && $this->exigeNfceAutomaticaPdv();
+    }
+
+    /**
+     * @param  list<array{key: string, atalho: string, label: string, fiscal: bool, primary: bool}>  $botoes
+     * @return list<array{key: string, atalho: string, label: string, fiscal: bool, primary: bool}>
+     */
+    protected function resolverPdvFinalizarOperacaoBotoes(array $botoes): array
+    {
+        if (! $this->exigeNfceAutomaticaPdv()) {
+            return $botoes;
+        }
+
+        $atalho = EmpresaParametros::atalhoConcluirVenda();
+
+        return [[
+            'key' => PdvFinalizarOperacao::NFCE_TRANSMITIR,
+            'atalho' => $atalho !== '' ? $atalho : 'F4',
+            'label' => 'NFC-e',
+            'fiscal' => true,
+            'primary' => true,
+        ]];
+    }
+
+    protected function resolverPdvFinalizarOperacaoUnica(?string $unica): ?string
+    {
+        if ($this->exigeNfceAutomaticaPdv()) {
+            return PdvFinalizarOperacao::NFCE_TRANSMITIR;
+        }
+
+        return $unica;
     }
 
     public function cancelFinalizarImprimir(): void
@@ -2450,7 +2597,8 @@ trait ManagesPdvVenda
         $this->pdvImprimirPosVendaId = null;
 
         if ($imprimir && $vendaId) {
-            $this->imprimirNfceCupomPosVenda((int) $vendaId, $this->pdvConfig()->viasImpressao());
+            // Pedido ou NFC-e: decide o cupom certo (fiscal vs não fiscal).
+            $this->imprimirCupomPosVenda((int) $vendaId);
         }
 
         $this->dispatch('erp-pdv-focus-search');
@@ -2472,6 +2620,8 @@ trait ManagesPdvVenda
 
     protected function executarFinalizarComOperacao(string $operacao, bool $imprimir): void
     {
+        $operacao = $this->resolverOperacaoFinalizarPdv($operacao);
+
         if (PdvFinalizarOperacao::isFiscal($operacao)) {
             $this->executarFinalizarVendaNfce($operacao, $imprimir);
 
@@ -2484,6 +2634,12 @@ trait ManagesPdvVenda
     protected function validarPreCondicoesFinalizarVenda(): bool
     {
         if (! $this->caixaAberto || ! $this->caixaSessaoId || ! $this->cupomTemItens()) {
+            return false;
+        }
+
+        if (! $this->vendedorDaVendaConfirmado()) {
+            $this->notifyPdvError('Selecione o vendedor da venda.');
+
             return false;
         }
 
@@ -2533,6 +2689,12 @@ trait ManagesPdvVenda
             return false;
         }
 
+        if (! $this->ensureSuperTefCreditoParcelas()) {
+            $this->dispatch('erp-pdv-hide-fiscal-progress');
+
+            return false;
+        }
+
         $restante = $this->finalizarValorRestanteValor();
 
         if ($restante > 0) {
@@ -2544,6 +2706,18 @@ trait ManagesPdvVenda
                     'Valor restante: R$ ' . ErpMoney::formatBr($restante),
                 );
             }
+
+            return false;
+        }
+
+        if (! $this->ensureSuperTefPdv()) {
+            $this->dispatch('erp-pdv-hide-fiscal-progress');
+
+            return false;
+        }
+
+        if ($msg = $this->validaSuperTefFinalizar()) {
+            $this->notifyPdvError($msg);
 
             return false;
         }
@@ -2621,11 +2795,19 @@ trait ManagesPdvVenda
         return null;
     }
 
-    protected function executarFinalizarVendaPedido(bool $imprimir = true): void
+    protected function executarFinalizarVendaPedido(bool $imprimir = true, bool $askPrintAfter = false): void
     {
+        // Se o caller não pediu askPrintAfter, ainda respeita "Perguntar Imprimir" do terminal.
+        if (! $askPrintAfter) {
+            $askPrintAfter = PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(
+                PdvFinalizarOperacao::PEDIDO,
+                $this->pdvConfig()->perguntarImprimir(),
+            );
+        }
+
         $imprimirCallback = null;
 
-        if ($imprimir) {
+        if ($imprimir && ! $askPrintAfter) {
             $imprimirCallback = function (int $vendaId): void {
                 $this->imprimirCupomPosVenda($vendaId);
             };
@@ -2636,6 +2818,7 @@ trait ManagesPdvVenda
             nfceOperacao: null,
             tituloNotificacao: 'Pedido finalizado.',
             imprimir: $imprimirCallback,
+            askPrintAfter: $askPrintAfter,
         );
     }
 
@@ -2679,7 +2862,7 @@ trait ManagesPdvVenda
         $this->concluirVendaFinalizada(
             fiscal: true,
             nfceOperacao: $operacao,
-            tituloNotificacao: 'NFC-e finalizada.',
+            tituloNotificacao: PdvNfceFiscalMensagens::PDV_VENDA_CONCLUIDA,
             imprimir: $imprimirCallback,
             askPrintAfter: $askPrintAfter,
         );
@@ -2785,14 +2968,16 @@ trait ManagesPdvVenda
                 ? (int) $mesaAtual['numero']
                 : null;
 
+            $vendedorGravar = $this->vendedorParaGravarNaVenda();
+
             $venda = PdvVenda::query()->create([
                 'pdv_caixa_sessao_id' => $this->caixaSessaoId,
                 'user_id' => Auth::id(),
                 'orcamento_id' => filled($orcamentoId) ? (int) $orcamentoId : null,
                 'person_id' => $personId,
                 'cpf_nota' => $cpfNota !== '' ? $cpfNota : null,
-                'vendedor_id' => $this->vendedorId,
-                'vendedor_nome' => $this->vendedor,
+                'vendedor_id' => $vendedorGravar['id'],
+                'vendedor_nome' => $vendedorGravar['nome'],
                 'numero' => $numero,
                 'pdv_mesa_numero' => $mesaNumero,
                 'subtotal' => $subtotal,
@@ -2818,6 +3003,18 @@ trait ManagesPdvVenda
                     ? json_encode($composicaoSelecao->toArray(), JSON_UNESCAPED_UNICODE)
                     : null;
 
+                $custoSnap = [];
+                $productIdItem = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+                if ($productIdItem > 0
+                    && \App\Support\Erp\Dre\VendaItemCustoHistorico::tabelaTemCusto('pdv_venda_itens')
+                ) {
+                    $custoSnap = \App\Support\Erp\Dre\VendaItemCustoHistorico::snapshot(
+                        $productIdItem,
+                        (float) ($item['quantidade'] ?? 1),
+                        (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0) ?: null,
+                    );
+                }
+
                 $pdvItem = PdvVendaItem::query()->create([
                     'pdv_venda_id' => $venda->id,
                     'product_id' => $item['product_id'] ?? null,
@@ -2833,6 +3030,7 @@ trait ManagesPdvVenda
                     'desconto' => round((float) ($item['desconto'] ?? 0), 2),
                     'acrescimo' => round((float) ($item['acrescimo'] ?? 0), 2),
                     'total' => $item['total'] ?? 0,
+                    ...$custoSnap,
                 ]);
 
                 if (filled($item['product_id'] ?? null)) {
@@ -2862,7 +3060,7 @@ trait ManagesPdvVenda
                 }
             }
 
-            foreach ($this->finalizarPagamentos as $pagamento) {
+            foreach ($this->finalizarPagamentos as $pagamentoIdx => $pagamento) {
                 $valor = ErpMoney::parseBr($pagamento['valor'] ?? '0');
 
                 if ($valor <= 0) {
@@ -2875,7 +3073,17 @@ trait ManagesPdvVenda
                     'valor' => $valor,
                 ];
 
-                if (PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber($pagamento)) {
+                if (PdvFinalizarPagamentosHelper::isFormaSuperTef($pagamento)) {
+                    $tef = $this->finalizarSuperTefPayload();
+                    if ($tef !== null) {
+                        $payload['cartao_nsu'] = $tef['nsu'];
+                        $payload['cartao_autorizacao'] = $tef['autorizacao'];
+                        $payload['cartao_maquininha'] = $tef['maquininha'];
+                        $payload['cartao_bandeira'] = $tef['bandeira'];
+                        $parcelas = (int) ($tef['parcelas'] ?? 1);
+                        $payload['cartao_parcela'] = max(1, $parcelas).'x';
+                    }
+                } elseif (PdvFinalizarPagamentosHelper::precisaCanhotoPosManual($pagamento)) {
                     $canhoto = $this->finalizarCartaoCanhotoPayload();
                     if ($canhoto !== null) {
                         $qtd = count($canhoto['dias'] ?? []);
@@ -2892,7 +3100,22 @@ trait ManagesPdvVenda
                     }
                 }
 
-                PdvVendaPagamento::query()->create($payload);
+                $pagRow = PdvVendaPagamento::query()->create($payload);
+                if (PdvFinalizarPagamentosHelper::isFormaSuperTef($pagamento)) {
+                    $this->vincularSuperTefAposVenda((int) $venda->id, (int) $pagRow->id);
+                }
+
+                if (
+                    PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv($pagamento)
+                    && (int) ($this->finalizarPixCobrancaId ?? 0) > 0
+                ) {
+                    $this->finalizarPagamentos[$pagamentoIdx]['pdv_venda_pagamento_id'] = (int) $pagRow->id;
+                    app(\App\Support\Pix\PixPdvLivroCaixaService::class)->vincularELancar(
+                        (int) $this->finalizarPixCobrancaId,
+                        $venda,
+                        $pagRow,
+                    );
+                }
             }
 
             $this->consumirCreditoClienteDaVenda($venda, $personId ? (int) $personId : null, (string) $numero);
@@ -2972,85 +3195,76 @@ trait ManagesPdvVenda
                         $onProgress,
                     );
                     $nfceSimulada = $nfce->simulada;
-                    $nfceContingencia = ! $nfce->simulada && $nfce->status === \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA;
+                    // Só "concluída" com autorização SEFAZ (ou simulada). Pendente/rejeitada/contingência = mensagem curta.
+                    $nfceContingencia = ! $nfce->simulada && $nfce->status !== \App\Models\PdvVendaNfce::STATUS_AUTORIZADA;
                 }
             } catch (FiscalEngineException $e) {
                 $this->dispatch('erp-pdv-hide-fiscal-progress');
                 $this->avancarNumeroNfceAposDuplicidade($e);
 
                 $this->encerrarEsperaAtivaAposVenda($vendaId ? (int) $vendaId : null);
-                $this->limparCupom();
-                $this->closePdvModal();
-
-                Notification::make()
-                    ->title($tituloNotificacao.' — venda gravada')
-                    ->body(
-                        'A venda foi finalizada (estoque e financeiro), mas a NFC-e não foi autorizada: '.$e->getMessage()
-                        .' Transmita ou trate na tela NFC-e.'
-                    )
-                    ->warning()
-                    ->persistent()
-                    ->send();
-
-                $this->notifyPdvFiscalError($e);
+                $this->finalizarUiAposNfcePendente(
+                    $vendaId ? (int) $vendaId : null,
+                    $e,
+                    $askPrintAfter,
+                    $imprimir,
+                );
 
                 return;
             } catch (\Throwable $e) {
                 $this->dispatch('erp-pdv-hide-fiscal-progress');
 
                 $this->encerrarEsperaAtivaAposVenda($vendaId ? (int) $vendaId : null);
-                $this->limparCupom();
-                $this->closePdvModal();
-
-                Notification::make()
-                    ->title($tituloNotificacao.' — venda gravada')
-                    ->body(
-                        'A venda foi finalizada (estoque e financeiro), mas a comunicação da NFC-e falhou: '.$e->getMessage()
-                        .' Confira a venda e a tela NFC-e; transmita ou use contingência se necessário.'
-                    )
-                    ->warning()
-                    ->persistent()
-                    ->send();
-
-                $this->dispatch('erp-pdv-focus-search');
-                $this->dispatch('erp-pdv-caixa-opened');
+                $this->finalizarUiAposNfcePendente(
+                    $vendaId ? (int) $vendaId : null,
+                    $e,
+                    $askPrintAfter,
+                    $imprimir,
+                );
 
                 return;
             }
         }
 
-        $totalFormatado = ErpMoney::formatBr($total);
-
         $this->encerrarEsperaAtivaAposVenda($vendaId ? (int) $vendaId : null);
+
+        // Abre Sim/Não ANTES de fechar o finalizar — assim o morph já inclui o modal.
+        if ($askPrintAfter && $vendaId) {
+            $this->pdvImprimirPosVendaId = (int) $vendaId;
+            $this->pdvConfirmImprimirPosVenda = true;
+        }
+
         $this->limparCupom();
         $this->closePdvModal();
 
-        $body = 'Total: R$ ' . $totalFormatado . ' — ' . $formaPagamento;
         if ($fiscal) {
-            $body .= match (true) {
-                $nfceSimulada => ' (cupom simulado, sem transmissão SEFAZ)',
-                $nfceContingencia => ' (NFC-e em contingência — transmita na tela NFC-e quando a SEFAZ normalizar)',
-                default => ' (NFC-e transmitida à SEFAZ)',
-            };
+            $msg = PdvNfceFiscalMensagens::mensagemPdvAposVenda(
+                $nfceContingencia ? 'pendente' : 'autorizada'
+            );
+            $n = Notification::make()->title($msg['titulo']);
+            if ($nfceContingencia) {
+                $n->warning();
+            } else {
+                $n->success();
+            }
+            $n->send();
+        } else {
+            Notification::make()
+                ->title($tituloNotificacao)
+                ->body('Total: R$ '.ErpMoney::formatBr($total).' — '.$formaPagamento)
+                ->success()
+                ->send();
         }
-
-        Notification::make()
-            ->title($tituloNotificacao)
-            ->body($body)
-            ->success()
-            ->send();
 
         $this->dispatch('erp-pdv-hide-fiscal-progress');
-
-        if ($askPrintAfter && $vendaId) {
-            $this->pdvImprimirPosVendaId = (int) $vendaId;
-        }
 
         if ($vendaId && $imprimir !== null) {
             $imprimir((int) $vendaId);
         }
 
         if ($this->offerEmitirBoletosPosDocumento($contasReceberCriadas)) {
+            // Mantém pdvImprimirPosVendaId; afterBoletoPosDocumentoFluxo reabre o Sim/Não.
+            $this->pdvConfirmImprimirPosVenda = false;
             $this->dispatch('erp-pdv-focus-search');
             $this->dispatch('erp-pdv-caixa-opened');
 
@@ -3059,7 +3273,20 @@ trait ManagesPdvVenda
 
         if ($askPrintAfter && $vendaId) {
             $this->pdvConfirmImprimirPosVenda = true;
+            $this->dispatch('erp-pdv-hide-fiscal-progress');
             $this->dispatch('erp-pdv-imprimir-pos-venda-opened');
+            $this->js(<<<'JS'
+                queueMicrotask(() => {
+                    try {
+                        document.querySelectorAll('.erp-pdv-fiscal-progress').forEach((el) => {
+                            el.classList.remove('is-visible');
+                            el.setAttribute('aria-busy', 'false');
+                        });
+                    } catch (e) {}
+                    const nao = document.getElementById('erp-pdv-imprimir-pos-venda-nao');
+                    nao?.focus();
+                });
+            JS);
 
             return;
         }
@@ -3195,6 +3422,73 @@ trait ManagesPdvVenda
         }
 
         $this->syncPdvPreviewFotoForProduct(Product::query()->find($productId));
+    }
+
+    /**
+     * Venda já gravada; NFC-e falhou/pendente. Ainda pergunta impressão (cupom com EMITIDA EM CONTINGÊNCIA).
+     *
+     * @param  (callable(int): void)|null  $imprimir
+     */
+    protected function finalizarUiAposNfcePendente(
+        ?int $pdvVendaId,
+        \Throwable $exception,
+        bool $askPrintAfter,
+        ?callable $imprimir,
+    ): void {
+        if ($askPrintAfter && $pdvVendaId) {
+            $this->pdvImprimirPosVendaId = $pdvVendaId;
+            $this->pdvConfirmImprimirPosVenda = true;
+        }
+
+        $this->limparCupom();
+        $this->closePdvModal();
+        $this->notificarPdvVendaGravadaNfcePendente($pdvVendaId, $exception);
+
+        if ($pdvVendaId && $imprimir !== null) {
+            $imprimir($pdvVendaId);
+        }
+
+        if ($askPrintAfter && $pdvVendaId) {
+            $this->pdvConfirmImprimirPosVenda = true;
+            $this->dispatch('erp-pdv-hide-fiscal-progress');
+            $this->dispatch('erp-pdv-imprimir-pos-venda-opened');
+            $this->js(<<<'JS'
+                queueMicrotask(() => {
+                    try {
+                        document.querySelectorAll('.erp-pdv-fiscal-progress').forEach((el) => {
+                            el.classList.remove('is-visible');
+                            el.setAttribute('aria-busy', 'false');
+                        });
+                    } catch (e) {}
+                    document.getElementById('erp-pdv-imprimir-pos-venda-nao')?.focus();
+                });
+            JS);
+
+            return;
+        }
+
+        $this->dispatch('erp-pdv-focus-search');
+        $this->dispatch('erp-pdv-caixa-opened');
+    }
+
+    /**
+     * Venda já gravada; NFC-e falhou. Operador vê texto curto; detalhe fica no log/gestão NFC-e.
+     */
+    protected function notificarPdvVendaGravadaNfcePendente(?int $pdvVendaId, \Throwable $exception): void
+    {
+        $msg = PdvNfceFiscalMensagens::mensagemPdvAposVenda('pendente');
+
+        Log::warning('PDV: venda gravada com NFC-e pendente', [
+            'pdv_venda_id' => $pdvVendaId,
+            'cStat' => $exception instanceof FiscalEngineException ? $exception->sefazCodigo : null,
+            'sefaz_motivo' => $exception instanceof FiscalEngineException ? $exception->sefazMotivo : null,
+            'message' => $exception->getMessage(),
+        ]);
+
+        Notification::make()
+            ->title($msg['titulo'])
+            ->warning()
+            ->send();
     }
 
     /**

@@ -211,8 +211,9 @@ Publish-UnitecDeviceServiceDist -SourceRoot $ProjectRoot | Out-Null
 
 Write-Host '>> Copiando arquivos para staging' -ForegroundColor White
 
-if (Test-Path $StagingDir) {
-    Remove-Item $StagingDir -Recurse -Force
+if (Test-Path -LiteralPath $StagingDir) {
+    Write-Host '>> Limpando staging antigo (robusto contra paths longos)...' -ForegroundColor Yellow
+    Remove-UnitecDirectoryTree -Path $StagingDir
 }
 
 Copy-UnitecProjectTree -SourceRoot $ProjectRoot -TargetRoot $StagingDir -ExcludeTools
@@ -224,7 +225,7 @@ if (-not (Test-Path -LiteralPath $stagingDeviceExe)) {
 }
 Write-Host '>> Device Service self-contained no staging (porta 9330).' -ForegroundColor Green
 
-foreach ($forbidden in @('apps', 'atualizacao', 'tests', 'docs', 'suporte', 'importar', 'services\unitec-erp-desktop')) {
+foreach ($forbidden in @('apps', 'atualizacao', 'tests', 'docs', 'suporte', 'importar', 'services\unitec-erp-desktop', '_tmp_ssl_audit', '_tmp')) {
     $hit = Join-Path $StagingDir $forbidden
     if (Test-Path -LiteralPath $hit) {
         throw "Staging contaminado com pasta de DEV/apps: $forbidden"
@@ -445,18 +446,93 @@ Write-Host ">> Icone: $IconAsset" -ForegroundColor Green
 Sync-InstallerAssetsToStaging -ProjectRoot $ProjectRoot -StagingDir $StagingDir
 Remove-PublicStorageLink -Root $StagingDir
 
-# Binarios desktop obrigatorios no instalador (sem aviso — falha o build).
+# Binarios desktop obrigatorios no instalador (self-contained — cliente sem .NET).
 $desktopBin = Join-Path $ProjectRoot 'bin'
 $distDesktop = Join-Path $ProjectRoot 'dist\erp-desktop'
 $stagingBin = Join-Path $StagingDir 'bin'
 Ensure-Directory $stagingBin
+
+function Test-UnitecDesktopPublishSelfContained {
+    param([string]$RootDir)
+
+    $checks = @(
+        (Join-Path $RootDir 'Unitec ERP.exe'),
+        (Join-Path $RootDir 'UnitecErpServer.exe'),
+        (Join-Path $RootDir 'Unitec Atualizador.exe'),
+        (Join-Path $RootDir 'coreclr.dll'),
+        (Join-Path $RootDir 'hostfxr.dll'),
+        (Join-Path $RootDir 'Unitec ERP.runtimeconfig.json'),
+        (Join-Path $RootDir 'UnitecErpServer.runtimeconfig.json'),
+        (Join-Path $RootDir 'Unitec Atualizador.runtimeconfig.json')
+    )
+    foreach ($path in $checks) {
+        if (-not (Test-Path -LiteralPath $path)) { return $false }
+    }
+    foreach ($rtName in @(
+            'Unitec ERP.runtimeconfig.json',
+            'UnitecErpServer.runtimeconfig.json',
+            'Unitec Atualizador.runtimeconfig.json'
+        )) {
+        $rt = Get-Content -LiteralPath (Join-Path $RootDir $rtName) -Raw -ErrorAction SilentlyContinue
+        if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-UnitecDesktopDistSelfContained {
+    param([string]$DistRoot)
+
+    foreach ($part in @('server', 'launcher', 'updater')) {
+        $dir = Join-Path $DistRoot $part
+        $rtName = switch ($part) {
+            'server' { 'UnitecErpServer.runtimeconfig.json' }
+            'launcher' { 'Unitec ERP.runtimeconfig.json' }
+            'updater' { 'Unitec Atualizador.runtimeconfig.json' }
+        }
+        $exeName = switch ($part) {
+            'server' { 'UnitecErpServer.exe' }
+            'launcher' { 'Unitec ERP.exe' }
+            'updater' { 'Unitec Atualizador.exe' }
+        }
+        $rtPath = Join-Path $dir $rtName
+        $exePath = Join-Path $dir $exeName
+        $coreClr = Join-Path $dir 'coreclr.dll'
+        if (-not ((Test-Path -LiteralPath $exePath) -and (Test-Path -LiteralPath $rtPath) -and (Test-Path -LiteralPath $coreClr))) {
+            return $false
+        }
+        $rt = Get-Content -LiteralPath $rtPath -Raw -ErrorAction SilentlyContinue
+        if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+            return $false
+        }
+    }
+    return $true
+}
 
 $serverFromDist = Join-Path $distDesktop 'server\UnitecErpServer.exe'
 $commonFromDist = Join-Path $distDesktop 'server\Unitec.ErpCommon.dll'
 $serverFromBin = Join-Path $desktopBin 'UnitecErpServer.exe'
 $commonFromBin = Join-Path $desktopBin 'Unitec.ErpCommon.dll'
 
-if ((Test-Path -LiteralPath $serverFromDist) -and (Test-Path -LiteralPath $commonFromDist)) {
+$distReady = (Test-Path -LiteralPath $serverFromDist) -and `
+    (Test-Path -LiteralPath $commonFromDist) -and `
+    (Test-UnitecDesktopDistSelfContained -DistRoot $distDesktop)
+$binReady = (Test-Path -LiteralPath $serverFromBin) -and `
+    (Test-Path -LiteralPath $commonFromBin) -and `
+    (Test-UnitecDesktopPublishSelfContained -RootDir $desktopBin)
+
+if (-not $distReady -and -not $binReady) {
+    Write-Host '>> Desktop framework-dependent ou ausente — republicando self-contained...' -ForegroundColor Yellow
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'scripts\build-erp-desktop.ps1')
+    if ($LASTEXITCODE -ne 0) {
+        throw 'build-erp-desktop.ps1 falhou (self-contained obrigatorio no instalador).'
+    }
+    $distReady = Test-UnitecDesktopDistSelfContained -DistRoot $distDesktop
+    $binReady = Test-UnitecDesktopPublishSelfContained -RootDir $desktopBin
+}
+
+if ($distReady) {
     Copy-Item (Join-Path $distDesktop 'server\*') $stagingBin -Force -Recurse -ErrorAction SilentlyContinue
     if (Test-Path (Join-Path $distDesktop 'launcher')) {
         Get-ChildItem (Join-Path $distDesktop 'launcher') -File |
@@ -468,28 +544,50 @@ if ((Test-Path -LiteralPath $serverFromDist) -and (Test-Path -LiteralPath $commo
             Where-Object { $_.Extension -notin @('.pdb') } |
             ForEach-Object { Copy-Item $_.FullName $stagingBin -Force }
     }
-    Write-Host '>> Binarios Unitec ERP Desktop copiados de dist\erp-desktop para staging\bin.' -ForegroundColor Green
-} elseif ((Test-Path -LiteralPath $serverFromBin) -and (Test-Path -LiteralPath $commonFromBin)) {
+    Write-Host '>> Binarios Unitec ERP Desktop self-contained copiados de dist\erp-desktop para staging\bin.' -ForegroundColor Green
+} elseif ($binReady) {
     Copy-Item (Join-Path $desktopBin '*') $stagingBin -Force -Recurse
-    Write-Host '>> Binarios Unitec ERP Desktop copiados de bin\ para staging\bin.' -ForegroundColor Green
+    Write-Host '>> Binarios Unitec ERP Desktop self-contained copiados de bin\ para staging\bin.' -ForegroundColor Green
 } else {
     throw @"
-Binarios desktop obrigatorios ausentes para o instalador.
+Binarios desktop self-contained ausentes para o instalador.
 Rode: .\scripts\build-erp-desktop.ps1
-Exigidos no staging:
+Exigidos no staging (self-contained):
   bin\UnitecErpServer.exe
   bin\Unitec.ErpCommon.dll
+  bin\Unitec ERP.exe
+  bin\Unitec Atualizador.exe
+  bin\coreclr.dll / hostfxr.dll (runtime .NET embutido)
 "@
 }
 
 $requiredStagingBins = @(
     (Join-Path $stagingBin 'UnitecErpServer.exe'),
-    (Join-Path $stagingBin 'Unitec.ErpCommon.dll')
+    (Join-Path $stagingBin 'Unitec.ErpCommon.dll'),
+    (Join-Path $stagingBin 'Unitec ERP.exe'),
+    (Join-Path $stagingBin 'Unitec Atualizador.exe'),
+    (Join-Path $stagingBin 'coreclr.dll'),
+    (Join-Path $stagingBin 'hostfxr.dll')
 )
 $missingBins = @($requiredStagingBins | Where-Object { -not (Test-Path -LiteralPath $_) })
 if ($missingBins.Count -gt 0) {
-    throw ('Staging incompleto (binarios desktop): {0}' -f ($missingBins -join ', '))
+    throw ('Staging incompleto (binarios desktop self-contained): {0}' -f ($missingBins -join ', '))
 }
+foreach ($rtName in @(
+        'Unitec ERP.runtimeconfig.json',
+        'UnitecErpServer.runtimeconfig.json',
+        'Unitec Atualizador.runtimeconfig.json'
+    )) {
+    $rtPath = Join-Path $stagingBin $rtName
+    if (-not (Test-Path -LiteralPath $rtPath)) {
+        throw ("Staging incompleto: bin\{0} ausente. Rode scripts\build-erp-desktop.ps1." -f $rtName)
+    }
+    $rt = Get-Content -LiteralPath $rtPath -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+        throw ("Staging incompleto: bin\{0} nao e self-contained. Rode scripts\build-erp-desktop.ps1." -f $rtName)
+    }
+}
+Write-Host '>> Desktop self-contained validado no staging (runtime .NET embutido).' -ForegroundColor Green
 
 # Cliente: um unico atalho (Unitec ERP.exe). Sem .bat na raiz do pacote.
 Get-ChildItem -Path $StagingDir -Filter '*.bat' -File -ErrorAction SilentlyContinue |
@@ -538,7 +636,7 @@ Requisitos em installer\assets\:
 Opcionais: HeidiSQL_*_Setup.exe, unitec-erp.ico (icone da marca)
 
 O staging inclui tools\frankenphp (obrigatorio),
-bin\UnitecErpServer.exe + Unitec.ErpCommon.dll (obrigatorio) e
+bin\Unitec ERP.exe + UnitecErpServer + Atualizador self-contained (runtime .NET embutido) e
 services\unitec-device-service\dist (Device Service self-contained, balanca/impressao).
 MariaDB e PHP sao extraidos na instalacao do cliente.
 "@

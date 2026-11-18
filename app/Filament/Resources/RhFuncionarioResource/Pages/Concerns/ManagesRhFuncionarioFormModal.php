@@ -11,9 +11,11 @@ use App\Models\Terminal;
 use App\Models\User;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\Rh\OperadorFromFuncionarioSync;
+use App\Support\Erp\Rh\RhFuncionarioFormSnapshot;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +30,10 @@ trait ManagesRhFuncionarioFormModal
     public bool $rhFuncionarioModalOpen = false;
 
     public ?int $rhFuncionarioModalRecordId = null;
+
+    public bool $rhFuncionarioExitConfirmOpen = false;
+
+    public ?string $rhFuncionarioFormBaselineHash = null;
 
     /** @var array<string, mixed> */
     public array $rhFuncionarioForm = [];
@@ -140,6 +146,7 @@ trait ManagesRhFuncionarioFormModal
         $this->rhFuncionarioForm = $this->blankRhFuncionarioForm();
         $this->rhFuncionarioForm['codigo'] = RhFuncionario::nextCodigo();
         $this->rhFuncionarioModalOpen = true;
+        $this->captureRhFuncionarioFormBaseline();
     }
 
     public function editRhFuncionario(): void
@@ -148,7 +155,11 @@ trait ManagesRhFuncionarioFormModal
             return;
         }
 
-        $record = RhFuncionario::query()->with(['vendedor.terminais', 'vendedor.usuario'])->find($this->highlightedRecordId);
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 0);
+        $record = RhFuncionario::query()
+            ->with(['vendedor.terminais', 'vendedor.usuario'])
+            ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->find($this->highlightedRecordId);
 
         if (! $record) {
             Notification::make()->title('Funcionário não encontrado.')->warning()->send();
@@ -189,6 +200,7 @@ trait ManagesRhFuncionarioFormModal
             ...$this->operadorFormFieldsFromRecord($record),
         ];
         $this->rhFuncionarioModalOpen = true;
+        $this->captureRhFuncionarioFormBaseline();
     }
 
     /**
@@ -233,6 +245,47 @@ trait ManagesRhFuncionarioFormModal
         ];
     }
 
+    /**
+     * Sair / X / ESC: confirma se houver alterações. Clique fora do modal não chama isto.
+     */
+    public function requestCloseRhFuncionarioModal(): void
+    {
+        if ($this->rhFuncionarioExitConfirmOpen) {
+            $this->dismissRhFuncionarioExitConfirm();
+
+            return;
+        }
+
+        if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR) {
+            Notification::make()
+                ->title('Cadastre o funcionário com a aba Operador para concluir o primeiro acesso.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($this->rhFuncionarioFormHasUnsavedChanges()) {
+            $this->rhFuncionarioExitConfirmOpen = true;
+
+            return;
+        }
+
+        $this->closeRhFuncionarioModal();
+    }
+
+    public function confirmRhFuncionarioExitWithoutSaving(): void
+    {
+        $this->rhFuncionarioExitConfirmOpen = false;
+        $this->closeRhFuncionarioModal();
+    }
+
+    public function dismissRhFuncionarioExitConfirm(): void
+    {
+        $this->rhFuncionarioExitConfirmOpen = false;
+        $this->dispatch('erp-rh-func-focus-form');
+    }
+
     public function closeRhFuncionarioModal(): void
     {
         if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR) {
@@ -244,9 +297,25 @@ trait ManagesRhFuncionarioFormModal
             return;
         }
 
+        $this->rhFuncionarioExitConfirmOpen = false;
+        $this->rhFuncionarioFormBaselineHash = null;
         $this->rhFuncionarioModalOpen = false;
         $this->rhFuncionarioModalRecordId = null;
         $this->rhFuncionarioForm = $this->blankRhFuncionarioForm();
+    }
+
+    protected function captureRhFuncionarioFormBaseline(): void
+    {
+        $this->rhFuncionarioFormBaselineHash = RhFuncionarioFormSnapshot::hash($this->rhFuncionarioForm);
+        $this->rhFuncionarioExitConfirmOpen = false;
+    }
+
+    protected function rhFuncionarioFormHasUnsavedChanges(): bool
+    {
+        return RhFuncionarioFormSnapshot::hasChanges(
+            $this->rhFuncionarioFormBaselineHash,
+            $this->rhFuncionarioForm,
+        );
     }
 
     public function updatedRhFuncionarioForm(mixed $value, string $key): void
@@ -345,6 +414,17 @@ trait ManagesRhFuncionarioFormModal
         $salarioRaw = trim((string) ($this->rhFuncionarioForm['salario'] ?? ''));
         $salario = $salarioRaw !== '' ? BrDecimal::parse($salarioRaw, 2) : null;
 
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 0);
+        if ($empresaId <= 0) {
+            Notification::make()
+                ->title('Empresa não definida.')
+                ->body('Selecione a empresa logada antes de gravar o funcionário.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         $payload = [
             'codigo' => trim((string) $this->rhFuncionarioForm['codigo']),
             'nome' => ErpUppercase::uppercase(trim((string) $this->rhFuncionarioForm['nome'])),
@@ -376,6 +456,9 @@ trait ManagesRhFuncionarioFormModal
         ];
 
         $isCreate = $this->rhFuncionarioModalRecordId === null;
+        if ($isCreate) {
+            $payload['empresa_id'] = $empresaId;
+        }
         $operadorPayload = [
             'eh_operador' => $ehOperador,
             'usuario_id' => filled($this->rhFuncionarioForm['usuario_id'] ?? null)
@@ -401,9 +484,11 @@ trait ManagesRhFuncionarioFormModal
         ];
 
         try {
-            $record = DB::transaction(function () use ($payload, $operadorPayload): RhFuncionario {
+            $record = DB::transaction(function () use ($payload, $operadorPayload, $empresaId): RhFuncionario {
                 if ($this->rhFuncionarioModalRecordId) {
-                    $record = RhFuncionario::query()->find($this->rhFuncionarioModalRecordId);
+                    $record = RhFuncionario::query()
+                        ->where('empresa_id', $empresaId)
+                        ->find($this->rhFuncionarioModalRecordId);
 
                     if (! $record) {
                         throw new InvalidArgumentException('Funcionário não encontrado.');
@@ -455,6 +540,8 @@ trait ManagesRhFuncionarioFormModal
 
         if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR && $ehOperador) {
             ErpOnboarding::complete();
+            $this->rhFuncionarioExitConfirmOpen = false;
+            $this->rhFuncionarioFormBaselineHash = null;
             $this->rhFuncionarioModalOpen = false;
             $this->rhFuncionarioModalRecordId = null;
             $this->rhFuncionarioForm = $this->blankRhFuncionarioForm();
@@ -468,6 +555,9 @@ trait ManagesRhFuncionarioFormModal
         }
 
         // Não chamar highlightRecord() aqui: ele usa skipRender() e a tela não fecha no browser.
+        // Gravar fecha direto — sem aviso de alterações não salvas.
+        $this->rhFuncionarioExitConfirmOpen = false;
+        $this->rhFuncionarioFormBaselineHash = null;
         $this->rhFuncionarioModalOpen = false;
         $this->rhFuncionarioModalRecordId = null;
         $this->rhFuncionarioForm = $this->blankRhFuncionarioForm();

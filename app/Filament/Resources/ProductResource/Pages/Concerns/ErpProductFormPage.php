@@ -45,6 +45,7 @@ trait ErpProductFormPage
     use ManagesProductFormUi;
     use ManagesProductGrade;
     use ManagesProductComposicao;
+    use ManagesProductReceita;
     use ManagesProductImei;
     use ManagesProductTabPreco;
     use ManagesProductUltimosPrecos;

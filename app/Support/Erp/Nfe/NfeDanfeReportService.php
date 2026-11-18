@@ -688,18 +688,10 @@ class NfeDanfeReportService
             $textoIbpt,
         );
 
+        // Chave, protocolo e emitente já constam no cabeçalho do DANFE — não repetir em info. complementares.
         $partes = array_filter([
             $obs !== '' ? $obs : null,
             filled($nfe->obs_fisco) ? trim((string) $nfe->obs_fisco) : null,
-            // Em devolução a origem/chave referenciada já vão em obs_contribuinte.
-            // Não misturar chave/protocolo da própria NF-e como se fossem da origem.
-            (! $this->isDevolucao($nfe) && filled($nfe->chave))
-                ? 'CHAVE NF-e: ' . $this->onlyDigits($nfe->chave)
-                : null,
-            (! $this->isDevolucao($nfe) && filled($nfe->protocolo))
-                ? 'PROTOCOLO: ' . $nfe->protocolo
-                : null,
-            $empresa ? 'EMITENTE: ' . mb_strtoupper((string) ($empresa->razao_social ?: $empresa->nome), 'UTF-8') : null,
         ]);
 
         return implode("\n", $partes);

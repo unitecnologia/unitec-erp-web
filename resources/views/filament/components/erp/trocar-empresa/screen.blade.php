@@ -4,11 +4,8 @@
     $selecionada = collect($empresas)->firstWhere('id', (int) $this->selectedEmpresaId);
 @endphp
 
-<div
-    class="erp-trocar-empresa"
-    wire:keydown.escape.window="closeScreen"
->
-    <div class="erp-trocar-empresa__backdrop" wire:click="closeScreen" aria-hidden="true"></div>
+<div class="erp-trocar-empresa">
+    <div class="erp-trocar-empresa__backdrop" aria-hidden="true"></div>
 
     <div
         class="erp-trocar-empresa__panel"
@@ -64,6 +61,7 @@
                             ->implode('');
                     @endphp
                     <div class="erp-trocar-empresa__item is-selected erp-trocar-empresa__item--atual" role="listitem">
+                        <span class="erp-trocar-empresa__codigo" title="Código">{{ $empresa['codigo'] }}</span>
                         <span class="erp-trocar-empresa__avatar" aria-hidden="true">{{ $initials !== '' ? $initials : 'E' }}</span>
                         <div class="erp-trocar-empresa__item-main">
                             <span class="erp-trocar-empresa__item-name">{{ $empresa['label'] }}</span>
@@ -103,6 +101,7 @@
                                 aria-selected="{{ $selected ? 'true' : 'false' }}"
                             >
                                 <span class="erp-trocar-empresa__radio" aria-hidden="true"></span>
+                                <span class="erp-trocar-empresa__codigo" title="Código">{{ $empresa['codigo'] }}</span>
                                 <span class="erp-trocar-empresa__avatar" aria-hidden="true">{{ $initials !== '' ? $initials : 'E' }}</span>
                                 <span class="erp-trocar-empresa__item-main">
                                     <span class="erp-trocar-empresa__item-name">{{ $empresa['label'] }}</span>
@@ -118,7 +117,7 @@
 
                 @if ($selecionada)
                     <p class="erp-trocar-empresa__selected-hint">
-                        Selecionada: <strong>{{ $selecionada['label'] }}</strong>
+                        Selecionada: <strong>{{ $selecionada['codigo'] }} — {{ $selecionada['label'] }}</strong>
                     </p>
                 @endif
 

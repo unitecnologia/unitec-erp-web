@@ -31,6 +31,16 @@ final class EmpresaModulos
             'rh.funcionarios' => 'param_modulo_rh',
             'rh.cargos' => 'param_modulo_rh',
             'rh.departamentos' => 'param_modulo_rh',
+            'rh.documentos' => 'param_modulo_rh',
+            'rh.epis' => 'param_modulo_rh',
+            'rh.uniformes' => 'param_modulo_rh',
+            'rh.exames' => 'param_modulo_rh',
+            'rh.ferias' => 'param_modulo_rh',
+            'rh.holerites' => 'param_modulo_rh',
+            'rh.beneficios' => 'param_modulo_rh',
+            'rh.ocorrencias' => 'param_modulo_rh',
+            'rh.treinamentos' => 'param_modulo_rh',
+            'rh.escalas' => 'param_modulo_rh',
             'mercado_livre' => 'param_modulo_mercado_livre',
         ];
     }

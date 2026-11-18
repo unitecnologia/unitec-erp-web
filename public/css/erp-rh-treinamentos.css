@@ -1,0 +1,108 @@
+/* RH — Treinamentos: ajustes finos sobre erp-rh-list + erp-list-ui */
+
+.erp-rh-treinamentos-page .erp-rh-treinamentos__status-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.75rem;
+}
+
+.erp-rh-treinamentos-page .erp-rh-treinamentos__status--validade {
+    margin-left: auto;
+}
+
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem !important;
+    max-width: 4.25rem;
+}
+
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 22% !important;
+}
+
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 24% !important;
+}
+
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(6),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(7),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 7.5rem !important;
+    text-align: center;
+}
+
+.erp-rh-treinamentos-page .fi-ta-empty-state {
+    padding: 1.25rem 0.75rem !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+}
+
+.erp-rh-treinamentos-page .fi-ta-empty-state-heading {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-rh-treinamentos-page .erp-rh-treinamento-form-modal .erp-contador-form-modal__window,
+.erp-rh-treinamentos-page .erp-rh-treinamento-catalog-modal .erp-contador-form-modal__window {
+    width: min(calc(34rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-treinamentos-page .erp-rh-treinamento-form-modal .erp-pcad-form__input--date,
+.erp-rh-treinamentos-page .erp-rh-treinamento-catalog-modal .erp-pcad-form__input--date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.erp-rh-treinamentos-page .erp-rh-treinamento-form-modal__multi {
+    min-height: 7.5rem;
+    height: auto;
+}
+
+.erp-rh-treinamentos-page .erp-rh-treinamento-form-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-rh-treinamentos-page .erp-contador-delete-modal__window {
+    width: min(26rem, calc(100vw - 2rem));
+}
+
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(8),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+    width: 4.5rem !important;
+    text-align: center;
+}
+
+.erp-rh-treinamentos-actions__file {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.erp-rh-treinamentos-actions__file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.erp-rh-treinamentos-actions__error {
+    width: 100%;
+    padding: 0.2rem 0.75rem 0.45rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b91c1c;
+    background: var(--erp-action-bg);
+}

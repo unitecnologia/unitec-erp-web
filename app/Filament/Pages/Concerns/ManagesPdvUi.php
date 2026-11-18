@@ -36,11 +36,14 @@ trait ManagesPdvUi
     use ManagesPdvAcessoRapido;
     use ManagesPdvReceber;
     use ManagesPdvReimprimir;
+    use ManagesPdvReimprimirNfce;
     use ManagesPdvRemoverItens;
     use ManagesPdvSerial;
     use ManagesPdvTabelaPreco;
     use ManagesPdvVenda {
         ManagesPdvVenda::afterBoletoPosDocumentoFluxo insteadof ManagesBoletoPosDocumentoPrompt;
+        ManagesPdvVenda::resolverPdvFinalizarOperacaoBotoes insteadof ManagesPdvConfig;
+        ManagesPdvVenda::resolverPdvFinalizarOperacaoUnica insteadof ManagesPdvConfig;
     }
     use ManagesPdvVendaEspera;
     use ManagesPdvVendedor;
@@ -284,7 +287,11 @@ trait ManagesPdvUi
             return;
         }
 
-        if ($wasFinalizar) {
+        // Não rouba o foco se a confirmação Sim/Não de impressão vai abrir em seguida.
+        if ($wasFinalizar
+            && ! ($this->pdvConfirmImprimirPosVenda ?? false)
+            && blank($this->pdvImprimirPosVendaId ?? null)
+        ) {
             $this->dispatch('erp-pdv-focus-search');
         }
     }
@@ -408,12 +415,14 @@ trait ManagesPdvUi
                 'importar' => $this->cancelImportar(),
                 'receber' => $this->cancelReceber(),
                 'reimprimir' => $this->cancelReimprimir(),
+                'reimprimir_nfce' => $this->cancelReimprimirNfce(),
                 'consulta_venda' => $this->cancelConsultaVenda(),
                 'estorno_venda' => $this->cancelEstornoVenda(),
                 'vendas_espera' => $this->cancelVendaEmEspera(),
                 'suspender_venda' => $this->cancelSuspenderVenda(),
                 'fiscal_aviso' => $this->sairPdvFiscalOverlay(),
                 'tabela_preco' => $this->cancelTabelaPreco(),
+                'vendedor_venda' => $this->cancelarVendedorDaVenda(),
                 'remover_itens' => $this->cancelRemoverItens(),
                 'autorizacao' => $this->cancelPdvAutorizacao(),
                 'bloqueio' => $this->cancelUnlockPdv(),
@@ -572,15 +581,6 @@ trait ManagesPdvUi
         Notification::make()
             ->title('TEF')
             ->body('Integração TEF disponível apenas no PDV desktop. Em implementação no web.')
-            ->info()
-            ->send();
-    }
-
-    public function moduleStubNfce(): void
-    {
-        Notification::make()
-            ->title('NFC-e')
-            ->body('Use o fechamento fiscal (F4/F6) no PDV para emitir NFC-e.')
             ->info()
             ->send();
     }

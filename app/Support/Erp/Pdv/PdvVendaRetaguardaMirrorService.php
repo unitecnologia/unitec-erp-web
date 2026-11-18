@@ -6,6 +6,7 @@ use App\Models\PdvVenda;
 use App\Models\Person;
 use App\Models\Venda;
 use App\Models\VendaItem;
+use App\Support\Erp\Dre\VendaItemCustoHistorico;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Carbon;
@@ -61,6 +62,7 @@ final class PdvVendaRetaguardaMirrorService
             'plataforma' => Venda::PLATAFORMA_PDV,
         ]);
 
+        $empresaId = (int) ($venda->empresa_id ?? ErpContext::currentEmpresaId() ?? 0);
         foreach ($pdvVenda->itens as $item) {
             if (! $item->product_id) {
                 continue;
@@ -72,6 +74,7 @@ final class PdvVendaRetaguardaMirrorService
                 'quantidade' => $item->quantidade,
                 'valor_item' => $item->preco_unitario,
                 'total' => $item->total,
+                ...$this->custoHistoricoDoPdvItem($item, $empresaId),
             ]);
         }
 
@@ -101,8 +104,10 @@ final class PdvVendaRetaguardaMirrorService
             'tipo' => $pdvVenda->fiscal ? Venda::TIPO_CUPOM : Venda::TIPO_PEDIDO,
         ])->save();
 
+        $preservado = VendaItemCustoHistorico::mapaPreservarPorProduto((int) $pedido->id);
         VendaItem::query()->where('venda_id', $pedido->id)->delete();
 
+        $empresaId = (int) ($pedido->empresa_id ?? ErpContext::currentEmpresaId() ?? 0);
         foreach ($pdvVenda->itens as $item) {
             if (! $item->product_id) {
                 continue;
@@ -114,6 +119,7 @@ final class PdvVendaRetaguardaMirrorService
                 'quantidade' => $item->quantidade,
                 'valor_item' => $item->preco_unitario,
                 'total' => $item->total,
+                ...$this->custoHistoricoDoPdvItem($item, $empresaId, $preservado),
             ]);
         }
 
@@ -199,5 +205,42 @@ final class PdvVendaRetaguardaMirrorService
         $moment = $pdvVenda->fechado_em ?? $pdvVenda->created_at ?? now();
 
         return ErpTimezone::toLocal($moment);
+    }
+
+    /**
+     * Prefere custo já capturado no item PDV; senão preservado da venda; senão resolve agora.
+     *
+     * @param  array<int, array<string, mixed>>  $preservado
+     * @return array<string, mixed>
+     */
+    private function custoHistoricoDoPdvItem(object $item, int $empresaId, array $preservado = []): array
+    {
+        if (! VendaItemCustoHistorico::tabelaTemCusto('venda_itens')) {
+            return [];
+        }
+
+        $copiado = VendaItemCustoHistorico::copiarDe($item);
+        if ($copiado !== null) {
+            if (($copiado['custo_situacao'] ?? '') === VendaItemCustoHistorico::SITUACAO_OK
+                && $copiado['custo_unitario'] !== null
+            ) {
+                $unit = (float) $copiado['custo_unitario'];
+                $copiado['custo_total'] = number_format(
+                    round($unit * abs((float) $item->quantidade), 2),
+                    2,
+                    '.',
+                    ''
+                );
+            }
+
+            return $copiado;
+        }
+
+        return VendaItemCustoHistorico::dePreservadoOuResolver(
+            (int) $item->product_id,
+            (float) $item->quantidade,
+            $empresaId > 0 ? $empresaId : null,
+            $preservado,
+        );
     }
 }

@@ -139,12 +139,32 @@ trait ManagesPdvConfig
      */
     public function getPdvFinalizarOperacaoBotoesProperty(): array
     {
-        return $this->pdvConfig()->finalizarOperacaoBotoes();
+        return $this->resolverPdvFinalizarOperacaoBotoes(
+            $this->pdvConfig()->finalizarOperacaoBotoes()
+        );
     }
 
     public function getPdvFinalizarOperacaoUnicaProperty(): ?string
     {
-        return $this->pdvConfig()->finalizarOperacaoUnica();
+        return $this->resolverPdvFinalizarOperacaoUnica(
+            $this->pdvConfig()->finalizarOperacaoUnica()
+        );
+    }
+
+    /**
+     * Hook do PDV online (ManagesPdvVenda): NFC-e automática por forma de pagamento.
+     *
+     * @param  list<array{key: string, atalho: string, label: string, fiscal: bool, primary: bool}>  $botoes
+     * @return list<array{key: string, atalho: string, label: string, fiscal: bool, primary: bool}>
+     */
+    protected function resolverPdvFinalizarOperacaoBotoes(array $botoes): array
+    {
+        return $botoes;
+    }
+
+    protected function resolverPdvFinalizarOperacaoUnica(?string $unica): ?string
+    {
+        return $unica;
     }
 
     /**

@@ -19,6 +19,10 @@ function bootErpOsFormLivewire() {
         focusOsFormInput('os-cliente', { selectAll: false });
     });
 
+    window.Livewire.on('erp-os-focus-atendente', () => {
+        focusOsFormInput('os-atendente', { selectAll: false });
+    });
+
     // Foco do F4: erp-os-faturamento.js (respeita focusEpoch — sem setTimeout que “puxa” a seleção).
 
     window.Livewire.on('erp-os-lookup-highlight', (payload) => {

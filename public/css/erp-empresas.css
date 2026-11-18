@@ -230,25 +230,30 @@
 
 .erp-empresas-page .fi-ta-header-cell:nth-child(2),
 .erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
-    width: 22%;
+    width: 20%;
 }
 
 .erp-empresas-page .fi-ta-header-cell:nth-child(3),
 .erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(3) {
-    width: 24%;
+    width: 22%;
 }
 
 .erp-empresas-page .fi-ta-header-cell:nth-child(4),
 .erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(4) {
-    width: 18%;
+    width: 16%;
 }
 
 .erp-empresas-page .fi-ta-header-cell:nth-child(5),
 .erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(5) {
-    width: 16%;
+    width: 14%;
 }
 
 .erp-empresas-page .fi-ta-header-cell:nth-child(6),
 .erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(6) {
-    width: 14%;
+    width: 12%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(7),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 10%;
 }

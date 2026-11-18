@@ -217,8 +217,9 @@ final class NfeXmlBuilder
         $infNFe->appendChild($emit);
 
         XmlHelper::append($emit, 'CNPJ', NumberFormatter::onlyDigits($emitente->cnpj));
-        XmlHelper::append($emit, 'xNome', XmlHelper::sanitizeText($emitente->razaoSocial, 60));
-        XmlHelper::append($emit, 'xFant', XmlHelper::sanitizeText($emitente->nomeFantasia, 60));
+        // TString SEFAZ: codepoints > U+00FF (ex.: Ő em "CONFECÇÕES") quebram emit/xNome (cStat 215/225).
+        XmlHelper::append($emit, 'xNome', XmlHelper::sanitizeTString($emitente->razaoSocial, 60));
+        XmlHelper::append($emit, 'xFant', XmlHelper::sanitizeTString($emitente->nomeFantasia, 60));
 
         $ender = $emit->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'enderEmit');
         $emit->appendChild($ender);

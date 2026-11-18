@@ -3,8 +3,13 @@
 namespace App\Support\Rh;
 
 use App\Models\RhAnexo;
+use App\Models\RhEpiEntrega;
 use App\Models\RhEscalaItem;
+use App\Support\Rh\RhEscalaService;
+use App\Models\RhExame;
+use App\Models\RhFeriasGozo;
 use App\Models\RhFuncionario;
+use App\Models\RhTreinamentoParticipante;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -19,6 +24,7 @@ final class RhDashboardService
      *   ferias: int,
      *   exames_vencendo: int,
      *   epis_vencendo: int,
+     *   treinamentos_vencendo: int,
      *   docs_vencendo: int,
      *   aniversariantes: int,
      *   folga_hoje: int,
@@ -34,6 +40,7 @@ final class RhDashboardService
             'ferias' => 0,
             'exames_vencendo' => 0,
             'epis_vencendo' => 0,
+            'treinamentos_vencendo' => 0,
             'docs_vencendo' => 0,
             'aniversariantes' => 0,
             'folga_hoje' => 0,
@@ -64,27 +71,68 @@ final class RhDashboardService
 
             $exames = 0;
             $epis = 0;
+            $treinamentos = 0;
             $docs = 0;
 
             if (Schema::hasTable('rh_anexos')) {
-                $exames = (int) RhAnexo::query()
-                    ->where('categoria', RhAnexo::CAT_EXAME)
-                    ->vencendoEm(30)
-                    ->count();
-                $epis = (int) RhAnexo::query()
-                    ->where('categoria', RhAnexo::CAT_EPI)
-                    ->vencendoEm(30)
-                    ->count();
                 $docs = (int) RhAnexo::query()
                     ->where('categoria', RhAnexo::CAT_DOCUMENTO)
                     ->vencendoEm(30)
                     ->count();
             }
 
+            $dataHoje = $hoje->toDateString();
+            $limite = $hoje->copy()->addDays(30)->toDateString();
+
+            if (Schema::hasTable('rh_epi_entregas')) {
+                $epis = (int) RhEpiEntrega::query()
+                    ->where('situacao', RhEpiEntrega::SIT_ENTREGUE)
+                    ->where('ativo', true)
+                    ->whereNotNull('previsao_troca')
+                    ->whereDate('previsao_troca', '>=', $dataHoje)
+                    ->whereDate('previsao_troca', '<=', $limite)
+                    ->count();
+            }
+
+            if (Schema::hasTable('rh_exames')) {
+                // Conta só próximos exames (prazo informado). Sem conclusão clínica no painel.
+                $exames = (int) RhExame::query()
+                    ->where('ativo', true)
+                    ->whereNotNull('proximo_em')
+                    ->whereDate('proximo_em', '>=', $dataHoje)
+                    ->whereDate('proximo_em', '<=', $limite)
+                    ->count();
+            }
+
+            if (Schema::hasTable('rh_treinamento_participantes')) {
+                $treinamentos = (int) RhTreinamentoParticipante::query()
+                    ->where('situacao', RhTreinamentoParticipante::SIT_ATIVO)
+                    ->where('ativo', true)
+                    ->whereNotNull('vencimento_em')
+                    ->whereDate('vencimento_em', '>=', $dataHoje)
+                    ->whereDate('vencimento_em', '<=', $limite)
+                    ->count();
+            }
+
+            $ferias = 0;
+
+            if (Schema::hasTable('rh_ferias_gozos')) {
+                $ferias = (int) RhFeriasGozo::query()
+                    ->where('ativo', true)
+                    ->where('situacao', RhFeriasGozo::SIT_EM_ANDAMENTO)
+                    ->whereDate('gozo_inicio', '<=', $dataHoje)
+                    ->whereDate('gozo_fim', '>=', $dataHoje)
+                    ->count();
+            }
+
             $folga = 0;
             $plantao = 0;
 
-            if (Schema::hasTable('rh_escala_itens')) {
+            if (Schema::hasTable('rh_escala_vinculos')) {
+                $contagem = (new RhEscalaService)->contagemHojePorTipo();
+                $folga = (int) ($contagem['folga'] ?? 0);
+                $plantao = (int) ($contagem['plantao'] ?? 0);
+            } elseif (Schema::hasTable('rh_escala_itens')) {
                 $dow = (int) $hoje->dayOfWeek;
                 $folga = (int) RhEscalaItem::query()
                     ->where('dia_semana', $dow)
@@ -100,9 +148,10 @@ final class RhDashboardService
                 'funcionarios' => $total,
                 'ativos' => $totalAtivos,
                 'demitidos' => $demitidos,
-                'ferias' => 0,
+                'ferias' => $ferias,
                 'exames_vencendo' => $exames,
                 'epis_vencendo' => $epis,
+                'treinamentos_vencendo' => $treinamentos,
                 'docs_vencendo' => $docs,
                 'aniversariantes' => $aniversariantes,
                 'folga_hoje' => $folga,

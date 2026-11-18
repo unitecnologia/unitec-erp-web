@@ -234,11 +234,61 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Há pelo menos um caixa tipo PDV liberado para operar no PDV.
+     * Há vínculo explícito a um caixa tipo PDV (Permissões → Caixas).
+     * Pivot vazio não libera todos os PDVs — evita abrir sessão no Caixa Geral.
      */
     public function podeOperarComCaixaPdv(?int $empresaId = null): bool
     {
-        return $this->accessibleCaixaContaIds($empresaId) !== [];
+        return $this->caixaPdvVinculadoId($empresaId) !== null;
+    }
+
+    /**
+     * Conta PDV vinculada ao usuário na empresa (is_padrao, senão menor id).
+     * Nunca retorna CAIXA GERAL nem inventa PDV sem linha em caixa_conta_user.
+     */
+    public function caixaPdvVinculadoId(?int $empresaId = null): ?int
+    {
+        $empresaId = $empresaId ?: (int) ($this->empresa_id ?? 0);
+        if ($empresaId <= 0) {
+            return null;
+        }
+
+        $ids = DB::table('caixa_conta_user')
+            ->where('user_id', $this->getKey())
+            ->where('empresa_id', $empresaId)
+            ->orderByDesc('is_padrao')
+            ->orderBy('caixa_conta_id')
+            ->pluck('caixa_conta_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return null;
+        }
+
+        $pdvs = CaixaConta::query()
+            ->whereIn('id', $ids)
+            ->where('ativo', true)
+            ->whereIn('tipo', [CaixaConta::TIPO_PDV, 'CAIXA', 'X'])
+            ->whereRaw('UPPER(nome) <> ?', [CaixaConta::NOME_CAIXA_GERAL])
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        if ($pdvs === []) {
+            return null;
+        }
+
+        $pdvSet = array_flip($pdvs);
+        foreach ($ids as $id) {
+            if (isset($pdvSet[$id])) {
+                return $id;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -247,6 +297,7 @@ class User extends Authenticatable implements FilamentUser
      * Prioridade: is_padrao → primeiro vínculo explícito → CAIXA GERAL.
      * Não usa accessibleCaixaContaIds (que libera todos os PDVs quando o pivot
      * está vazio): sem vínculo, o padrão financeiro é sempre o Caixa Geral.
+     * Para abrir sessão PDV use {@see caixaPdvVinculadoId()} (sem fallback Geral).
      */
     public function defaultCaixaContaId(?int $empresaId = null): ?int
     {

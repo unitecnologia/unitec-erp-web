@@ -401,9 +401,10 @@ class ListCaixaContas extends ListRecords
             }
 
             $agencia = mb_substr(trim((string) ($data['agencia'] ?? '')), 0, 20);
-            $agenciaDv = mb_substr(trim((string) ($data['agencia_dv'] ?? '')), 0, 4) ?: null;
+            // DV "0" é válido — não usar ?: null (em PHP "0" é falsy).
+            $agenciaDv = $this->digitoVerificadorOuNull($data['agencia_dv'] ?? null);
             $contaNumero = mb_substr(trim((string) ($data['conta_numero'] ?? '')), 0, 40);
-            $contaDv = mb_substr(trim((string) ($data['conta_dv'] ?? '')), 0, 4) ?: null;
+            $contaDv = $this->digitoVerificadorOuNull($data['conta_dv'] ?? null);
             $contaTipo = (string) ($data['conta_tipo_bancaria'] ?? CaixaConta::CONTA_CORRENTE);
             $titularNome = mb_substr(mb_strtoupper(trim((string) ($data['titular_nome'] ?? '')), 'UTF-8'), 0, 120);
             $titularDocumento = mb_substr(preg_replace('/\D/', '', (string) ($data['titular_documento'] ?? '')) ?? '', 0, 20);
@@ -620,5 +621,15 @@ class ListCaixaContas extends ListRecords
             'titular_nome' => '',
             'titular_documento' => '',
         ];
+    }
+
+    /**
+     * Persiste DV inclusive quando o valor é "0" (falsy em PHP).
+     */
+    private function digitoVerificadorOuNull(mixed $value): ?string
+    {
+        $dv = mb_substr(trim((string) $value), 0, 4, 'UTF-8');
+
+        return $dv === '' ? null : $dv;
     }
 }

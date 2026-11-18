@@ -428,6 +428,18 @@ body,
     color: #9333ea;
 }
 
+.erp-menu-bar__icon--rose {
+    color: #e11d48;
+}
+
+.erp-menu-bar__icon--petrol {
+    color: #0e7490;
+}
+
+.erp-menu-bar__icon--sky {
+    color: #0284c7;
+}
+
 .erp-menu-bar__link:hover,
 .erp-menu-bar__link:focus-visible {
     background: #1e5a9e;

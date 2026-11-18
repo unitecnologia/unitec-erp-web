@@ -25,6 +25,7 @@ trait ManagesProductFormUi
             ['key' => 'combustivel', 'label' => 'Combustível', 'visible' => (bool) ($data['is_combustivel'] ?? false)],
             ['key' => 'info_nutricional', 'label' => 'Info. Nutricional', 'visible' => (bool) ($data['tem_info_nutricional'] ?? false)],
             ['key' => 'composicao', 'label' => 'Composição', 'visible' => (bool) ($data['is_composicao'] ?? false)],
+            ['key' => 'receita', 'label' => 'Receita', 'visible' => ! (bool) ($data['is_servico'] ?? false)],
             ['key' => 'grade', 'label' => 'Grade', 'visible' => (bool) ($data['is_grade'] ?? false)],
             ['key' => 'imei', 'label' => 'IMEI', 'visible' => (bool) ($data['usa_imei'] ?? false)],
             ['key' => 'tabela_preco', 'label' => 'Tab. Preço', 'visible' => (bool) ($data['usa_tab_preco'] ?? false)],
@@ -103,6 +104,10 @@ trait ManagesProductFormUi
             $this->closeCompositionSuggestions();
         }
 
+        if ($previous === 'receita' && method_exists($this, 'closeReceitaSuggestions')) {
+            $this->closeReceitaSuggestions();
+        }
+
         if ($previous === 'estoques' && $this->activeEstoqueSubTab === 'movimentacoes' && $next !== 'estoques') {
             $this->releaseProductMovimentacoesTransientState();
         }
@@ -150,6 +155,10 @@ trait ManagesProductFormUi
 
         if ($key === 'is_servico' && (bool) $value) {
             $this->data = $this->aplicarIssqnPadraoServico($this->data ?? []);
+            $visibleKeys = collect($this->visibleProductFormTabs)->pluck('key')->all();
+            if (! in_array($this->activeFormTab, $visibleKeys, true)) {
+                $this->activeFormTab = $visibleKeys[0] ?? 'estoques';
+            }
         }
 
         if ($key === 'is_remedio' && ! (bool) $value) {
@@ -239,6 +248,10 @@ trait ManagesProductFormUi
 
         if ($tab === 'composicao' && method_exists($this, 'ensureProductCompositionsLoaded')) {
             $this->ensureProductCompositionsLoaded();
+        }
+
+        if ($tab === 'receita' && method_exists($this, 'ensureProductReceitaLoaded')) {
+            $this->ensureProductReceitaLoaded();
         }
 
         if ($tab === 'imei' && method_exists($this, 'ensureProductImeisLoaded')) {

@@ -75,6 +75,26 @@ class EditEmpresa extends EditRecord
                 (int) $empresa->id,
                 $this->data[EmpresaParametros::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR] ?? false,
             );
+            EmpresaParametros::gravarMonitorPedidosImprimirDuasVias(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_MONITOR_PEDIDOS_DUAS_VIAS] ?? false,
+            );
+            EmpresaParametros::gravarMonitorPedidosImprimirMeiaFolhaA4(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4] ?? false,
+            );
+            EmpresaParametros::gravarPedidoExibirCabecalhoEmpresa(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_PEDIDO_CABECALHO_EMPRESA] ?? false,
+            );
+            EmpresaParametros::gravarForcaVendasAlterarPrecoUnitario(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO] ?? false,
+            );
+            EmpresaParametros::gravarSolicitarVendedorCadaVenda(
+                (int) $empresa->id,
+                $this->data[EmpresaParametros::COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA] ?? false,
+            );
         }
     }
 }

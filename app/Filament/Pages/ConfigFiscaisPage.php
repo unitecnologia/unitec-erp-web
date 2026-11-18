@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\Erp\Audit\ErpOperacaoAuditoria;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpAccess;
 use App\Models\Empresa;
 use App\Models\Nfe;
@@ -21,6 +23,7 @@ use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Fiscal\NfceNumeracao;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use Unitec\FiscalEngine\Nfe\DfeDistribuidor;
+use Unitec\FiscalEngine\Util\NumberFormatter;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -65,6 +68,15 @@ class ConfigFiscaisPage extends Page
 
     public string $terminaisAmbienteLabel = '';
 
+    /**
+     * Lista de caixas só sob demanda (aba PDVs Offline). Evita MAX NFC-e no open da tela.
+     * Livewire precisa persistir entre requests.
+     */
+    public bool $terminaisCarregados = false;
+
+    /** Ambiente NFC-e com o qual a lista foi montada (invalida se mudar após gravar). */
+    public ?int $terminaisAmbienteCarregado = null;
+
     public ?TemporaryUploadedFile $certificadoUpload = null;
 
     /** @var array{titulo: string, emissor: string, validade_inicio: string, validade: string, numero_serie: string}|null */
@@ -89,7 +101,11 @@ class ConfigFiscaisPage extends Page
         $this->loadNfseRegime($empresa);
         $this->syncNfeStoragePathsToForm();
         $this->refreshCertificadoInfo();
-        $this->loadTerminais();
+        // Terminais: lazy na aba PDVs Offline (ensureTerminaisLoaded) — sem MAX NFC-e no mount.
+        $this->terminais = [];
+        $this->terminaisAmbienteLabel = '';
+        $this->terminaisCarregados = false;
+        $this->terminaisAmbienteCarregado = null;
         $this->emailTestTo = (string) ($empresa?->email ?? '');
     }
 
@@ -123,8 +139,41 @@ class ConfigFiscaisPage extends Page
         }
 
         if ($this->activeTab === 'pdv_offline') {
-            $this->loadTerminais();
+            $this->ensureTerminaisLoaded();
         }
+    }
+
+    /**
+     * Carrega caixas sob demanda; não repete se já montados no mesmo ambiente NFC-e.
+     */
+    protected function ensureTerminaisLoaded(bool $force = false): void
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            $this->invalidateTerminaisCache();
+            $this->terminais = [];
+            $this->terminaisAmbienteLabel = '';
+
+            return;
+        }
+
+        $ambiente = NfceNumeracao::ambiente(VendasParametro::forEmpresa($empresaId));
+
+        if (! $force
+            && $this->terminaisCarregados
+            && $this->terminaisAmbienteCarregado === $ambiente
+            && $this->terminais !== []) {
+            return;
+        }
+
+        $this->loadTerminais();
+    }
+
+    protected function invalidateTerminaisCache(): void
+    {
+        $this->terminaisCarregados = false;
+        $this->terminaisAmbienteCarregado = null;
     }
 
     /**
@@ -138,12 +187,14 @@ class ConfigFiscaisPage extends Page
         if (! $empresaId) {
             $this->terminais = [];
             $this->terminaisAmbienteLabel = '';
+            $this->invalidateTerminaisCache();
 
             return;
         }
 
         $params = VendasParametro::forEmpresa($empresaId);
-        $this->terminaisAmbienteLabel = NfceNumeracao::ambiente($params) === PdvVendaNfce::AMBIENTE_PRODUCAO
+        $ambiente = NfceNumeracao::ambiente($params);
+        $this->terminaisAmbienteLabel = $ambiente === PdvVendaNfce::AMBIENTE_PRODUCAO
             ? 'Produção'
             : 'Homologação';
 
@@ -169,6 +220,8 @@ class ConfigFiscaisPage extends Page
             ->all();
 
         $this->aplicarAlertasSeries($params);
+        $this->terminaisCarregados = true;
+        $this->terminaisAmbienteCarregado = $ambiente;
     }
 
     /**
@@ -444,7 +497,7 @@ class ConfigFiscaisPage extends Page
                 ->send();
         }
 
-        $this->loadTerminais();
+        $this->ensureTerminaisLoaded(force: true);
 
         return true;
     }
@@ -489,6 +542,10 @@ class ConfigFiscaisPage extends Page
         $nacional = $this->form['nfse_provedor'] === 'nacional';
         $ipm = $this->form['nfse_provedor'] === 'ipm';
         $nsuDigits = preg_replace('/\D/', '', (string) ($this->form['dfe_ultimo_nsu'] ?? '')) ?? '';
+        $respCnpj = NumberFormatter::onlyDigits((string) ($this->form['resp_tecnico_cnpj'] ?? ''));
+        $respFone = NumberFormatter::onlyDigits((string) ($this->form['resp_tecnico_fone'] ?? ''));
+        $this->form['resp_tecnico_cnpj'] = $respCnpj !== '' ? $respCnpj : null;
+        $this->form['resp_tecnico_fone'] = $respFone !== '' ? $respFone : null;
 
         try {
             if (strlen($nsuDigits) > 15) {
@@ -506,15 +563,15 @@ class ConfigFiscaisPage extends Page
                 'form.intervalo' => ['required', 'integer', 'min:0'],
                 'form.tentativas' => ['required', 'integer', 'min:1'],
                 'form.numero_nfe' => ['required', 'integer', 'min:1'],
-                'form.serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
+                'form.serie_nfe' => ['required', 'integer', 'min:0', 'max:999'],
                 'form.dfe_ultimo_nsu' => ['required', 'regex:/^\d{15}$/'],
                 'form.id_token' => ['nullable', 'string', 'max:40'],
                 'form.token' => ['nullable', 'string', 'max:120'],
                 'form.versao_qrcode' => ['nullable', 'integer', 'in:2,3'],
-                'form.resp_tecnico_cnpj' => ['nullable', 'string', 'max:18'],
+                'form.resp_tecnico_cnpj' => ['nullable', 'string', 'size:14'],
                 'form.resp_tecnico_contato' => ['nullable', 'string', 'max:60'],
                 'form.resp_tecnico_email' => ['nullable', 'string', 'max:60'],
-                'form.resp_tecnico_fone' => ['nullable', 'string', 'max:20'],
+                'form.resp_tecnico_fone' => ['nullable', 'string', 'max:14'],
                 'form.resp_tecnico_id_csrt' => ['nullable', 'string', 'max:6'],
                 'form.resp_tecnico_csrt' => ['nullable', 'string', 'max:100'],
                 'form.nfse_provedor' => ['required', 'in:nacional,ipm'],
@@ -560,6 +617,8 @@ class ConfigFiscaisPage extends Page
                 'form.nfse_url_homologacao.max' => 'URL de homologação da NFS-e inválida.',
                 'form.dfe_ultimo_nsu.required' => 'Informe o último NSU.',
                 'form.dfe_ultimo_nsu.regex' => 'Último NSU inválido. Informe até 15 dígitos.',
+                'form.resp_tecnico_cnpj.size' => 'CNPJ do responsável técnico inválido. Informe os 14 dígitos.',
+                'form.resp_tecnico_fone.max' => 'Telefone do responsável técnico inválido.',
             ]);
 
             if ($nacional) {
@@ -641,10 +700,12 @@ class ConfigFiscaisPage extends Page
             'email_tls' => ! empty($this->form['email_tls']) ? 'S' : 'N',
             'email_modo' => FiscalMailService::normalizeModo((string) ($this->form['email_modo'] ?? FiscalMailService::MODO_SMTP)),
             'email_api_provedor' => FiscalMailService::normalizeApiProvider((string) ($this->form['email_api_provedor'] ?? FiscalMailService::API_BREVO)),
-            'resp_tecnico_cnpj' => trim((string) ($this->form['resp_tecnico_cnpj'] ?? '')) ?: NfeFiscalConfig::defaultRespTecnico()['cnpj'],
+            'resp_tecnico_cnpj' => NumberFormatter::onlyDigits((string) ($this->form['resp_tecnico_cnpj'] ?? ''))
+                ?: NfeFiscalConfig::defaultRespTecnico()['cnpj'],
             'resp_tecnico_contato' => trim((string) ($this->form['resp_tecnico_contato'] ?? '')) ?: NfeFiscalConfig::defaultRespTecnico()['contato'],
             'resp_tecnico_email' => trim((string) ($this->form['resp_tecnico_email'] ?? '')) ?: NfeFiscalConfig::defaultRespTecnico()['email'],
-            'resp_tecnico_fone' => trim((string) ($this->form['resp_tecnico_fone'] ?? '')) ?: NfeFiscalConfig::defaultRespTecnico()['fone'],
+            'resp_tecnico_fone' => NumberFormatter::onlyDigits((string) ($this->form['resp_tecnico_fone'] ?? ''))
+                ?: NfeFiscalConfig::defaultRespTecnico()['fone'],
             'resp_tecnico_id_csrt' => $this->form['resp_tecnico_id_csrt'] ?: null,
             'resp_tecnico_csrt' => $this->form['resp_tecnico_csrt'] ?: null,
         ];
@@ -671,7 +732,29 @@ class ConfigFiscaisPage extends Page
             'caminho_certificado' => $this->form['caminho_certificado'] ?: null,
         ];
 
+        $campos = ErpOperacaoAuditoria::camposConfigFiscais();
+        $antes = ErpOperacaoAuditoria::somente($params->getAttributes(), $campos);
+        $depoisPrevisto = ErpOperacaoAuditoria::somente(
+            array_merge($params->getAttributes(), $payload),
+            $campos,
+        );
+        $mudancas = ErpOperacaoAuditoria::diffCampos($antes, $depoisPrevisto);
+
         $params->update($payload);
+
+        if ($mudancas !== []) {
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'ALTERAR_CONFIG_FISCAIS',
+                resumo: 'Configurações fiscais da empresa #'.$empresaId.' alteradas ('.count($mudancas).' campo(s)).',
+                origem: 'config_fiscais',
+                documentoTipo: 'config_fiscais',
+                documentoId: $empresaId,
+                documentoNumero: (string) $empresaId,
+                detalhes: ['campos' => $mudancas],
+                empresaId: $empresaId,
+            );
+        }
+
         \App\Support\Erp\Dashboard\ErpDashboardCertificadoAlert::forgetCacheForEmpresa($empresaId);
         $params = NfeFiscalConfig::syncStoragePaths($params->fresh());
         $params = NfeFiscalConfig::syncWebStack($params);
@@ -693,6 +776,12 @@ class ConfigFiscaisPage extends Page
                 ->send();
 
             return;
+        }
+
+        // Ambiente pode ter mudado no F2. Grade já aberta: persistTerminaisSeries forçou reload.
+        // Grade ainda não aberta: invalida para a próxima visita à aba PDVs Offline.
+        if (! $this->terminaisCarregados) {
+            $this->invalidateTerminaisCache();
         }
 
         Notification::make()->title('Configurações fiscais gravadas.')->success()->send();

@@ -188,6 +188,42 @@ class PdvVendaNfce extends Model
         };
     }
 
+    /** Resumo da coluna Situação SEFAZ (status + cStat); motivo completo vai ao rodapé amarelo. */
+    public function situacaoSefazResumo(): string
+    {
+        $label = $this->situacaoSefazLabel();
+        $cStat = $this->cStatDoMotivoRejeicao();
+
+        if ($cStat === null) {
+            return $label;
+        }
+
+        // Duplicidade já traz (539) no rótulo.
+        if ((string) $this->status === self::STATUS_DUPLICIDADE && $cStat === '539') {
+            return $label;
+        }
+
+        if (str_contains($label, $cStat)) {
+            return $label;
+        }
+
+        return $label.' — cStat '.$cStat;
+    }
+
+    public function cStatDoMotivoRejeicao(): ?string
+    {
+        $motivo = trim((string) ($this->motivo_rejeicao ?? ''));
+        if ($motivo === '') {
+            return null;
+        }
+
+        if (preg_match('/cStat\s+(\d+)/i', $motivo, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
     public static function normalizeTabFilter(string $filter): string
     {
         return array_key_exists($filter, self::tabLabels()) ? $filter : self::TAB_TRANSMITIDOS;

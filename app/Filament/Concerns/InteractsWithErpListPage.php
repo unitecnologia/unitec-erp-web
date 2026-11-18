@@ -216,6 +216,8 @@ trait InteractsWithErpListPage
         $entity = $this->erpListEntityName();
 
         return match ($action) {
+            'conciliar' => "{$entity} pendente na lista",
+            'desfazer' => "{$entity} conciliado na lista",
             'edit' => "{$entity} na lista",
             'delete' => "{$entity} para excluir",
             default => $entity,

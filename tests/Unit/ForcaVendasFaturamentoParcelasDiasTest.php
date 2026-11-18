@@ -232,6 +232,45 @@ class ForcaVendasFaturamentoParcelasDiasTest extends TestCase
         $this->assertSame([30], $dias);
     }
 
+    public function test_cartao_credito_considerar_a_vista_vira_zero_sem_canhoto(): void
+    {
+        $forma = $this->formaComTabelas(12, 30, 'tabela', ['30', '60']);
+        $forma->tipo = 'cartao_credito';
+        $forma->considerar_a_vista = true;
+
+        $dias = $this->service()->resolverParcelasDias(
+            [
+                'tabela_prazo_dias' => null,
+                'condicao_pagamento' => null,
+                'cartao_canhoto' => null,
+            ],
+            $forma,
+            null,
+        );
+
+        $this->assertSame([0], $dias);
+    }
+
+    public function test_cartao_credito_sem_considerar_a_vista_mantem_modo_tabela(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Não existe prazo válido para a forma selecionada.');
+
+        $forma = $this->formaComTabelas(12, 30, 'tabela', ['30', '60']);
+        $forma->tipo = 'cartao_credito';
+        $forma->considerar_a_vista = false;
+
+        $this->service()->resolverParcelasDias(
+            [
+                'tabela_prazo_dias' => null,
+                'condicao_pagamento' => null,
+                'cartao_canhoto' => null,
+            ],
+            $forma,
+            null,
+        );
+    }
+
     /**
      * @param  list<string>  $tabelas
      */

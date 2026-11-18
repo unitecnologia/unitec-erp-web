@@ -42,6 +42,17 @@ final class XmlHelper
     }
 
     /**
+     * TString SEFAZ (emit/xNome, xFant, infCpl, etc.) — cStat 215/225.
+     *
+     * Repara mojibake comum (Ő→Õ, Ă→Ã) e remove codepoints fora de Latin-1
+     * (U+0020 + U+0021..U+00FF). Não altera cadastro: só o valor enviado no XML.
+     */
+    public static function sanitizeTString(string $value, int $maxLength = 60): string
+    {
+        return self::sanitizeInfAdProd(self::repairCommonMojibake($value), $maxLength);
+    }
+
+    /**
      * Sanitiza infAdProd / infCpl conforme padrão SEFAZ (TString — cStat 225).
      *
      * Remove quebras de linha, caracteres de controle, símbolos XML problemáticos
@@ -79,6 +90,19 @@ final class XmlHelper
         }
 
         return $value;
+    }
+
+    /**
+     * Corrige trocas frequentes de encoding em nomes BR (não grava no banco).
+     */
+    public static function repairCommonMojibake(string $value): string
+    {
+        return strtr($value, [
+            "\u{0150}" => "\u{00D5}", // Ő → Õ
+            "\u{0151}" => "\u{00F5}", // ő → õ
+            "\u{0102}" => "\u{00C3}", // Ă → Ã
+            "\u{0103}" => "\u{00E3}", // ă → ã
+        ]);
     }
 
     public static function stripXmlDeclaration(string $xml): string

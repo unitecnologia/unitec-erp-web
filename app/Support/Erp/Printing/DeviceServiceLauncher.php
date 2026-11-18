@@ -10,6 +10,11 @@ final class DeviceServiceLauncher
 {
     public const WINDOWS_SERVICE_NAME = 'UnitecDeviceService';
 
+    /**
+     * Nome legado ainda registrado em máquinas de desenvolvimento (erro 2 se o EXE antigo sumiu).
+     */
+    private const LEGACY_WINDOWS_SERVICE_NAME = 'UnitecPdvDeviceService';
+
     public static function isOnline(int $timeoutMs = 1500): bool
     {
         $base = rtrim((string) config('unitec.device_service.base_url', 'http://127.0.0.1:9330'), '/');
@@ -129,13 +134,16 @@ final class DeviceServiceLauncher
             return;
         }
 
-        try {
-            @exec('sc stop '.self::WINDOWS_SERVICE_NAME.' 2>NUL');
-        } catch (\Throwable) {
-            // ignore
-        }
+        $serviceName = self::installedWindowsServiceName();
+        if ($serviceName !== null) {
+            try {
+                @exec('sc stop '.$serviceName.' 2>NUL');
+            } catch (\Throwable) {
+                // ignore
+            }
 
-        usleep(1_200_000);
+            usleep(1_200_000);
+        }
 
         if (self::isOnline(500)) {
             try {
@@ -164,23 +172,34 @@ final class DeviceServiceLauncher
 
     private static function windowsServiceExists(): bool
     {
-        try {
-            @exec('sc query '.self::WINDOWS_SERVICE_NAME.' 2>NUL', $output, $queryExit);
+        return self::installedWindowsServiceName() !== null;
+    }
 
-            return $queryExit === 0;
-        } catch (\Throwable) {
-            return false;
+    private static function installedWindowsServiceName(): ?string
+    {
+        foreach ([self::WINDOWS_SERVICE_NAME, self::LEGACY_WINDOWS_SERVICE_NAME] as $name) {
+            try {
+                @exec('sc query '.$name.' 2>NUL', $output, $queryExit);
+                if ($queryExit === 0) {
+                    return $name;
+                }
+            } catch (\Throwable) {
+                continue;
+            }
         }
+
+        return null;
     }
 
     private static function startWindowsService(): bool
     {
         try {
-            if (! self::windowsServiceExists()) {
+            $serviceName = self::installedWindowsServiceName();
+            if ($serviceName === null) {
                 return false;
             }
 
-            @exec('sc start '.self::WINDOWS_SERVICE_NAME.' 2>NUL', $startOutput, $startExit);
+            @exec('sc start '.$serviceName.' 2>NUL', $startOutput, $startExit);
 
             // 1056 = já está em execução.
             return in_array($startExit, [0, 1056], true);

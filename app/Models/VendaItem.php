@@ -17,6 +17,10 @@ class VendaItem extends Model
         'valor_item',
         'total',
         'comissao_pct',
+        'custo_unitario',
+        'custo_total',
+        'custo_origem',
+        'custo_situacao',
     ];
 
     protected static function booted(): void
@@ -67,6 +71,8 @@ class VendaItem extends Model
             'valor_item' => 'decimal:2',
             'total' => 'decimal:2',
             'comissao_pct' => 'decimal:2',
+            'custo_unitario' => 'decimal:4',
+            'custo_total' => 'decimal:2',
         ];
     }
 

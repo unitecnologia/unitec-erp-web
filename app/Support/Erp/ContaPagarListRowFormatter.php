@@ -3,6 +3,7 @@
 namespace App\Support\Erp;
 
 use App\Models\ContaPagar;
+use App\Support\Erp\Financeiro\ContaPagarCompetencia;
 use Illuminate\Support\Carbon;
 
 final class ContaPagarListRowFormatter
@@ -20,12 +21,13 @@ final class ContaPagarListRowFormatter
             'nota_fiscal' => filled($record->compra?->numero_nota) ? e((string) $record->compra->numero_nota) : '—',
             'fornecedor' => e($record->fornecedor?->nome_razao ?? '—'),
             'vencimento' => e($this->formatData($record->vencimento)),
-            'valor' => e($this->formatMoney($record->valor)),
-            'desconto' => e($this->formatMoney($record->desconto)),
-            'juros' => e($this->formatMoney($record->juros)),
-            'valor_pago' => e($this->formatMoney($record->valor_pago)),
+            'competencia' => e($this->formatCompetenciaMesAno($record->competencia ?? null)),
+            'valor' => $this->formatMoneyCell($record->valor),
+            'desconto' => $this->formatMoneyCell($record->desconto),
+            'juros' => $this->formatMoneyCell($record->juros),
+            'valor_pago' => $this->formatMoneyCell($record->valor_pago),
             'pago_em' => e($this->formatData($record->pago_em)),
-            'saldo' => e($this->formatMoney($record->saldo)),
+            'saldo' => $this->formatMoneyCell($record->saldo),
             'row_class' => $this->rowClass($record),
         ];
     }
@@ -39,7 +41,7 @@ final class ContaPagarListRowFormatter
             return ['erp-pagar-row--paga'];
         }
 
-        if ($record->vencimento && $record->vencimento->isBefore(now()->startOfDay())) {
+        if ($record->vencimento && $record->vencimento->toDateString() < ErpTimezone::today()) {
             return ['erp-pagar-row--vencida'];
         }
 
@@ -71,8 +73,25 @@ final class ContaPagarListRowFormatter
         }
     }
 
+    private function formatCompetenciaMesAno(mixed $state): string
+    {
+        $fmt = ContaPagarCompetencia::formatMesAno($state);
+
+        return $fmt !== '' ? $fmt : '—';
+    }
+
     private function formatMoney(mixed $state): string
     {
         return number_format((float) ($state ?? 0), 2, ',', '.');
+    }
+
+    private function formatMoneyCell(mixed $state): string
+    {
+        $valor = $this->formatMoney($state);
+
+        return '<span class="erp-pagar-money">'
+            .'<span class="erp-pagar-money__currency">R$</span>'
+            .'<span class="erp-pagar-money__amount" title="R$ '.e($valor).'">'.e($valor).'</span>'
+            .'</span>';
     }
 }

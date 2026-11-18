@@ -1,5 +1,101 @@
 /* Layout compacto — aba Configurações (Terminais) */
 
+.erp-terminais-tef {
+    padding-bottom: 0.35rem;
+}
+
+.erp-terminais-tef__summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+    padding: 0.15rem 0;
+}
+
+.erp-terminais-tef__summary::-webkit-details-marker {
+    display: none;
+}
+
+.erp-terminais-tef__summary::before {
+    content: '▸';
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-right: 0.15rem;
+}
+
+.erp-terminais-tef[open] > .erp-terminais-tef__summary::before {
+    content: '▾';
+}
+
+.erp-terminais-tef__hint {
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.erp-terminais-tef__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.35rem 0 0.5rem;
+}
+
+.erp-terminais-tef__row,
+.erp-terminais-tef__grid,
+.erp-terminais-tef__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    align-items: end;
+}
+
+.erp-terminais-tef__field {
+    flex: 1 1 12rem;
+    min-width: 10rem;
+}
+
+.erp-terminais-tef__field--sm {
+    flex: 0 1 8rem;
+    min-width: 6.5rem;
+}
+
+.erp-terminais-tef__secret {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.erp-terminais-tef__secret .erp-pcad-form__input {
+    flex: 1 1 auto;
+}
+
+.erp-terminais-tef__clear,
+.erp-terminais-tef__badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.erp-terminais-tef__badge {
+    margin-left: 0.35rem;
+    color: #0f766e;
+    text-transform: lowercase;
+}
+
+.erp-terminais-tef__clear {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+    border-radius: 4px;
+    padding: 0.25rem 0.45rem;
+    cursor: pointer;
+}
+
+.erp-terminais-tef__actions .erp-terminais-balanca__test-status {
+    flex: 1 1 12rem;
+}
+
 .erp-terminais-form--config {
     display: flex;
     flex-direction: column;

@@ -24,6 +24,7 @@ class ListTerminais extends ListRecords
     use InteractsWithErpListPage;
     use ManagesTerminalAparelhos;
     use ManagesTerminalMasterDetail;
+    use Concerns\ManagesTerminalSuperTef;
 
     protected static string $resource = TerminalResource::class;
 

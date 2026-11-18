@@ -7,6 +7,7 @@ use App\Filament\Resources\EmpresaResource\Pages\Concerns\ErpEmpresaFormPage;
 use App\Models\Empresa;
 use App\Models\User;
 use App\Support\Erp\Boleto\BoletoContaApiDefaults;
+use App\Support\Erp\Dre\DrePlanoClassificacaoPadraoService;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\EmpresaVendaProntaBootstrap;
 use App\Support\Erp\ErpOnboarding;
@@ -76,6 +77,13 @@ class CreateEmpresa extends CreateRecord
         // Estoque LOJA + caixa PDV + terminal Pedido + operador do usuário logado.
         EmpresaVendaProntaBootstrap::forEmpresa($empresa, $user instanceof User ? $user : null);
 
+        // Classificações DRE iniciais seguras (não sobrescreve; não altera planos_contas).
+        try {
+            app(DrePlanoClassificacaoPadraoService::class)->aplicarIniciaisSeguras((int) $empresa->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // Contas API Boleto (Ailos + Sicredi) já com homologação Unitec.
         // A flag "Habilitar API Boleto" permanece desligada até o cliente ativar.
         BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
@@ -93,6 +101,26 @@ class CreateEmpresa extends CreateRecord
         EmpresaParametros::gravarPermanecerTelaVendaAposConcluir(
             (int) $empresa->id,
             $this->data[EmpresaParametros::COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR] ?? false,
+        );
+        EmpresaParametros::gravarMonitorPedidosImprimirDuasVias(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_MONITOR_PEDIDOS_DUAS_VIAS] ?? false,
+        );
+        EmpresaParametros::gravarMonitorPedidosImprimirMeiaFolhaA4(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4] ?? false,
+        );
+        EmpresaParametros::gravarPedidoExibirCabecalhoEmpresa(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_PEDIDO_CABECALHO_EMPRESA] ?? false,
+        );
+        EmpresaParametros::gravarForcaVendasAlterarPrecoUnitario(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO] ?? false,
+        );
+        EmpresaParametros::gravarSolicitarVendedorCadaVenda(
+            (int) $empresa->id,
+            $this->data[EmpresaParametros::COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA] ?? false,
         );
         if (! filter_var($empresa->param_boleto_habilitar ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $empresa->forceFill(['param_boleto_habilitar' => false])->saveQuietly();

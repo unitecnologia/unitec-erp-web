@@ -163,7 +163,19 @@ class Orcamento extends Model
 
     public function isEditable(): bool
     {
-        return $this->status === self::STATUS_ABERTO;
+        if ($this->status !== self::STATUS_ABERTO) {
+            return false;
+        }
+
+        // Orçamento do Vendas Internas em edição no app: bloqueia formulário ERP.
+        try {
+            app(\App\Support\VendasInternas\VendasInternasEdicaoLockService::class)
+                ->assertOrcamentoLivre($this);
+        } catch (\RuntimeException) {
+            return false;
+        }
+
+        return true;
     }
 
     public function cliente(): BelongsTo

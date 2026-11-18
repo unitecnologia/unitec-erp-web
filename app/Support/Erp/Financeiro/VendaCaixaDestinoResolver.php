@@ -6,8 +6,8 @@ use App\Models\CaixaConta;
 use App\Models\FormaPagamento;
 use App\Models\PdvCaixaSessao;
 use App\Models\User;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Destino de caixa para vendas comerciais (Tela / FV / Monitor).
@@ -81,11 +81,11 @@ final class VendaCaixaDestinoResolver
             return null;
         }
 
-        if (! Schema::hasTable((new PdvCaixaSessao)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvCaixaSessao)->getTable())) {
             return null;
         }
 
-        if (! Schema::hasColumn('pdv_caixa_sessoes', 'caixa_conta_id')) {
+        if (! ErpSchema::hasColumn('pdv_caixa_sessoes', 'caixa_conta_id')) {
             return null;
         }
 
@@ -94,7 +94,7 @@ final class VendaCaixaDestinoResolver
             ->whereNull('fechado_em')
             ->orderByDesc('id');
 
-        if ($empresaId && $empresaId > 0 && Schema::hasColumn('pdv_caixa_sessoes', 'empresa_id')) {
+        if ($empresaId && $empresaId > 0 && ErpSchema::hasColumn('pdv_caixa_sessoes', 'empresa_id')) {
             $query->where('empresa_id', $empresaId);
         }
 
@@ -171,7 +171,7 @@ final class VendaCaixaDestinoResolver
             return [];
         }
 
-        if (! Schema::hasTable('caixa_conta_user')) {
+        if (! ErpSchema::hasTable('caixa_conta_user')) {
             return [];
         }
 

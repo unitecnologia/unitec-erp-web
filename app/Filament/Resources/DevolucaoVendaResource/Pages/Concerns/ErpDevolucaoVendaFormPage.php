@@ -803,6 +803,36 @@ trait ErpDevolucaoVendaFormPage
                         'total' => ErpMoney::parseBr($row['total'] ?? 0),
                     ];
 
+                    // D2.6 — custo histórico da venda original (não recalcula pelo cadastro atual).
+                    if (\App\Support\Erp\Dre\VendaItemCustoHistorico::tabelaTemCusto('devolucao_venda_itens')) {
+                        $vendaItemId = (int) ($itemData['venda_item_id'] ?? 0);
+                        $custoSnap = null;
+                        if ($vendaItemId > 0) {
+                            $origem = \App\Models\VendaItem::query()->whereKey($vendaItemId)->first([
+                                'custo_unitario', 'custo_total', 'custo_origem', 'custo_situacao', 'quantidade',
+                            ]);
+                            if ($origem) {
+                                $custoSnap = \App\Support\Erp\Dre\VendaItemCustoHistorico::copiarDe($origem);
+                                if ($custoSnap !== null
+                                    && ($custoSnap['custo_situacao'] ?? '') === \App\Support\Erp\Dre\VendaItemCustoHistorico::SITUACAO_OK
+                                    && $custoSnap['custo_unitario'] !== null
+                                ) {
+                                    $unit = (float) $custoSnap['custo_unitario'];
+                                    $custoSnap['custo_total'] = number_format(round($unit * abs($qtd), 2), 2, '.', '');
+                                }
+                            }
+                        }
+                        $itemData = array_merge(
+                            $itemData,
+                            $custoSnap ?? [
+                                'custo_unitario' => null,
+                                'custo_total' => null,
+                                'custo_origem' => \App\Support\Erp\Dre\VendaItemCustoHistorico::ORIGEM_INDISPONIVEL,
+                                'custo_situacao' => \App\Support\Erp\Dre\VendaItemCustoHistorico::SITUACAO_INDISPONIVEL,
+                            ]
+                        );
+                    }
+
                     if (filled($row['id'] ?? null)) {
                         $item = DevolucaoVendaItem::query()->find($row['id']);
 

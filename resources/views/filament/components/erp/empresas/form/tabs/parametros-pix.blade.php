@@ -7,6 +7,8 @@
     $isAilos = $provedor === 'ailos';
     $isMp = $provedor === 'mercadopago';
     $webhookPadrao = EmpresaParametros::pixAilosWebhookUrl();
+    $contasPix = $this->pixContasBancariasOptions();
+    $campoContaPix = EmpresaParametros::COLUMN_PIX_CAIXA_CONTA_ID;
 @endphp
 
 <div class="erp-empresas-pix">
@@ -49,6 +51,26 @@
                     </select>
                 </div>
             @endunless
+
+            <div class="erp-empresas-pix__field erp-empresas-pix__field--full">
+                <label class="erp-pcad-form__label" for="param-{{ $campoContaPix }}">Conta Bancária Vinculada *</label>
+                <select
+                    id="param-{{ $campoContaPix }}"
+                    wire:model="data.{{ $campoContaPix }}"
+                    class="erp-pcad-form__select"
+                >
+                    <option value="">Selecione…</option>
+                    @foreach ($contasPix as $opt)
+                        <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                    @endforeach
+                </select>
+                @if ($contasPix === [])
+                    <p class="erp-empresas-pix__hint">Nenhuma conta bancária ativa nesta empresa. Cadastre em Financeiro → Contas (tipo BANCO) para vincular o PIX.</p>
+                @endif
+                @error('data.'.$campoContaPix)
+                    <p class="erp-pcad-form__error">{{ $message }}</p>
+                @enderror
+            </div>
         </div>
 
         @if ($isMp)

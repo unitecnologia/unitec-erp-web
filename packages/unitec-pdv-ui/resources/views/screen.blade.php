@@ -36,7 +36,7 @@
             </header>
             <div class="erp-pdv-modal__body">
                 <p class="erp-pdv-modal__confirm-text">
-                    NFC-e autorizada. Deseja imprimir o documento?
+                    Deseja imprimir o documento?
                 </p>
             </div>
             <footer class="erp-pdv-modal__footer">
@@ -70,6 +70,7 @@
 @includeWhen($modal === 'excluir_item', 'pdvui::modals.excluir-item')
 @includeWhen($this->pdvConfirmCancelarVenda ?? false, 'pdvui::modals.cancelar-venda')
 @includeWhen($modal === 'vendedor', 'pdvui::modals.vendedor')
+@includeWhen($modal === 'vendedor_venda', 'pdvui::modals.vendedor-venda')
 @includeWhen($modal === 'desconto_item', 'pdvui::modals.desconto-item')
 @includeWhen($modal === 'grade', 'pdvui::modals.grade')
 @includeWhen($modal === 'serial', 'pdvui::modals.serial')
@@ -82,6 +83,7 @@
 @includeWhen($modal === 'importar', 'pdvui::modals.importar')
 @includeWhen($modal === 'receber', 'pdvui::modals.receber')
 @includeWhen($modal === 'reimprimir', 'pdvui::modals.reimprimir')
+@includeWhen($modal === 'reimprimir_nfce', 'pdvui::modals.reimprimir-nfce')
 @includeWhen($modal === 'consulta_venda', 'pdvui::modals.consulta-venda')
 @includeWhen($modal === 'estorno_venda', 'pdvui::modals.estorno-venda')
 @includeWhen(filled($this->pdvFiscalOverlayTipo ?? null), 'pdvui::modals.fiscal-mensagem')

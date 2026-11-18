@@ -17,6 +17,7 @@ class ForcaVendasItemAgrupamentoTest extends TestCase
             quantidadeAdicionar: 39.0,
             descontoAdicionar: 0.0,
             acrescimoAdicionar: 0.0,
+            modoReais: 'unitario',
         );
 
         $this->assertSame(40.0, $r['quantidade']);
@@ -26,6 +27,22 @@ class ForcaVendasItemAgrupamentoTest extends TestCase
         $preco = 10.0;
         $total = round(($r['quantidade'] * $preco) + $r['acrescimo'] - $r['desconto'], 2);
         $this->assertSame(360.0, $total);
+    }
+
+    public function test_modo_linha_nao_reescala_desconto_ao_aumentar_qtd(): void
+    {
+        $r = ForcaVendasItemAgrupamento::consolidar(
+            quantidadeAtual: 6.0,
+            descontoLinhaAtual: 1.0,
+            acrescimoLinhaAtual: 0.0,
+            quantidadeAdicionar: 2.0,
+            descontoAdicionar: 0.0,
+            acrescimoAdicionar: 0.0,
+            modoReais: 'linha',
+        );
+
+        $this->assertSame(8.0, $r['quantidade']);
+        $this->assertSame(1.0, $r['desconto']);
     }
 
     public function test_desconto_1_50_por_unidade_ao_dobrar_quantidade(): void

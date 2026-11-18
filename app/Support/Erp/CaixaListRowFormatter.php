@@ -3,6 +3,7 @@
 namespace App\Support\Erp;
 
 use App\Models\CaixaLancamento;
+use App\Support\Pix\PixPdvLivroCaixaService;
 use Illuminate\Support\Carbon;
 
 final class CaixaListRowFormatter
@@ -47,9 +48,15 @@ final class CaixaListRowFormatter
             default => $this->formatData($record->emissao),
         };
 
+        $numeroPixPdv = PixPdvLivroCaixaService::numeroPedidoExibicao(
+            $record->documento,
+            (string) ($record->historico ?? ''),
+        );
+
         $documento = match (true) {
             $isAbertura => 'ABERTURA',
             $isFechamento => 'FECHAMENTO',
+            $numeroPixPdv !== null => $numeroPixPdv,
             default => ContaReceberPedidoExibicao::texto($record->documento, $this->pedidosMonitor),
         };
 
@@ -64,6 +71,11 @@ final class CaixaListRowFormatter
         if ($isFechamento) {
             $movId = (int) ($record->getAttribute('livro_movimento_id') ?? 0);
             $verItens = $this->formatFechamentoButton($movId);
+        } elseif ($isAbertura) {
+            $verItens = $this->formatViewButton(
+                (int) $record->getKey(),
+                'Visualizar abertura de caixa',
+            );
         } elseif (! $isVirtual) {
             $qtdGrupo = (int) ($record->getAttribute('caixa_grupo_qtd') ?? 0);
             $grupoIds = $isGrupo

@@ -2,11 +2,10 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Pages\Concerns\ManagesZeraEstoque;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
-use App\Support\Erp\ZeraEstoqueNegativoService;
 use BackedEnum;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -15,6 +14,8 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class ZeraEstoqueNegativoPage extends Page
 {
+    use ManagesZeraEstoque;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
 
     protected static ?string $title = '';
@@ -30,7 +31,8 @@ class ZeraEstoqueNegativoPage extends Page
 
     public function mount(): void
     {
-        ErpScreen::set('Zera Estoque Negativo');
+        ErpScreen::set('Zera Estoque');
+        $this->bootZeraEstoqueDefaults();
     }
 
     public function getHeading(): string|Htmlable|null
@@ -40,7 +42,7 @@ class ZeraEstoqueNegativoPage extends Page
 
     public function getPageClasses(): array
     {
-        return [...parent::getPageClasses(), 'erp-list-page', 'erp-comando-page'];
+        return [...parent::getPageClasses(), 'erp-list-page', 'erp-zera-estoque-page'];
     }
 
     public function content(Schema $schema): Schema
@@ -50,17 +52,6 @@ class ZeraEstoqueNegativoPage extends Page
             ->components([
                 View::make('filament.components.erp.zera-estoque-negativo.screen'),
             ]);
-    }
-
-    public function executar(): void
-    {
-        $count = (new ZeraEstoqueNegativoService())->zerarTodos();
-
-        Notification::make()
-            ->title('Estoque negativo zerado.')
-            ->body($count . ' produto(s) ajustado(s).')
-            ->success()
-            ->send();
     }
 
     public function closeScreen(): void

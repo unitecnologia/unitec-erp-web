@@ -1942,3 +1942,67 @@ html:has(.erp-pessoas-form-page.erp-pdv-embed) {
     justify-content: flex-end;
     border-top: 1px solid #e8eef6;
 }
+
+/* Diff consulta CNPJ (cadastro existente) */
+.erp-aviso-modal__box:has(.erp-pcad-cnpj-diff) {
+    width: min(96vw, 46rem);
+}
+
+.erp-pcad-cnpj-diff {
+    max-height: min(42vh, 18rem);
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.55rem;
+    background: #f8fafc;
+}
+
+.erp-pcad-cnpj-diff__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.erp-pcad-cnpj-diff__table th,
+.erp-pcad-cnpj-diff__table td {
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+    text-align: left;
+}
+
+.erp-pcad-cnpj-diff__table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #eef2f7;
+    color: #334155;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-pcad-cnpj-diff__table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.erp-pcad-cnpj-diff__check {
+    width: 2rem;
+    text-align: center;
+}
+
+.erp-pcad-cnpj-diff__campo {
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+}
+
+.erp-pcad-cnpj-diff__atual {
+    color: #64748b;
+    word-break: break-word;
+}
+
+.erp-pcad-cnpj-diff__novo {
+    color: #0f766e;
+    font-weight: 600;
+    word-break: break-word;
+}

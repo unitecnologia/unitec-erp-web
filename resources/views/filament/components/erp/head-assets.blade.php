@@ -21,6 +21,26 @@
     <script src="{{ asset('js/erp-receber-boleto-venc-progress.js') }}?v={{ $version }}-v2"></script>
     <script src="{{ asset('js/erp-boleto-print.js') }}?v={{ $version }}-v2"></script>
 @endif
+@if (ErpPageAssets::resourceSegment() === 'contas-pagar')
+    <script src="{{ asset('js/erp-pagar-form-enter.js') }}?v={{ $version }}-v3" data-navigate-track></script>
+    <script src="{{ asset('js/erp-pagar-baixa-enter.js') }}?v={{ $version }}-v6" data-navigate-track></script>
+@endif
+@php
+    $descontoSegment = ErpPageAssets::resourceSegment();
+    $descontoJsPath = public_path('js/erp-desconto-item-modal.js');
+    $descontoJsVersion = is_file($descontoJsPath) ? (string) filemtime($descontoJsPath) : $version;
+    $precisaDescontoJs = in_array($descontoSegment, [
+        'forca-vendas-tela-venda',
+        'orcamentos',
+        'ordens-servico',
+        'nfe',
+        'nfse',
+        'pdv',
+    ], true) || ErpPageAssets::routeKind() === 'pdv';
+@endphp
+@if ($precisaDescontoJs)
+    <script src="{{ asset('js/erp-desconto-item-modal.js') }}?v={{ $descontoJsVersion }}"></script>
+@endif
 @if (ErpPageAssets::resourceSegment() === 'nfe')
     <script src="{{ asset('js/erp-nfe-lancamento.js') }}?v={{ $version }}" defer></script>
 @endif

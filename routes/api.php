@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
 use App\Http\Controllers\Api\VendasInternas\DeviceController as ViDeviceController;
 use App\Http\Controllers\Api\VendasInternas\EquipamentoController as ViEquipamentoController;
 use App\Http\Controllers\Api\VendasInternas\InfoController as ViInfoController;
+use App\Http\Controllers\Api\VendasInternas\OrderEdicaoController as ViOrderEdicaoController;
 use App\Http\Controllers\Api\VendasInternas\SyncController as ViSyncController;
 use App\Http\Controllers\Api\MeliHubPairController;
 use App\Http\Controllers\Webhooks\MercadoLivreWebhookController;
@@ -171,6 +172,10 @@ Route::prefix('v1/vendas-internas')->group(function (): void {
         Route::get('ping', [ViInfoController::class, 'ping']);
         Route::post('devices/register', [ViDeviceController::class, 'register']);
         Route::get('devices/status', [ViDeviceController::class, 'status']);
+        // Reset da base local: precisa funcionar antes do login (app recém-aberto).
+        Route::get('devices/reset', [ViDeviceController::class, 'resetStatus']);
+        Route::post('devices/reset/{reset}/concluir', [ViDeviceController::class, 'resetConcluir'])
+            ->where('reset', '[0-9a-fA-F-]{36}');
     });
 
     Route::get('produtos/{product}/foto', ProductPhotoController::class)
@@ -182,10 +187,20 @@ Route::prefix('v1/vendas-internas')->group(function (): void {
         Route::post('auth/login', [ViAuthController::class, 'login']);
 
         Route::middleware('auth:sanctum')->group(function (): void {
-            Route::get('auth/me', [ViAuthController::class, 'me']);
+            // Logout fica fora do vínculo: sempre deve conseguir encerrar o token.
             Route::post('auth/logout', [ViAuthController::class, 'logout']);
+        });
+
+        Route::middleware(['auth:sanctum', 'vendasinternas.device.user'])->group(function (): void {
+            Route::get('auth/me', [ViAuthController::class, 'me']);
             Route::get('sync/pull', [ViSyncController::class, 'pull']);
             Route::post('sync/push', [ViSyncController::class, 'push']);
+
+            // Bloqueio persistente EM EDIÇÃO NO VI (reabertura de documento sincronizado).
+            Route::post('orders/{uuid}/edicao/lock', [ViOrderEdicaoController::class, 'lock'])
+                ->where('uuid', '[0-9a-fA-F-]{36}');
+            Route::post('orders/{uuid}/edicao/unlock', [ViOrderEdicaoController::class, 'unlock'])
+                ->where('uuid', '[0-9a-fA-F-]{36}');
 
             Route::get('equipamentos', [ViEquipamentoController::class, 'index']);
             Route::get('equipamentos/{id}', [ViEquipamentoController::class, 'show'])->whereNumber('id');

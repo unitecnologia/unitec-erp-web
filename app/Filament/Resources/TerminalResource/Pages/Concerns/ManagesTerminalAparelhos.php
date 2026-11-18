@@ -9,12 +9,14 @@ use App\Models\ForcaVendasDeviceReset;
 use App\Models\MesasDevice;
 use App\Models\UnitecOsDevice;
 use App\Models\VendasInternasDevice;
+use App\Models\VendasInternasDeviceReset;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\License\DeviceLicenseLimitExceeded;
 use App\Support\Erp\Pdv\TerminalResolver;
 use App\Support\ForcaVendas\ForcaVendasDeviceResetService;
 use App\Support\Gestor\GestorAprovacaoService;
+use App\Support\VendasInternas\VendasInternasDeviceResetService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -144,9 +146,10 @@ trait ManagesTerminalAparelhos
             return;
         }
 
-        if (($item['origem'] ?? null) !== 'fv') {
+        $origem = $item['origem'] ?? null;
+        if (! in_array($origem, ['fv', 'vi'], true)) {
             Notification::make()
-                ->title('Reset da base disponível só para aparelhos do Força de Vendas.')
+                ->title('Reset da base disponível só para Força de Vendas e Vendas Internas.')
                 ->warning()
                 ->send();
 
@@ -157,7 +160,11 @@ trait ManagesTerminalAparelhos
             return;
         }
 
-        if (! app(ForcaVendasDeviceResetService::class)->tabelaDisponivel()) {
+        $tabelaOk = $origem === 'vi'
+            ? app(VendasInternasDeviceResetService::class)->tabelaDisponivel()
+            : app(ForcaVendasDeviceResetService::class)->tabelaDisponivel();
+
+        if (! $tabelaOk) {
             Notification::make()
                 ->title('Reset da base indisponível.')
                 ->body('Execute as migrações do sistema (php artisan migrate).')
@@ -167,7 +174,8 @@ trait ManagesTerminalAparelhos
             return;
         }
 
-        if (($item['reset_status'] ?? null) === ForcaVendasDeviceReset::STATUS_PENDENTE) {
+        if (($item['reset_status'] ?? null) === ForcaVendasDeviceReset::STATUS_PENDENTE
+            || ($item['reset_status'] ?? null) === VendasInternasDeviceReset::STATUS_PENDENTE) {
             Notification::make()
                 ->title('Este aparelho já tem um reset pendente.')
                 ->body('Ele será executado na próxima vez que o app conectar ao servidor.')
@@ -190,7 +198,7 @@ trait ManagesTerminalAparelhos
         $key = $this->resetAparelhoKey;
         $this->resetAparelhoKey = null;
 
-        if ($key === null || ! str_starts_with($key, 'fv:')) {
+        if ($key === null) {
             return;
         }
 
@@ -198,19 +206,26 @@ trait ManagesTerminalAparelhos
             return;
         }
 
-        $device = ForcaVendasDevice::query()->find((int) substr($key, 3));
-
-        if ($device === null || blank($device->device_uuid)) {
-            Notification::make()
-                ->title('Aparelho não encontrado.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
         try {
-            $result = app(ForcaVendasDeviceResetService::class)->autorizar($device, Auth::user());
+            if (str_starts_with($key, 'fv:')) {
+                $device = ForcaVendasDevice::query()->find((int) substr($key, 3));
+                if ($device === null || blank($device->device_uuid)) {
+                    Notification::make()->title('Aparelho não encontrado.')->danger()->send();
+
+                    return;
+                }
+                $result = app(ForcaVendasDeviceResetService::class)->autorizar($device, Auth::user());
+            } elseif (str_starts_with($key, 'vi:')) {
+                $device = VendasInternasDevice::query()->find((int) substr($key, 3));
+                if ($device === null || blank($device->device_uuid)) {
+                    Notification::make()->title('Aparelho não encontrado.')->danger()->send();
+
+                    return;
+                }
+                $result = app(VendasInternasDeviceResetService::class)->autorizar($device, Auth::user());
+            } else {
+                return;
+            }
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Não foi possível autorizar o reset.')
@@ -303,23 +318,24 @@ trait ManagesTerminalAparelhos
 
         $devices = $query->limit(200)->get();
         $empresas = $this->empresasDosAparelhos($devices);
-        $resets = $origem === 'fv'
-            ? app(ForcaVendasDeviceResetService::class)->resumoPorAparelho(
-                $devices->pluck('device_uuid')->filter()->map(fn ($u): string => (string) $u)->values()->all(),
-            )
-            : collect();
+        $uuids = $devices->pluck('device_uuid')->filter()->map(fn ($u): string => (string) $u)->values()->all();
+        $resets = match ($origem) {
+            'fv' => app(ForcaVendasDeviceResetService::class)->resumoPorAparelho($uuids),
+            'vi' => app(VendasInternasDeviceResetService::class)->resumoPorAparelho($uuids),
+            default => collect(),
+        };
 
         return $devices->map(function ($device) use ($origem, $origemLabel, $empresas, $resets): array {
             $empresa = $empresas->get((int) ($device->empresa_id ?? 0));
-            /** @var ForcaVendasDeviceReset|null $reset */
+            /** @var ForcaVendasDeviceReset|VendasInternasDeviceReset|null $reset */
             $reset = $resets->get((string) $device->device_uuid);
 
             return [
                 'device_uuid' => $device->device_uuid,
                 'reset_status' => $reset?->status,
                 'reset_label' => match ($reset?->status) {
-                    ForcaVendasDeviceReset::STATUS_PENDENTE => 'Reset pendente',
-                    ForcaVendasDeviceReset::STATUS_CONCLUIDO => 'Concluído '.$reset->completed_at?->format('d/m/Y H:i'),
+                    ForcaVendasDeviceReset::STATUS_PENDENTE, VendasInternasDeviceReset::STATUS_PENDENTE => 'Reset pendente',
+                    ForcaVendasDeviceReset::STATUS_CONCLUIDO, VendasInternasDeviceReset::STATUS_CONCLUIDO => 'Concluído '.$reset->completed_at?->format('d/m/Y H:i'),
                     default => null,
                 },
                 'reset_title' => $reset !== null

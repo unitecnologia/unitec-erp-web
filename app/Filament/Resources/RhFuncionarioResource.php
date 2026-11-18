@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\RhFuncionarioResource\Pages;
 use App\Models\RhFuncionario;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTableSort;
 use BackedEnum;
@@ -38,6 +39,18 @@ class RhFuncionarioResource extends Resource
         }
 
         return ErpAccess::currentCan('rh.funcionarios.access');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        $query = parent::getEloquentQuery();
+
+        if ($empresaId > 0) {
+            return $query->where('empresa_id', $empresaId);
+        }
+
+        return $query->whereRaw('1 = 0');
     }
 
     public static function table(Table $table): Table

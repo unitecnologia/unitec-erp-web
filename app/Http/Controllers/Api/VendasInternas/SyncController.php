@@ -58,6 +58,17 @@ class SyncController
         ]);
 
         $orders = (array) $request->input('orders', []);
+        $deviceUuid = trim((string) $request->header('X-VI-Device', ''));
+        if ($deviceUuid !== '') {
+            foreach ($orders as $i => $order) {
+                if (! is_array($order)) {
+                    continue;
+                }
+                if (trim((string) ($order['device_uuid'] ?? '')) === '') {
+                    $orders[$i]['device_uuid'] = $deviceUuid;
+                }
+            }
+        }
 
         /** @var User $user */
         $user = $request->user();

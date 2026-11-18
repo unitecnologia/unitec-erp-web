@@ -20,6 +20,7 @@ use Unitec\FiscalEngine\Dto\NfeDestinatarioDto;
 use Unitec\FiscalEngine\Dto\NfeTransporteDto;
 use Unitec\FiscalEngine\Dto\PagamentoDto;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
+use Unitec\FiscalEngine\Util\XmlHelper;
 
 final class NfeFiscalPayloadBuilder
 {
@@ -337,10 +338,26 @@ final class NfeFiscalPayloadBuilder
 
     private function buildEmitente(Empresa $empresa, string $ufEmitente): EmitenteDto
     {
+        $razao = XmlHelper::sanitizeTString(
+            (string) ($empresa->razao_social ?: $empresa->nome),
+            60,
+        );
+        $fantasia = XmlHelper::sanitizeTString(
+            (string) ($empresa->fantasia ?: $empresa->nome),
+            60,
+        );
+
+        if (mb_strlen($razao, 'UTF-8') < 2) {
+            throw new FiscalEngineException(
+                'Razão social da empresa inválida para o XML fiscal (emit/xNome). '
+                .'Corrija o cadastro da empresa (sem caracteres inválidos) e tente novamente.',
+            );
+        }
+
         return new EmitenteDto(
             cnpj: (string) $empresa->cnpj,
-            razaoSocial: (string) ($empresa->razao_social ?: $empresa->nome),
-            nomeFantasia: (string) ($empresa->fantasia ?: $empresa->nome),
+            razaoSocial: $razao,
+            nomeFantasia: $fantasia !== '' ? $fantasia : $razao,
             ie: (string) $empresa->ie,
             crt: RegimeCrtMapper::toCrt($empresa->regime_tributario ?? 'simples'),
             logradouro: (string) ($empresa->endereco ?? 'NAO INFORMADO'),

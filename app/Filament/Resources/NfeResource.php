@@ -62,6 +62,17 @@ class NfeResource extends Resource
                     ))
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('serie')
+                    ->label('Série')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => ErpTableSort::orderByCodigoNumerico(
+                        $query,
+                        $direction,
+                        'serie',
+                        desempateIdDesc: true,
+                    ))
+                    ->placeholder('—')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('npedido')
                     ->label('Ped/OS')
                     ->state(fn (Nfe $record): string => self::formatNumeroPedido($record))

@@ -12,6 +12,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\CaixaLivroFechamentoConferencia;
 use App\Support\Erp\Financeiro\CaixaLivroFechamentoReportData;
 use App\Support\Erp\Financeiro\CaixaLivroMovimentoService;
+use App\Support\Erp\Queries\CaixaPdvMovimentacaoQuery;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
@@ -20,6 +21,14 @@ use Livewire\Attributes\Locked;
 
 trait ManagesCaixaLivroMovimentoModal
 {
+    /**
+     * Contas ativas já lidas para o seletor (id => nome + tipo).
+     * A tela usa este cache para o combo e para o F8, sem uma segunda consulta.
+     *
+     * @var array<int, array{nome: string, tipo: string}>|null
+     */
+    private ?array $caixaContasCatalogoMemo = null;
+
     public bool $caixaAbrirOpen = false;
 
     public bool $caixaFecharOpen = false;
@@ -81,21 +90,95 @@ trait ManagesCaixaLivroMovimentoModal
         return app(CaixaLivroMovimentoService::class)->movimentoAberto($empresaId, $contaId);
     }
 
-    #[Computed]
-    public function caixaF8PodeUsar(): bool
+    /**
+     * Uma leitura das contas ativas (nome e tipo). O seletor e o F8 compartilham o resultado.
+     *
+     * @return array<int, array{nome: string, tipo: string}>
+     */
+    protected function caixaContasCatalogo(): array
+    {
+        if ($this->caixaContasCatalogoMemo !== null) {
+            return $this->caixaContasCatalogoMemo;
+        }
+
+        $catalogo = [];
+
+        $rows = CaixaConta::query()
+            ->visiveisNaEmpresa()
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'tipo']);
+
+        foreach ($rows as $row) {
+            $catalogo[(int) $row->id] = [
+                'nome' => (string) $row->nome,
+                'tipo' => (string) $row->tipo,
+            ];
+        }
+
+        return $this->caixaContasCatalogoMemo = $catalogo;
+    }
+
+    protected function contaFiltroEhBancaria(): bool
     {
         $contaId = is_numeric($this->contaFilter) ? (int) $this->contaFilter : 0;
         if ($contaId <= 0) {
             return false;
         }
 
-        $conta = CaixaConta::query()->visiveisNaEmpresa()->whereKey($contaId)->first();
-        if (! $conta || ! $conta->ativo) {
+        $tipo = $this->caixaContasCatalogo()[$contaId]['tipo'] ?? null;
+        if ($tipo === null) {
+            return false;
+        }
+
+        $conta = new CaixaConta;
+        $conta->tipo = $tipo;
+
+        return $conta->isContaBancaria();
+    }
+
+    /**
+     * Conta tipo PDV (ou filtro virtual de sessões sem caixa): retaguarda só consulta.
+     * Catálogo já carregado para contas reais — sem query extra.
+     */
+    protected function contaFiltroEhPdv(): bool
+    {
+        $contaId = is_numeric($this->contaFilter) ? (int) $this->contaFilter : -1;
+
+        if (CaixaPdvMovimentacaoQuery::isFiltroSessoesSemConta($contaId)) {
+            return true;
+        }
+
+        if ($contaId <= 0) {
+            return false;
+        }
+
+        $tipo = $this->caixaContasCatalogo()[$contaId]['tipo'] ?? null;
+
+        return app(CaixaLivroMovimentoService::class)->isContaTipoPdv($tipo);
+    }
+
+    #[Computed]
+    public function caixaContaPdvSomenteConsulta(): bool
+    {
+        return $this->contaFiltroEhPdv();
+    }
+
+    #[Computed]
+    public function caixaF8PodeUsar(): bool
+    {
+        if ($this->contaFiltroEhBancaria() || $this->contaFiltroEhPdv()) {
+            return false;
+        }
+
+        $contaId = is_numeric($this->contaFilter) ? (int) $this->contaFilter : 0;
+        $tipo = $this->caixaContasCatalogo()[$contaId]['tipo'] ?? null;
+        if ($tipo === null) {
             return false;
         }
 
         return in_array(
-            (string) $conta->tipo,
+            $tipo,
             app(CaixaLivroMovimentoService::class)->tiposElegiveis(),
             true
         );
@@ -109,6 +192,10 @@ trait ManagesCaixaLivroMovimentoModal
 
     public function openCaixaF8(): void
     {
+        if ($this->contaFiltroEhBancaria()) {
+            return;
+        }
+
         if ($this->caixaMovimentoAberto) {
             $this->openCaixaFechamento();
 
@@ -120,6 +207,10 @@ trait ManagesCaixaLivroMovimentoModal
 
     public function openCaixaAbertura(): void
     {
+        if ($this->contaFiltroEhBancaria()) {
+            return;
+        }
+
         if (! $this->erpAuthorizeOrNotify('caixa.abrir')) {
             return;
         }
@@ -201,6 +292,10 @@ trait ManagesCaixaLivroMovimentoModal
 
     public function openCaixaFechamento(): void
     {
+        if ($this->contaFiltroEhBancaria()) {
+            return;
+        }
+
         if (! $this->erpAuthorizeOrNotify('caixa.fechar')) {
             return;
         }
@@ -554,6 +649,10 @@ trait ManagesCaixaLivroMovimentoModal
 
     public function openCaixaFechamentoHistorico(): void
     {
+        if ($this->contaFiltroEhBancaria()) {
+            return;
+        }
+
         if (! $this->erpAuthorizeOrNotify('caixa.print')) {
             return;
         }

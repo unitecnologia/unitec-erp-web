@@ -3,6 +3,8 @@
         $finalizarBackdropAction = match (true) {
             $this->finalizarConfirmSair => 'cancelCloseFinalizar',
             $this->finalizarConfirmImprimir => 'cancelFinalizarImprimir',
+            $this->finalizarSuperTefConfirmNovaCobranca => 'voltarConfirmacaoNovaCobrancaSuperTef',
+            $this->finalizarSuperTefResolverAberta => 'voltarResolverPagamentoAnteriorSuperTef',
             default => 'requestCloseFinalizar',
         };
     @endphp
@@ -157,78 +159,144 @@
                     <div class="erp-pdv-canhoto-overlay" role="dialog" aria-labelledby="erp-pdv-canhoto-title">
                         <div class="erp-pdv-parcelas erp-pdv-canhoto">
                             <header class="erp-pdv-parcelas__header">
-                                <h3 id="erp-pdv-canhoto-title">Canhoto POS | Contas a Receber</h3>
+                                <h3 id="erp-pdv-canhoto-title">
+                                    @if ($this->finalizarCartaoModoSuperTef)
+                                        SuperTEF Crédito | Parcelas
+                                    @else
+                                        Canhoto POS | Contas a Receber
+                                    @endif
+                                </h3>
                                 <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarCartaoCanhoto" title="Fechar">✕</button>
                             </header>
 
                             <div class="erp-pdv-parcelas__toolbar">
                                 <div class="erp-pdv-parcelas__avulso">
-                                    <span class="erp-pdv-parcelas__avulso-title">Dados do canhoto</span>
+                                    <span class="erp-pdv-parcelas__avulso-title">
+                                        @if ($this->finalizarCartaoModoSuperTef)
+                                            Parcelas (cadastro da forma)
+                                        @else
+                                            Dados do canhoto
+                                        @endif
+                                    </span>
                                     <div class="erp-pdv-parcelas__avulso-fields">
                                         <label class="erp-pdv-parcelas__field">
                                             <span>Total</span>
                                             <input type="text" value="{{ \Unitec\PdvUi\Support\PdvMoney::formatBr($this->finalizarCartaoTotalValor) }}" readonly tabindex="-1">
                                         </label>
-                                        <label class="erp-pdv-parcelas__field">
-                                            <span>NSU</span>
-                                            <input id="erp-pdv-canhoto-nsu" type="text" wire:model="finalizarCartaoNsu" autocomplete="off">
-                                        </label>
-                                        <label class="erp-pdv-parcelas__field">
-                                            <span>Autorização</span>
-                                            <input id="erp-pdv-canhoto-autorizacao" type="text" wire:model="finalizarCartaoAutorizacao" autocomplete="off">
-                                        </label>
-                                        <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
-                                            <span>Maquininha</span>
-                                            <select id="erp-pdv-canhoto-maquininha" wire:model="finalizarCartaoMaquininha">
-                                                <option value="">— Selecione —</option>
-                                                @php
-                                                    $maqs = $this->cartaoMaquininhaOptions
-                                                        ?? (class_exists(\App\Models\CartaoMaquininha::class)
-                                                            ? \App\Models\CartaoMaquininha::optionsAtivas()
-                                                            : []);
-                                                @endphp
-                                                @foreach ($maqs as $nome)
-                                                    <option value="{{ $nome }}">{{ $nome }}</option>
-                                                @endforeach
-                                            </select>
-                                        </label>
-                                        <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
-                                            <span>Bandeira</span>
-                                            <select id="erp-pdv-canhoto-bandeira" wire:model="finalizarCartaoBandeira">
-                                                <option value="">— Selecione —</option>
-                                                @php
-                                                    $bands = $this->cartaoBandeiraOptions
-                                                        ?? (class_exists(\App\Models\CartaoBandeira::class)
-                                                            ? \App\Models\CartaoBandeira::optionsAtivas()
-                                                            : []);
-                                                @endphp
-                                                @foreach ($bands as $nome)
-                                                    <option value="{{ $nome }}">{{ $nome }}</option>
-                                                @endforeach
-                                            </select>
-                                        </label>
+                                        @unless ($this->finalizarCartaoModoSuperTef)
+                                            <label class="erp-pdv-parcelas__field">
+                                                <span>NSU</span>
+                                                <input id="erp-pdv-canhoto-nsu" type="text" wire:model="finalizarCartaoNsu" autocomplete="off">
+                                            </label>
+                                            <label class="erp-pdv-parcelas__field">
+                                                <span>Autorização</span>
+                                                <input id="erp-pdv-canhoto-autorizacao" type="text" wire:model="finalizarCartaoAutorizacao" autocomplete="off">
+                                            </label>
+                                            <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
+                                                <span>Maquininha</span>
+                                                <select id="erp-pdv-canhoto-maquininha" wire:model="finalizarCartaoMaquininha">
+                                                    <option value="">— Selecione —</option>
+                                                    @php
+                                                        $maqs = $this->cartaoMaquininhaOptions
+                                                            ?? (class_exists(\App\Models\CartaoMaquininha::class)
+                                                                ? \App\Models\CartaoMaquininha::optionsAtivas()
+                                                                : []);
+                                                    @endphp
+                                                    @foreach ($maqs as $nome)
+                                                        <option value="{{ $nome }}">{{ $nome }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </label>
+                                            <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
+                                                <span>Bandeira</span>
+                                                <select id="erp-pdv-canhoto-bandeira" wire:model="finalizarCartaoBandeira">
+                                                    <option value="">— Selecione —</option>
+                                                    @php
+                                                        $bands = $this->cartaoBandeiraOptions
+                                                            ?? (class_exists(\App\Models\CartaoBandeira::class)
+                                                                ? \App\Models\CartaoBandeira::optionsAtivas()
+                                                                : []);
+                                                    @endphp
+                                                    @foreach ($bands as $nome)
+                                                        <option value="{{ $nome }}">{{ $nome }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </label>
+                                        @endunless
                                     </div>
                                     <div class="erp-pdv-parcelas__avulso-fields" style="margin-top:0.5rem;">
-                                        <label class="erp-pdv-parcelas__field">
-                                            <span>Qtd. Parcelas</span>
-                                            <input id="erp-pdv-canhoto-qtd" type="text" wire:model="finalizarCartaoParcelasQtd" data-mask="integer" autocomplete="off">
-                                        </label>
-                                        <label class="erp-pdv-parcelas__field">
-                                            <span>Intervalo (dias)</span>
-                                            <input id="erp-pdv-canhoto-intervalo" type="text" wire:model="finalizarCartaoIntervalo" data-mask="integer" autocomplete="off">
-                                        </label>
-                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarParcelasCartaoCanhoto">
-                                            <kbd>F2</kbd> Gerar
-                                        </button>
+                                        @if ($this->finalizarCartaoOcultarEscolhaParcelas)
+                                            <p class="erp-pdv-pix-qr__hint" style="margin:0">À vista (1x) — informe NSU/autorização e conclua.</p>
+                                        @elseif (! $this->finalizarCartaoModoSuperTef || $this->finalizarCartaoModoPrazo === 'financeiro')
+                                            <label class="erp-pdv-parcelas__field">
+                                                <span>Qtd. Parcelas</span>
+                                                <input id="erp-pdv-canhoto-qtd" type="text" wire:model="finalizarCartaoParcelasQtd" data-mask="integer" autocomplete="off" @disabled($this->finalizarCartaoModoSuperTef && $this->finalizarCartaoModoPrazo === 'tabela')">
+                                            </label>
+                                            <label class="erp-pdv-parcelas__field">
+                                                <span>Intervalo (dias)</span>
+                                                <input id="erp-pdv-canhoto-intervalo" type="text" wire:model="finalizarCartaoIntervalo" data-mask="integer" autocomplete="off" @disabled($this->finalizarCartaoModoSuperTef && $this->finalizarCartaoModoPrazo === 'tabela')">
+                                            </label>
+                                            <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarParcelasCartaoCanhoto" @disabled($this->finalizarCartaoModoSuperTef && $this->finalizarCartaoModoPrazo === 'tabela')">
+                                                <kbd>F2</kbd> Gerar
+                                            </button>
+                                        @else
+                                            <p class="erp-pdv-pix-qr__hint" style="margin:0">Modo Tabela de Prazo: use F8 e escolha uma condição cadastrada na forma.</p>
+                                        @endif
                                     </div>
                                 </div>
 
                                 <div class="erp-pdv-parcelas__toolbar-actions">
+                                    @if ($this->finalizarCartaoModoSuperTef && $this->finalizarCartaoModoPrazo === 'tabela')
+                                        <button type="button" class="erp-pdv-modal__btn" wire:click="abrirTabelasCartaoPredefinidas">
+                                            <kbd>F8</kbd> Tabelas
+                                        </button>
+                                    @endif
                                     <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarCartaoCanhoto">
                                         <kbd>F4</kbd> Cancelar
                                     </button>
                                 </div>
                             </div>
+
+                            @if ($this->finalizarCartaoModoSuperTef && $this->finalizarCartaoTabelasListaAberta)
+                                <div class="erp-pdv-parcelas__tabelas" id="erp-pdv-cartao-tabelas">
+                                    <div class="erp-pdv-parcelas__tabelas-head">
+                                        <strong>Condições da forma</strong>
+                                        <button type="button" class="erp-pdv-parcelas__tabelas-close" wire:click="fecharTabelasCartaoPredefinidas" title="Fechar">✕</button>
+                                    </div>
+                                    <div class="erp-pdv-parcelas__tabelas-list">
+                                        <table class="erp-pdv__grid erp-pdv-parcelas__tabelas-grid">
+                                            <thead>
+                                                <tr>
+                                                    <th>Prazo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($this->finalizarCartaoTabelasPredefinidas as $index => $tabela)
+                                                    <tr
+                                                        wire:click="selectFinalizarCartaoTabelaPredefinida({{ $index }})"
+                                                        wire:dblclick="aplicarTabelaCartaoPredefinida"
+                                                        wire:key="pdv-cartao-tabela-{{ $index }}-{{ $tabela['tabela_prazo_id'] }}"
+                                                        @class([
+                                                            'erp-pdv__grid-row',
+                                                            'erp-pdv__grid-row--selected' => $this->selectedFinalizarCartaoTabelaIndex === $index,
+                                                        ])
+                                                    >
+                                                        <td>{{ $tabela['label'] ?? $tabela['dias'] ?? '—' }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="erp-pdv-parcelas__tabelas-actions">
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="aplicarTabelaCartaoPredefinida">
+                                            Enter | Usar tabela
+                                        </button>
+                                        <button type="button" class="erp-pdv-modal__btn" wire:click="fecharTabelasCartaoPredefinidas">
+                                            ESC | Voltar
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
 
                             <div class="erp-pdv-parcelas__grid-wrap" id="erp-pdv-finalizar-cartao-canhoto">
                                 <table class="erp-pdv__grid erp-pdv-parcelas__grid">
@@ -256,7 +324,17 @@
                                             </tr>
                                         @empty
                                             <tr class="erp-pdv__grid-empty">
-                                                <td colspan="3">Informe NSU/Autorização/Bandeira e use F2 | Gerar parcelas.</td>
+                                                <td colspan="3">
+                                                @if ($this->finalizarCartaoModoSuperTef)
+                                                    @if ($this->finalizarCartaoModoPrazo === 'tabela')
+                                                        Use F8 | Tabelas e escolha uma condição cadastrada.
+                                                    @else
+                                                        Informe Qtd. Parcelas + Intervalo e use F2 | Gerar.
+                                                    @endif
+                                                @else
+                                                    Informe NSU/Autorização/Bandeira e use F2 | Gerar parcelas.
+                                                @endif
+                                            </td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -278,7 +356,71 @@
                     </div>
                 @endif
 
-                @if ($this->finalizarPixQrAberta)
+                @if ($this->finalizarSuperTefAberta)
+                    <div
+                        class="erp-pdv-canhoto-overlay erp-pdv-pix-qr-overlay"
+                        role="dialog"
+                        aria-labelledby="erp-pdv-supertef-title"
+                        @if ($this->finalizarSuperTefDevePollar())
+                            wire:poll.4s="pollFinalizarSuperTef"
+                        @endif
+                    >
+                        {{-- 1ª pintura do modal: um único envio (lock no PHP evita reenvio em remount). --}}
+                        @if ($this->finalizarSuperTefEnviando && ! $this->finalizarSuperTefEnvioLock && $this->finalizarSuperTefErro === '')
+                            <div wire:init="enviarSuperTefPdvAgora" class="hidden" aria-hidden="true"></div>
+                        @endif
+                        {{-- Fora do wire:poll: grava Pedido/NFC-e e abre Sim/Não de impressão. --}}
+                        @if ($this->finalizarSuperTefAguardandoConclusao ?? false)
+                            <div wire:init="concluirVendaAposSuperTefPago" class="hidden" aria-hidden="true"></div>
+                        @endif
+                        <div class="erp-pdv-parcelas erp-pdv-pix-qr" style="max-width:22rem">
+                            <header class="erp-pdv-parcelas__header">
+                                <h3 id="erp-pdv-supertef-title">SuperTEF @if ($this->finalizarSuperTefModalidadeLabel !== '') — {{ $this->finalizarSuperTefModalidadeLabel }} @endif</h3>
+                                <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarSuperTef" title="Fechar janela (não cancela a cobrança)" @disabled($this->finalizarSuperTefCancelando)>✕</button>
+                            </header>
+                            <div class="erp-pdv-pix-qr__body">
+                                <div class="erp-pdv-pix-qr__valor">
+                                    <span>Valor</span>
+                                    <strong>R$ {{ $this->finalizarSuperTefValorLabel !== '' ? $this->finalizarSuperTefValorLabel : '0,00' }}</strong>
+                                </div>
+                                @if ($this->finalizarSuperTefPosLabel !== '')
+                                    <p class="erp-pdv-pix-qr__status">POS {{ $this->finalizarSuperTefPosLabel }}</p>
+                                @endif
+                                @if ($this->finalizarSuperTefErro !== '')
+                                    <p class="erp-pdv-pix-qr__erro">{{ $this->finalizarSuperTefErro }}</p>
+                                    @if ($this->finalizarSuperTefStatus !== '')
+                                        <p class="erp-pdv-pix-qr__hint" aria-live="polite">{{ $this->finalizarSuperTefStatus }}</p>
+                                    @endif
+                                @else
+                                    <p class="erp-pdv-pix-qr__hint" aria-live="polite">{{ $this->finalizarSuperTefStatus !== '' ? $this->finalizarSuperTefStatus : 'Aguardando pagamento.' }}</p>
+                                    @if ($this->finalizarSuperTefEnviando || $this->finalizarSuperTefCancelando || ($this->finalizarSuperTefIntencaoId && $this->finalizarSuperTefDevePollar()))
+                                        <div class="erp-pdv-supertef-pulse" aria-hidden="true"></div>
+                                    @endif
+                                @endif
+                                @if ($this->finalizarSuperTefOrderId !== '')
+                                    <p class="erp-pdv-pix-qr__status">{{ $this->finalizarSuperTefOrderId }}</p>
+                                @endif
+                            </div>
+                            <footer class="erp-pdv-parcelas__footer">
+                                <div class="erp-pdv-parcelas__footer-actions">
+                                    <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarSuperTef" title="Fecha a janela sem cancelar a cobrança" @disabled($this->finalizarSuperTefEnviando || $this->finalizarSuperTefCancelando || $this->finalizarSuperTefStatus === 'Finalizando pedido.')>
+                                        <kbd>ESC</kbd> Fechar
+                                    </button>
+                                    @if ($this->finalizarSuperTefPodeCancelarPagamento())
+                                        <button type="button" class="erp-pdv-modal__btn" wire:click="cancelarPagamentoSuperTef" wire:loading.attr="disabled" wire:target="cancelarPagamentoSuperTef">
+                                            Cancelar pagamento
+                                        </button>
+                                    @endif
+                                    @if ($this->finalizarSuperTefIntencaoId && ! $this->finalizarSuperTefEnviando && ! $this->finalizarSuperTefCancelando && $this->finalizarSuperTefStatus !== 'Finalizando pedido.' && $this->finalizarSuperTefStatus !== 'Pedido concluído')
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="pollFinalizarSuperTef">
+                                            Consultar
+                                        </button>
+                                    @endif
+                                </div>
+                            </footer>
+                        </div>
+                    </div>
+                @elseif ($this->finalizarPixQrAberta)
                     <div
                         class="erp-pdv-canhoto-overlay erp-pdv-pix-qr-overlay"
                         role="dialog"
@@ -606,6 +748,8 @@
                                                     @if ($linhaCredito && $this->finalizarCreditoClienteResumo)
                                                         <span class="erp-pdv-finalizar__forma-disponivel"> — disponível R$ {{ $this->finalizarCreditoClienteResumo }}</span>
                                                     @endif
+
+
                                                 </span>
                                             </span>
                                         </td>
@@ -727,6 +871,7 @@
                 class="erp-pdv-modal__footer erp-pdv-finalizar__footer-actions"
                 data-operacao-unica="{{ $this->pdvFinalizarOperacaoUnica ?? '' }}"
                 data-pix-qr="{{ $this->finalizarTemPixGerarQrcodeComValor() && ! $this->finalizarPixQrConfirmado ? '1' : '0' }}"
+                data-supertef="{{ $this->finalizarTemSuperTefComValor() && ! $this->finalizarSuperTefConfirmado ? '1' : '0' }}"
             >
                 <div class="erp-pdv-finalizar__operacao-botoes">
                     @foreach ($this->pdvFinalizarOperacaoBotoes as $botao)
@@ -753,6 +898,103 @@
                     <kbd>Esc</kbd> Cancelar
                 </button>
             </footer>
+
+            @if ($this->finalizarSuperTefResolverAberta)
+                <div class="erp-pdv-finalizar__confirm" role="dialog" aria-labelledby="erp-pdv-supertef-resolver-title">
+                    <div class="erp-pdv-finalizar__confirm-window erp-pdv-modal__window erp-pdv-modal__window--small">
+                        <header class="erp-pdv-modal__header">
+                            <h2 id="erp-pdv-supertef-resolver-title">SuperTEF</h2>
+                        </header>
+                        <div class="erp-pdv-modal__body">
+                            <p class="erp-pdv-modal__confirm-text">
+                                Existe um pagamento anterior pendente nesta maquininha.
+                            </p>
+                            @if ($this->finalizarSuperTefResolverStatusLabel !== '')
+                                <p class="erp-pdv-pix-qr__status">{{ $this->finalizarSuperTefResolverStatusLabel }}</p>
+                            @endif
+                            @if ($this->finalizarSuperTefResolverDetalhe !== '')
+                                <p class="erp-pdv-pix-qr__status">{{ $this->finalizarSuperTefResolverDetalhe }}</p>
+                            @endif
+                        </div>
+                        <footer class="erp-pdv-modal__footer">
+                            <button
+                                type="button"
+                                wire:click="voltarResolverPagamentoAnteriorSuperTef"
+                                class="erp-pdv-modal__btn"
+                                @disabled($this->finalizarSuperTefResolverBusy)
+                            >Voltar</button>
+                            @if ($this->finalizarSuperTefResolverConfirmCancelar)
+                                <button
+                                    type="button"
+                                    wire:click="confirmarCancelamentoPagamentoAnteriorSuperTef"
+                                    class="erp-pdv-modal__btn erp-pdv-modal__btn--primary"
+                                    wire:loading.attr="disabled"
+                                    wire:target="confirmarCancelamentoPagamentoAnteriorSuperTef"
+                                >Confirmar cancelamento</button>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="verificarPagamentoAnteriorSuperTef"
+                                    class="erp-pdv-modal__btn erp-pdv-modal__btn--primary"
+                                    wire:loading.attr="disabled"
+                                    wire:target="verificarPagamentoAnteriorSuperTef"
+                                    @disabled($this->finalizarSuperTefResolverBusy)
+                                >Verificar pagamento anterior</button>
+                                @if ($this->finalizarSuperTefResolverPodeCancelar())
+                                    <button
+                                        type="button"
+                                        wire:click="solicitarCancelamentoPagamentoAnteriorSuperTef"
+                                        class="erp-pdv-modal__btn"
+                                    >Cancelar cobrança anterior</button>
+                                @endif
+                                @if ($this->finalizarSuperTefResolverPodeTratarPago())
+                                    <button
+                                        type="button"
+                                        wire:click="tratarPagamentoAnteriorAprovadoSuperTef"
+                                        class="erp-pdv-modal__btn erp-pdv-modal__btn--primary"
+                                    >Tratar pagamento aprovado</button>
+                                @endif
+                                @if ($this->finalizarSuperTefResolverPosLiberada())
+                                    <button
+                                        type="button"
+                                        wire:click="voltarResolverPagamentoAnteriorSuperTef"
+                                        class="erp-pdv-modal__btn erp-pdv-modal__btn--primary"
+                                    >Continuar</button>
+                                @endif
+                            @endif
+                        </footer>
+                    </div>
+                </div>
+            @endif
+
+            @if ($this->finalizarSuperTefConfirmNovaCobranca)
+                <div class="erp-pdv-finalizar__confirm" role="dialog" aria-labelledby="erp-pdv-supertef-recon-title">
+                    <div class="erp-pdv-finalizar__confirm-window erp-pdv-modal__window erp-pdv-modal__window--small">
+                        <header class="erp-pdv-modal__header">
+                            <h2 id="erp-pdv-supertef-recon-title">SuperTEF</h2>
+                        </header>
+                        <div class="erp-pdv-modal__body">
+                            <p class="erp-pdv-modal__confirm-text">
+                                Existe um pagamento anterior aprovado aguardando reconciliação. Deseja iniciar uma nova cobrança para este pedido?
+                            </p>
+                        </div>
+                        <footer class="erp-pdv-modal__footer">
+                            <button
+                                type="button"
+                                wire:click="voltarConfirmacaoNovaCobrancaSuperTef"
+                                class="erp-pdv-modal__btn"
+                            >Voltar</button>
+                            <button
+                                type="button"
+                                wire:click="confirmarNovaCobrancaSuperTef"
+                                class="erp-pdv-modal__btn erp-pdv-modal__btn--primary"
+                                wire:loading.attr="disabled"
+                                wire:target="confirmarNovaCobrancaSuperTef"
+                            >Iniciar nova cobrança</button>
+                        </footer>
+                    </div>
+                </div>
+            @endif
 
             @if ($this->finalizarConfirmImprimir)
                 <div class="erp-pdv-finalizar__confirm" role="dialog" aria-labelledby="erp-pdv-finalizar-imprimir-title">
@@ -828,9 +1070,11 @@
                             class="erp-pdv-naoencontrado__btn"
                             id="erp-pdv-finalizar-aviso-ok"
                         >OK</button>
-                        <p class="erp-pdv-naoencontrado__hint">
-                            Preencha o pagamento e clique em OK para continuar.
-                        </p>
+                        @if (! str_contains((string) $this->finalizarAlertaTitulo, 'SUPERTEF'))
+                            <p class="erp-pdv-naoencontrado__hint">
+                                Preencha o pagamento e clique em OK para continuar.
+                            </p>
+                        @endif
                     </div>
                 </div>
             @endif

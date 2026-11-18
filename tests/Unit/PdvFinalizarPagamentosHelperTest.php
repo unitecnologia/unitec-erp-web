@@ -51,19 +51,218 @@ class PdvFinalizarPagamentosHelperTest extends TestCase
         $this->assertTrue(PdvFinalizarPagamentosHelper::isFormaAPrazo('CREDIÁRIO'));
     }
 
+    public function test_considerar_a_vista_somente_cartao_credito(): void
+    {
+        $this->assertTrue(PdvFinalizarPagamentosHelper::isFormaConsiderarAVista([
+            'tipo' => 'cartao_credito',
+            'considerar_a_vista' => true,
+        ]));
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaConsiderarAVista([
+            'tipo' => 'cartao_credito',
+            'considerar_a_vista' => false,
+        ]));
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaConsiderarAVista([
+            'tipo' => 'cartao_debito',
+            'considerar_a_vista' => true,
+        ]));
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaConsiderarAVista([
+            'tipo' => 'pix',
+            'considerar_a_vista' => true,
+        ]));
+    }
+
+    public function test_deve_assumir_parcela_unica_financeiro_max_1_e_flag_avista(): void
+    {
+        $this->assertTrue(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao([
+            'tipo' => 'cartao_credito',
+            'considerar_a_vista' => true,
+            'modo_prazo' => 'tabela',
+            'max_parcelas' => 12,
+        ]));
+
+        $this->assertTrue(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao([
+            'tipo' => 'cartao_credito',
+            'considerar_a_vista' => false,
+            'modo_prazo' => 'financeiro',
+            'max_parcelas' => 1,
+        ]));
+
+        $this->assertTrue(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao([
+            'tipo' => 'crediario',
+            'modo_prazo' => 'financeiro',
+            'max_parcelas' => 1,
+            'intervalo_parcelas' => 30,
+        ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao([
+            'tipo' => 'cartao_credito',
+            'considerar_a_vista' => false,
+            'modo_prazo' => 'financeiro',
+            'max_parcelas' => 12,
+        ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao([
+            'tipo' => 'cartao_credito',
+            'considerar_a_vista' => false,
+            'modo_prazo' => 'tabela',
+            'max_parcelas' => 1,
+        ]));
+    }
+
+    public function test_dias_parcela_unica_financeiro_usa_intervalo_ou_prazo(): void
+    {
+        $this->assertSame([14], PdvFinalizarPagamentosHelper::diasParcelaUnicaFinanceiro([
+            'intervalo_parcelas' => 14,
+            'prazo_cartao' => 30,
+        ]));
+        $this->assertSame([21], PdvFinalizarPagamentosHelper::diasParcelaUnicaFinanceiro([
+            'intervalo_parcelas' => 0,
+            'prazo_cartao' => 21,
+        ]));
+        $this->assertSame([30], PdvFinalizarPagamentosHelper::diasParcelaUnicaFinanceiro([
+            'intervalo_parcelas' => 0,
+            'prazo_cartao' => 0,
+        ]));
+    }
+
     public function test_pos_credito_com_aparece_contas_receber_e_cartao_cr(): void
     {
         $this->assertTrue(PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
             'forma' => 'POS CREDITO',
             'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'contas_receber',
             'aparece_contas_receber' => true,
         ]));
 
         $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
             'forma' => 'POS CREDITO',
             'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'caixa',
             'aparece_contas_receber' => false,
         ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
+            'forma' => 'SUPERTEF CREDITO',
+            'tipo' => 'cartao_credito',
+            'usa_super_tef' => true,
+            'aparece_contas_receber' => true,
+            'tipo_movimento' => 'contas_receber',
+        ]));
+    }
+
+    public function test_precisa_canhoto_pos_manual_por_usa_pos_e_legado_cr(): void
+    {
+        // Legado CR sem flag usa_pos.
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'CARTAO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'contas_receber',
+            'usa_pos' => false,
+        ]));
+
+        // POS Crédito / Débito com Usa POS + movimento nenhum.
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'nenhum',
+            'usa_pos' => true,
+        ]));
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'POS DEBITO',
+            'tipo' => 'cartao_debito',
+            'tipo_movimento' => 'nenhum',
+            'usa_pos' => true,
+        ]));
+
+        // Movimento caixa / CR com Usa POS.
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'caixa',
+            'usa_pos' => true,
+        ]));
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'contas_receber',
+            'usa_pos' => true,
+        ]));
+
+        // Sem flag e sem CR: não abre.
+        $this->assertFalse(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'nenhum',
+            'usa_pos' => false,
+        ]));
+        $this->assertFalse(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'caixa',
+            'usa_pos' => false,
+        ]));
+
+        // SuperTEF nunca abre canhoto manual (mesmo com usa_pos residual).
+        $this->assertFalse(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual([
+            'forma' => 'SUPERTEF CREDITO',
+            'tipo' => 'cartao_credito',
+            'tipo_movimento' => 'caixa',
+            'usa_super_tef' => true,
+            'usa_pos' => true,
+        ]));
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaUsaPos([
+            'forma' => 'SUPERTEF DEBITO',
+            'tipo' => 'cartao_debito',
+            'usa_super_tef' => true,
+            'usa_pos' => true,
+        ]));
+
+        // TEF tradicional marcado: não misturar com POS manual.
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaUsaPos([
+            'forma' => 'TEF',
+            'tipo' => 'tef',
+            'usa_tef' => true,
+            'usa_pos' => true,
+        ]));
+    }
+
+    public function test_usa_pos_respeita_considerar_a_vista_e_max_1_via_helper(): void
+    {
+        $avista = [
+            'tipo' => 'cartao_credito',
+            'usa_pos' => true,
+            'tipo_movimento' => 'nenhum',
+            'considerar_a_vista' => true,
+            'modo_prazo' => 'financeiro',
+            'max_parcelas' => 12,
+        ];
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual($avista));
+        $this->assertTrue(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($avista));
+
+        $max1 = [
+            'tipo' => 'cartao_credito',
+            'usa_pos' => true,
+            'tipo_movimento' => 'caixa',
+            'considerar_a_vista' => false,
+            'modo_prazo' => 'financeiro',
+            'max_parcelas' => 1,
+            'intervalo_parcelas' => 30,
+        ];
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual($max1));
+        $this->assertTrue(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($max1));
+        $this->assertSame([30], PdvFinalizarPagamentosHelper::diasParcelaUnicaFinanceiro($max1));
+
+        $maxN = [
+            'tipo' => 'cartao_credito',
+            'usa_pos' => true,
+            'tipo_movimento' => 'contas_receber',
+            'considerar_a_vista' => false,
+            'modo_prazo' => 'financeiro',
+            'max_parcelas' => 3,
+            'intervalo_parcelas' => 30,
+        ];
+        $this->assertTrue(PdvFinalizarPagamentosHelper::precisaCanhotoPosManual($maxN));
+        $this->assertFalse(PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($maxN));
     }
 
     public function test_prazo_financeiro_valido_exclui_default_1x30(): void
@@ -148,5 +347,24 @@ class PdvFinalizarPagamentosHelperTest extends TestCase
             [14, 28],
             PdvFinalizarPagamentosHelper::resolverDiasCarnePrioridade([14, 28], 3, 30, 'financeiro'),
         );
+    }
+
+    public function test_exige_nfce_automatica_somente_com_forma_marcada_e_valor(): void
+    {
+        $this->assertFalse(PdvFinalizarPagamentosHelper::exigeNfceAutomatica([
+            ['forma' => 'DINHEIRO', 'valor' => '10,00', 'nfce' => false],
+            ['forma' => 'PIX', 'valor' => '0,00', 'nfce' => true],
+        ]));
+
+        $this->assertTrue(PdvFinalizarPagamentosHelper::exigeNfceAutomatica([
+            ['forma' => 'DINHEIRO', 'valor' => '5,00', 'nfce' => false],
+            ['forma' => 'PIX', 'valor' => '5,00', 'nfce' => true],
+        ]));
+
+        $this->assertTrue(PdvFinalizarPagamentosHelper::exigeNfceAutomatica([
+            ['forma' => 'PIX', 'valor' => '10,00', 'nfce' => 1],
+        ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::exigeNfceAutomatica([]));
     }
 }

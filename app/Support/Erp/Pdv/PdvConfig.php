@@ -200,12 +200,20 @@ final class PdvConfig
     }
 
     /**
-     * TEF sem integração funcional: menu "Administrativo TEF" (Ctrl+T) sempre oculto.
+     * TEF legado (Ctrl+T): permanece desligado. SuperTEF usa usaSuperTefDebito().
      * A coluna terminais.usa_tef é preservada para compatibilidade.
      */
     public function usaTef(): bool
     {
         return false;
+    }
+
+    /**
+     * Débito SuperTEF no PDV (DEV/local ou flag explícita + terminal configurado).
+     */
+    public function usaSuperTefDebito(): bool
+    {
+        return \App\Support\Erp\Tef\SuperTefPdvGate::terminalPronto($this->terminal);
     }
 
     public function bloquearCancelamentoDocFiscal(): bool

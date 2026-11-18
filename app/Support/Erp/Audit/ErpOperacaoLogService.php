@@ -4,8 +4,8 @@ namespace App\Support\Erp\Audit;
 
 use App\Models\ErpOperacaoLog;
 use App\Models\User;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 
 final class ErpOperacaoLogService
 {
@@ -24,7 +24,8 @@ final class ErpOperacaoLogService
         ?int $empresaId = null,
         ?User $user = null,
     ): void {
-        if (! Schema::hasTable('erp_operacao_logs')) {
+        // ErpSchema memoiza no processo — evita information_schema a cada gravação.
+        if (! ErpSchema::hasTable('erp_operacao_logs')) {
             return;
         }
 

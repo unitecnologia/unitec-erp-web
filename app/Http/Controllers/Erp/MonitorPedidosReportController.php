@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Carga;
 use App\Models\CargaPedido;
 use App\Models\Empresa;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\Reports\MonitorPedidosReport;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -121,6 +122,11 @@ class MonitorPedidosReportController extends Controller
             FILTER_VALIDATE_BOOLEAN,
         );
 
+        // Só a impressão HTML; PDF permanece 1 via / A4 normal (params via JSON, sem migration).
+        $impDuasVias = EmpresaParametros::monitorPedidosImprimirDuasVias($empresaId);
+        $impMeiaFolhaA4 = EmpresaParametros::monitorPedidosImprimirMeiaFolhaA4($empresaId);
+        $exibirCabecalhoEmpresa = EmpresaParametros::pedidoExibirCabecalhoEmpresa($empresaId);
+
         $data = [
             'empresa' => $empresa,
             'blocos' => $blocos,
@@ -142,6 +148,9 @@ class MonitorPedidosReportController extends Controller
             'autoPrint' => $request->boolean('auto'),
             'idsParam' => $vendaIds !== [] ? implode(',', $vendaIds) : implode(',', $orderIds),
             'impSemColunaDesconto' => $impSemColunaDesconto,
+            'impDuasVias' => $impDuasVias,
+            'impMeiaFolhaA4' => $impMeiaFolhaA4,
+            'exibirCabecalhoEmpresa' => $exibirCabecalhoEmpresa,
         ];
 
         if ($request->boolean('pdf')) {
@@ -153,13 +162,17 @@ class MonitorPedidosReportController extends Controller
             $dompdf = $pdf->getDomPDF();
             $dompdf->render();
             $canvas = $dompdf->getCanvas();
-            $font = $dompdf->getFontMetrics()->getFont('Helvetica');
+            $fontMetrics = $dompdf->getFontMetrics();
+            $font = $fontMetrics->getFont('Helvetica');
+            $fontSize = 7;
+            // Largura aproximada com 2 dígitos para centralizar na folha A4.
+            $textWidth = $fontMetrics->getTextWidth('Pag: 00 de 00', $font, $fontSize);
             $canvas->page_text(
-                $canvas->get_width() - 95,
+                ($canvas->get_width() - $textWidth) / 2,
                 $canvas->get_height() - 24,
                 'Pag: {PAGE_NUM} de {PAGE_COUNT}',
                 $font,
-                7,
+                $fontSize,
                 [0.3, 0.3, 0.3]
             );
 

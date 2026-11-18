@@ -22,6 +22,7 @@ use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\Erp\Pdv\PdvStockService;
 use App\Support\Erp\Pdv\PdvVendaFinanceiroService;
+use App\Support\Erp\Dre\VendaItemCustoHistorico;
 use App\Support\Erp\Pdv\PdvVendaRetaguardaMirrorService;
 use App\Support\Erp\Vendas\EstornarVendaService;
 use App\Support\Fiscal\NfceNumeracao;
@@ -167,6 +168,17 @@ class PdvRetornoService
                     $productId = null;
                 }
 
+                $custoSnap = [];
+                if ($productId !== null && VendaItemCustoHistorico::tabelaTemCusto('pdv_venda_itens')) {
+                    // Prefere custo do terminal (venda original); fallback = cadastro no sync.
+                    $custoSnap = VendaItemCustoHistorico::dePayloadOfflineOuSnapshot(
+                        is_array($item) ? $item : [],
+                        $productId,
+                        (float) $this->num($item['quantidade'] ?? 1, 3),
+                        $empresa?->id !== null ? (int) $empresa->id : null,
+                    );
+                }
+
                 $pdvItem = PdvVendaItem::query()->create([
                     'pdv_venda_id' => $pdvVenda->id,
                     'product_id' => $productId,
@@ -178,6 +190,7 @@ class PdvRetornoService
                     'desconto' => $this->num($item['desconto'] ?? 0),
                     'acrescimo' => $this->num($item['acrescimo'] ?? 0),
                     'total' => $this->num($item['total'] ?? 0),
+                    ...$custoSnap,
                 ]);
 
                 if ($productId !== null) {

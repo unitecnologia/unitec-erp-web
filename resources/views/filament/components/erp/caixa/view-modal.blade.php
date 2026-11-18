@@ -9,7 +9,7 @@
         class="erp-lookup-modal erp-caixa-view-modal"
         wire:keydown.escape.window="closeCaixaView"
     >
-        <div class="erp-lookup-modal__backdrop" wire:click="closeCaixaView"></div>
+        <div class="erp-lookup-modal__backdrop" aria-hidden="true"></div>
 
         <div
             class="erp-lookup-modal__window erp-caixa-view-modal__window"
@@ -18,7 +18,7 @@
             aria-labelledby="erp-caixa-view-modal-title"
         >
                 <div class="erp-lookup-modal__titlebar">
-                <span id="erp-caixa-view-modal-title">{{ $ehGrupo ? 'Pagamento misto (Caixa)' : 'Lançamento de Caixa' }}</span>
+                <span id="erp-caixa-view-modal-title">Consulta de lançamento</span>
                 <button
                     type="button"
                     class="erp-lookup-modal__close"
@@ -28,19 +28,21 @@
             </div>
 
             <div class="erp-caixa-view-modal__body">
-                <div class="erp-caixa-view-modal__grid">
-                    <div class="erp-caixa-view-modal__field">
+                <div class="erp-caixa-view-modal__grid erp-caixa-view-modal__grid--topo">
+                    <div class="erp-caixa-view-modal__field erp-caixa-view-modal__field--codigo">
                         <span class="erp-caixa-view-modal__label">Código</span>
                         <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['codigo'] ?? '—' }}</span>
                     </div>
-                    <div class="erp-caixa-view-modal__field">
+                    <div class="erp-caixa-view-modal__field erp-caixa-view-modal__field--emissao">
                         <span class="erp-caixa-view-modal__label">Emissão</span>
                         <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['emissao'] ?? '—' }}</span>
                     </div>
-                    <div class="erp-caixa-view-modal__field">
+                    <div class="erp-caixa-view-modal__field erp-caixa-view-modal__field--pedido">
                         <span class="erp-caixa-view-modal__label">Pedido</span>
                         <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['documento'] ?? '—' }}</span>
                     </div>
+                </div>
+                <div class="erp-caixa-view-modal__grid">
                     <div class="erp-caixa-view-modal__field erp-caixa-view-modal__field--wide">
                         <span class="erp-caixa-view-modal__label">Histórico</span>
                         <span class="erp-caixa-view-modal__value">{{ preg_replace('/^\[MANUAL\]\s*/iu', '', (string) ($this->viewModalData['historico'] ?? '—')) }}</span>
@@ -63,6 +65,27 @@
                     </div>
                 </div>
 
+                @if ($temDetalhe && is_array($detalhes) && $detalhes !== [])
+                    <div class="erp-caixa-view-modal__origem">
+                        <h4 class="erp-caixa-view-modal__origem-title">Detalhes</h4>
+                        <div class="erp-caixa-view-modal__grid erp-caixa-view-modal__grid--origem">
+                            @foreach ($detalhes as $linha)
+                                <div @class([
+                                    'erp-caixa-view-modal__field',
+                                    'erp-caixa-view-modal__field--wide' => ! empty($linha['wide']),
+                                ])>
+                                    <span class="erp-caixa-view-modal__label">{{ $linha['label'] ?? '' }}</span>
+                                    <span @class([
+                                        'erp-caixa-view-modal__value',
+                                        'erp-caixa-view-modal__value--money' => ! empty($linha['money']),
+                                        'erp-caixa-view-modal__value--estorno' => ($linha['destaque'] ?? null) === 'estorno',
+                                    ])>{{ $linha['value'] ?? '—' }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 @if ($ehGrupo && is_array($membrosGrupo) && $membrosGrupo !== [])
                     <div class="erp-caixa-view-modal__origem">
                         <h4 class="erp-caixa-view-modal__origem-title">Lançamentos individuais</h4>
@@ -80,25 +103,6 @@
                                             · S {{ $membro['saida'] }}
                                         @endif
                                     </span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @elseif ($temDetalhe && is_array($detalhes) && $detalhes !== [])
-                    <div class="erp-caixa-view-modal__origem">
-                        <h4 class="erp-caixa-view-modal__origem-title">Detalhes da origem</h4>
-                        <div class="erp-caixa-view-modal__grid erp-caixa-view-modal__grid--origem">
-                            @foreach ($detalhes as $linha)
-                                <div @class([
-                                    'erp-caixa-view-modal__field',
-                                    'erp-caixa-view-modal__field--wide' => ! empty($linha['wide']),
-                                ])>
-                                    <span class="erp-caixa-view-modal__label">{{ $linha['label'] ?? '' }}</span>
-                                    <span @class([
-                                        'erp-caixa-view-modal__value',
-                                        'erp-caixa-view-modal__value--money' => ! empty($linha['money']),
-                                        'erp-caixa-view-modal__value--estorno' => ($linha['destaque'] ?? null) === 'estorno',
-                                    ])>{{ $linha['value'] ?? '—' }}</span>
                                 </div>
                             @endforeach
                         </div>
@@ -131,7 +135,7 @@
         class="erp-lookup-modal erp-caixa-itens-modal"
         wire:keydown.escape.window="closeCaixaItensVenda"
     >
-        <div class="erp-lookup-modal__backdrop" wire:click="closeCaixaItensVenda"></div>
+        <div class="erp-lookup-modal__backdrop" aria-hidden="true"></div>
         <div
             class="erp-lookup-modal__window erp-caixa-itens-modal__window"
             role="dialog"

@@ -100,10 +100,8 @@ trait ManagesPdvRemoverItens
             unset($this->cupomItens[$index]);
             $this->cupomItens = array_values($this->cupomItens);
         } else {
-            $preco = (float) ($item['preco'] ?? 0);
             $novaQtd = round($qtdAtual - $qtdRemover, 3);
-            $this->cupomItens[$index]['quantidade'] = $novaQtd;
-            $this->cupomItens[$index]['total'] = round($novaQtd * $preco, 2);
+            $this->cupomItens[$index] = $this->pdvRecalcularItemPorQuantidade($item, $novaQtd);
         }
 
         if ($this->selectedCupomIndex !== null && ! isset($this->cupomItens[$this->selectedCupomIndex])) {

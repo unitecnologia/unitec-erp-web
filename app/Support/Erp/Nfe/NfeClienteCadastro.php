@@ -13,6 +13,22 @@ use App\Support\Erp\CepLookupService;
 final class NfeClienteCadastro
 {
     /**
+     * Consumidor Final (código CF/000001 ou nome) — bloqueio típico do Monitor.
+     */
+    public static function ehConsumidorFinalParaBloqueioNfe(?Person $cliente): bool
+    {
+        if ($cliente === null) {
+            return false;
+        }
+
+        if (Person::isCodigoConsumidorFinal($cliente->codigo !== null ? (string) $cliente->codigo : null)) {
+            return true;
+        }
+
+        return mb_strtoupper(trim((string) ($cliente->nome_razao ?? '')), 'UTF-8') === 'CONSUMIDOR FINAL';
+    }
+
+    /**
      * @return list<string>
      */
     public static function camposFaltantesDoCliente(?Person $cliente): array

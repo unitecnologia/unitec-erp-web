@@ -45,6 +45,16 @@ class ForcaVendasTelaVendaService
             throw new \RuntimeException('Somente pedidos podem ser editados nesta tela.');
         }
 
+        // Pedidos originados no Vendas Internas: bloqueio persistente EM EDIÇÃO NO VI.
+        $viLocks = app(\App\Support\VendasInternas\VendasInternasEdicaoLockService::class);
+        $viLocks->assertForcaVendasOrderLivre($order);
+
+        // Mantém TTL do bloqueio ERP vivo enquanto grava/edita.
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user instanceof \App\Models\User) {
+            $viLocks->tocarErpPorForcaVendasOrderId((int) $order->id, $user);
+        }
+
         if (! in_array((string) $order->situacao, self::situacoesEditaveis(), true)) {
             throw new \RuntimeException('Este pedido não pode mais ser editado (situação: '.$order->situacaoLabel().').');
         }

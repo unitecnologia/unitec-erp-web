@@ -1158,7 +1158,16 @@ a.erp-produtos__tab {
 .erp-vendedores-actions__icon--cancel,
 .erp-rh-funcionarios-actions__icon--cancel,
 .erp-rh-cargos-actions__icon--cancel,
-.erp-rh-departamentos-actions__icon--cancel {
+.erp-rh-departamentos-actions__icon--cancel,
+.erp-rh-documentos-actions__icon--cancel,
+.erp-rh-epis-actions__icon--cancel,
+.erp-rh-exames-actions__icon--cancel,
+.erp-rh-ocorrencias-actions__icon--cancel,
+.erp-rh-escalas-actions__icon--cancel,
+.erp-rh-ferias-actions__icon--cancel,
+.erp-rh-holerites-actions__icon--cancel,
+.erp-rh-treinamentos-actions__icon--cancel,
+.erp-rh-uniformes-actions__icon--cancel {
     background: var(--erp-action-danger);
     color: var(--erp-text-inverse);
     border-radius: 50%;
@@ -1375,7 +1384,14 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes__tab,
 .erp-rh-funcionarios__tab,
 .erp-rh-cargos__tab,
-.erp-rh-departamentos__tab {
+.erp-rh-departamentos__tab,
+.erp-rh-documentos__tab,
+.erp-rh-epis__tab,
+.erp-rh-exames__tab,
+.erp-rh-beneficios__tab,
+.erp-rh-ocorrencias__tab, .erp-rh-holerites__tab, .erp-rh-ferias__tab, .erp-rh-escalas__tab,
+.erp-rh-treinamentos__tab,
+.erp-rh-uniformes__tab {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1400,7 +1416,14 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes__tab:hover:not(.erp-logistica-remetentes__tab--active),
 .erp-rh-funcionarios__tab:hover:not(.erp-rh-funcionarios__tab--active),
 .erp-rh-cargos__tab:hover:not(.erp-rh-cargos__tab--active),
-.erp-rh-departamentos__tab:hover:not(.erp-rh-departamentos__tab--active) {
+.erp-rh-departamentos__tab:hover:not(.erp-rh-departamentos__tab--active),
+.erp-rh-documentos__tab:hover:not(.erp-rh-documentos__tab--active),
+.erp-rh-epis__tab:hover:not(.erp-rh-epis__tab--active),
+.erp-rh-exames__tab:hover:not(.erp-rh-exames__tab--active),
+.erp-rh-beneficios__tab:hover:not(.erp-rh-beneficios__tab--active),
+.erp-rh-ocorrencias__tab, .erp-rh-holerites__tab, .erp-rh-ferias__tab, .erp-rh-escalas__tab:hover:not(.erp-rh-ocorrencias__tab--active),
+.erp-rh-treinamentos__tab:hover:not(.erp-rh-treinamentos__tab--active),
+.erp-rh-uniformes__tab:hover:not(.erp-rh-uniformes__tab--active) {
     background: #dde4ec;
     color: #475569;
     border-color: #b0bcc9;
@@ -1413,7 +1436,13 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes__tab--active,
 .erp-rh-funcionarios__tab--active,
 .erp-rh-cargos__tab--active,
-.erp-rh-departamentos__tab--active {
+.erp-rh-departamentos__tab--active,
+.erp-rh-documentos__tab--active,
+.erp-rh-epis__tab--active,
+.erp-rh-exames__tab--active,
+.erp-rh-beneficios__tab--active,
+.erp-rh-treinamentos__tab--active,
+.erp-rh-uniformes__tab--active {
     position: relative;
     z-index: 2;
     background: #fff;
@@ -1431,7 +1460,17 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions,
 .erp-rh-funcionarios-actions,
 .erp-rh-cargos-actions,
-.erp-rh-departamentos-actions {
+.erp-rh-departamentos-actions,
+.erp-rh-documentos-actions,
+.erp-rh-epis-actions,
+.erp-rh-exames-actions,
+.erp-rh-beneficios-actions,
+.erp-rh-ocorrencias-actions,
+.erp-rh-escalas-actions,
+.erp-rh-ferias-actions,
+.erp-rh-holerites-actions,
+.erp-rh-treinamentos-actions,
+.erp-rh-uniformes-actions {
     display: flex;
     flex-wrap: wrap;
     flex-shrink: 0;
@@ -1449,7 +1488,17 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions__btn,
 .erp-rh-funcionarios-actions__btn,
 .erp-rh-cargos-actions__btn,
-.erp-rh-departamentos-actions__btn {
+.erp-rh-departamentos-actions__btn,
+.erp-rh-documentos-actions__btn,
+.erp-rh-epis-actions__btn,
+.erp-rh-exames-actions__btn,
+.erp-rh-beneficios-actions__btn,
+.erp-rh-ocorrencias-actions__btn,
+.erp-rh-escalas-actions__btn,
+.erp-rh-ferias-actions__btn,
+.erp-rh-holerites-actions__btn,
+.erp-rh-treinamentos-actions__btn,
+.erp-rh-uniformes-actions__btn {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1474,7 +1523,17 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions__btn:hover,
 .erp-rh-funcionarios-actions__btn:hover,
 .erp-rh-cargos-actions__btn:hover,
-.erp-rh-departamentos-actions__btn:hover {
+.erp-rh-departamentos-actions__btn:hover,
+.erp-rh-documentos-actions__btn:hover,
+.erp-rh-epis-actions__btn:hover,
+.erp-rh-exames-actions__btn:hover,
+.erp-rh-beneficios-actions__btn:hover,
+.erp-rh-ocorrencias-actions__btn:hover,
+.erp-rh-escalas-actions__btn:hover,
+.erp-rh-ferias-actions__btn:hover,
+.erp-rh-holerites-actions__btn:hover,
+.erp-rh-treinamentos-actions__btn:hover,
+.erp-rh-uniformes-actions__btn:hover {
     background: #fff;
     transform: translateY(-1px);
     box-shadow: var(--erp-shadow-lg);
@@ -1487,7 +1546,17 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions__icon,
 .erp-rh-funcionarios-actions__icon,
 .erp-rh-cargos-actions__icon,
-.erp-rh-departamentos-actions__icon {
+.erp-rh-departamentos-actions__icon,
+.erp-rh-documentos-actions__icon,
+.erp-rh-epis-actions__icon,
+.erp-rh-exames-actions__icon,
+.erp-rh-beneficios-actions__icon,
+.erp-rh-ocorrencias-actions__icon,
+.erp-rh-escalas-actions__icon,
+.erp-rh-ferias-actions__icon,
+.erp-rh-holerites-actions__icon,
+.erp-rh-treinamentos-actions__icon,
+.erp-rh-uniformes-actions__icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1509,7 +1578,17 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions__label,
 .erp-rh-funcionarios-actions__label,
 .erp-rh-cargos-actions__label,
-.erp-rh-departamentos-actions__label {
+.erp-rh-departamentos-actions__label,
+.erp-rh-documentos-actions__label,
+.erp-rh-epis-actions__label,
+.erp-rh-exames-actions__label,
+.erp-rh-beneficios-actions__label,
+.erp-rh-ocorrencias-actions__label,
+.erp-rh-escalas-actions__label,
+.erp-rh-ferias-actions__label,
+.erp-rh-holerites-actions__label,
+.erp-rh-treinamentos-actions__label,
+.erp-rh-uniformes-actions__label {
     font-size: 0.68rem;
     text-align: center;
     line-height: 1.1;
@@ -1523,7 +1602,17 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions__btn--close,
 .erp-rh-funcionarios-actions__btn--close,
 .erp-rh-cargos-actions__btn--close,
-.erp-rh-departamentos-actions__btn--close {
+.erp-rh-departamentos-actions__btn--close,
+.erp-rh-documentos-actions__btn--close,
+.erp-rh-epis-actions__btn--close,
+.erp-rh-exames-actions__btn--close,
+.erp-rh-beneficios-actions__btn--close,
+.erp-rh-ocorrencias-actions__btn--close,
+.erp-rh-escalas-actions__btn--close,
+.erp-rh-ferias-actions__btn--close,
+.erp-rh-holerites-actions__btn--close,
+.erp-rh-treinamentos-actions__btn--close,
+.erp-rh-uniformes-actions__btn--close {
     margin-left: auto;
     background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
     border-color: #991b1b;
@@ -1538,6 +1627,16 @@ a.erp-produtos__tab {
 .erp-rh-funcionarios-actions__btn--close .erp-rh-funcionarios-actions__icon,
 .erp-rh-cargos-actions__btn--close .erp-rh-cargos-actions__icon,
 .erp-rh-departamentos-actions__btn--close .erp-rh-departamentos-actions__icon,
+.erp-rh-documentos-actions__btn--close .erp-rh-documentos-actions__icon,
+.erp-rh-epis-actions__btn--close .erp-rh-epis-actions__icon,
+.erp-rh-exames-actions__btn--close .erp-rh-exames-actions__icon,
+.erp-rh-ocorrencias-actions__btn--close .erp-rh-ocorrencias-actions__icon,
+.erp-rh-holerites-actions__btn--close .erp-rh-holerites-actions__icon,,
+.erp-rh-escalas-actions__icon,
+.erp-rh-ferias-actions__icon,
+.erp-rh-holerites-actions__icon,
+.erp-rh-treinamentos-actions__btn--close .erp-rh-treinamentos-actions__icon,
+.erp-rh-uniformes-actions__btn--close .erp-rh-uniformes-actions__icon,
 .erp-transportadoras-actions__btn--close .erp-transportadoras-actions__label,
 .erp-veiculos-actions__btn--close .erp-veiculos-actions__label,
 .erp-tomadores-servico-actions__btn--close .erp-tomadores-servico-actions__label,
@@ -1545,7 +1644,19 @@ a.erp-produtos__tab {
 .erp-logistica-remetentes-actions__btn--close .erp-logistica-remetentes-actions__label,
 .erp-rh-funcionarios-actions__btn--close .erp-rh-funcionarios-actions__label,
 .erp-rh-cargos-actions__btn--close .erp-rh-cargos-actions__label,
-.erp-rh-departamentos-actions__btn--close .erp-rh-departamentos-actions__label {
+.erp-rh-departamentos-actions__btn--close .erp-rh-departamentos-actions__label,
+.erp-rh-documentos-actions__btn--close .erp-rh-documentos-actions__label,
+.erp-rh-epis-actions__btn--close .erp-rh-epis-actions__label,
+.erp-rh-exames-actions__btn--close .erp-rh-exames-actions__label,
+.erp-rh-ocorrencias-actions__btn--close .erp-rh-ocorrencias-actions__label,
+.erp-rh-holerites-actions__btn--close .erp-rh-holerites-actions__label,
+.erp-rh-ferias-actions__btn--close .erp-rh-ferias-actions__label,
+.erp-rh-escalas-actions__btn--close .erp-rh-escalas-actions__label,
+.erp-rh-escalas-actions__label,
+.erp-rh-ferias-actions__label,
+.erp-rh-holerites-actions__label,
+.erp-rh-treinamentos-actions__btn--close .erp-rh-treinamentos-actions__label,
+.erp-rh-uniformes-actions__btn--close .erp-rh-uniformes-actions__label {
     color: var(--erp-text-inverse);
     background: rgba(255, 255, 255, 0.2);
 }

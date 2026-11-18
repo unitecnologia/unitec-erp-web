@@ -20,6 +20,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'tipo',
     'status',
     'situacao',
+    'em_edicao_vi',
+    'em_edicao_vi_at',
+    'em_edicao_device_uuid',
+    'em_edicao_user_id',
+    'em_edicao_erp',
+    'em_edicao_erp_at',
+    'em_edicao_erp_user_id',
     'erro',
     'payload',
     'client_created_at',
@@ -55,10 +62,24 @@ class VendasInternasOrder extends Model
         return [
             'total' => 'decimal:2',
             'payload' => 'array',
+            'em_edicao_vi' => 'boolean',
+            'em_edicao_vi_at' => 'datetime',
+            'em_edicao_erp' => 'boolean',
+            'em_edicao_erp_at' => 'datetime',
             'client_created_at' => 'datetime',
             'received_at' => 'datetime',
             'pago_at' => 'datetime',
         ];
+    }
+
+    public function emEdicaoNoVi(): bool
+    {
+        return (bool) $this->em_edicao_vi;
+    }
+
+    public function emEdicaoNoErp(): bool
+    {
+        return (bool) $this->em_edicao_erp;
     }
 
     /**

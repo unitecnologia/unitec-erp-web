@@ -331,7 +331,24 @@ final class ContaPagarBaixaService
                     }
 
                     if ($valorPago > $valorAPagar + 0.009) {
-                        throw new InvalidArgumentException('Valor pago maior que o valor a pagar.');
+                        $excesso = ContaPagarBaixaValorPagoJuros::absorverExcesso(
+                            $saldo,
+                            $juros,
+                            $multa,
+                            $desconto,
+                            $valorPago,
+                        );
+                        if (! $excesso['aplicar']) {
+                            throw new InvalidArgumentException('Valor pago maior que o valor a pagar.');
+                        }
+
+                        $juros = $excesso['juros'];
+                        if ($saldo > 0) {
+                            $percJ = round(($juros / $saldo) * 100, 4);
+                        }
+                        $saldoComJuros = round($saldo + $juros + $multa, 2);
+                        $desconto = min($desconto, $saldoComJuros);
+                        $valorAPagar = $excesso['valor_a_pagar'];
                     }
                 }
 
@@ -482,8 +499,21 @@ final class ContaPagarBaixaService
                 throw new InvalidArgumentException('Informe o valor pago.');
             }
 
-            if ($valorTotal > $somaDevido + 0.009) {
-                throw new InvalidArgumentException('Valor pago maior que o valor a pagar.');
+            $excessoGrupo = round($valorTotal - $somaDevido, 2);
+            if ($excessoGrupo > 0.009) {
+                $this->distribuirProporcional($linhas, 'juros_add', $excessoGrupo, 'saldo');
+                $somaDevido = 0.0;
+                foreach ($linhas as $i => $linha) {
+                    $juros = round((float) $linha['juros'] + (float) ($linha['juros_add'] ?? 0), 2);
+                    $linhas[$i]['juros'] = $juros;
+                    $base = round((float) $linha['saldo'] + $juros + (float) $linha['multa'], 2);
+                    $linhas[$i]['base'] = $base;
+                    $descontoLinha = round(min((float) $linha['desconto'], $base), 2);
+                    $linhas[$i]['desconto'] = $descontoLinha;
+                    $devido = round(max(0, $base - $descontoLinha), 2);
+                    $linhas[$i]['devido'] = $devido;
+                    $somaDevido = round($somaDevido + $devido, 2);
+                }
             }
 
             $this->distribuirProporcional($linhas, 'valor', $valorTotal, 'devido');

@@ -23,10 +23,15 @@ use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
+use App\Support\Erp\Financeiro\FaturamentoPendenciaFinanceiraGuard;
+use App\Models\PdvVenda;
+use App\Support\Erp\Nfce\NfceRegularizacaoService;
 use App\Support\Erp\Nfe\NfeMonitorEmitenteResolver;
 use App\Support\Erp\Nfe\NfeVendaLoteEmissionService;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
+use App\Support\Erp\Pdv\PdvConfig;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
+use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
 use App\Support\ForcaVendas\ForcaVendasCancelamentoBoletoPendenteException;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasMonitorCancelamentoService;
@@ -43,6 +48,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -183,6 +189,22 @@ class ListForcaVendasMonitor extends ListRecords
     public ?int $nfeLoteEmpresaEmitenteId = null;
 
     public bool $faturarProgressOpen = false;
+
+    /** Confirmação pós-autorização NFC-e (Sim/Não imprimir DANFE). */
+    public bool $nfceImprimirConfirmOpen = false;
+
+    public ?int $nfceImprimirPdvVendaId = null;
+
+    public string $nfceImprimirConfirmDetalhe = '';
+
+    /** Trava leve anti duplo clique enquanto a emissão NFC-e roda. */
+    public bool $nfceTransmitindo = false;
+
+    /**
+     * Venda alvo entre a fase rápida (trava + pausa do poll) e a transmissão SEFAZ.
+     * Evita corrida do poll 5s com o request longo — sintoma: overlay preso em SEFAZ e F5 “conclui”.
+     */
+    public ?int $nfceTransmitirVendaId = null;
 
     public int $faturarAtual = 0;
 
@@ -453,11 +475,7 @@ class ListForcaVendasMonitor extends ListRecords
                 break;
 
             case 'meio_pgto':
-                $query->where(function (Builder $q) use ($valor): void {
-                    $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento'))) = ?", [mb_strtolower($valor, 'UTF-8')])
-                        ->orWhereHas('pedido', fn (Builder $s) => $s
-                            ->whereRaw('LOWER(forma_pagamento) = ?', [mb_strtolower($valor, 'UTF-8')]));
-                });
+                $this->aplicarFiltroMeioPgto($query, $valor);
                 break;
 
             case 'cliente':
@@ -692,6 +710,7 @@ class ListForcaVendasMonitor extends ListRecords
                 View::make('filament.components.erp.forca-vendas.monitor-nfe-emitente-modal'),
                 View::make('filament.components.erp.forca-vendas.monitor-email-modal'),
                 View::make('filament.components.erp.forca-vendas.monitor-nfe-cliente-incompleto-modal'),
+                View::make('filament.components.erp.forca-vendas.monitor-nfce-fiscal-overlays'),
             ]);
     }
 
@@ -864,7 +883,11 @@ class ListForcaVendasMonitor extends ListRecords
     public function updatedFiltroCampo(): void
     {
         // Ao trocar o campo, reinicia o valor conforme o tipo de controle.
-        $this->filtroValor = $this->filtroCampoTipo() === 'select' ? 'todos' : '';
+        $this->filtroValor = match ($this->filtroCampoTipo()) {
+            'select' => 'todos',
+            'multi' => '',
+            default => '',
+        };
         $this->clearListSelection();
         $this->resetTable();
     }
@@ -915,12 +938,13 @@ class ListForcaVendasMonitor extends ListRecords
     }
 
     /**
-     * Tipo de controle do valor para o campo atual: select | date | number | text.
+     * Tipo de controle do valor para o campo atual: select | multi | date | number | text.
      */
     public function filtroCampoTipo(): string
     {
         return match ($this->filtroCampo) {
-            'cliente', 'vendedor', 'status', 'meio_pgto' => 'select',
+            'cliente', 'vendedor', 'status' => 'select',
+            'meio_pgto' => 'multi',
             'data_abert', 'data_fech', 'sincronizado' => 'date',
             'desconto', 'acrescimo', 'tt_bruto', 'tt_liquido' => 'number',
             default => 'text',
@@ -965,45 +989,188 @@ class ListForcaVendasMonitor extends ListRecords
         return (string) (Person::query()->whereKey((int) $this->filtroValor)->value('nome_razao') ?? '');
     }
 
+    /**
+     * Opções do filtro Meio Pgto: cadastro ativo, sem duplicidade e sem varrer payload.
+     *
+     * @return array<string, string> descricao => rótulo
+     */
     #[Computed]
     public function meiosPagamentoOptions(): array
     {
         $formas = FormaPagamento::query()
             ->where('ativo', true)
             ->orderBy('descricao')
-            ->pluck('descricao', 'descricao')
+            ->pluck('descricao')
             ->all();
-
-        // Meios já usados em pedidos (mesmo inativos / textos do app).
-        $usados = ForcaVendasMonitorResource::ordersQuery()
-            ->where('tipo', 'pedido')
-            ->whereNotNull('payload')
-            ->selectRaw("DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento')) as forma")
-            ->pluck('forma')
-            ->filter(fn ($forma): bool => filled($forma) && $forma !== 'null')
-            ->map(fn ($forma): string => trim((string) $forma))
-            ->filter()
-            ->all();
-
-        foreach ($usados as $forma) {
-            $formas[$forma] = $forma;
-        }
-
-        asort($formas, SORT_NATURAL | SORT_FLAG_CASE);
 
         $rotulos = [];
+        $vistos = [];
 
         foreach ($formas as $forma) {
-            $rotulos[$forma] = $this->rotuloMeioPagamento($forma);
+            $forma = trim((string) $forma);
+            if ($forma === '') {
+                continue;
+            }
+
+            $chave = self::normalizarChaveMeioPagamento($forma);
+            if ($chave === '' || isset($vistos[$chave])) {
+                continue;
+            }
+
+            $vistos[$chave] = true;
+            $rotulos[$forma] = self::rotuloMeioPagamento($forma);
         }
 
         return $rotulos;
     }
 
-    private function rotuloMeioPagamento(string $descricao): string
+    /**
+     * Dados do combo multi (checkboxes) do filtro Meio Pgto.
+     *
+     * @return array{itens: list<array{id: string, nome: string}>, selecionados: list<string>, rotulo: string, quantidade: int, aplicado: string}
+     */
+    public function filtroMeioPgtoCombo(): array
+    {
+        $options = $this->meiosPagamentoOptions;
+        $selecionados = self::parseFiltroMeioPgtoValor((string) $this->filtroValor);
+        // Mantém só IDs ainda existentes no cadastro (evita lixo de URL antiga).
+        $selecionados = array_values(array_filter(
+            $selecionados,
+            fn (string $id): bool => array_key_exists($id, $options),
+        ));
+
+        $itens = [];
+        foreach ($options as $id => $nome) {
+            $itens[] = [
+                'id' => (string) $id,
+                'nome' => (string) $nome,
+            ];
+        }
+
+        $quantidade = count($selecionados);
+        $rotulo = match (true) {
+            $quantidade === 0 => '<todos>',
+            $quantidade === 1 => (string) ($options[$selecionados[0]] ?? $selecionados[0]),
+            default => $quantidade.' selecionados',
+        };
+
+        return [
+            'itens' => $itens,
+            'selecionados' => $selecionados,
+            'rotulo' => $rotulo,
+            'quantidade' => $quantidade,
+            'aplicado' => self::encodeFiltroMeioPgtoValor($selecionados),
+        ];
+    }
+
+    /**
+     * Valor do filtro multi: vazio/"todos" = todos; senão IDs separados por "|".
+     *
+     * @return list<string>
+     */
+    public static function parseFiltroMeioPgtoValor(string $valor): array
+    {
+        $raw = trim($valor);
+        if ($raw === '' || $raw === 'todos') {
+            return [];
+        }
+
+        $parts = preg_split('/\|/', $raw) ?: [];
+        $out = [];
+        $vistos = [];
+
+        foreach ($parts as $parte) {
+            $id = trim((string) $parte);
+            if ($id === '' || isset($vistos[$id])) {
+                continue;
+            }
+            $vistos[$id] = true;
+            $out[] = $id;
+        }
+
+        return $out;
+    }
+
+    public static function encodeFiltroMeioPgtoValor(array $selecionados): string
+    {
+        $clean = [];
+        $vistos = [];
+
+        foreach ($selecionados as $id) {
+            $id = trim((string) $id);
+            if ($id === '' || $id === 'todos' || isset($vistos[$id])) {
+                continue;
+            }
+            $vistos[$id] = true;
+            $clean[] = $id;
+        }
+
+        return $clean === [] ? '' : implode('|', $clean);
+    }
+
+    /**
+     * Vendas com pelo menos uma das formas marcadas (cabeçalho misto incluso via LIKE).
+     */
+    protected function aplicarFiltroMeioPgto(Builder $query, string $valorRaw): void
+    {
+        $valores = self::parseFiltroMeioPgtoValor($valorRaw);
+        if ($valores === []) {
+            return;
+        }
+
+        $query->where(function (Builder $outer) use ($valores): void {
+            foreach ($valores as $valor) {
+                $needles = self::variantesBuscaMeioPagamento($valor);
+                if ($needles === []) {
+                    continue;
+                }
+
+                $outer->orWhere(function (Builder $grupo) use ($needles): void {
+                    foreach ($needles as $needle) {
+                        $like = '%'.addcslashes($needle, '%_\\').'%';
+                        $grupo->orWhereRaw(
+                            "LOWER(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento'))) LIKE ?",
+                            [$like]
+                        )->orWhereHas(
+                            'pedido',
+                            fn (Builder $s) => $s->whereRaw('LOWER(forma_pagamento) LIKE ?', [$like])
+                        );
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * @return list<string> variantes em minúsculas para LIKE (original + ASCII).
+     */
+    public static function variantesBuscaMeioPagamento(string $valor): array
+    {
+        $valor = trim($valor);
+        if ($valor === '') {
+            return [];
+        }
+
+        $lower = mb_strtolower($valor, 'UTF-8');
+        $ascii = mb_strtolower(self::normalizarChaveMeioPagamento($valor), 'UTF-8');
+
+        return array_values(array_unique(array_filter([$lower, $ascii], fn (string $v): bool => $v !== '')));
+    }
+
+    public static function normalizarChaveMeioPagamento(string $descricao): string
     {
         $chave = mb_strtoupper(trim($descricao), 'UTF-8');
-        $chave = str_replace(['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'], ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'], $chave);
+
+        return str_replace(
+            ['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'],
+            ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'],
+            $chave,
+        );
+    }
+
+    public static function rotuloMeioPagamento(string $descricao): string
+    {
+        $chave = self::normalizarChaveMeioPagamento($descricao);
 
         return match ($chave) {
             'DINHEIRO' => 'Dinheiro',
@@ -1118,7 +1285,9 @@ class ListForcaVendasMonitor extends ListRecords
             || $this->cancelarProgressOpen
             || $this->reabrirProgressOpen
             || $this->nfeLoteProgressOpen
-            || $this->clonarProgressOpen;
+            || $this->clonarProgressOpen
+            || $this->nfceTransmitindo
+            || $this->nfceImprimirConfirmOpen;
     }
 
     /**
@@ -1352,6 +1521,8 @@ class ListForcaVendasMonitor extends ListRecords
             cancelarProgressOpen: $this->cancelarProgressOpen,
             reabrirProgressOpen: $this->reabrirProgressOpen,
             clonarProgressOpen: $this->clonarProgressOpen,
+            nfceImprimirConfirmOpen: $this->nfceImprimirConfirmOpen,
+            nfceTransmitindo: $this->nfceTransmitindo,
         )->to(ForcaVendasMonitorDetalhePanel::class);
     }
 
@@ -1432,13 +1603,19 @@ class ListForcaVendasMonitor extends ListRecords
         }
 
         $candidatos = [];
+        $podeFaturarFinanceiro = FaturamentoPendenciaFinanceiraGuard::podeFaturarSemLiberacaoFinanceira(
+            ErpContext::currentEmpresaId(),
+        );
 
         foreach ($orders as $order) {
             if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
                 continue;
             }
 
-            if ($order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+            if (
+                $order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO
+                && ! $podeFaturarFinanceiro
+            ) {
                 continue;
             }
 
@@ -2244,6 +2421,290 @@ class ListForcaVendasMonitor extends ListRecords
             ->all();
     }
 
+    /**
+     * Fase 1 (rápida): valida e trava a UI/poll antes da SEFAZ.
+     * A transmissão longa fica em transmitirNfceDoBotao (indicador SEFAZ).
+     */
+    public function emitirNfceDoBotao(): void
+    {
+        if ($this->nfceTransmitindo || $this->nfceImprimirConfirmOpen) {
+            Notification::make()
+                ->title('Já existe uma emissão NFC-e em andamento.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $estado = $this->nfceEmitirEstado;
+
+        if (! ($estado['enabled'] ?? false) || ! ($estado['venda_id'] ?? null)) {
+            $mensagem = (string) ($estado['title'] ?? 'Selecione um pedido faturado sem documento fiscal.');
+            Notification::make()
+                ->title('Não é possível emitir NFC-e.')
+                ->body($mensagem)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfce.access')) {
+            return;
+        }
+
+        $vendaId = (int) $estado['venda_id'];
+
+        if ($this->vendaIdsPermitidosDoMonitor([$vendaId]) === []) {
+            Notification::make()
+                ->title('Pedido não pertence à empresa ativa.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresa = ErpContext::currentEmpresa();
+
+        if ($empresa === null) {
+            Notification::make()
+                ->title('Empresa não configurada para emissão fiscal.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $motivosConfig = app(NfceRegularizacaoService::class)->motivosBloqueioConfiguracao($empresa);
+
+        if ($motivosConfig !== []) {
+            Notification::make()
+                ->title('NFC-e não configurada.')
+                ->body(implode(' ', $motivosConfig))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // Trava visível ao cliente ANTES do request longo — pausa o poll 5s e evita duplo clique.
+        $this->nfceTransmitindo = true;
+        $this->nfceTransmitirVendaId = $vendaId;
+        $this->pushSelecaoToDetalhePanel();
+        $this->js(<<<'JS'
+            queueMicrotask(() => { $wire.transmitirNfceDoBotao(); });
+        JS);
+    }
+
+    /**
+     * Fase 2: transmite NFC-e à SEFAZ (só fiscal).
+     * Indicador = erp-sefaz-progress.js + pdvui::fiscal-progress (método = este).
+     */
+    public function transmitirNfceDoBotao(): void
+    {
+        $vendaId = (int) ($this->nfceTransmitirVendaId ?? 0);
+
+        if (! $this->nfceTransmitindo || $vendaId <= 0) {
+            $this->nfceTransmitindo = false;
+            $this->nfceTransmitirVendaId = null;
+            $this->dispatch(
+                'erp-sefaz-resultado',
+                ok: false,
+                etapa: 'validacao',
+                mensagem: 'Emissão NFC-e não preparada. Clique novamente em Emitir NFC-e.',
+            );
+
+            return;
+        }
+
+        if ($this->nfceImprimirConfirmOpen) {
+            $this->nfceTransmitindo = false;
+            $this->nfceTransmitirVendaId = null;
+            $this->dispatch(
+                'erp-sefaz-resultado',
+                ok: false,
+                etapa: 'validacao',
+                mensagem: 'Já existe uma emissão NFC-e em andamento.',
+            );
+
+            return;
+        }
+
+        // Revalida permissão/escopo na fase longa (anti replay / sessão trocada).
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfce.access')) {
+            $this->nfceTransmitindo = false;
+            $this->nfceTransmitirVendaId = null;
+            $this->dispatch(
+                'erp-sefaz-resultado',
+                ok: false,
+                etapa: 'validacao',
+                mensagem: 'Sem permissão para emitir NFC-e.',
+            );
+
+            return;
+        }
+
+        if ($this->vendaIdsPermitidosDoMonitor([$vendaId]) === []) {
+            $this->nfceTransmitindo = false;
+            $this->nfceTransmitirVendaId = null;
+            $this->dispatch(
+                'erp-sefaz-resultado',
+                ok: false,
+                etapa: 'validacao',
+                mensagem: 'Pedido não pertence à empresa ativa.',
+            );
+
+            return;
+        }
+
+        $empresa = ErpContext::currentEmpresa();
+
+        if ($empresa === null) {
+            $this->nfceTransmitindo = false;
+            $this->nfceTransmitirVendaId = null;
+            $this->dispatch(
+                'erp-sefaz-resultado',
+                ok: false,
+                etapa: 'validacao',
+                mensagem: 'Empresa não configurada para emissão fiscal.',
+            );
+
+            return;
+        }
+
+        @set_time_limit(180);
+
+        $t0 = microtime(true);
+        $resultado = ['status' => '', 'mensagem' => 'Falha na emissão.', 'nfce_numero' => null];
+
+        try {
+            $resultado = app(NfceRegularizacaoService::class)->emitir($vendaId, $empresa, null);
+        } finally {
+            $msSefaz = (int) round((microtime(true) - $t0) * 1000);
+            // Libera trava só no fim do transmit; poll continua pausado se a confirmação de impressão abrir.
+            $this->nfceTransmitindo = false;
+            $this->nfceTransmitirVendaId = null;
+        }
+
+        if (($resultado['status'] ?? '') === NfceRegularizacaoService::STATUS_AUTORIZADA) {
+            // Sinaliza o overlay ANTES do refresh pesado da grade (UI não fica presa em “SEFAZ”).
+            $this->dispatch('erp-sefaz-resultado', ok: true);
+
+            $tUi = microtime(true);
+            $pdvVendaId = (int) (PdvVenda::query()->where('venda_id', $vendaId)->value('id') ?? 0);
+            $mensagem = (string) ($resultado['mensagem'] ?? 'NFC-e autorizada.');
+
+            Notification::make()
+                ->title($mensagem)
+                ->success()
+                ->send();
+
+            unset($this->nfceEmitirEstado, $this->nfeEmitirEstado, $this->nfeAbrirEstado);
+
+            // Pergunta de impressão no mesmo padrão do PDV (após o indicador SEFAZ fechar).
+            if ($pdvVendaId > 0) {
+                $this->nfceImprimirPdvVendaId = $pdvVendaId;
+                $this->nfceImprimirConfirmDetalhe = $mensagem;
+                $this->nfceImprimirConfirmOpen = true;
+            }
+
+            $this->pushSelecaoToDetalhePanel();
+
+            $msPos = (int) round((microtime(true) - $tUi) * 1000);
+            Log::info('Monitor NFC-e autorizada (tempos)', [
+                'venda_id' => $vendaId,
+                'ms_sefaz_e_persistencia' => $msSefaz,
+                'ms_pos_ui_leve' => $msPos,
+            ]);
+
+            // Refresh da grade no próximo tick — resposta do transmit fica leve e o overlay fecha sem F5.
+            $this->js(<<<'JS'
+                queueMicrotask(() => { $wire.aposTransmitirNfceMonitor(); });
+            JS);
+
+            return;
+        }
+
+        $mensagemFalha = (string) ($resultado['mensagem'] ?? 'Falha na emissão.');
+        $this->dispatch(
+            'erp-sefaz-resultado',
+            ok: false,
+            etapa: 'sefaz',
+            mensagem: mb_substr($mensagemFalha, 0, 600, 'UTF-8'),
+        );
+        Notification::make()
+            ->title('NFC-e não autorizada.')
+            ->body($mensagemFalha)
+            ->danger()
+            ->send();
+
+        unset($this->nfceEmitirEstado);
+        $this->pushSelecaoToDetalhePanel();
+
+        Log::info('Monitor NFC-e não autorizada (tempos)', [
+            'venda_id' => $vendaId,
+            'ms_sefaz_e_persistencia' => $msSefaz,
+            'status' => (string) ($resultado['status'] ?? ''),
+        ]);
+    }
+
+    /** Atualiza a grade após o transmit (request curto; não compete com o overlay SEFAZ). */
+    public function aposTransmitirNfceMonitor(): void
+    {
+        $t0 = microtime(true);
+
+        // Só é chamado após STATUS_AUTORIZADA — limpa checkbox e destaque azul.
+        // Erro / rejeição / pendente não passam por aqui (seleção permanece).
+        $haviaSelecao = $this->selecionados !== [] || $this->highlightedRecordId !== null;
+        $this->selecionados = [];
+        $this->highlightedRecordId = null;
+
+        $this->atualizarTabelaMantendoPagina();
+        unset($this->nfceEmitirEstado, $this->nfeEmitirEstado, $this->nfeAbrirEstado);
+        $this->pushSelecaoToDetalhePanel();
+
+        if ($haviaSelecao) {
+            $this->js(
+                'requestAnimationFrame(() => {'
+                .'document.querySelectorAll(".erp-fv-monitor-page .erp-fv-mon__check").forEach((el) => {'
+                .'el.checked = false;'
+                .'el.removeAttribute("checked");'
+                .'el.closest(".fi-ta-row")?.classList.remove("erp-row-selected");'
+                .'});'
+                .'});'
+            );
+        }
+
+        Log::info('Monitor NFC-e refresh pós-autorização', [
+            'ms_refresh_grade' => (int) round((microtime(true) - $t0) * 1000),
+        ]);
+    }
+
+    /**
+     * Sim: imprime DANFE NFC-e pelo fluxo existente do PDV.
+     * Não: só fecha a confirmação (sem reemitir).
+     */
+    public function confirmImprimirNfceMonitor(bool $imprimir): void
+    {
+        $pdvVendaId = (int) ($this->nfceImprimirPdvVendaId ?? 0);
+
+        $this->nfceImprimirConfirmOpen = false;
+        $this->nfceImprimirPdvVendaId = null;
+        $this->nfceImprimirConfirmDetalhe = '';
+        $this->pushSelecaoToDetalhePanel();
+
+        if (! $imprimir || $pdvVendaId <= 0) {
+            return;
+        }
+
+        $copias = PdvConfig::make()->viasImpressao();
+        $js = PdvNfceCupomPrinter::livewireOpenJs($pdvVendaId, $copias);
+
+        if ($js !== '') {
+            $this->js($js);
+        }
+    }
+
     public function emitirNfeDoBotao(): void
     {
         $estado = $this->nfeEmitirEstado;
@@ -2533,7 +2994,7 @@ class ListForcaVendasMonitor extends ListRecords
         $this->selecionados = [];
         $this->pushSelecaoToDetalhePanel();
         $this->atualizarTabelaMantendoPagina();
-        unset($this->nfeEmitirEstado, $this->nfeAbrirEstado);
+        unset($this->nfeEmitirEstado, $this->nfeAbrirEstado, $this->nfceEmitirEstado);
         $this->nfeLoteEmpresaEmitenteId = null;
     }
 

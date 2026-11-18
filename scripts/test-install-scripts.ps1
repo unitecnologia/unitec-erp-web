@@ -191,6 +191,55 @@ if (Test-Path $StagingDir) {
     Write-Host '[INFO] Staging ainda nao existe (normal antes do build-setup)' -ForegroundColor Yellow
 }
 
+# Deteccao de instalacao existente: ibdata1 sozinho NAO pode marcar Recovery.
+$existingProbe = Join-Path $env:TEMP ("unitec-existing-probe-{0}" -f [guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Path (Join-Path $existingProbe 'tools\mysql\data') -Force | Out-Null
+    'x' | Set-Content (Join-Path $existingProbe 'tools\mysql\data\ibdata1') -Encoding ASCII
+
+    if (Test-UnitecExistingInstall -AppPath $existingProbe) {
+        Add-Failure 'Test-UnitecExistingInstall nao deveria tratar so ibdata1 como instalacao existente'
+    } else {
+        Add-Pass 'Test-UnitecExistingInstall ignora ibdata1 isolado (instalacao nova)'
+    }
+
+    'APP_KEY=base64:test' | Set-Content (Join-Path $existingProbe '.env') -Encoding ASCII
+    if (-not (Test-UnitecExistingInstall -AppPath $existingProbe)) {
+        Add-Failure 'Test-UnitecExistingInstall deveria detectar .env como instalacao existente'
+    } else {
+        Add-Pass 'Test-UnitecExistingInstall detecta .env'
+    }
+
+    Remove-Item (Join-Path $existingProbe '.env') -Force
+    New-Item -ItemType Directory -Path (Join-Path $existingProbe 'tools\mysql\data\unitec_erp') -Force | Out-Null
+    1..6 | ForEach-Object {
+        'x' | Set-Content (Join-Path $existingProbe ("tools\mysql\data\unitec_erp\table{0}.ibd" -f $_)) -Encoding ASCII
+    }
+    if (-not (Test-UnitecExistingInstall -AppPath $existingProbe)) {
+        Add-Failure 'Test-UnitecExistingInstall deveria detectar schema unitec_erp no datadir'
+    } else {
+        Add-Pass 'Test-UnitecExistingInstall detecta dados unitec_erp'
+    }
+} catch {
+    Add-Failure ("Test-UnitecExistingInstall probe: {0}" -f $_.Exception.Message)
+} finally {
+    Remove-Item $existingProbe -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+$installWindowsText = Get-Content (Join-Path $ScriptsDir 'install-windows.ps1') -Raw
+if ($installWindowsText -notmatch 'Retomada de instalacao incompleta') {
+    Add-Failure 'install-windows.ps1 sem logica de retomada com base padrao'
+} else {
+    Add-Pass 'install-windows.ps1 restaura base padrao em retomada sem usuarios'
+}
+
+$issText = Get-Content (Join-Path $ProjectRoot 'installer\unitec-erp.iss') -Raw
+if ($issText -match 'tools\\mysql\\data\\ibdata1') {
+    Add-Failure 'unitec-erp.iss ainda usa ibdata1 como sinal de instalacao existente'
+} else {
+    Add-Pass 'unitec-erp.iss nao usa ibdata1 isolado para Recovery'
+}
+
 Write-Host ''
 if ($failures.Count -eq 0) {
     Write-Host 'Todos os testes passaram.' -ForegroundColor Green

@@ -38,8 +38,8 @@ use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Logistica\LogisticaVendaHookService;
 use App\Support\VendasInternas\VendasInternasMonitorHookService;
 use Illuminate\Database\Eloquent\Builder;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Fatura um pedido vindo do app Força de Vendas:
@@ -696,8 +696,8 @@ class ForcaVendasFaturamentoService
      */
     public function boletosBancariosAtivos(ForcaVendasOrder $order): \Illuminate\Support\Collection
     {
-        if (! Schema::hasTable((new Boleto)->getTable())
-            || ! Schema::hasTable((new ContaReceber)->getTable())) {
+        if (! ErpSchema::hasTable((new Boleto)->getTable())
+            || ! ErpSchema::hasTable((new ContaReceber)->getTable())) {
             return collect();
         }
 
@@ -751,7 +751,7 @@ class ForcaVendasFaturamentoService
      */
     public function garantirTitulosNaoRecebidos(ForcaVendasOrder $order): void
     {
-        if (! Schema::hasTable((new ContaReceber)->getTable())) {
+        if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
             return;
         }
 
@@ -774,7 +774,7 @@ class ForcaVendasFaturamentoService
      */
     public function garantirEntregaNaoExpedida(Venda $venda): void
     {
-        if (! Schema::hasTable((new Entrega)->getTable())) {
+        if (! ErpSchema::hasTable((new Entrega)->getTable())) {
             return;
         }
 
@@ -1499,7 +1499,7 @@ class ForcaVendasFaturamentoService
         string $base,
         ?int $empresaId,
     ): void {
-        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvCaixaMovimento)->getTable())) {
             return;
         }
 
@@ -1573,7 +1573,7 @@ class ForcaVendasFaturamentoService
 
     private function sessaoJaConsolidadaNoLivro(int $sessaoId): bool
     {
-        if ($sessaoId <= 0 || ! Schema::hasTable((new CaixaLancamento)->getTable())) {
+        if ($sessaoId <= 0 || ! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
             return false;
         }
 
@@ -1598,7 +1598,7 @@ class ForcaVendasFaturamentoService
             return;
         }
 
-        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvCaixaMovimento)->getTable())) {
             return;
         }
 
@@ -1620,23 +1620,26 @@ class ForcaVendasFaturamentoService
 
     private function saldoLiquidoLivroDocumento(string $documento): float
     {
-        if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+        if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
             return 0.0;
         }
 
-        $rows = CaixaLancamento::query()
+        // Mesma regra (documento exato OU prefixo /%), agregada no SQL — evita
+        // carregar N linhas e usa o índice em documento (equality + range LIKE).
+        $row = CaixaLancamento::query()
             ->where(function ($query) use ($documento): void {
                 $query->where('documento', $documento)
                     ->orWhere('documento', 'like', $documento.'/%');
             })
-            ->get(['entrada', 'saida']);
+            ->selectRaw('COALESCE(SUM(entrada), 0) as soma_entrada, COALESCE(SUM(saida), 0) as soma_saida')
+            ->first();
 
-        return round((float) $rows->sum('entrada') - (float) $rows->sum('saida'), 2);
+        return round((float) ($row->soma_entrada ?? 0) - (float) ($row->soma_saida ?? 0), 2);
     }
 
     private function saldoLiquidoSessaoDocumento(string $documento): float
     {
-        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvCaixaMovimento)->getTable())) {
             return 0.0;
         }
 
@@ -1652,7 +1655,7 @@ class ForcaVendasFaturamentoService
      */
     private function saldoLiquidoSessaoForma(string $base, string $formaLabel, string $historicoRef): float
     {
-        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvCaixaMovimento)->getTable())) {
             return 0.0;
         }
 
@@ -1681,7 +1684,7 @@ class ForcaVendasFaturamentoService
      */
     private function estornarLancamentosCaixaDoPedido(ForcaVendasOrder $order, ?int $empresaId = null): void
     {
-        if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+        if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
             return;
         }
 

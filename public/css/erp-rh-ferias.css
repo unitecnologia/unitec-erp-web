@@ -1,0 +1,102 @@
+/* RH — Férias (gozos) */
+
+.erp-rh-ferias-page .erp-rh-ferias__status-wrap {
+    flex-wrap: wrap;
+}
+
+.erp-rh-ferias-page .erp-rh-ferias__status--alerta {
+    margin-left: 0.35rem;
+}
+
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 3.5rem;
+    max-width: 3.5rem;
+}
+
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    min-width: 10rem;
+}
+
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    min-width: 9rem;
+}
+
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(6),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(7),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(8),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.erp-rh-ferias-page .erp-rh-ferias-form-modal .erp-contador-form-modal__window {
+    max-width: 42rem;
+}
+
+.erp-rh-ferias-page .erp-rh-ferias-form-modal__hint {
+    margin: 0;
+    padding: 0 0.35rem;
+    font-size: 0.68rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.erp-rh-ferias-page .erp-rh-ferias-form-modal__check {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+}
+
+.erp-rh-ferias-actions,
+.erp-rh-ferias-page .erp-rh-ferias-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.35rem 0.45rem;
+    background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-top: 1px solid #cbd5e1;
+}
+
+.erp-rh-ferias-actions__btn,
+.erp-rh-ferias-page .erp-rh-ferias-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    min-width: 4.2rem;
+    padding: 0.22rem 0.35rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    cursor: pointer;
+    font: inherit;
+}
+
+.erp-rh-ferias-actions__icon,
+.erp-rh-ferias-page .erp-rh-ferias-actions__icon {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.erp-rh-ferias-actions__label,
+.erp-rh-ferias-page .erp-rh-ferias-actions__label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.15;
+}
+
+.erp-rh-ferias__tab,
+.erp-rh-ferias-page .erp-rh-ferias__tab {
+    font-size: 0.68rem;
+}

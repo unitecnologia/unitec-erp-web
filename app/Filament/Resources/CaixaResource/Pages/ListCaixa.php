@@ -16,12 +16,15 @@ use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
 use App\Models\FormaPagamento;
 use App\Models\PlanoConta;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use Illuminate\Support\Facades\DB;
 use App\Support\Erp\Financeiro\CaixaTransferencia;
 use App\Support\Erp\Pdv\PdvCaixaFechamentoService;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
+use App\Support\Erp\Queries\CaixaPdvMovimentacaoQuery;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\View;
@@ -124,17 +127,52 @@ class ListCaixa extends ListRecords
 
     protected function customErpListKeyboardConfig(): array
     {
-        return [
-            'searchInput' => '.erp-caixa__input',
-            'create' => 'createLancamento',
-            'edit' => 'editLancamento',
-            'delete' => 'deleteLancamento',
-            'extraKeys' => [
-                'F6' => ['method' => 'imprimirMovimentoCaixa'],
-                'F7' => ['method' => 'openCaixaTransferencia'],
-                'F8' => ['method' => 'openCaixaF8'],
-            ],
+        $extraKeys = [
+            'F6' => ['method' => 'imprimirMovimentoCaixa'],
         ];
+
+        $pdvConsulta = $this->contaFiltroEhPdv();
+
+        if (! $pdvConsulta) {
+            $extraKeys['F7'] = ['method' => 'openCaixaTransferencia'];
+        }
+
+        if (! $this->contaFiltroEhBancaria() && ! $pdvConsulta) {
+            $extraKeys['F8'] = ['method' => 'openCaixaF8'];
+        }
+
+        $config = [
+            'searchInput' => '.erp-caixa__input',
+            'extraKeys' => $extraKeys,
+        ];
+
+        if (! $pdvConsulta) {
+            $config['create'] = 'createLancamento';
+            $config['edit'] = 'editLancamento';
+            $config['delete'] = 'deleteLancamento';
+        }
+
+        return $config;
+    }
+
+    /**
+     * Bloqueia mutação na retaguarda quando a conta filtrada (ou destino) é PDV.
+     */
+    protected function assertRetaguardaPodeMutarConta(int $contaId, string $titulo = 'Conta PDV — somente consulta'): bool
+    {
+        try {
+            app(CaixaLivroMovimentoService::class)->assertContaRetaguardaMutavel($contaId);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title($titulo)
+                ->body($e->getMessage())
+                ->warning()
+                ->send();
+
+            return false;
+        }
+
+        return true;
     }
 
     public function table(Table $table): Table
@@ -168,12 +206,17 @@ class ListCaixa extends ListRecords
     #[Computed]
     public function contasOptions(): array
     {
-        return CaixaConta::query()
-            ->visiveisNaEmpresa()
-            ->where('ativo', true)
-            ->orderBy('nome')
-            ->pluck('nome', 'id')
-            ->all();
+        $options = [];
+
+        foreach ($this->caixaContasCatalogo() as $id => $row) {
+            $options[$id] = $row['nome'];
+        }
+
+        // Sessões antigas sem caixa_conta_id: visão separada, fora das contas PDV.
+        $options[CaixaPdvMovimentacaoQuery::FILTRO_SESSOES_SEM_CONTA]
+            = CaixaPdvMovimentacaoQuery::LABEL_SESSOES_SEM_CONTA;
+
+        return $options;
     }
 
     #[Computed]
@@ -306,6 +349,7 @@ class ListCaixa extends ListRecords
 
         $this->clearListSelection();
         $this->pushCaixaListRefresh();
+        $this->patchCaixaLivroAcoes();
     }
 
     public function clearSearch(): void
@@ -483,6 +527,10 @@ class ListCaixa extends ListRecords
             ? (int) $this->contaFilter
             : (int) (CaixaConta::query()->visiveisNaEmpresa()->where('ativo', true)->orderBy('nome')->value('id') ?? 0);
 
+        if (! $this->assertRetaguardaPodeMutarConta($contaId)) {
+            return;
+        }
+
         try {
             app(CaixaLivroMovimentoService::class)->assertPodeOperarConta($contaId);
         } catch (\InvalidArgumentException $e) {
@@ -552,6 +600,7 @@ class ListCaixa extends ListRecords
                 $selecionada > 0 ? $selecionada : null,
                 $destinoForma > 0 ? $destinoForma : null,
             );
+            app(CaixaLivroMovimentoService::class)->assertContaRetaguardaMutavel($contaId);
         } catch (\InvalidArgumentException $e) {
             $this->caixaFormAlert = $e->getMessage();
 
@@ -631,6 +680,10 @@ class ListCaixa extends ListRecords
             return;
         }
 
+        if ($this->contaFiltroEhPdv() && ! $this->assertRetaguardaPodeMutarConta((int) $this->contaFilter)) {
+            return;
+        }
+
         $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
 
         if (! $resolvedId) {
@@ -667,6 +720,10 @@ class ListCaixa extends ListRecords
                 ->warning()
                 ->send();
 
+            return;
+        }
+
+        if (! $this->assertRetaguardaPodeMutarConta((int) $lancamento->caixa_conta_id)) {
             return;
         }
 
@@ -722,6 +779,12 @@ class ListCaixa extends ListRecords
             return;
         }
 
+        if ($this->contaFiltroEhPdv()) {
+            $this->caixaAttentionMessage = 'Conta PDV operacional: na retaguarda é somente consulta. Opere pelo PDV.';
+
+            return;
+        }
+
         $recordId = $this->highlightedRecordIdOrNotify('delete');
 
         if (! $recordId) {
@@ -765,6 +828,7 @@ class ListCaixa extends ListRecords
         }
 
         try {
+            app(CaixaLivroMovimentoService::class)->assertContaRetaguardaMutavel((int) $lancamento->caixa_conta_id);
             app(CaixaLivroMovimentoService::class)->assertPodeMutarLancamento(
                 (int) $lancamento->caixa_conta_id,
                 optional($lancamento->emissao)?->toDateString() ?? now()->toDateString(),
@@ -826,10 +890,46 @@ class ListCaixa extends ListRecords
             return;
         }
 
-        CaixaLancamento::query()
+        $lancamento = CaixaLancamento::query()
             ->whereKey($id)
             ->where('historico', 'like', '[MANUAL]%')
-            ->delete();
+            ->first();
+
+        if (! $lancamento) {
+            Notification::make()
+                ->title('Lançamento não encontrado ou não é manual.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        DB::transaction(function () use ($lancamento): void {
+            $snapshot = [
+                'id' => (int) $lancamento->id,
+                'codigo' => $lancamento->codigo,
+                'emissao' => optional($lancamento->emissao)?->toDateString(),
+                'documento' => $lancamento->documento,
+                'historico' => $lancamento->historico,
+                'entrada' => (float) $lancamento->entrada,
+                'saida' => (float) $lancamento->saida,
+                'caixa_conta_id' => $lancamento->caixa_conta_id ? (int) $lancamento->caixa_conta_id : null,
+                'plano_conta_id' => $lancamento->plano_conta_id ? (int) $lancamento->plano_conta_id : null,
+            ];
+
+            $lancamento->delete();
+
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'EXCLUIR_LANCAMENTO_CAIXA',
+                resumo: 'Excluído lançamento manual de caixa #'.($snapshot['codigo'] ?: $snapshot['id']).'.',
+                origem: 'caixa',
+                documentoTipo: 'caixa_lancamento',
+                documentoId: (int) $snapshot['id'],
+                documentoNumero: (string) ($snapshot['codigo'] ?: $snapshot['id']),
+                detalhes: ['antes' => $snapshot],
+                empresaId: $lancamento->empresa_id ? (int) $lancamento->empresa_id : ErpContext::currentEmpresaId(),
+            );
+        });
 
         $this->clearListSelection();
         $this->resetTable();
@@ -875,7 +975,14 @@ class ListCaixa extends ListRecords
         $totalEntrada = $builder->sumEntradaFiltered();
         $totalSaida = $builder->sumSaidaFiltered();
         $saldoAtual = $saldoAnterior + $totalEntrada - $totalSaida;
-        unset($this->caixaRodape, $this->caixaStatusBanner, $this->caixaMovimentoAberto, $this->caixaF8Label);
+        unset(
+            $this->caixaRodape,
+            $this->caixaStatusBanner,
+            $this->caixaMovimentoAberto,
+            $this->caixaF8Label,
+            $this->caixaF8PodeUsar,
+            $this->caixaContaPdvSomenteConsulta,
+        );
 
         $this->dispatch(
             'erp-caixa-list-refresh',
@@ -897,6 +1004,93 @@ class ListCaixa extends ListRecords
         $rodape = $this->caixaRodape;
 
         $this->patchCaixaFooterTotals($saldoAnterior, $totalEntrada, $totalSaida, $saldoAtual, $rodape);
+    }
+
+    /**
+     * Troca de conta sem redesenhar a página: sincroniza barra inferior + atalhos no DOM.
+     * Reusa contaFiltroEhPdv / caixaF8PodeUsar (sem query extra).
+     */
+    protected function patchCaixaLivroAcoes(): void
+    {
+        unset(
+            $this->caixaMovimentoAberto,
+            $this->caixaF8Label,
+            $this->caixaF8PodeUsar,
+            $this->caixaContaPdvSomenteConsulta,
+        );
+
+        $pdvConsulta = $this->contaFiltroEhPdv();
+        $mostrarLivro = $this->caixaF8PodeUsar;
+        $label = 'Abrir Caixa';
+        $icon = "\u{25A2}";
+        $title = 'Abrir movimento do Livro Caixa';
+
+        if ($mostrarLivro) {
+            $aberto = $this->caixaMovimentoAberto !== null;
+            $label = $this->caixaF8Label;
+            $icon = $aberto ? "\u{25A3}" : "\u{25A2}";
+            $title = $aberto
+                ? 'Fechar movimento do Livro Caixa'
+                : 'Abrir movimento do Livro Caixa';
+        }
+
+        $keys = $this->customErpListKeyboardConfig();
+
+        $payload = json_encode([
+            'operacional' => ! $pdvConsulta,
+            'livro' => $mostrarLivro,
+            'label' => $label,
+            'icon' => $icon,
+            'title' => $title,
+            'create' => $keys['create'] ?? null,
+            'edit' => $keys['edit'] ?? null,
+            'delete' => $keys['delete'] ?? null,
+            'extraKeys' => $keys['extraKeys'] ?? [],
+        ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        $this->js(<<<JS
+            (() => {
+                const data = {$payload};
+                const root = document.querySelector('.erp-caixa-page');
+                if (! root) return;
+
+                root.querySelectorAll('[data-erp-caixa-operacional]').forEach((el) => {
+                    el.hidden = !data.operacional;
+                });
+                root.querySelectorAll('[data-erp-caixa-livro]').forEach((el) => {
+                    el.hidden = !data.livro;
+                });
+                if (data.livro) {
+                    const label = root.querySelector('[data-erp-caixa-livro-label]');
+                    const icon = root.querySelector('[data-erp-caixa-livro-icon]');
+                    const button = root.querySelector('[data-erp-key="F8"]');
+                    if (label) label.textContent = data.label;
+                    if (icon) icon.textContent = data.icon;
+                    if (button) button.title = data.title;
+                }
+
+                const config = window.__erpListConfigByClass && window.__erpListConfigByClass['erp-caixa-page'];
+                if (! config) return;
+
+                if (data.create) {
+                    config.create = data.create;
+                } else {
+                    delete config.create;
+                }
+                if (data.edit) {
+                    config.edit = data.edit;
+                } else {
+                    delete config.edit;
+                }
+                if (data.delete) {
+                    config.delete = data.delete;
+                } else {
+                    delete config.delete;
+                }
+
+                config.extraKeys = Object.assign({}, data.extraKeys || {});
+            })()
+        JS);
     }
 
     /**

@@ -383,6 +383,73 @@
     font-weight: 600;
 }
 
+/* Meio Pgto: multi-select compacto com checkboxes */
+.erp-fv-mon__combo--multi .erp-fv-mon__select-btn {
+    gap: 0.25rem;
+}
+
+.erp-fv-mon__multi-count {
+    flex: 0 0 auto;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    padding: 0 0.28rem;
+    border-radius: 999px;
+    background: var(--erp-primary, #1d4ed8);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1.1rem;
+    text-align: center;
+}
+
+.erp-fv-mon__combo-panel--multi {
+    min-width: 10.5rem;
+    max-height: 14rem;
+}
+
+.erp-fv-mon__combo-item--todos {
+    margin-bottom: 0.1rem;
+    border-bottom: 1px solid var(--erp-border-light, #e2e8f0);
+    border-radius: 5px 5px 0 0;
+    color: var(--erp-text-muted, #64748b);
+    font-weight: 600;
+}
+
+.erp-fv-mon__multi-option {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    margin: 0;
+    padding: 0.22rem 0.4rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    font-weight: 600;
+    color: var(--erp-text, #0f172a);
+    user-select: none;
+}
+
+.erp-fv-mon__multi-option:hover {
+    background: var(--erp-row-hover, #e8f2ff);
+}
+
+.erp-fv-mon__multi-check {
+    flex: 0 0 auto;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin: 0;
+    accent-color: var(--erp-primary, #1d4ed8);
+    cursor: pointer;
+}
+
+.erp-fv-mon__multi-option-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ---- Itens da direita na mesma linha (mobile / legenda / consultar) ---- */
 .erp-fv-mon__mobile-check {
     display: inline-flex;
@@ -1005,7 +1072,24 @@
 .erp-list-page.erp-fv-monitor-page .fi-ta-table {
     border-collapse: collapse;
     table-layout: auto !important;
-    min-width: 92rem;
+    /* Duas colunas a menos (hora abert./fech. fundidas em data+hora). */
+    min-width: 84rem;
+}
+
+/* Data Abert. / Data Fech. / Sincronizado: dd/mm/aaaa HH:mm compacto */
+.erp-fv-monitor-page .fi-ta-header-cell-data_abert,
+.erp-fv-monitor-page .fi-ta-cell-data_abert,
+.erp-fv-monitor-page .fi-ta-header-cell-data_fech,
+.erp-fv-monitor-page .fi-ta-cell-data_fech,
+.erp-fv-monitor-page .fi-ta-header-cell-sincronizado,
+.erp-fv-monitor-page .fi-ta-cell-sincronizado,
+.erp-fv-monitor-page .fi-ta-header-cell.erp-fv-mon-dt,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-dt {
+    width: 7.6rem;
+    min-width: 7.6rem;
+    max-width: 8.2rem;
+    padding-inline: 0.28rem !important;
+    font-variant-numeric: tabular-nums;
 }
 
 .erp-fv-monitor-page .fi-ta-header-cell {
@@ -1519,6 +1603,35 @@
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__amount {
     color: inherit;
     opacity: 1;
+}
+
+/* Meio Pgto: largura do título; texto não alarga a coluna. */
+.erp-fv-monitor-page .fi-ta-header-cell.erp-fv-mon-meio,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-meio,
+.erp-fv-monitor-page .fi-ta-header-cell-meio_pgto,
+.erp-fv-monitor-page .fi-ta-cell-meio_pgto {
+    width: calc(9ch + 1rem) !important;
+    min-width: calc(9ch + 1rem) !important;
+    max-width: calc(9ch + 1rem) !important;
+    overflow: hidden;
+    padding-inline: 0.28rem !important;
+}
+
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-meio .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-meio .fi-ta-text,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-meio .fi-ta-text-item,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-meio .erp-fv-mon-meio--pix,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-meio span,
+.erp-fv-monitor-page .fi-ta-cell-meio_pgto .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell-meio_pgto .fi-ta-text,
+.erp-fv-monitor-page .fi-ta-cell-meio_pgto .fi-ta-text-item,
+.erp-fv-monitor-page .fi-ta-cell-meio_pgto .erp-fv-mon-meio--pix,
+.erp-fv-monitor-page .fi-ta-cell-meio_pgto span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Meio Pgto = PIX: verde forte (o color do Filament é sobrescrito pela grade) */

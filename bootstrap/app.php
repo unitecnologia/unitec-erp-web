@@ -38,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'forcavendas.device' => \App\Http\Middleware\EnsureForcaVendasDeviceApproved::class,
             'forcavendas.device.user' => \App\Http\Middleware\EnsureForcaVendasDeviceUser::class,
             'vendasinternas.device' => \App\Http\Middleware\EnsureVendasInternasDeviceApproved::class,
+            'vendasinternas.device.user' => \App\Http\Middleware\EnsureVendasInternasDeviceUser::class,
             'unitecos.device' => \App\Http\Middleware\EnsureUnitecOsDeviceApproved::class,
             'entregas.device' => \App\Http\Middleware\EnsureEntregasDeviceApproved::class,
             'mesas.device' => \App\Http\Middleware\EnsureMesasDeviceApproved::class,

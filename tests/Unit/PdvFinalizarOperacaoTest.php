@@ -50,13 +50,19 @@ class PdvFinalizarOperacaoTest extends TestCase
         $this->assertFalse(PdvFinalizarOperacao::isFiscal(PdvFinalizarOperacao::PEDIDO));
     }
 
-    public function test_it_requests_print_confirmation_before_for_pedido_and_after_for_nfce(): void
+    public function test_it_requests_print_confirmation_after_sale_for_pedido_and_nfce(): void
     {
-        $this->assertTrue(PdvFinalizarOperacao::solicitaConfirmacaoImpressao(PdvFinalizarOperacao::PEDIDO));
+        // Antes da gravação: nunca (legado desativado).
+        $this->assertFalse(PdvFinalizarOperacao::solicitaConfirmacaoImpressao(PdvFinalizarOperacao::PEDIDO));
         $this->assertFalse(PdvFinalizarOperacao::solicitaConfirmacaoImpressao(PdvFinalizarOperacao::NFCE_TRANSMITIR));
-        $this->assertTrue(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::NFCE_TRANSMITIR));
-        $this->assertFalse(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::PEDIDO));
         $this->assertFalse(PdvFinalizarOperacao::solicitaConfirmacaoImpressao(PdvFinalizarOperacao::NFCE_CONTINGENCIA));
         $this->assertFalse(PdvFinalizarOperacao::solicitaConfirmacaoImpressao(PdvFinalizarOperacao::FINALIZAR));
+
+        // Depois da gravação: Pedido + NFC-e + Finalizar.
+        $this->assertTrue(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::PEDIDO));
+        $this->assertTrue(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::NFCE_TRANSMITIR));
+        $this->assertTrue(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::NFCE_CONTINGENCIA));
+        $this->assertTrue(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::FINALIZAR));
+        $this->assertFalse(PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(PdvFinalizarOperacao::PEDIDO, false));
     }
 }

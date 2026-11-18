@@ -77,7 +77,7 @@ class TrocarEmpresaPage extends Page
     }
 
     /**
-     * @return list<array{id: int, label: string, cnpj: string, atual: bool}>
+     * @return list<array{id: int, codigo: int|string|null, label: string, cnpj: string, atual: bool}>
      */
     public function empresasDisponiveis(): array
     {
@@ -89,13 +89,16 @@ class TrocarEmpresaPage extends Page
             return [];
         }
 
+        // Mesma ordem da tela Empresas (código crescente).
         return Empresa::query()
             ->whereIn('id', $ids)
             ->where('ativo', true)
-            ->orderByRaw('COALESCE(NULLIF(fantasia, ""), NULLIF(nome, ""), razao_social) ASC')
-            ->get(['id', 'nome', 'fantasia', 'razao_social', 'cnpj'])
+            ->orderBy('codigo')
+            ->orderBy('id')
+            ->get(['id', 'codigo', 'nome', 'fantasia', 'razao_social', 'cnpj'])
             ->map(fn (Empresa $e): array => [
                 'id' => (int) $e->id,
+                'codigo' => $e->codigo !== null && $e->codigo !== '' ? $e->codigo : (int) $e->id,
                 'label' => (string) ($e->fantasia ?: ($e->nome ?: $e->razao_social)),
                 'cnpj' => $this->formatCnpj((string) ($e->cnpj ?? '')),
                 'atual' => $atualId !== null && (int) $e->id === (int) $atualId,

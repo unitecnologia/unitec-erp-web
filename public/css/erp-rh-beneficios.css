@@ -1,0 +1,85 @@
+/* RH — Benefícios: ajustes finos sobre erp-rh-list + erp-list-ui */
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem !important;
+    max-width: 4.25rem;
+}
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 18% !important;
+}
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 18% !important;
+}
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 7rem !important;
+    text-align: center;
+}
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(6),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 6.5rem !important;
+    text-align: right;
+}
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(7),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(8),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+    width: 7rem !important;
+    text-align: center;
+}
+
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(9),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(9) {
+    width: 6.5rem !important;
+    text-align: center;
+}
+
+.erp-rh-beneficios-page .fi-ta-empty-state {
+    padding: 1.25rem 0.75rem !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+}
+
+.erp-rh-beneficios-page .fi-ta-empty-state-heading {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-rh-beneficios-page .erp-rh-beneficio-form-modal .erp-contador-form-modal__window,
+.erp-rh-beneficios-page .erp-rh-beneficio-catalog-modal .erp-contador-form-modal__window {
+    width: min(calc(34rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-beneficios-page .erp-rh-beneficio-form-modal .erp-pcad-form__input--date,
+.erp-rh-beneficios-page .erp-rh-beneficio-catalog-modal .erp-pcad-form__input--date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.erp-rh-beneficios-page .erp-rh-beneficio-form-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-rh-beneficios-page .erp-contador-delete-modal__window {
+    width: min(26rem, calc(100vw - 2rem));
+}
+
+.erp-rh-beneficios-actions__icon--cancel,
+.erp-rh-beneficios-actions__icon--close {
+    color: inherit;
+}

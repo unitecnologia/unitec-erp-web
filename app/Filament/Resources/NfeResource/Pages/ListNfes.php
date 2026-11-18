@@ -29,8 +29,10 @@ use App\Models\OutrasSaidaMovimento;
 use App\Models\Person;
 use App\Models\Venda;
 use App\Models\VendasParametro;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
 use App\Support\Erp\Nfe\NfeListStatusCounts;
 use App\Support\Erp\Nfe\NfeOrdemServicoService;
@@ -521,7 +523,9 @@ class ListNfes extends ListRecords
         }
 
         try {
-            $payload = app(NfeVendaMercadoriaService::class)->montarPayload($venda, $emitente);
+            $permitirCf = EmpresaParametros::permitirIniciarNfeConsumidorFinal()
+                && NfeClienteCadastro::ehConsumidorFinalParaBloqueioNfe($venda->cliente);
+            $payload = app(NfeVendaMercadoriaService::class)->montarPayload($venda, $emitente, $permitirCf);
 
             $this->createNfe($emitente?->id);
 

@@ -8,12 +8,13 @@
         ['key' => 'nota_fiscal', 'label' => 'Nota fiscal', 'sortable' => false, 'align' => 'center'],
         ['key' => 'fornecedor', 'label' => 'Fornecedor', 'sortable' => false, 'align' => 'start'],
         ['key' => 'vencimento', 'label' => 'Vencimento', 'sortable' => true, 'align' => 'center'],
-        ['key' => 'valor', 'label' => 'Valor', 'sortable' => false, 'align' => 'end'],
-        ['key' => 'desconto', 'label' => 'Desconto', 'sortable' => false, 'align' => 'end'],
-        ['key' => 'juros', 'label' => 'Juros', 'sortable' => false, 'align' => 'end'],
-        ['key' => 'valor_pago', 'label' => 'Vl. Pago', 'sortable' => false, 'align' => 'end'],
+        ['key' => 'competencia', 'label' => 'Competência', 'sortable' => false, 'align' => 'center'],
+        ['key' => 'valor', 'label' => 'Valor', 'sortable' => false, 'align' => 'start', 'html' => true],
+        ['key' => 'desconto', 'label' => 'Desconto', 'sortable' => false, 'align' => 'start', 'html' => true],
+        ['key' => 'juros', 'label' => 'Juros', 'sortable' => false, 'align' => 'start', 'html' => true],
+        ['key' => 'valor_pago', 'label' => 'Vl. Pago', 'sortable' => false, 'align' => 'start', 'html' => true],
         ['key' => 'pago_em', 'label' => 'Pago Em', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'saldo', 'label' => 'Saldo', 'sortable' => false, 'align' => 'end'],
+        ['key' => 'saldo', 'label' => 'Saldo', 'sortable' => false, 'align' => 'start', 'html' => true],
     ];
 @endphp
 
@@ -105,6 +106,8 @@
                                     wire:click.stop="$dispatch('erp-pagar-toggle-baixa', { contaId: {{ (int) $record->getKey() }}, selected: $event.target.checked })"
                                     @click.stop
                                 >
+                            @elseif ($column['html'] ?? false)
+                                {!! $value !!}
                             @else
                                 {{ $value }}
                             @endif

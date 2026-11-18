@@ -3,6 +3,8 @@
     $pageClass = $pageClass ?? 'erp-tomadores-servico';
     $pageSizeOptions = [25, 50, 100];
     $deleteHint = $deleteHint ?? 'registro';
+    $uppercaseFields = $uppercaseFields ?? ['nome'];
+    $numericFields = $numericFields ?? ['codigo'];
 @endphp
 
 <div class="{{ $pageClass }}" wire:ignore.self>
@@ -22,8 +24,8 @@
                     class="{{ $pageClass }}__input {{ $pageClass }}__search-text"
                     placeholder="Digite para pesquisar"
                     autocomplete="off"
-                    @if ($this->searchColumn === 'nome') data-erp-uppercase @endif
-                    @if ($this->searchColumn === 'codigo') inputmode="numeric" @endif
+                    @if (in_array($this->searchColumn, $uppercaseFields, true)) data-erp-uppercase @endif
+                    @if (in_array($this->searchColumn, $numericFields, true)) inputmode="numeric" @endif
                 >
             </div>
 

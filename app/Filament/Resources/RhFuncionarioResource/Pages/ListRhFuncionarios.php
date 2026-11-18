@@ -8,10 +8,13 @@ use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\RhFuncionarioResource;
 use App\Filament\Resources\RhFuncionarioResource\Pages\Concerns\ManagesRhFuncionarioFormModal;
 use App\Models\RhFuncionario;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Rh\OperadorFromFuncionarioSync;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
@@ -56,6 +59,7 @@ class ListRhFuncionarios extends ListRecords
         if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR && ! $this->rhFuncionarioModalOpen) {
             $this->createRhFuncionario();
             $this->rhFuncionarioForm['eh_operador'] = true;
+            $this->captureRhFuncionarioFormBaseline();
         }
     }
 
@@ -128,6 +132,13 @@ class ListRhFuncionarios extends ListRecords
     {
         $query = parent::getTableQuery()->with(['cargo', 'departamento']);
 
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        if ($empresaId > 0) {
+            $query->where('empresa_id', $empresaId);
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+
         $query = match ($this->statusFilter) {
             'ativos' => $query->where('ativo', true)->whereNull('data_demissao'),
             'inativos' => $query->where(fn (Builder $q) => $q->where('ativo', false)->orWhereNotNull('data_demissao')),
@@ -183,7 +194,10 @@ class ListRhFuncionarios extends ListRecords
             return;
         }
 
-        $record = RhFuncionario::query()->find($recordId);
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        $record = RhFuncionario::query()
+            ->when($empresaId > 0, fn (Builder $q) => $q->where('empresa_id', $empresaId))
+            ->find($recordId);
 
         if (! $record) {
             Notification::make()
@@ -202,7 +216,32 @@ class ListRhFuncionarios extends ListRecords
             );
         }
 
-        $record->delete();
+        DB::transaction(function () use ($record): void {
+            $snapshot = [
+                'id' => (int) $record->id,
+                'codigo' => $record->codigo,
+                'nome' => $record->nome,
+                'ativo' => (bool) $record->ativo,
+                'vendedor_id' => $record->vendedor_id ? (int) $record->vendedor_id : null,
+                'tipo_vinculo' => $record->tipo_vinculo ?? null,
+            ];
+
+            $record->delete();
+
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'EXCLUIR_RH_FUNCIONARIO',
+                resumo: 'Funcionário RH excluído: '.($snapshot['nome'] ?: '#'.$snapshot['id']).'.',
+                origem: 'rh_funcionarios',
+                documentoTipo: 'rh_funcionario',
+                documentoId: (int) $snapshot['id'],
+                documentoNumero: (string) ($snapshot['codigo'] ?: $snapshot['id']),
+                detalhes: [
+                    'acao' => 'excluir',
+                    'antes' => $snapshot,
+                ],
+                empresaId: ErpContext::currentEmpresaId(),
+            );
+        });
 
         $this->clearListSelection();
         $this->resetTable();

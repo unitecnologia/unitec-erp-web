@@ -7,6 +7,7 @@
         ['label' => 'Férias', 'value' => (int) ($k['ferias'] ?? 0), 'hint' => 'Em breve', 'tone' => 'teal', 'icon' => 'heroicon-o-sun'],
         ['label' => 'Exames vencendo', 'value' => (int) ($k['exames_vencendo'] ?? 0), 'hint' => 'Próximos 30 dias', 'tone' => (($k['exames_vencendo'] ?? 0) > 0 ? 'orange' : 'blue'), 'icon' => 'heroicon-o-heart'],
         ['label' => 'EPIs vencendo', 'value' => (int) ($k['epis_vencendo'] ?? 0), 'hint' => 'Próximos 30 dias', 'tone' => (($k['epis_vencendo'] ?? 0) > 0 ? 'orange' : 'blue'), 'icon' => 'heroicon-o-shield-check'],
+        ['label' => 'Trein. vencendo', 'value' => (int) ($k['treinamentos_vencendo'] ?? 0), 'hint' => 'Próximos 30 dias', 'tone' => (($k['treinamentos_vencendo'] ?? 0) > 0 ? 'orange' : 'blue'), 'icon' => 'heroicon-o-academic-cap'],
         ['label' => 'Docs vencendo', 'value' => (int) ($k['docs_vencendo'] ?? 0), 'hint' => 'Próximos 30 dias', 'tone' => (($k['docs_vencendo'] ?? 0) > 0 ? 'orange' : 'blue'), 'icon' => 'heroicon-o-document-text'],
         ['label' => 'Aniversariantes', 'value' => (int) ($k['aniversariantes'] ?? 0), 'hint' => 'Hoje', 'tone' => 'indigo', 'icon' => 'heroicon-o-cake'],
         ['label' => 'Folga hoje', 'value' => (int) ($k['folga_hoje'] ?? 0), 'hint' => 'Pela escala', 'tone' => 'slate', 'icon' => 'heroicon-o-calendar'],
@@ -54,6 +55,6 @@
     </section>
 
     <p class="erp-rh-dashboard__note">
-        Use o menu <strong>RH</strong> para Funcionários, Cargos e Departamentos. Demais módulos aparecem como “Em breve”.
+        Use o menu <strong>RH</strong> para Funcionários, Documentos, EPIs, Exames, Treinamentos e Uniformes.
     </p>
 </div>

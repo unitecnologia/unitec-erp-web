@@ -8,6 +8,7 @@ use App\Models\Empresa;
 use App\Models\ForcaVendasOrder;
 use App\Models\Nfe;
 use App\Models\PdvVendaNfce;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\Nfce\NfceCupomReportService;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
@@ -198,6 +199,9 @@ final class ForcaVendasMonitorEnvioAnexosService
             'logoDataUri' => $this->logoDataUri($empresa),
             'logoUrl' => $empresa?->logoUrl(),
             'impSemColunaDesconto' => $impSemColunaDesconto,
+            'exibirCabecalhoEmpresa' => EmpresaParametros::pedidoExibirCabecalhoEmpresa(
+                $empresaId > 0 ? $empresaId : null,
+            ),
         ];
 
         $directory = storage_path('app/temp/forca-vendas-monitor-envio');

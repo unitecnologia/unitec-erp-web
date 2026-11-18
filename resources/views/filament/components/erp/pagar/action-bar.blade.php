@@ -43,6 +43,16 @@
             <span class="erp-pagar-actions__icon">☰</span>
             <span class="erp-pagar-actions__label"><kbd>F8</kbd> | Histórico</span>
         </button>
+        <button
+            type="button"
+            wire:click="pedirExcluirConta"
+            class="erp-pagar-actions__btn erp-pagar-actions__btn--excluir"
+            data-erp-key="Delete"
+            title="{{ $this->exclusaoContaTooltip }}"
+        >
+            <span class="erp-pagar-actions__icon erp-pagar-actions__icon--excluir" aria-hidden="true">🗑</span>
+            <span class="erp-pagar-actions__label"><kbd>Del</kbd> | Excluir</span>
+        </button>
         <button type="button" wire:click="closeScreen" class="erp-pagar-actions__btn erp-pagar-actions__btn--close">
             <span class="erp-pagar-actions__icon erp-pagar-actions__icon--close">✕</span>
             <span class="erp-pagar-actions__label">Fechar</span>

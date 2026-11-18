@@ -3660,3 +3660,38 @@
     opacity: 0.65;
     cursor: wait;
 }
+
+
+/* Formas de Pagamento — Bandeiras / Maquininhas recolhíveis */
+.erp-fpgto-bandeiras--collapsible {
+    padding-top: 0.12rem;
+}
+.erp-fpgto-bandeiras__summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.12rem 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+.erp-fpgto-bandeiras__summary::-webkit-details-marker {
+    display: none;
+}
+.erp-fpgto-bandeiras__summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 0.7rem;
+    font-size: 0.68rem;
+    line-height: 1;
+    color: #64748b;
+}
+.erp-fpgto-bandeiras--collapsible[open] > .erp-fpgto-bandeiras__summary::before {
+    content: '▾';
+}
+.erp-fpgto-bandeiras__body {
+    padding-top: 0.2rem;
+}

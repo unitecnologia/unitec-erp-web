@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpContext;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
@@ -203,8 +205,23 @@ class Vendedor extends Model
         return $this->hasOne(User::class, 'vendedor_id');
     }
 
+    /**
+     * Funcionário RH do vendedor na empresa logada (evita pegar vínculo de outra empresa).
+     */
     public function rhFuncionario(): HasOne
     {
-        return $this->hasOne(RhFuncionario::class, 'vendedor_id');
+        $rel = $this->hasOne(RhFuncionario::class, 'vendedor_id');
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+
+        if ($empresaId > 0) {
+            $rel->where($rel->getRelated()->getTable().'.empresa_id', $empresaId);
+        }
+
+        return $rel;
+    }
+
+    public function rhFuncionarios(): HasMany
+    {
+        return $this->hasMany(RhFuncionario::class, 'vendedor_id');
     }
 }

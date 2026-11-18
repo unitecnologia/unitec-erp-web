@@ -2,10 +2,13 @@
 
 namespace App\Support\ForcaVendas;
 
+use App\Support\Erp\DescontoReaisItemCalculator;
+use App\Support\Erp\EmpresaParametros;
+
 /**
  * Consolidação de quantidade ao agrupar o mesmo produto na Tela de Venda.
- * Desconto/acréscimo da linha são totais; o ajuste unitário da linha existente
- * é reaplicado na nova quantidade.
+ * Desconto/acréscimo da linha são totais; a reescala depende do modo
+ * (por unidade × qtd vs total da linha fixo).
  */
 final class ForcaVendasItemAgrupamento
 {
@@ -19,21 +22,18 @@ final class ForcaVendasItemAgrupamento
         float $quantidadeAdicionar,
         float $descontoAdicionar,
         float $acrescimoAdicionar,
+        ?string $modoReais = null,
+        ?int $empresaId = null,
     ): array {
-        $novaQtd = round($quantidadeAtual + $quantidadeAdicionar, 3);
-
-        if ($quantidadeAtual > 0 && ($descontoLinhaAtual > 0 || $acrescimoLinhaAtual > 0)) {
-            return [
-                'quantidade' => $novaQtd,
-                'desconto' => round(($descontoLinhaAtual / $quantidadeAtual) * $novaQtd, 2),
-                'acrescimo' => round(($acrescimoLinhaAtual / $quantidadeAtual) * $novaQtd, 2),
-            ];
-        }
-
-        return [
-            'quantidade' => $novaQtd,
-            'desconto' => round($descontoLinhaAtual + $descontoAdicionar, 2),
-            'acrescimo' => round($acrescimoLinhaAtual + $acrescimoAdicionar, 2),
-        ];
+        return DescontoReaisItemCalculator::consolidarAgrupamento(
+            $quantidadeAtual,
+            $descontoLinhaAtual,
+            $acrescimoLinhaAtual,
+            $quantidadeAdicionar,
+            $descontoAdicionar,
+            $acrescimoAdicionar,
+            $modoReais ?? EmpresaParametros::DESCONTO_REAIS_ITEM_UNITARIO,
+            $empresaId,
+        );
     }
 }

@@ -36,6 +36,11 @@ class PersonResource extends Resource
         return ErpAccess::currentCan('pessoas.access');
     }
 
+    public static function canCreate(): bool
+    {
+        return ErpAccess::currentCan('pessoas.create');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components(static::hiddenFormFields());

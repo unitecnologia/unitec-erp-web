@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'fornecedor_id',
     'compra_id',
     'vencimento',
+    'competencia',
+    'plano_conta_id',
     'valor',
     'desconto',
     'juros',
@@ -58,9 +60,26 @@ class ContaPagar extends Model
         return $this->belongsTo(Compra::class, 'compra_id');
     }
 
+    public function planoConta(): BelongsTo
+    {
+        return $this->belongsTo(PlanoConta::class, 'plano_conta_id');
+    }
+
     public function pagamentos(): HasMany
     {
         return $this->hasMany(ContaPagarPagamento::class, 'conta_pagar_id');
+    }
+
+    /** Valor do título para apuração por competência (independente do pago). */
+    public function valorCompetencia(): float
+    {
+        return round(
+            (float) $this->valor
+            - (float) $this->desconto
+            + (float) $this->juros
+            + (float) ($this->multa ?? 0),
+            2
+        );
     }
 
     protected function casts(): array
@@ -68,6 +87,7 @@ class ContaPagar extends Model
         return [
             'emissao' => 'date',
             'vencimento' => 'date',
+            'competencia' => 'date',
             'pago_em' => 'date',
             'valor' => 'decimal:2',
             'desconto' => 'decimal:2',

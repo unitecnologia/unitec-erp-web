@@ -29,6 +29,31 @@ abstract class AbstractTabularReport implements TabularReportDefinition
     }
 
     /**
+     * Quando true, a abertura do viewer não executa a consulta pesada até ?gerar=1.
+     * Default false — demais relatórios permanecem com preview imediato.
+     */
+    public function requiresExplicitGenerate(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Quando true, o escopo de empresa é sempre a empresa da sessão (sem filtro Grupo).
+     */
+    public function locksCurrentEmpresa(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Orientação do papel no viewer/impressão/PDF: landscape|portrait.
+     */
+    public function paperOrientation(): string
+    {
+        return 'landscape';
+    }
+
+    /**
      * @return list<string>
      */
     public function numericColumns(): array

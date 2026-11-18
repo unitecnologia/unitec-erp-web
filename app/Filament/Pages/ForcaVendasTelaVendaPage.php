@@ -4,6 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Models\CaixaConta;
+use App\Models\CartaoBandeira;
+use App\Models\CartaoMaquininha;
 use App\Models\Estoque;
 use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
@@ -13,6 +15,7 @@ use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\Vendedor;
 use App\Support\Erp\ConsumidorFinalGuard;
+use App\Support\Erp\DescontoReaisItemCalculator;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ProductEmpresaPrecoService;
@@ -21,8 +24,10 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Rh\OperadorDoUsuario;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\FaturamentoPendenciaFinanceiraGuard;
 use App\Support\Erp\Financeiro\VendaCaixaDestinoResolver;
 use App\Support\Erp\Pdv\PdvClienteLimiteService;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
@@ -31,6 +36,7 @@ use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasItemAgrupamento;
 use App\Support\ForcaVendas\ForcaVendasMargemVendaCalculator;
 use App\Support\ForcaVendas\ForcaVendasTelaVendaService;
+use App\Support\VendasInternas\VendasInternasEdicaoLockService;
 use App\Filament\Pages\Concerns\ManagesBoletoPosDocumentoPrompt;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaImportarOrcamento;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaListarVendas;
@@ -175,6 +181,9 @@ class ForcaVendasTelaVendaPage extends Page
     /** Inclusão de item em andamento (bloqueia F3/F4 até concluir). */
     public bool $isConfirmingItem = false;
 
+    /** Quando true, adicionarItem remorpha a tela (Ctrl+D na barra precisa fechar modal + limpar form). */
+    private bool $fvRemorphAposIncluir = false;
+
     /** Key do item retirado da grade para edição na barra (duplo clique). */
     public ?string $editingItemKey = null;
 
@@ -318,6 +327,21 @@ class ForcaVendasTelaVendaPage extends Page
 
     /** @var list<array{id: int, descricao: string, atalho: string, valor: string}> */
     public array $meiosPagamento = [];
+
+    /**
+     * Espelho UI do Canhoto POS (Alpine + skipRender, sem remorph da TV).
+     */
+    public bool $fvCanhotoOcultarParcelas = false;
+
+    public string $fvCanhotoTotalLabel = '0,00';
+
+    public string $fvCanhotoParcelasTotalLabel = '';
+
+    /** @var list<string> */
+    public array $fvCanhotoMaquininhas = [];
+
+    /** @var list<string> */
+    public array $fvCanhotoBandeiras = [];
 
     /** Divisão informativa da conta (F4) — não altera pagamentos. */
     public string $fvDividirPor = '1';
@@ -605,7 +629,30 @@ class ForcaVendasTelaVendaPage extends Page
      */
     private function liberarSaidaTelaVenda(): void
     {
+        $this->liberarLockEdicaoErpVi();
         $this->dispatch('fv-tela-venda-allow-leave');
+    }
+
+    /**
+     * Libera EM EDIÇÃO NO ERP do pedido VI-linked aberto nesta tela.
+     */
+    private function liberarLockEdicaoErpVi(): void
+    {
+        if (! $this->pedidoId) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user instanceof \App\Models\User) {
+            return;
+        }
+
+        try {
+            app(VendasInternasEdicaoLockService::class)
+                ->liberarErpPorForcaVendasOrderId((int) $this->pedidoId, $user);
+        } catch (\Throwable) {
+            // Saída do formulário não deve falhar por lock.
+        }
     }
 
     /**
@@ -1127,7 +1174,7 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function abrirModalDescontoItem(): void
     {
-        if ($this->etapa !== 'venda' || $this->descontoModalOpen) {
+        if ($this->etapa !== 'venda') {
             return;
         }
 
@@ -1145,9 +1192,10 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $this->itemAjusteTipo = 'desconto';
+        $seed = $this->seedItemAjusteModal();
+        $this->itemAjusteTipo = $seed['tipo'];
         $this->itemAjusteModo = 'percentual';
-        $this->itemAjusteValor = '0,00';
+        $this->itemAjusteValor = $seed['pct'];
         $this->descontoModalOpen = true;
         $this->dispatch('erp-fv-focus-desconto-item');
     }
@@ -1158,53 +1206,96 @@ class ForcaVendasTelaVendaPage extends Page
         $this->itemAjusteAlvo = null;
     }
 
-    public function updatedItemAjusteValor(): void
-    {
-        $this->itemAjusteValor = $this->sanitizarNumero($this->itemAjusteValor);
-    }
-
-    public function setItemAjusteTipo(string $tipo): void
-    {
-        $this->itemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
-    }
-
-    public function setItemAjusteModo(string $modo): void
-    {
-        $this->itemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
-    }
-
     /**
-     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
+     * @return array{
+     *   descricao: string,
+     *   baseRaw: float,
+     *   qtdRaw: float,
+     *   tipo: string,
+     *   pct: string,
+     *   reais: string,
+     *   modoReais: string
+     * }
      */
-    public function getItemAjustePreviewProperty(): array
+    public function getItemAjusteModalProperty(): array
     {
         $ctx = $this->contextoItemAjuste();
-
-        if ($ctx === null) {
-            return [
-                'descricao' => '',
-                'base' => $this->formatMoney(0),
-                'novoPreco' => $this->formatMoney(0),
-                'total' => $this->formatMoney(0),
-                'tipo' => $this->itemAjusteTipo,
-                'temAjuste' => false,
-            ];
-        }
-
-        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
+        $seed = $this->seedItemAjusteModal();
 
         return [
-            'descricao' => $ctx['descricao'],
-            'base' => $this->formatMoney($calc['base']),
-            'novoPreco' => $this->formatMoney($calc['novoPreco']),
-            'total' => $this->formatMoney($calc['total']),
-            'tipo' => $this->itemAjusteTipo,
-            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
+            'descricao' => $ctx['descricao'] ?? '',
+            'baseRaw' => (float) ($ctx['preco'] ?? 0),
+            'qtdRaw' => (float) ($ctx['quantidade'] ?? 0),
+            'tipo' => $seed['tipo'],
+            'pct' => $seed['pct'],
+            'reais' => $seed['reais'],
+            'modoReais' => EmpresaParametros::descontoReaisItemModo(),
         ];
     }
 
-    public function confirmarItemAjuste(): void
+    /**
+     * @return array{tipo: string, pct: string, reais: string}
+     */
+    private function seedItemAjusteModal(): array
     {
+        $ctx = $this->contextoItemAjuste();
+        $preco = (float) ($ctx['preco'] ?? 0);
+        $qtd = (float) ($ctx['quantidade'] ?? 0);
+        $bruto = max(0.0, round($preco * $qtd, 2));
+
+        $ajuste = 0.0;
+        $tipo = 'desconto';
+
+        if ($this->itemAjusteAlvo === 'form') {
+            $desc = $this->parseDecimal($this->descontoValor);
+            $acr = $this->parseDecimal($this->acrescimoValor);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        } elseif ($this->itemAjusteAlvo === 'grid' && $this->itemSelecionado !== null && isset($this->itens[$this->itemSelecionado])) {
+            $item = $this->itens[$this->itemSelecionado];
+            $desc = (float) ($item['desconto'] ?? 0);
+            $acr = (float) ($item['acrescimo'] ?? 0);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        }
+
+        $pct = $bruto > 0 && $ajuste > 0 ? round(($ajuste / $bruto) * 100, 2) : 0.0;
+
+        return [
+            'tipo' => $tipo,
+            'pct' => $this->formatMoney($pct),
+            'reais' => $this->formatMoney($ajuste),
+        ];
+    }
+
+    public function confirmarItemAjuste(
+        ?string $valorInformado = null,
+        ?string $modoEntrada = null,
+        ?string $tipoInformado = null,
+    ): void {
+        if ($tipoInformado !== null && $tipoInformado !== '') {
+            $this->itemAjusteTipo = $tipoInformado === 'acrescimo' ? 'acrescimo' : 'desconto';
+        }
+
+        if ($modoEntrada !== null && $modoEntrada !== '') {
+            $this->itemAjusteModo = $modoEntrada === 'valor' ? 'valor' : 'percentual';
+        }
+
+        if ($valorInformado !== null && trim($valorInformado) !== '') {
+            $limpo = $this->sanitizarNumero($valorInformado);
+            $this->itemAjusteValor = $limpo !== ''
+                ? $this->formatMoney($this->parseDecimal($limpo))
+                : '0,00';
+        }
+
         $ctx = $this->contextoItemAjuste();
 
         if ($ctx === null) {
@@ -1214,7 +1305,10 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
-        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+        $ajusteLinha = round((float) $calc['ajusteLinha'], 2);
+        $modoReais = EmpresaParametros::descontoReaisItemModo();
+        $propagarPct = $this->itemAjusteModo === 'percentual'
+            || $modoReais === EmpresaParametros::DESCONTO_REAIS_ITEM_UNITARIO;
 
         if ($this->itemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
             Notification::make()->title('Desconto inválido.')->warning()->send();
@@ -1222,17 +1316,22 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        if ($this->itemAjusteAlvo === 'form') {
-            if ($this->itemAjusteTipo === 'desconto') {
+        // Fecha antes de alterar a grade (evita remorph reabrir o diálogo).
+        $tipo = $this->itemAjusteTipo;
+        $alvo = $this->itemAjusteAlvo;
+        $this->descontoModalOpen = false;
+
+        if ($alvo === 'form') {
+            if ($tipo === 'desconto') {
                 $this->descontoValor = $this->formatMoney($ajusteLinha);
-                $this->descontoPct = $ctx['preco'] > 0
+                $this->descontoPct = $propagarPct && $ctx['preco'] > 0
                     ? $this->formatMoney(($calc['deltaUnit'] / $ctx['preco']) * 100)
                     : '0,00';
                 $this->acrescimoValor = '0,00';
                 $this->acrescimoPct = '0,00';
             } else {
                 $this->acrescimoValor = $this->formatMoney($ajusteLinha);
-                $this->acrescimoPct = $ctx['preco'] > 0
+                $this->acrescimoPct = $propagarPct && $ctx['preco'] > 0
                     ? $this->formatMoney(($calc['deltaUnit'] / $ctx['preco']) * 100)
                     : '0,00';
                 $this->descontoValor = '0,00';
@@ -1240,9 +1339,9 @@ class ForcaVendasTelaVendaPage extends Page
             }
 
             $this->recalcularTotalItem();
-            $tipo = $this->itemAjusteTipo;
-            $this->fecharModalDescontoItem();
-            // Registra o item na grade já com o ajuste (não deixa só na barra de inclusão).
+            $this->itemAjusteAlvo = null;
+            // Remorph completo: fecha modal + limpa barra + mostra item com desconto.
+            $this->fvRemorphAposIncluir = true;
             $this->adicionarItem();
             Notification::make()
                 ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
@@ -1253,11 +1352,17 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         $index = (int) $this->itemSelecionado;
+        if (! isset($this->itens[$index])) {
+            $this->itemAjusteAlvo = null;
+
+            return;
+        }
+
         $item = $this->itens[$index];
         $qtd = (float) $item['quantidade'];
         $preco = (float) $item['preco_unitario'];
 
-        if ($this->itemAjusteTipo === 'desconto') {
+        if ($tipo === 'desconto') {
             $item['desconto'] = $ajusteLinha;
             $item['acrescimo'] = 0.0;
         } else {
@@ -1267,9 +1372,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         $item['total'] = round(($qtd * $preco) + (float) $item['acrescimo'] - (float) $item['desconto'], 2);
         $this->itens[$index] = $item;
-
-        $tipo = $this->itemAjusteTipo;
-        $this->fecharModalDescontoItem();
+        $this->itemAjusteAlvo = null;
         $this->dispatch('fv-tela-venda-focus-barcode');
         Notification::make()
             ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
@@ -1304,34 +1407,23 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     * @return array{base: float, deltaUnit: float, ajusteLinha: float, novoPreco: float, total: float}
      */
     private function calcularItemAjuste(float $base, float $quantidade): array
     {
-        $valor = $this->parseDecimal($this->itemAjusteValor);
-
-        if ($this->itemAjusteModo === 'percentual') {
-            $deltaUnit = round($base * ($valor / 100), 2);
-        } else {
-            $deltaUnit = round($valor, 2);
-        }
-
-        $novoPreco = $this->itemAjusteTipo === 'acrescimo'
-            ? round($base + $deltaUnit, 2)
-            : round($base - $deltaUnit, 2);
-
-        if ($novoPreco < 0) {
-            $novoPreco = 0.0;
-        }
-
-        return [
-            'base' => $base,
-            'deltaUnit' => $deltaUnit,
-            'novoPreco' => $novoPreco,
-            'total' => round($quantidade * $novoPreco, 2),
-        ];
+        return DescontoReaisItemCalculator::calcular(
+            $base,
+            $quantidade,
+            $this->parseDecimal($this->itemAjusteValor),
+            $this->itemAjusteTipo,
+            $this->itemAjusteModo,
+        );
     }
 
+    /**
+     * F4 não usa mais wire:model nestes campos (cálculo local).
+     * Estes hooks só rodam se a propriedade for gravada pelo Livewire.
+     */
     public function updatedDescontoPedidoPct(): void
     {
         $this->descontoPedidoPct = $this->sanitizarNumero($this->descontoPedidoPct);
@@ -1404,6 +1496,10 @@ class ForcaVendasTelaVendaPage extends Page
     public function adicionarItem(?string $qtdRaw = null, ?string $precoRaw = null): void
     {
         if ($this->isConfirmingItem) {
+            return;
+        }
+
+        if (! $this->garantirVendedorSelecionadoParaItem()) {
             return;
         }
 
@@ -1556,6 +1652,7 @@ class ForcaVendasTelaVendaPage extends Page
                         $qtd,
                         $desconto,
                         $acrescimo,
+                        EmpresaParametros::descontoReaisItemModo(),
                     );
                     $item['quantidade'] = $consolidado['quantidade'];
                     $item['acrescimo'] = $consolidado['acrescimo'];
@@ -1608,6 +1705,7 @@ class ForcaVendasTelaVendaPage extends Page
                         $qtd,
                         $desconto,
                         $acrescimo,
+                        EmpresaParametros::descontoReaisItemModo(),
                     );
 
                     $novaQtd = $consolidado['quantidade'];
@@ -1655,8 +1753,9 @@ class ForcaVendasTelaVendaPage extends Page
             $included = $this->fvItemIncludedPayload($agrupado);
             $this->limparEntradaItem();
 
-            // Grade + totais no DOM (1º item usa <template>; demais clonam/atualizam linha).
-            if ($included !== null) {
+            // Ctrl+D na barra: remorph completo (modal + form + grade).
+            // Demais inclusões: grade/totais no DOM sem remount (mais rápido).
+            if ($included !== null && ! $this->fvRemorphAposIncluir) {
                 $this->skipRender();
                 $this->dispatch(
                     'fv-tela-venda-item-included',
@@ -1670,9 +1769,11 @@ class ForcaVendasTelaVendaPage extends Page
                 );
             }
 
+            $this->fvRemorphAposIncluir = false;
             $this->dispatch('fv-tela-venda-focus-barcode');
         } finally {
             $this->isConfirmingItem = false;
+            $this->fvRemorphAposIncluir = false;
         }
     }
 
@@ -1735,7 +1836,7 @@ class ForcaVendasTelaVendaPage extends Page
 
     /**
      * Índice da linha existente para agrupar o mesmo item
-     * (produto + grade + preço unitário + desconto/acréscimo unitários).
+     * (produto + grade + preço unitário + desconto/acréscimo compatíveis com o modo).
      */
     private function indiceItemAgrupavel(
         int $productId,
@@ -1746,6 +1847,7 @@ class ForcaVendasTelaVendaPage extends Page
         float $acrescimo,
         ?string $excludeKey = null,
     ): ?int {
+        $modoLinha = EmpresaParametros::descontoReaisItemModo() === EmpresaParametros::DESCONTO_REAIS_ITEM_LINHA;
         $descUnit = $quantidade > 0 ? round($desconto / $quantidade, 4) : 0.0;
         $acrUnit = $quantidade > 0 ? round($acrescimo / $quantidade, 4) : 0.0;
 
@@ -1770,13 +1872,21 @@ class ForcaVendasTelaVendaPage extends Page
                 continue;
             }
 
+            $itemDesc = (float) ($item['desconto'] ?? 0);
+            $itemAcr = (float) ($item['acrescimo'] ?? 0);
+
+            if ($modoLinha) {
+                // Total da linha não é proporcional: só agrupa linhas sem ajuste comercial.
+                if ($desconto > 0.0001 || $acrescimo > 0.0001 || $itemDesc > 0.0001 || $itemAcr > 0.0001) {
+                    continue;
+                }
+
+                return (int) $index;
+            }
+
             $itemQtd = (float) ($item['quantidade'] ?? 0);
-            $itemDescUnit = $itemQtd > 0
-                ? round(((float) ($item['desconto'] ?? 0)) / $itemQtd, 4)
-                : 0.0;
-            $itemAcrUnit = $itemQtd > 0
-                ? round(((float) ($item['acrescimo'] ?? 0)) / $itemQtd, 4)
-                : 0.0;
+            $itemDescUnit = $itemQtd > 0 ? round($itemDesc / $itemQtd, 4) : 0.0;
+            $itemAcrUnit = $itemQtd > 0 ? round($itemAcr / $itemQtd, 4) : 0.0;
 
             // Não misturar linha limpa com linha que tem Ctrl+D (ou acréscimo legado).
             if (abs($itemDescUnit - $descUnit) > 0.0001 || abs($itemAcrUnit - $acrUnit) > 0.0001) {
@@ -1850,10 +1960,12 @@ class ForcaVendasTelaVendaPage extends Page
             }
         }
         $this->precoListaItem = $this->formatMoney($lista > 0 ? $lista : $preco);
-        $this->descontoPct = $preco > 0 && $qtd > 0
+        // Em "total da linha", não deriva % — senão mudança de qtd reescala o R$ indevidamente.
+        $propagarPct = EmpresaParametros::descontoReaisItemEhPorUnidade();
+        $this->descontoPct = $propagarPct && $preco > 0 && $qtd > 0 && $desconto > 0
             ? $this->formatMoney(($desconto / ($preco * $qtd)) * 100)
             : '0,00';
-        $this->acrescimoPct = $preco > 0 && $qtd > 0
+        $this->acrescimoPct = $propagarPct && $preco > 0 && $qtd > 0 && $acrescimo > 0
             ? $this->formatMoney(($acrescimo / ($preco * $qtd)) * 100)
             : '0,00';
         $this->descontoValor = $this->formatMoney($desconto);
@@ -2072,11 +2184,16 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        if (! $this->garantirVendedorSelecionadoParaItem()) {
+            return;
+        }
+
         $this->etapa = 'finalizacao';
         ErpScreen::set('Finalização do Pedido');
         $this->fvDividirPor = '1';
         $this->resetFinalizarCartaoCanhoto();
         $this->carregarMeiosPagamento();
+        $this->ensureFvCanhotoOpcoesCached();
 
         if (trim($this->clienteBusca) === '' && filled($this->clienteNome)) {
             $this->clienteBusca = trim(($this->clienteCodigo ? $this->clienteCodigo.' — ' : '').$this->clienteNome);
@@ -2127,6 +2244,7 @@ class ForcaVendasTelaVendaPage extends Page
         ?int $selectedIndex,
         string $cpfNota,
         string $observacoes,
+        array $ajuste = [],
     ): void {
         if ($this->gravando) {
             return;
@@ -2148,6 +2266,7 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        $this->aplicarAjustePedidoDoDom($ajuste);
         $this->flushValoresPagamento($valores, $selectedIndex, skipRender: false);
         $this->flushCpfNotaEObservacoes($cpfNota, $observacoes, validarCpf: false, skipRender: false);
         $this->voltarParaVenda();
@@ -2236,11 +2355,13 @@ class ForcaVendasTelaVendaPage extends Page
      *
      * @param  array<int|string, string>  $valores
      */
-    public function aplicarPagamentoLocalEEspeciais(array $valores, int $index): void
+    public function aplicarPagamentoLocalEEspeciais(array $valores, int $index, array $ajuste = []): void
     {
         if ($this->etapa !== 'finalizacao') {
             return;
         }
+
+        $this->aplicarAjustePedidoDoDom($ajuste);
 
         if (! isset($this->meiosPagamento[$index])) {
             $this->flushValoresPagamento($valores, $index, skipRender: true);
@@ -2249,10 +2370,10 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         $meioPreview = $this->meiosPagamento[$index];
-        // Cartão ainda depende do remorph do canhoto; carnê abre via Alpine + skipRender.
-        $abreCartao = PdvFinalizarPagamentosHelper::isFormaCartao($meioPreview);
+        // Canhoto POS só com usa_pos; carnê/overlay já no DOM (x-show) + skipRender.
+        $abreCanhotoPos = PdvFinalizarPagamentosHelper::isFormaUsaPos($meioPreview);
 
-        $this->flushValoresPagamento($valores, $index, skipRender: ! $abreCartao);
+        $this->flushValoresPagamento($valores, $index, skipRender: true);
 
         if (! isset($this->meiosPagamento[$index])) {
             $this->skipRender();
@@ -2263,7 +2384,7 @@ class ForcaVendasTelaVendaPage extends Page
         $meio = $this->meiosPagamento[$index];
         $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
 
-        if ($valor > 0.009 && $abreCartao) {
+        if ($valor > 0.009 && $abreCanhotoPos) {
             $this->finalizarCartaoCanhotoConfirmado = false;
             $this->finalizarCartaoParcelasRows = [];
             $this->ensureCartaoCanhoto();
@@ -2286,12 +2407,13 @@ class ForcaVendasTelaVendaPage extends Page
      *
      * @param  array<int|string, string>  $valores
      */
-    public function confirmarValorPagamentoLinhaComFlush(array $valores, int $index, string $valor): void
+    public function confirmarValorPagamentoLinhaComFlush(array $valores, int $index, string $valor, array $ajuste = []): void
     {
         if ($this->etapa !== 'finalizacao') {
             return;
         }
 
+        $this->aplicarAjustePedidoDoDom($ajuste);
         $this->flushValoresPagamento($valores, $index, skipRender: false);
         $this->confirmarValorPagamentoLinha($valor, $index);
     }
@@ -2307,14 +2429,17 @@ class ForcaVendasTelaVendaPage extends Page
         string $clienteBusca,
         string $cpfNota,
         string $observacoes,
+        array $ajuste = [],
     ): void {
         if ($this->etapa !== 'finalizacao' || $this->gravando) {
             return;
         }
 
+        // Ajuste do DOM antes dos pagamentos: total líquido do faturamento usa estes campos.
+        $this->aplicarAjustePedidoDoDom($ajuste);
+
         // Flush sem skipRender: falhas de cliente/CPF/pagamento ainda remorpham e
-        // exibem Notification + estado digitado. Só após validações OK evitamos
-        // remorph da grade durante o faturamento (PC fraco).
+        // exibem Notification + estado digitado (e o JS restaura o modal escondido).
         $this->flushValoresPagamento($valores, $selectedIndex, skipRender: false);
 
         if (! $this->sincronizarClienteFinalizacaoBusca($clienteBusca, skipRender: false)) {
@@ -2325,8 +2450,8 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        // Estado já sincronizado; faturar + redirect/notify sem remontar a grade.
-        $this->skipRender();
+        // Sucesso com permanecer/impressão: skipRender + patch DOM (ver finalizarUiAposConcluirSemRemorph).
+        // Redirect ao Monitor já chama skipRender via HandlesRedirects.
         $this->faturarPedido();
     }
 
@@ -2404,7 +2529,7 @@ class ForcaVendasTelaVendaPage extends Page
         $meio = $this->meiosPagamento[$index];
         $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
 
-        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaCartao($meio)) {
+        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaUsaPos($meio)) {
             $this->finalizarCartaoCanhotoConfirmado = false;
             $this->finalizarCartaoParcelasRows = [];
             $this->ensureCartaoCanhoto();
@@ -2686,6 +2811,12 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         if ($this->etapa === 'finalizacao') {
+            if ($faturar && ! $this->garantirVendedorSelecionadoParaItem()) {
+                $this->gravando = false;
+
+                return;
+            }
+
             if ($this->clienteId === null) {
                 $this->gravando = false;
                 Notification::make()->title('Selecione o cliente.')->warning()->send();
@@ -2847,9 +2978,22 @@ class ForcaVendasTelaVendaPage extends Page
                 && ! $temCarne
                 && ($canhoto === null || empty($canhoto['dias']))
             ) {
-                $this->tabelaPrazoDias = null;
-                $this->resetFvParcelasFaturamento();
-                $tabelaPrazo = null;
+                // Cartão com "Considerar à vista" e sem Canhoto POS: 1x / 0 dias (não depende de usa_pos).
+                if ($this->fvTemCartaoConsiderarAVista($pagamentosPositivos)) {
+                    $canhoto = [
+                        'nsu' => '',
+                        'autorizacao' => '',
+                        'maquininha' => '',
+                        'bandeira' => '',
+                        'dias' => [0],
+                    ];
+                    $tabelaPrazo = '0';
+                    $this->tabelaPrazoDias = '0';
+                } else {
+                    $this->tabelaPrazoDias = null;
+                    $this->resetFvParcelasFaturamento();
+                    $tabelaPrazo = null;
+                }
             } elseif ($canhoto !== null && ! empty($canhoto['dias']) && is_array($canhoto['dias'])) {
                 $tabelaPrazo = implode(',', array_map('intval', $canhoto['dias']));
             }
@@ -3014,6 +3158,9 @@ class ForcaVendasTelaVendaPage extends Page
                 $this->fvImprimirPosVendaAposBoleto = true;
             }
 
+            // Boleto mantém a TV: evita remorph de 160KB (modal F4 + grade).
+            $this->finalizarUiAposConcluirSemRemorph();
+
             return;
         }
 
@@ -3029,7 +3176,7 @@ class ForcaVendasTelaVendaPage extends Page
             }
 
             $this->fvImprimirPosVendaOpen = true;
-            $this->dispatch('erp-fv-focus-imprimir-pos-venda');
+            $this->finalizarUiAposConcluirSemRemorph();
 
             return;
         }
@@ -3037,6 +3184,7 @@ class ForcaVendasTelaVendaPage extends Page
         if ($permanecer) {
             $this->reiniciarVendaAposConcluir(preservarImpressao: false);
             $this->fvAposConcluirPermanecer = false;
+            $this->finalizarUiAposConcluirSemRemorph();
 
             return;
         }
@@ -3044,6 +3192,32 @@ class ForcaVendasTelaVendaPage extends Page
         $this->fvAposConcluirPermanecer = false;
         $this->limparTelaAposFaturamentoSucesso();
         $this->redirect($monitorUrl);
+    }
+
+    /**
+     * Pós-F10 na TV: skipRender + patch DOM (fecha F4, limpa grade, abre impressão).
+     * Não usar skipRender sem este patch — o modal Forma de Pagamento ficaria aberto.
+     */
+    private function finalizarUiAposConcluirSemRemorph(): void
+    {
+        $this->skipRender();
+
+        $this->dispatch('erp-fv-apos-concluir-ui', [
+            'totais' => $this->fvTotaisPayload(),
+            'cliente_busca' => $this->clienteBusca,
+            'cliente_codigo' => $this->clienteCodigo,
+            'cliente_nome' => $this->clienteNome,
+            'abertura_data' => $this->aberturaData,
+            'abertura_hora' => $this->aberturaHora,
+            'imprimir' => $this->fvImprimirPosVendaOpen,
+            'colspan' => $this->exibirCustoProdutoGrade ? 11 : 10,
+        ]);
+
+        if ($this->fvImprimirPosVendaOpen) {
+            $this->dispatch('erp-fv-focus-imprimir-pos-venda');
+        } else {
+            $this->focarCodigoProdutoNovaVenda();
+        }
     }
 
     /**
@@ -3065,7 +3239,7 @@ class ForcaVendasTelaVendaPage extends Page
             }
 
             $this->fvImprimirPosVendaOpen = true;
-            $this->dispatch('erp-fv-focus-imprimir-pos-venda');
+            $this->finalizarUiAposConcluirSemRemorph();
 
             return;
         }
@@ -3131,8 +3305,8 @@ class ForcaVendasTelaVendaPage extends Page
             $this->fvAposConcluirPermanecer = (bool) $printSnap['permanecer'];
         }
 
-        // Restaura contexto operacional da sessão (quando ainda válido).
-        if ($vendedorId) {
+        // Com "solicitar vendedor", a próxima venda começa em Selecione.
+        if ($vendedorId && ! $this->deveExigirVendedorAntesDoItem()) {
             $this->vendedorId = $vendedorId;
             $this->vendedorLabel = $vendedorLabel;
         }
@@ -3186,6 +3360,10 @@ class ForcaVendasTelaVendaPage extends Page
         $this->fvImprimirPosVendaProcessando = false;
     }
 
+    /**
+     * Fallback server-side (teclado legado / chamadas wire). Preferir open síncrono no JS
+     * do modal — evita remorph de ~160KB antes do window.open.
+     */
     public function confirmarImprimirPosVenda(): void
     {
         if (! $this->fvImprimirPosVendaOpen || $this->fvImprimirPosVendaProcessando) {
@@ -3201,9 +3379,17 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        // skipRender: não remorphar a TV; o JS do modal já deve ter aberto a janela.
+        // Mantém window.open aqui só como fallback se alguém chamar o método direto.
+        $this->skipRender();
         $urlJs = Js::from($url);
         $this->js(<<<JS
             (() => {
+                if (window.__erpFvImprimirPosVendaOpened) {
+                    window.__erpFvImprimirPosVendaOpened = false;
+                    \$wire.finalizarAposPerguntaImprimir();
+                    return;
+                }
                 let win = null;
                 try { win = window.open({$urlJs}, '_blank'); } catch (e) { win = null; }
                 if (!win || win.closed) {
@@ -3223,9 +3409,13 @@ class ForcaVendasTelaVendaPage extends Page
 
         $this->fvImprimirPosVendaPopupBloqueado = true;
         $this->fvImprimirPosVendaProcessando = false;
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-imprimir-pos-venda');
     }
 
+    /**
+     * Fallback server-side. Preferir open síncrono no JS do modal.
+     */
     public function abrirComprovantePosVendaManual(): void
     {
         if (! $this->fvImprimirPosVendaOpen || $this->fvImprimirPosVendaUrl === '') {
@@ -3237,12 +3427,18 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         $this->fvImprimirPosVendaProcessando = true;
+        $this->skipRender();
         $urlJs = Js::from($this->fvImprimirPosVendaUrl);
         $permanecerJs = $this->fvAposConcluirPermanecer ? 'true' : 'false';
 
         // Com "permanecer", não navega a aba atual (senão perde a nova venda).
         $this->js(<<<JS
             (() => {
+                if (window.__erpFvImprimirPosVendaOpened) {
+                    window.__erpFvImprimirPosVendaOpened = false;
+                    \$wire.finalizarAposPerguntaImprimir();
+                    return;
+                }
                 let win = null;
                 try { win = window.open({$urlJs}, '_blank'); } catch (e) { win = null; }
                 if (!win || win.closed) {
@@ -3282,6 +3478,8 @@ class ForcaVendasTelaVendaPage extends Page
         if ($permanecer) {
             $this->fvAposConcluirPermanecer = false;
             // Nova venda já foi reiniciada antes do modal (ou no pós-boleto).
+            // skipRender: fecha o modal via snapshot sem remorph de ~160KB da TV.
+            $this->skipRender();
             $this->focarCodigoProdutoNovaVenda();
 
             return;
@@ -3296,6 +3494,7 @@ class ForcaVendasTelaVendaPage extends Page
         if ($this->fvAposConcluirPermanecer) {
             $this->reiniciarVendaAposConcluir(preservarImpressao: false);
             $this->fvAposConcluirPermanecer = false;
+            $this->finalizarUiAposConcluirSemRemorph();
 
             return;
         }
@@ -3317,9 +3516,18 @@ class ForcaVendasTelaVendaPage extends Page
     /**
      * Motivo da retenção financeira (limite de crédito) considerando apenas a
      * parte a prazo do pagamento. Retorna null quando não há restrição.
+     * Respeita Financeiro → "Ignorar financeiro" (marcado = não retém).
      */
     private function restricaoFinanceira(ForcaVendasOrder $order): ?string
     {
+        $empresaId = FaturamentoPendenciaFinanceiraGuard::empresaIdOuContexto(
+            $order->empresa_id ? (int) $order->empresa_id : ($this->vendaEmpresaId ?: null),
+        );
+
+        if (! FaturamentoPendenciaFinanceiraGuard::deveReterPorPendenciaCliente($empresaId)) {
+            return null;
+        }
+
         $aPrazo = $this->valorAPrazo();
 
         if ($aPrazo <= 0 || ! $this->clienteId) {
@@ -3627,6 +3835,14 @@ class ForcaVendasTelaVendaPage extends Page
 
             app(ForcaVendasTelaVendaService::class)->assertOrderDaEmpresa($order, (int) $empresaSessao);
             app(ForcaVendasTelaVendaService::class)->assertEditavel($order);
+
+            $user = Auth::user();
+            if ($user instanceof \App\Models\User) {
+                // Pedido com vínculo VI: bloqueia o app enquanto o ERP edita.
+                app(VendasInternasEdicaoLockService::class)
+                    ->adquirirErpPorForcaVendasOrderId((int) $order->id, $user);
+            }
+
             $this->vendaEmpresaId = (int) $order->empresa_id;
             // Edição: UUID do pedido (idempotência de create não se aplica; update usa lockForUpdate).
             $this->operacaoUuid = filled($order->uuid) ? (string) $order->uuid : (string) Str::uuid();
@@ -4728,8 +4944,25 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        // 1º: operador/vendedor vinculado ao usuário logado (mesmo fluxo do PDV).
-        $vendedor = $user->vendedor()->with(['rhFuncionario', 'empresas'])->first();
+        // Parâmetro ligado: nova venda começa em "Selecione" (não pré-escolhe o operador).
+        if ($this->deveExigirVendedorAntesDoItem()) {
+            $this->vendedorId = null;
+            $this->vendedorLabel = '';
+            $this->estoqueId = null;
+            $this->estoqueLabel = '';
+            $this->caixaId = null;
+            $this->caixaLabel = '';
+            $this->caixaOperacionalDefinido();
+
+            return;
+        }
+
+        // 1º: operador do usuário na empresa logada (mesmo fluxo do PDV).
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        $vendedor = OperadorDoUsuario::vendedorAtivo($user, $empresaId > 0 ? $empresaId : null);
+        if ($vendedor) {
+            $vendedor->loadMissing(['rhFuncionario', 'empresas']);
+        }
 
         if ($vendedor && $this->vendedorOperacionalValido($vendedor)) {
             $this->aplicarVendedor($vendedor);
@@ -4760,6 +4993,29 @@ class ForcaVendasTelaVendaPage extends Page
         $this->estoqueLabel = '';
         $this->caixaId = null;
         $this->caixaLabel = '';
+    }
+
+    private function deveExigirVendedorAntesDoItem(): bool
+    {
+        return EmpresaParametros::solicitarVendedorCadaVenda(
+            (int) ($this->vendaEmpresaId ?: ErpContext::currentEmpresaId()),
+        );
+    }
+
+    private function garantirVendedorSelecionadoParaItem(): bool
+    {
+        if (! $this->deveExigirVendedorAntesDoItem()) {
+            return true;
+        }
+
+        if ((int) ($this->vendedorId ?? 0) > 0) {
+            return true;
+        }
+
+        Notification::make()->title('Selecione o vendedor.')->warning()->send();
+        $this->dispatch('erp-fv-focus-vendedor');
+
+        return false;
     }
 
     /**
@@ -5195,6 +5451,10 @@ class ForcaVendasTelaVendaPage extends Page
                 'max_parcelas' => max(1, (int) ($f->max_parcelas ?: 12)),
                 'prazo_cartao' => max(0, (int) ($f->prazo_cartao ?: 0)),
                 'intervalo_parcelas' => max(0, (int) ($f->intervalo_parcelas ?: 30)),
+                // Canhoto POS: à vista / Financeiro 1x esconde Qtd/Intervalo (mesmo helper do PDV).
+                'modo_prazo' => FormaPagamento::normalizeModoPrazo($f->modo_prazo ?? null),
+                'usa_pos' => (bool) ($f->usa_pos ?? false),
+                'considerar_a_vista' => (bool) ($f->considerar_a_vista ?? false),
             ];
         })->all();
     }
@@ -5328,7 +5588,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
 
-        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaCartao($meio)) {
+        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaUsaPos($meio)) {
             $this->finalizarCartaoCanhotoConfirmado = false;
             $this->finalizarCartaoParcelasRows = [];
             $this->ensureCartaoCanhoto();
@@ -5346,12 +5606,12 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * Adaptado do PDV: total do cartão POS na finalização da Força de Vendas.
+     * Total do Canhoto POS: só formas com usa_pos (maquininha manual).
      */
     public function getFinalizarCartaoTotalValorProperty(): float
     {
         foreach ($this->meiosPagamento as $meio) {
-            if (! PdvFinalizarPagamentosHelper::isFormaCartao($meio)) {
+            if (! PdvFinalizarPagamentosHelper::isFormaUsaPos($meio)) {
                 continue;
             }
 
@@ -5372,7 +5632,7 @@ class ForcaVendasTelaVendaPage extends Page
     {
         foreach ($this->meiosPagamento as $meio) {
             if (
-                PdvFinalizarPagamentosHelper::isFormaCartao($meio)
+                PdvFinalizarPagamentosHelper::isFormaUsaPos($meio)
                 && ErpMoney::parseBr($meio['valor'] ?? '0') > 0
             ) {
                 return $meio;
@@ -5380,6 +5640,24 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         return null;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $pagamentos
+     */
+    protected function fvTemCartaoConsiderarAVista(array $pagamentos): bool
+    {
+        foreach ($pagamentos as $pagamento) {
+            if (ErpMoney::parseBr($pagamento['valor'] ?? '0') <= 0) {
+                continue;
+            }
+
+            if (PdvFinalizarPagamentosHelper::isFormaConsiderarAVista($pagamento)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function finalizarTemCartaoContasReceberComValor(): bool
@@ -5398,23 +5676,185 @@ class ForcaVendasTelaVendaPage extends Page
         $n->send();
     }
 
+    protected function resetFinalizarCartaoCanhoto(): void
+    {
+        $this->finalizarCartaoCanhotoAberta = false;
+        $this->finalizarCartaoCanhotoConfirmado = false;
+        $this->finalizarCartaoModoSuperTef = false;
+        $this->finalizarCartaoNsu = '';
+        $this->finalizarCartaoAutorizacao = '';
+        $this->finalizarCartaoMaquininha = '';
+        $this->finalizarCartaoBandeira = '';
+        $this->finalizarCartaoParcelasQtd = '1';
+        $this->finalizarCartaoIntervalo = '30';
+        $this->finalizarCartaoParcelasRows = [];
+        $this->selectedFinalizarCartaoParcelaIndex = null;
+        $this->finalizarCartaoTabelasListaAberta = false;
+        $this->finalizarCartaoTabelasPredefinidas = [];
+        $this->selectedFinalizarCartaoTabelaIndex = null;
+        $this->finalizarCartaoTabelaId = null;
+        $this->fvCanhotoOcultarParcelas = false;
+        $this->fvCanhotoTotalLabel = '0,00';
+        $this->fvCanhotoParcelasTotalLabel = '';
+    }
+
+    /**
+     * Canhoto TV: overlay no DOM (x-show) + skipRender — sem remorph da grade.
+     */
+    protected function abrirCartaoCanhoto(bool $superTef = false): bool
+    {
+        unset($superTef); // TV não usa SuperTEF neste overlay.
+        $this->finalizarCartaoModoSuperTef = false;
+        $this->finalizarCartaoTabelasListaAberta = false;
+        $this->finalizarCartaoTabelasPredefinidas = [];
+        $this->selectedFinalizarCartaoTabelaIndex = null;
+        $this->finalizarCartaoTabelaId = null;
+        $this->ensureFvCanhotoOpcoesCached();
+        $this->prepararCartaoCanhotoForm();
+        $this->finalizarCartaoCanhotoAberta = true;
+        $this->finalizarCartaoCanhotoConfirmado = false;
+        $this->selectedFinalizarCartaoParcelaIndex = $this->finalizarCartaoParcelasRows !== [] ? 0 : null;
+        $this->syncFvCanhotoModalUi();
+        $this->skipRender();
+        $this->dispatch('erp-pdv-focus-finalizar-cartao-canhoto');
+
+        return false;
+    }
+
+    /**
+     * Considerar à vista → 1x com dias=[0] (sem fallback 30). Demais casos: regra do helper.
+     */
+    protected function prepararCartaoCanhotoForm(): void
+    {
+        $pagamento = $this->resolvePagamentoCartaoParcelamentoAtivo() ?? [];
+        $max = max(1, (int) ($pagamento['max_parcelas'] ?? 1));
+        $prazo = max(0, (int) ($pagamento['prazo_cartao'] ?? 0));
+        $intervalo = max(0, (int) ($pagamento['intervalo_parcelas'] ?? 0));
+
+        if ($prazo <= 0) {
+            $prazo = $intervalo > 0 ? $intervalo : 30;
+        }
+
+        if ($intervalo <= 0) {
+            $intervalo = $prazo;
+        }
+
+        $this->finalizarCartaoIntervalo = (string) $intervalo;
+
+        if (PdvFinalizarPagamentosHelper::isFormaConsiderarAVista($pagamento)) {
+            $this->finalizarCartaoParcelasQtd = '1';
+            $this->finalizarCartaoTabelaId = null;
+            $this->finalizarCartaoIntervalo = '0';
+            $this->gerarParcelasCartaoPorDias([0]);
+
+            return;
+        }
+
+        if (PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($pagamento)) {
+            $this->finalizarCartaoParcelasQtd = '1';
+            $this->finalizarCartaoTabelaId = null;
+            $dias = PdvFinalizarPagamentosHelper::diasParcelaUnicaFinanceiro($pagamento);
+            $this->finalizarCartaoIntervalo = (string) ($dias[0] ?? $intervalo);
+            $this->gerarParcelasCartaoPorDias($dias);
+
+            return;
+        }
+
+        $this->finalizarCartaoParcelasQtd = (string) min(max(1, (int) $this->finalizarCartaoParcelasQtd), $max);
+
+        if ($this->finalizarCartaoParcelasRows === []) {
+            $this->gerarParcelasCartaoCanhoto();
+        }
+    }
+
+    public function gerarParcelasCartaoCanhoto(): void
+    {
+        $pagamento = $this->resolvePagamentoCartaoParcelamentoAtivo() ?? [];
+
+        if (PdvFinalizarPagamentosHelper::isFormaConsiderarAVista($pagamento)) {
+            $this->finalizarCartaoParcelasQtd = '1';
+            $this->finalizarCartaoIntervalo = '0';
+            $this->finalizarCartaoTabelaId = null;
+            $this->finalizarCartaoCanhotoConfirmado = false;
+            $this->gerarParcelasCartaoPorDias([0]);
+            $this->selectedFinalizarCartaoParcelaIndex = 0;
+            $this->syncFvCanhotoModalUi();
+            $this->skipRender();
+            $this->dispatch('erp-pdv-focus-finalizar-cartao-canhoto');
+
+            return;
+        }
+
+        if (PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($pagamento)) {
+            $this->finalizarCartaoParcelasQtd = '1';
+        }
+
+        $max = max(1, (int) ($pagamento['max_parcelas'] ?? 12));
+        $qtd = max(1, min($max, (int) preg_replace('/\D/', '', $this->finalizarCartaoParcelasQtd) ?: 1));
+        $intervalo = max(0, (int) preg_replace('/\D/', '', $this->finalizarCartaoIntervalo) ?: 30);
+
+        $this->finalizarCartaoParcelasQtd = (string) $qtd;
+        $this->finalizarCartaoIntervalo = (string) $intervalo;
+        $this->finalizarCartaoCanhotoConfirmado = false;
+        $this->finalizarCartaoTabelaId = null;
+
+        $dias = [];
+        for ($i = 1; $i <= $qtd; $i++) {
+            $dias[] = $intervalo * $i;
+        }
+
+        $this->gerarParcelasCartaoPorDias($dias);
+        $this->selectedFinalizarCartaoParcelaIndex = 0;
+        $this->syncFvCanhotoModalUi();
+        $this->skipRender();
+        $this->dispatch('erp-pdv-focus-finalizar-cartao-canhoto');
+    }
+
+    public function selectFinalizarCartaoParcelaRow(int $index): void
+    {
+        if (! isset($this->finalizarCartaoParcelasRows[$index])) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->selectedFinalizarCartaoParcelaIndex = $index;
+        $this->skipRender();
+    }
+
     public function cancelFinalizarCartaoCanhoto(): void
     {
         if (! $this->finalizarCartaoCanhotoAberta) {
+            $this->skipRender();
+
             return;
         }
 
         $this->finalizarCartaoCanhotoAberta = false;
+        $this->syncFvCanhotoModalUi();
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-pagamento', index: $this->selectedPagamentoIndex ?? 0);
     }
 
     public function concluirCartaoCanhoto(): void
     {
+        $pagamento = $this->resolvePagamentoCartaoParcelamentoAtivo() ?? [];
+
+        if (
+            $this->finalizarCartaoParcelasRows === []
+            && PdvFinalizarPagamentosHelper::isFormaConsiderarAVista($pagamento)
+        ) {
+            $this->gerarParcelasCartaoPorDias([0]);
+        }
+
         if ($this->finalizarCartaoParcelasRows === []) {
             $this->notifyPdvError(
                 'Gere as parcelas do cartão.',
-                'Informe Qtd. Parcelas + Intervalo e use F2 | Gerar.',
+                $this->fvCanhotoOcultarParcelas
+                    ? 'Confirme o canhoto à vista com F7.'
+                    : 'Informe Qtd. Parcelas + Intervalo e use F2 | Gerar.',
             );
+            $this->skipRender();
 
             return;
         }
@@ -5427,7 +5867,6 @@ class ForcaVendasTelaVendaPage extends Page
         $this->finalizarCartaoCanhotoConfirmado = true;
         $this->finalizarCartaoCanhotoAberta = false;
 
-        // Propaga os dias das parcelas para o pedido (prévia do monitor + faturamento).
         $dias = collect($this->finalizarCartaoParcelasRows)
             ->map(fn (array $row): int => (int) ($row['dias'] ?? 0))
             ->values()
@@ -5437,7 +5876,48 @@ class ForcaVendasTelaVendaPage extends Page
             $this->tabelaPrazoDias = implode(',', $dias);
         }
 
+        $this->syncFvCanhotoModalUi();
+        $this->skipRender();
         $this->dispatch('erp-fv-focus-pagamento', index: $this->selectedPagamentoIndex ?? 0);
+    }
+
+    protected function syncFvCanhotoModalUi(): void
+    {
+        $pagamento = $this->resolvePagamentoCartaoParcelamentoAtivo();
+        $this->fvCanhotoOcultarParcelas = $pagamento !== null
+            && PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($pagamento);
+        $this->fvCanhotoTotalLabel = ErpMoney::formatBr($this->finalizarCartaoTotalValor);
+        $this->fvCanhotoParcelasTotalLabel = $this->finalizarCartaoParcelasTotalLabel;
+    }
+
+    protected function ensureFvCanhotoOpcoesCached(): void
+    {
+        if ($this->fvCanhotoMaquininhas === []) {
+            $this->fvCanhotoMaquininhas = array_values(CartaoMaquininha::optionsAtivas());
+        }
+
+        if ($this->fvCanhotoBandeiras === []) {
+            $this->fvCanhotoBandeiras = array_values(CartaoBandeira::optionsAtivas());
+        }
+    }
+
+    /**
+     * Copia %/R$ digitados no F4 (sem request por tecla) para as propriedades do pedido.
+     *
+     * @param  array<string, mixed>  $ajuste
+     */
+    private function aplicarAjustePedidoDoDom(array $ajuste): void
+    {
+        foreach (['desconto_pct', 'desconto_valor', 'acrescimo_pct', 'acrescimo_valor'] as $key) {
+            if (! array_key_exists($key, $ajuste)) {
+                return;
+            }
+        }
+
+        $this->descontoPedidoPct = $this->sanitizarNumero((string) $ajuste['desconto_pct']);
+        $this->descontoPedidoValor = $this->sanitizarNumero((string) $ajuste['desconto_valor']);
+        $this->acrescimoPedidoPct = $this->sanitizarNumero((string) $ajuste['acrescimo_pct']);
+        $this->acrescimoPedidoValor = $this->sanitizarNumero((string) $ajuste['acrescimo_valor']);
     }
 
     /**
@@ -5759,19 +6239,16 @@ class ForcaVendasTelaVendaPage extends Page
         $bruto = $qtd * $preco;
 
         // Se há % de desconto/acréscimo, recalcula o R$ a partir do preço/qtd atuais.
+        // Se só há R$ (modo total da linha), preserva o valor absoluto ao mudar a quantidade.
         $descPct = $this->parseDecimal($this->descontoPct);
         $acrPct = $this->parseDecimal($this->acrescimoPct);
 
         if ($descPct > 0) {
             $this->descontoValor = $this->formatMoney(round($bruto * ($descPct / 100), 2));
-        } elseif ($descPct <= 0) {
-            $this->descontoValor = '0,00';
         }
 
         if ($acrPct > 0) {
             $this->acrescimoValor = $this->formatMoney(round($bruto * ($acrPct / 100), 2));
-        } elseif ($acrPct <= 0) {
-            $this->acrescimoValor = '0,00';
         }
 
         $acr = $this->parseDecimal($this->acrescimoValor);

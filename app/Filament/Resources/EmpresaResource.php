@@ -288,6 +288,13 @@ class EmpresaResource extends Resource
                     ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('ativo')
+                    ->label('Ativo')
+                    ->formatStateUsing(fn ($state): string => ((bool) $state) ? 'Sim' : 'Não')
+                    ->badge()
+                    ->color(fn ($state): string => ((bool) $state) ? 'success' : 'danger')
+                    ->alignCenter()
+                    ->sortable(),
             ])
             ->defaultSort('codigo')
             ->striped()

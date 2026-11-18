@@ -4,6 +4,7 @@ namespace App\Support\Erp;
 
 use App\Models\AjusteEstoque;
 use App\Models\Empresa;
+use App\Models\Estoque;
 use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
@@ -15,13 +16,19 @@ final class AjusteEstoqueService
         private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
     ) {}
 
-    public function criar(int $productId, string $data, float $qtdInformada, string $modo = 'somar'): AjusteEstoque
-    {
-        return DB::transaction(function () use ($productId, $data, $qtdInformada, $modo): AjusteEstoque {
+    public function criar(
+        int $productId,
+        string $data,
+        float $qtdInformada,
+        string $modo = 'somar',
+        ?int $estoqueId = null,
+        ?string $observacao = null,
+    ): AjusteEstoque {
+        return DB::transaction(function () use ($productId, $data, $qtdInformada, $modo, $estoqueId, $observacao): AjusteEstoque {
             $product = Product::query()->whereKey($productId)->lockForUpdate()->firstOrFail();
-            [$estoqueId, $empresa] = $this->resolverDeposito();
+            [$depositoId, $empresa] = $this->resolverDeposito($estoqueId);
 
-            $atual = $this->saldos->fisico((int) $product->id, $estoqueId);
+            $atual = $this->saldos->fisico((int) $product->id, $depositoId);
             $qtdAjust = $modo === 'substituir'
                 ? round($qtdInformada - $atual, 3)
                 : round($qtdInformada, 3);
@@ -34,7 +41,7 @@ final class AjusteEstoqueService
                 );
             }
 
-            $this->garantirEstoquePermitido($product, $qtdAjust, $estoqueId);
+            $this->garantirEstoquePermitido($product, $qtdAjust, $depositoId);
 
             $ajuste = AjusteEstoque::query()->create([
                 'data' => $data,
@@ -42,7 +49,15 @@ final class AjusteEstoqueService
                 'qtd_ajust' => $qtdAjust,
             ]);
 
-            $this->aplicarDelta($productId, $qtdAjust, $estoqueId, $empresa, (int) $ajuste->id);
+            $this->aplicarDelta(
+                $productId,
+                $qtdAjust,
+                $depositoId,
+                $empresa,
+                (int) $ajuste->id,
+                EstoqueMovimentacao::TIPO_AJUSTE,
+                $observacao,
+            );
 
             return $ajuste;
         });
@@ -89,10 +104,13 @@ final class AjusteEstoqueService
         ?Empresa $empresa,
         ?int $ajusteId = null,
         string $tipo = EstoqueMovimentacao::TIPO_AJUSTE,
+        ?string $observacao = null,
     ): void {
         if (abs($delta) < 0.0005) {
             return;
         }
+
+        $obs = $observacao !== null ? trim($observacao) : null;
 
         $ctx = EstoqueMovimentacaoContext::make(
             $tipo,
@@ -100,6 +118,7 @@ final class AjusteEstoqueService
             origemTipo: 'ajuste_estoque',
             origemId: $ajusteId,
             origemNumero: $ajusteId !== null ? (string) $ajusteId : null,
+            observacao: $obs !== '' ? $obs : null,
         );
 
         $product = Product::query()->find($productId);
@@ -132,11 +151,30 @@ final class AjusteEstoqueService
     /**
      * @return array{0: ?int, 1: ?Empresa}
      */
-    private function resolverDeposito(): array
+    private function resolverDeposito(?int $estoqueIdOverride = null): array
     {
         $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
         $empresaId = $empresaId ? (int) $empresaId : null;
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+
+        if ($estoqueIdOverride !== null && $estoqueIdOverride > 0) {
+            $query = Estoque::query()
+                ->whereKey($estoqueIdOverride)
+                ->where('ativo', true);
+
+            if ($empresaId) {
+                $query->where('empresa_id', $empresaId);
+            }
+
+            $estoque = $query->first();
+
+            if ($estoque === null) {
+                throw new \DomainException('Depósito inválido para a empresa atual.');
+            }
+
+            return [(int) $estoque->id, $empresa];
+        }
+
         $estoqueId = $this->saldos->estoqueIdParaEmpresa($empresaId);
 
         return [$estoqueId, $empresa];

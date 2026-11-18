@@ -36,7 +36,7 @@ class ContaPagarListQueryBuilder
     {
         $table = (new ContaPagar)->getTable();
 
-        $query = $this->buildFilteredQuery()->select([
+        $cols = [
             "{$table}.id",
             "{$table}.numero",
             "{$table}.emissao",
@@ -50,7 +50,15 @@ class ContaPagarListQueryBuilder
             "{$table}.valor_pago",
             "{$table}.pago_em",
             "{$table}.saldo",
-        ]);
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'competencia')) {
+            $cols[] = "{$table}.competencia";
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'plano_conta_id')) {
+            $cols[] = "{$table}.plano_conta_id";
+        }
+
+        $query = $this->buildFilteredQuery()->select($cols);
 
         $query->with([
             'fornecedor:id,nome_razao',

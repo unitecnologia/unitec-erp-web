@@ -86,6 +86,13 @@ Thumbs.db
 # Diagnósticos / benches locais
 /scripts/_diag_*
 /public/_bench_*.php
+/_tmp_ssl_audit/
+/storage/fonts/
+
+# Tooling local (não vai no update; não versionar etapas DEV)
+/tools/scope-tef-etapa1/
+/tools/supertef-etapa0/
+/scripts/diagnostico-sefaz-pr-ssl*
 
 # Caches/binários PHP locais
 /tools/php/opcache/
@@ -105,3 +112,10 @@ frankenphp-worker.php
 /scripts/sql/consolidar-boleto-formas-heidisql.sql
 hotfix-privada*
 /chaves-unitec/
+/migracoes/
+/storage/framework/*.lock
+/storage/framework/unitec-migrations.sig
+
+# SuperTEF etapa 0 — credencial local, fora do ERP
+/tools/supertef-etapa0/.env.local
+/tools/supertef-etapa0/journal/

@@ -101,24 +101,25 @@
 
                 <div class="erp-lookup-modal__body erp-fv-reset-modal__body">
                     <p class="erp-fv-reset-modal__alert">
-                        Atenção: pedidos, orçamentos, clientes, visitas e demais dados que ainda
-                        <strong>não foram sincronizados</strong> neste aparelho poderão ser
-                        <strong>perdidos definitivamente</strong>.
+                        Atenção: pedidos, orçamentos, clientes e demais dados que ainda
+                        <strong>não foram sincronizados</strong> neste aparelho serão
+                        <strong>apagados definitivamente</strong> (inclui fila pendente).
                     </p>
 
                     <dl class="erp-fv-reset-modal__details">
                         <div><dt>Aparelho</dt><dd>{{ $resetConfirm['device_name'] }}</dd></div>
-                        <div><dt>Vendedor vinculado</dt><dd>{{ $resetConfirm['vendedor'] ?: '—' }}</dd></div>
+                        <div><dt>Origem</dt><dd>{{ $resetConfirm['origem_label'] ?: '—' }}</dd></div>
+                        <div><dt>Usuário vinculado</dt><dd>{{ $resetConfirm['vendedor'] ?: '—' }}</dd></div>
                         <div><dt>Visto por último</dt><dd>{{ $resetConfirm['last_seen_at'] ?: '—' }}</dd></div>
                         <div><dt>ID do aparelho</dt><dd class="erp-fv-reset-modal__uuid">{{ $resetConfirm['device_uuid'] }}</dd></div>
                     </dl>
 
                     <p>
-                        Na próxima conexão com o servidor o app apaga toda a base local (catálogo, clientes,
-                        pedidos, fila de envio, fotos e sessão) e volta para a tela de login.
-                        O aparelho continua autorizado. Pedidos já gravados no ERP não são alterados.
-                        Ao concluir, o vínculo com o vendedor é liberado: o próximo login válido
-                        define o novo vendedor do aparelho. A autorização vale uma única vez.
+                        Na próxima conexão o app apaga a base local (SQLite, fotos, pedidos, pendências,
+                        sessão e vínculo) e volta para o login, mantendo só o servidor configurado
+                        (IP/domínio, protocolo e porta). O aparelho continua autorizado.
+                        Vendas e cadastros já gravados no ERP não são alterados.
+                        O próximo login válido define o novo usuário. A autorização vale uma única vez.
                     </p>
                 </div>
 

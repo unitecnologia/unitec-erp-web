@@ -1,10 +1,20 @@
 @echo off
 chcp 65001 >nul
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================================================
-REM  REPARAR SISTEMA Unitec ERP (500 / nao abre / pdo_mysql)
-REM  Use no PC do cliente: C:\UNITECNOLOGIA_WEB
+REM  REPARAR SISTEMA Unitec ERP - HTTP 500 (Pail) / views code:5
+REM  Independente para instalacao 6.4.1.267 (e posteriores).
+REM
+REM  Leve junto para o cliente (mesma pasta):
+REM    - Reparar Sistema.bat
+REM    - Reparar-Sistema-HTTP500.ps1
+REM
+REM  Seguro:
+REM   - so encerra processos DESTA pasta Unitec (nao outros PHP)
+REM   - nao altera banco / nao roda migrate
+REM   - nao apaga caches indiscriminadamente
+REM   - artisan com cwd correto (cd na pasta do ERP)
 REM ============================================================
 
 set "APP=C:\UNITECNOLOGIA_WEB"
@@ -13,249 +23,162 @@ if "%APP:~-1%"=="\" set "APP=%APP:~0,-1%"
 
 set "PHPDIR=%APP%\tools\php"
 set "PHPEXE=%PHPDIR%\php.exe"
-set "INI=%PHPDIR%\php.ini"
-set "EXTDIR=%PHPDIR%\ext"
-set "LOG=%APP%\instalacao.log"
 set "ERR=%USERPROFILE%\Desktop\unitec-erro.txt"
 set "LARALOG=%APP%\storage\logs\laravel.log"
+set "PS1=%~dp0Reparar-Sistema-HTTP500.ps1"
 
 echo.
 echo ========================================
-echo   REPARAR SISTEMA Unitec ERP
+echo   REPARAR SISTEMA - HTTP 500 / views
 echo ========================================
 echo Pasta: %APP%
 echo.
+echo Este reparo NAO altera banco de dados.
 echo Aguarde - nao feche esta janela.
 echo.
 
+if not exist "%PS1%" (
+  echo [ERRO] Falta o arquivo ao lado deste .bat:
+  echo   Reparar-Sistema-HTTP500.ps1
+  echo.
+  echo Copie os DOIS arquivos para a pasta do ERP ou para um pendrive
+  echo e execute novamente.
+  pause
+  exit /b 1
+)
+
+if not exist "%APP%\artisan" (
+  echo [ERRO] artisan nao encontrado em: %APP%
+  echo Coloque este .bat dentro de C:\UNITECNOLOGIA_WEB ou informe a pasta correta.
+  pause
+  exit /b 1
+)
+
 if not exist "%PHPEXE%" (
-    echo [ERRO] PHP nao encontrado: %PHPEXE%
-    echo Reinstale o Unitec ERP.
-    pause
-    exit /b 1
+  echo [ERRO] PHP nao encontrado: %PHPEXE%
+  echo Reinstale o Unitec ERP.
+  pause
+  exit /b 1
 )
 
-echo [1/8] Encerrando PHP e MySQL antigos...
-taskkill /F /IM php.exe >nul 2>&1
-REM so mata mysqld do Unitec (nao outros)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "Get-Process mysqld -EA SilentlyContinue | Where-Object { $_.Path -like '*UNITECNOLOGIA_WEB*' -or $_.Path -like '*unitec-erp-web*' } | Stop-Process -Force -EA SilentlyContinue"
+echo [1/6] Encerrando somente processos desta instalacao Unitec...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" -AppPath "%APP%" -Phase stop
+if errorlevel 1 (
+  echo [AVISO] Falha parcial ao encerrar processos - continuando.
+)
 timeout /t 2 /nobreak >nul
 
-echo [2/8] Recriando pastas storage...
-mkdir "%APP%\storage\framework\sessions" 2>nul
-mkdir "%APP%\storage\framework\views" 2>nul
-mkdir "%APP%\storage\framework\cache\data" 2>nul
-mkdir "%APP%\storage\logs" 2>nul
-mkdir "%APP%\storage\app\private\updates" 2>nul
-mkdir "%APP%\bootstrap\cache" 2>nul
-
-echo [3/8] Corrigindo php.ini (pdo_mysql)...
-if not exist "%INI%" (
-  if exist "%PHPDIR%\php.ini-development" copy /Y "%PHPDIR%\php.ini-development" "%INI%" >nul
-)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ini='%INI%'; $extDir=('%EXTDIR%' -replace '\\','/');" ^
-  "if(-not(Test-Path $ini)){throw 'php.ini ausente'};" ^
-  "$c=[IO.File]::ReadAllText($ini);" ^
-  "@('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','zip') | ForEach-Object {" ^
-  "  $e=$_; $c=[regex]::Replace($c,'(?m)^;\s*extension\s*=\s*'+$e+'\s*$','extension='+$e);" ^
-  "  if($c -notmatch ('(?m)^\s*extension\s*=\s*'+$e+'\s*$')){ $c += \"`r`nextension=$e\" }" ^
-  "};" ^
-  "$c=[regex]::Replace($c,'(?m)^\s*;?\s*extension_dir\s*=.*\r?\n?','');" ^
-  "$c=$c.TrimEnd()+\"`r`nextension_dir=`\"$extDir`\"`r`n\";" ^
-  "[IO.File]::WriteAllText($ini,$c,(New-Object Text.UTF8Encoding $false))"
-
-pushd "%PHPDIR%"
-"%PHPEXE%" -m > "%TEMP%\unitec-php-m.txt" 2> "%TEMP%\unitec-php-m.err"
-popd
-findstr /I /X "pdo_mysql" "%TEMP%\unitec-php-m.txt" >nul
+echo [2/6] Recriando pastas e rotacionando views (code:5)...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" -AppPath "%APP%" -Phase views
 if errorlevel 1 (
-  echo [AVISO] pdo_mysql nao carregou.
-  echo.
-  echo --- Erro do PHP ---
-  type "%TEMP%\unitec-php-m.err"
-  echo -------------------
-  echo.
-  echo [3b] Instalando Visual C++ x64...
-  set "VC="
-  if exist "%APP%\installer\assets\vc_redist.x64.exe" set "VC=%APP%\installer\assets\vc_redist.x64.exe"
-  if not defined VC if exist "%~dp0vc_redist.x64.exe" set "VC=%~dp0vc_redist.x64.exe"
-  if not defined VC if exist "%TEMP%\vc_redist.x64.exe" set "VC=%TEMP%\vc_redist.x64.exe"
-  if not defined VC (
-    echo Baixando VC++ da Microsoft (~25 MB)...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-      "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;" ^
-      "Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '%TEMP%\vc_redist.x64.exe' -UseBasicParsing"
-    if exist "%TEMP%\vc_redist.x64.exe" set "VC=%TEMP%\vc_redist.x64.exe"
-  )
-  if defined VC (
-    echo Instalando: %VC%
-    "%VC%" /install /quiet /norestart
-    echo Aguardando 8s...
-    timeout /t 8 /nobreak >nul
-    pushd "%PHPDIR%"
-    "%PHPEXE%" -m > "%TEMP%\unitec-php-m.txt" 2> "%TEMP%\unitec-php-m.err"
-    popd
-  ) else (
-    echo [ERRO] Nao baixou o VC++. Sem internet?
-  )
-)
-findstr /I /X "pdo_mysql" "%TEMP%\unitec-php-m.txt" >nul
-if errorlevel 1 (
-  echo.
-  echo ========================================
-  echo   PRECISA REINICIAR O WINDOWS
-  echo ========================================
-  echo.
-  echo O Visual C++ foi instalado ^(ou precisa instalar^),
-  echo mas o PHP so carrega pdo_mysql DEPOIS do reinicio.
-  echo.
-  echo 1. Reinicie o computador
-  echo 2. Rode de novo: Reparar Sistema.bat
-  echo.
-  echo Ou rode agora: Instalar Visual C++.bat
-  echo.
-  echo --- Aviso PHP ---
-  type "%TEMP%\unitec-php-m.err"
-  echo.
-  set /p R=Reiniciar Windows agora? (S/N): 
-  if /I "%R%"=="S" shutdown /r /t 5 /c "Unitec ERP: reinicio para ativar Visual C++"
+  echo [ERRO] Falha ao preparar storage/views.
   pause
   exit /b 1
 )
-echo [OK] pdo_mysql
 
-echo [4/8] Limpando caches quebrados do update...
-del /F /Q "%APP%\bootstrap\cache\*.php" >nul 2>&1
+echo [3/6] Removendo residuo Pail e manifests contaminados...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" -AppPath "%APP%" -Phase pail
+if errorlevel 1 (
+  echo [ERRO] Falha ao limpar Pail/manifests.
+  pause
+  exit /b 1
+)
+
+echo [4/6] Regenerando descoberta de pacotes (cwd = pasta do ERP)...
 cd /d "%APP%"
-"%PHPEXE%" artisan package:discover >nul 2>&1
-"%PHPEXE%" artisan optimize:clear >nul 2>&1
-"%PHPEXE%" artisan view:clear >nul 2>&1
-"%PHPEXE%" artisan config:clear >nul 2>&1
-"%PHPEXE%" artisan route:clear >nul 2>&1
-"%PHPEXE%" artisan cache:clear >nul 2>&1
-REM packages.php pode ter ficado com Laravel\Pail (DEV) apos update — rediscover de novo limpo
-del /F /Q "%APP%\bootstrap\cache\packages.php" "%APP%\bootstrap\cache\services.php" >nul 2>&1
-"%PHPEXE%" artisan package:discover >nul 2>&1
-"%PHPEXE%" artisan unitec:filament-cache --force >nul 2>&1
-
-echo [5/8] Ajustando .env (debug para capturar erro)...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$f='%APP%\.env'; if(Test-Path $f){" ^
-  " $c=[IO.File]::ReadAllText($f);" ^
-  " $c=[regex]::Replace($c,'(?m)^APP_DEBUG=.*$','APP_DEBUG=true');" ^
-  " $c=[regex]::Replace($c,'(?m)^LOG_LEVEL=.*$','LOG_LEVEL=debug');" ^
-  " $c=[regex]::Replace($c,'(?m)^SESSION_SECURE_COOKIE=.*$','SESSION_SECURE_COOKIE=false');" ^
-  " if($c -notmatch '(?m)^SESSION_SECURE_COOKIE='){ $c += \"`r`nSESSION_SECURE_COOKIE=false\" };" ^
-  " [IO.File]::WriteAllText($f,$c,(New-Object Text.UTF8Encoding $false)) }"
-
-echo [6/8] Iniciando MySQL + servidor web...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "Set-Location '%APP%'; . '%APP%\scripts\unitec-install-lib.ps1';" ^
-  "Ensure-UnitecStorageStructure -AppPath '%APP%';" ^
-  "Start-UnitecStack -AppPath '%APP%' -WaitSeconds 30"
-
 if errorlevel 1 (
-  echo [ERRO] Falha ao iniciar servicos.
-  echo Veja %LOG%
+  echo [ERRO] Nao foi possivel entrar em: %APP%
+  pause
+  exit /b 1
+)
+echo cwd=%CD%
+"%PHPEXE%" artisan package:discover
+if errorlevel 1 (
+  echo [ERRO] package:discover falhou.
+  if exist "%LARALOG%" echo Veja: %LARALOG%
   pause
   exit /b 1
 )
 
-REM Migrate DEPOIS do MySQL subir (passo 1 encerra o mysqld).
-REM Isto corrige "BD: Pendente (N)" / banco incompativel apos update.
-echo [7/8] Aplicando migrations pendentes...
-cd /d "%APP%"
-echo.
-echo --- unitec:migrate-tolerante ---
-"%PHPEXE%" artisan unitec:migrate-tolerante
-if errorlevel 1 (
-  echo.
-  echo Tentando migrate --force simples...
-  "%PHPEXE%" artisan migrate --force
+REM So packages/services. Nao roda optimize:clear / cache:clear em massa.
+findstr /I /C:"PailServiceProvider" /C:"laravel/pail" "%APP%\bootstrap\cache\packages.php" >nul 2>&1
+if not errorlevel 1 (
+  echo [AVISO] packages.php ainda cita Pail - nova limpeza...
+  if exist "%APP%\vendor\laravel\pail" rmdir /S /Q "%APP%\vendor\laravel\pail" >nul 2>&1
+  del /F /Q "%APP%\bootstrap\cache\packages.php" "%APP%\bootstrap\cache\services.php" >nul 2>&1
+  cd /d "%APP%"
+  "%PHPEXE%" artisan package:discover
 )
-if errorlevel 1 (
-  echo.
-  echo [ERRO] Migrate falhou. Veja a mensagem acima.
-  echo Se persistir, envie ao suporte: %LARALOG%
+findstr /I /C:"PailServiceProvider" /C:"laravel/pail" "%APP%\bootstrap\cache\packages.php" >nul 2>&1
+if not errorlevel 1 (
+  echo [ERRO] packages.php continua com Pail apos rediscover.
+  echo Envie ao suporte: %APP%\bootstrap\cache\packages.php
   pause
   exit /b 1
 )
-echo.
-echo --- migrate:status (conferencia) ---
-"%PHPEXE%" artisan migrate:status > "%TEMP%\unitec-migrate-status.txt" 2>&1
-if errorlevel 1 (
-  echo [AVISO] Nao foi possivel listar migrate:status.
-  type "%TEMP%\unitec-migrate-status.txt"
-) else (
-  findstr /I /C:"Pending" "%TEMP%\unitec-migrate-status.txt" >nul
+if exist "%APP%\bootstrap\cache\services.php" (
+  findstr /I /C:"PailServiceProvider" "%APP%\bootstrap\cache\services.php" >nul 2>&1
   if not errorlevel 1 (
-    echo.
-    echo [ERRO] Ainda ha migration^(s^) Pending apos o migrate:
-    findstr /I /C:"Pending" "%TEMP%\unitec-migrate-status.txt"
-    echo.
-    echo Envie ao suporte este resultado e: %LARALOG%
+    echo [AVISO] services.php ainda cita Pail - removendo para rebuild no boot...
+    del /F /Q "%APP%\bootstrap\cache\services.php" >nul 2>&1
+  )
+)
+echo [OK] Manifesto sem Pail.
+
+echo [5/6] Reiniciando servicos Unitec (MySQL + HTTP)...
+if exist "%APP%\scripts\unitec-install-lib.ps1" (
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+    "Set-Location -LiteralPath '%APP%';" ^
+    " . '%APP%\scripts\unitec-install-lib.ps1';" ^
+    " Ensure-UnitecStorageStructure -AppPath '%APP%';" ^
+    " Start-UnitecStack -AppPath '%APP%' -WaitSeconds 30"
+  if errorlevel 1 (
+    echo [ERRO] Falha ao iniciar servicos via unitec-install-lib.
+    echo Tente abrir pelo atalho Unitec ERP.bat e rode este reparo de novo.
     pause
     exit /b 1
   )
-  echo [OK] Nenhuma migration Pending.
-)
-REM Limpa cache do indicador BD (PendingMigrationsGuard) + config
-"%PHPEXE%" artisan optimize:clear >nul 2>&1
-"%PHPEXE%" artisan config:cache >nul 2>&1
-"%PHPEXE%" artisan unitec:filament-cache --force >nul 2>&1
-
-echo [8/8] Testando login...
-timeout /t 2 /nobreak >nul
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try {" ^
-  "  $r=Invoke-WebRequest 'http://127.0.0.1:8765/admin/login' -UseBasicParsing -TimeoutSec 20;" ^
-  "  Write-Host ('HTTP ' + [int]$r.StatusCode);" ^
-  "  if($r.Content -match 'Server Error|Whoops|SQLSTATE|Exception'){" ^
-  "    $r.Content | Out-File '%ERR%' -Encoding UTF8;" ^
-  "    Write-Host 'AINDA COM ERRO - salvo em Desktop\unitec-erro.txt';" ^
-  "    exit 2" ^
-  "  }; exit 0" ^
-  "} catch {" ^
-  "  $code=0; if($_.Exception.Response){ $code=[int]$_.Exception.Response.StatusCode };" ^
-  "  Write-Host ('HTTP ' + $code + ' - ' + $_.Exception.Message);" ^
-  "  if(Test-Path '%LARALOG%'){ Get-Content '%LARALOG%' -Tail 80 | Out-File '%ERR%' -Encoding UTF8 }" ^
-  "  else { $_.Exception.Message | Out-File '%ERR%' -Encoding UTF8 };" ^
-  "  exit 2" ^
-  "}"
-
-if errorlevel 2 (
-  echo.
-  echo ========================================
-  echo   AINDA COM ERRO 500
-  echo ========================================
-  echo Envie ao suporte o arquivo:
-  echo   %ERR%
-  if exist "%LARALOG%" echo E tambem: %LARALOG%
-  echo.
-  start "" notepad "%ERR%"
+) else if exist "%APP%\Unitec ERP.bat" (
+  echo Biblioteca de instalacao ausente - abrindo Unitec ERP.bat...
+  start "" "%APP%\Unitec ERP.bat"
+  timeout /t 15 /nobreak >nul
+) else (
+  echo [AVISO] Nao achei scripts\unitec-install-lib.ps1 nem Unitec ERP.bat.
+  echo Inicie o ERP manualmente e pressione uma tecla para testar.
   pause
-  exit /b 1
 )
 
-REM Volta debug off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$f='%APP%\.env'; if(Test-Path $f){" ^
-  " $c=[IO.File]::ReadAllText($f);" ^
-  " $c=[regex]::Replace($c,'(?m)^APP_DEBUG=.*$','APP_DEBUG=false');" ^
-  " $c=[regex]::Replace($c,'(?m)^LOG_LEVEL=.*$','LOG_LEVEL=warning');" ^
-  " [IO.File]::WriteAllText($f,$c,(New-Object Text.UTF8Encoding $false)) }"
-"%PHPEXE%" artisan config:cache >nul 2>&1
+echo [6/6] Testando saude HTTP...
+timeout /t 2 /nobreak >nul
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" -AppPath "%APP%" -Phase health
+set "HC=%ERRORLEVEL%"
+
+if "%HC%"=="0" (
+  echo.
+  echo ========================================
+  echo   SISTEMA OK
+  echo ========================================
+  for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -Command "$p=8765; $f=Join-Path '%APP%' '.env'; if(Test-Path -LiteralPath $f){ $t=[IO.File]::ReadAllText($f); if($t -match '(?m)^APP_URL\s*=\s*.*:(\d+)'){ $p=[int]$Matches[1] } }; Write-Output $p"`) do set "PORT=%%P"
+  if not defined PORT set "PORT=8765"
+  start "" "http://127.0.0.1:!PORT!/admin/login"
+  echo.
+  echo Se a tela ficar em branco, pressione Ctrl+F5.
+  echo.
+  pause
+  exit /b 0
+)
 
 echo.
 echo ========================================
-echo   SISTEMA OK
+echo   AINDA COM ERRO
 echo ========================================
-echo Abrindo o ERP...
-start "" "http://127.0.0.1:8765/admin/login"
-echo.
-echo Se a tela ficar em branco, pressione Ctrl+F5.
+if exist "%LARALOG%" (
+  powershell.exe -NoProfile -Command "Get-Content -LiteralPath '%LARALOG%' -Tail 80 | Out-File -FilePath '%ERR%' -Encoding utf8"
+  echo Log salvo em: %ERR%
+  start "" notepad "%ERR%"
+) else (
+  echo Nao achei laravel.log. Teste manual: http://127.0.0.1:8765/admin/login
+)
 echo.
 pause
-exit /b 0
+exit /b 1

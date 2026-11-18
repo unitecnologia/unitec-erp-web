@@ -177,10 +177,11 @@ class AuthController
             'tabela_venda_descricao' => $tabela?->descricao,
             'pix_api_habilitada' => (bool) ($empresa?->param_pix_habilitar ?? false),
             'ver_todos_clientes' => (bool) ($empresa?->param_forca_vendas_ver_todos_clientes ?? false),
-            'desconto_reais_item_modo' => \App\Support\Erp\EmpresaParametros::normalizarDescontoReaisItemModo(
-                ($empresa !== null && Schema::hasColumn('empresas', 'param_monitor_vendas_desconto_reais_item_modo'))
-                    ? $empresa->param_monitor_vendas_desconto_reais_item_modo
-                    : null,
+            'alterar_preco_unitario' => \App\Support\Erp\EmpresaParametros::forcaVendasAlterarPrecoUnitario(
+                $user->empresa_id ? (int) $user->empresa_id : null,
+            ),
+            'desconto_reais_item_modo' => \App\Support\Erp\EmpresaParametros::descontoReaisItemModo(
+                $empresa?->id,
             ),
             'imp_valor_liquido' => app(\App\Support\ForcaVendas\ForcaVendasSyncService::class)
                 ->impressaoPedidoValorLiquido($user->empresa_id ? (int) $user->empresa_id : null),

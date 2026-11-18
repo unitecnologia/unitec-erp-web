@@ -79,15 +79,64 @@ final class PdvFinalizarPagamentosHelper
     /**
      * Cartão (crédito/débito/POS) com tipo_movimento Contas à Receber.
      *
-     * @param  array{forma?: string, tipo?: string, tipo_movimento?: string, aparece_contas_receber?: bool|int|string}  $pagamento
+     * @param  array{forma?: string, tipo?: string, tipo_movimento?: string, aparece_contas_receber?: bool|int|string, usa_super_tef?: bool|int|string}  $pagamento
      */
     public static function isFormaCartaoContasReceber(array $pagamento): bool
     {
+        // SuperTEF: NSU/parcelas vêm da API — nunca abrir canhoto manual.
+        if (self::isFormaSuperTef($pagamento)) {
+            return false;
+        }
+
         if (! self::isFormaCartao($pagamento)) {
             return false;
         }
 
         return FormaPagamentoDestino::geraContasReceber($pagamento);
+    }
+
+    /**
+     * Forma marcada para canhoto POS manual (maquininha), independente do tipo_movimento.
+     *
+     * @param  array{usa_pos?: bool|int|string, usa_super_tef?: bool|int|string, usa_tef?: bool|int|string}  $pagamento
+     */
+    public static function isFormaUsaPos(array $pagamento): bool
+    {
+        if (! filter_var($pagamento['usa_pos'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        // Combinações incompatíveis: SuperTEF / TEF integrado vencem e não pedem canhoto manual.
+        if (self::isFormaSuperTef($pagamento)) {
+            return false;
+        }
+
+        if (filter_var($pagamento['usa_tef'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        return self::isFormaCartao($pagamento);
+    }
+
+    /**
+     * Abre o canhoto POS manual:
+     * - legado: cartão → Contas a Receber (mesmo sem usa_pos), ou
+     * - flag usa_pos (qualquer tipo_movimento financeiro).
+     * SuperTEF nunca entra aqui.
+     *
+     * @param  array{forma?: string, tipo?: string, tipo_movimento?: string, usa_pos?: bool|int|string, usa_super_tef?: bool|int|string, usa_tef?: bool|int|string}  $pagamento
+     */
+    public static function precisaCanhotoPosManual(array $pagamento): bool
+    {
+        if (self::isFormaSuperTef($pagamento)) {
+            return false;
+        }
+
+        if (self::isFormaCartaoContasReceber($pagamento)) {
+            return true;
+        }
+
+        return self::isFormaUsaPos($pagamento);
     }
 
     /**
@@ -98,6 +147,10 @@ final class PdvFinalizarPagamentosHelper
      */
     public static function cartaoVaiParaContasReceber(array $pagamento, bool $lancarCartaoNoCaixa = true): bool
     {
+        if (self::isFormaSuperTef($pagamento)) {
+            return false;
+        }
+
         if (! self::isFormaCartao($pagamento)) {
             return false;
         }
@@ -186,6 +239,258 @@ final class PdvFinalizarPagamentosHelper
         $forma = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
 
         return str_contains($forma, 'PIX');
+    }
+
+    /**
+     * Cartão de crédito marcado como à vista: PDV não solicita parcelas (1x).
+     *
+     * @param  array{tipo?: string, considerar_a_vista?: bool|int|string}  $pagamento
+     */
+    public static function isFormaConsiderarAVista(array $pagamento): bool
+    {
+        if (! filter_var($pagamento['considerar_a_vista'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+
+        return $tipo === 'cartao_credito';
+    }
+
+    /**
+     * PDV pode seguir com 1 parcela sem overlay de escolha:
+     * - flag "Considerar à vista" (cartão crédito), ou
+     * - modo Financeiro com max_parcelas = 1
+     * Tabela de Prazo: não usa max_parcelas para essa automação.
+     *
+     * @param  array{tipo?: string, considerar_a_vista?: bool|int|string, modo_prazo?: string, max_parcelas?: int|string}  $pagamento
+     */
+    public static function deveAssumirParcelaUnicaSemSelecao(array $pagamento): bool
+    {
+        if (self::isFormaConsiderarAVista($pagamento)) {
+            return true;
+        }
+
+        $modo = \App\Models\FormaPagamento::normalizeModoPrazo($pagamento['modo_prazo'] ?? null);
+        if ($modo === \App\Models\FormaPagamento::MODO_PRAZO_TABELA) {
+            return false;
+        }
+
+        return max(0, (int) ($pagamento['max_parcelas'] ?? 0)) === 1;
+    }
+
+    /**
+     * Vencimento único (dias) no padrão financeiro do canhoto/carnê: intervalo*1.
+     * Usa intervalo_parcelas; se vazio, prazo_cartao; senão 30 (mesmo fallback do canhoto).
+     *
+     * @param  array{intervalo_parcelas?: int|string, prazo_cartao?: int|string}  $pagamento
+     * @return list<int>
+     */
+    public static function diasParcelaUnicaFinanceiro(array $pagamento): array
+    {
+        $intervalo = max(0, (int) ($pagamento['intervalo_parcelas'] ?? 0));
+        $prazo = max(0, (int) ($pagamento['prazo_cartao'] ?? 0));
+
+        if ($intervalo <= 0) {
+            $intervalo = $prazo > 0 ? $prazo : 30;
+        }
+
+        return self::diasDePrazoFinanceiro(1, $intervalo);
+    }
+
+    /**
+     * Qualquer SuperTEF integrado (débito ou crédito) — separado do POS/canhoto.
+     *
+     * @param  array{forma?: string, tipo?: string, usa_super_tef?: bool|int|string}  $pagamento
+     */
+    public static function isFormaSuperTef(array $pagamento): bool
+    {
+        if (! filter_var($pagamento['usa_super_tef'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+        if (in_array($tipo, ['cartao_debito', 'cartao_credito', 'tef'], true)) {
+            return true;
+        }
+
+        $forma = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
+
+        return str_contains($forma, 'SUPERTEF') || str_contains($forma, 'SUPER TEF');
+    }
+
+    /**
+     * SuperTEF Débito (integrado).
+     *
+     * @param  array{forma?: string, tipo?: string, usa_super_tef?: bool|int|string}  $pagamento
+     */
+    public static function isFormaSuperTefDebito(array $pagamento): bool
+    {
+        if (! self::isFormaSuperTef($pagamento)) {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+        if ($tipo === 'cartao_credito') {
+            return false;
+        }
+        if (in_array($tipo, ['cartao_debito', 'tef'], true)) {
+            return true;
+        }
+
+        $forma = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
+
+        return str_contains($forma, 'DEBITO') || str_contains($forma, 'DÉBITO');
+    }
+
+    /**
+     * SuperTEF Crédito (à vista ou parcelado na mesma forma).
+     *
+     * @param  array{forma?: string, tipo?: string, usa_super_tef?: bool|int|string}  $pagamento
+     */
+    public static function isFormaSuperTefCredito(array $pagamento): bool
+    {
+        if (! self::isFormaSuperTef($pagamento)) {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+        if ($tipo === 'cartao_credito') {
+            return true;
+        }
+        if (in_array($tipo, ['cartao_debito', 'tef'], true)) {
+            return false;
+        }
+
+        $forma = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
+
+        return str_contains($forma, 'CREDITO') || str_contains($forma, 'CRÉDITO');
+    }
+
+    /**
+     * Condições de parcelamento SuperTEF Crédito a partir do cadastro da forma.
+     * - modo financeiro: 1..max_parcelas (mesma regra do canhoto/POS)
+     * - modo tabela: cada tabela_prazo com N dias => N parcelas na adquirente
+     *   (usa só a quantidade; não gera títulos CR a partir dos dias)
+     * Teto técnico (POS/acquirer) limita as opções; não cria tabela paralela.
+     *
+     * @param  array{
+     *   modo_prazo?: string,
+     *   max_parcelas?: int|string,
+     *   intervalo_parcelas?: int|string,
+     *   supertef_condicoes?: list<array<string,mixed>>,
+     *   tabelas_prazo?: list<array{id?:int,dias?:string,ordem?:int}>
+     * }  $pagamento
+     * @return list<array{key: string, parcelas: int, label: string, origem: string, tabela_id: int|null, dias: list<int>}>
+     */
+    public static function condicoesSuperTefCredito(array $pagamento, int $maxTecnico = 12): array
+    {
+        if (isset($pagamento['supertef_condicoes']) && is_array($pagamento['supertef_condicoes']) && $pagamento['supertef_condicoes'] !== []) {
+            return array_values(array_filter(
+                $pagamento['supertef_condicoes'],
+                static fn ($c): bool => is_array($c) && (int) ($c['parcelas'] ?? 0) >= 1
+            ));
+        }
+
+        $teto = max(1, min(18, $maxTecnico));
+        $modo = \App\Models\FormaPagamento::normalizeModoPrazo($pagamento['modo_prazo'] ?? null);
+        $out = [];
+
+        if ($modo === \App\Models\FormaPagamento::MODO_PRAZO_TABELA) {
+            $tabelas = $pagamento['tabelas_prazo'] ?? [];
+            if (is_array($tabelas)) {
+                foreach ($tabelas as $tab) {
+                    if (! is_array($tab)) {
+                        continue;
+                    }
+                    $dias = self::diasDeString((string) ($tab['dias'] ?? ''));
+                    $qtd = count($dias);
+                    if ($qtd < 1 || $qtd > $teto) {
+                        continue;
+                    }
+                    $id = (int) ($tab['id'] ?? 0);
+                    $rotuloDias = implode('/', $dias);
+                    $out[] = [
+                        'key' => $id > 0 ? 'tab:'.$id : 'tab:'.$qtd.':'.$rotuloDias,
+                        'parcelas' => $qtd,
+                        'label' => $qtd === 1 ? ('À vista ('.$rotuloDias.')') : ($qtd.'x ('.$rotuloDias.')'),
+                        'origem' => 'tabela',
+                        'tabela_id' => $id > 0 ? $id : null,
+                        'dias' => $dias,
+                    ];
+                }
+            }
+        }
+
+        if ($out === []) {
+            // Financeiro (ou tabela sem condições válidas para TEF): 1..max_parcelas.
+            $formaMax = max(1, (int) ($pagamento['max_parcelas'] ?? $teto));
+            $limite = min($teto, $formaMax);
+            $intervalo = max(0, (int) ($pagamento['intervalo_parcelas'] ?? 0));
+            for ($p = 1; $p <= $limite; $p++) {
+                $hint = '';
+                if ($intervalo > 0 && $p > 1) {
+                    $hint = ' / '.$intervalo.'d';
+                }
+                $out[] = [
+                    'key' => 'fin:'.$p,
+                    'parcelas' => $p,
+                    'label' => $p === 1 ? 'À vista' : ($p.'x'.$hint),
+                    'origem' => 'financeiro',
+                    'tabela_id' => null,
+                    'dias' => [],
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Condição escolhida (ou primeira) para cobrança SuperTEF Crédito.
+     *
+     * @param  array{supertef_condicao?: string, supertef_parcelas?: int|string}  $pagamento
+     * @return array{key: string, parcelas: int, label: string, origem: string, tabela_id: int|null, dias: list<int>}|null
+     */
+    public static function resolverCondicaoSuperTefCredito(array $pagamento, int $maxTecnico = 12): ?array
+    {
+        $conds = self::condicoesSuperTefCredito($pagamento, $maxTecnico);
+        if ($conds === []) {
+            return null;
+        }
+
+        $key = trim((string) ($pagamento['supertef_condicao'] ?? ''));
+        if ($key !== '') {
+            foreach ($conds as $c) {
+                if ((string) ($c['key'] ?? '') === $key) {
+                    return $c;
+                }
+            }
+        }
+
+        // Legado: supertef_parcelas numérico.
+        $qtdLegado = (int) preg_replace('/\D/', '', (string) ($pagamento['supertef_parcelas'] ?? '')) ?: 0;
+        if ($qtdLegado > 0) {
+            foreach ($conds as $c) {
+                if ((int) $c['parcelas'] === $qtdLegado) {
+                    return $c;
+                }
+            }
+        }
+
+        return $conds[0];
+    }
+
+    /**
+     * Parcelas SuperTEF Crédito (1 = à vista) — derivado da condição da forma.
+     *
+     * @param  array{supertef_condicao?: string, supertef_parcelas?: int|string, max_parcelas?: int|string}  $pagamento
+     */
+    public static function superTefParcelas(array $pagamento, int $maxPermitido = 12): int
+    {
+        $cond = self::resolverCondicaoSuperTefCredito($pagamento, $maxPermitido);
+
+        return max(1, (int) ($cond['parcelas'] ?? 1));
     }
 
     /**
@@ -313,5 +618,30 @@ final class PdvFinalizarPagamentosHelper
         }
 
         return $pagamentos;
+    }
+
+    /**
+     * PDV online: se alguma forma com valor > 0 estiver marcada nfce, a venda transmite NFC-e
+     * automaticamente (uma nota com o total e todos os pagamentos).
+     *
+     * @param  array<int, array{valor?: string|int|float|null, nfce?: bool|int|string|null}>  $pagamentos
+     */
+    public static function exigeNfceAutomatica(array $pagamentos): bool
+    {
+        foreach ($pagamentos as $pagamento) {
+            if (! is_array($pagamento)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($pagamento['valor'] ?? '0') <= 0) {
+                continue;
+            }
+
+            if (filter_var($pagamento['nfce'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

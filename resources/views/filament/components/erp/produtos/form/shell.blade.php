@@ -146,6 +146,8 @@
                             @include('filament.components.erp.produtos.form.tabs.imei')
                         @elseif ($this->activeFormTab === 'composicao')
                             @include('filament.components.erp.produtos.form.tabs.composicao')
+                        @elseif ($this->activeFormTab === 'receita')
+                            @include('filament.components.erp.produtos.form.tabs.receita')
                         @elseif ($this->activeFormTab === 'tabela_preco')
                             @include('filament.components.erp.produtos.form.tabs.tabela-preco')
                         @elseif ($this->activeFormTab === 'ultimos_precos')

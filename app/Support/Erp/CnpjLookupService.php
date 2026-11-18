@@ -30,7 +30,7 @@ class CnpjLookupService
     /**
      * @return array<string, string|null>
      */
-    public function fetch(string $cnpj): array
+    public function fetch(string $cnpj, bool $forceRefresh = false): array
     {
         $cnpj = preg_replace('/\D/', '', $cnpj);
 
@@ -42,8 +42,14 @@ class CnpjLookupService
             throw new RuntimeException('CNPJ inválido.');
         }
 
+        $cacheKey = "erp.cnpj.lookup.{$cnpj}";
+
+        if ($forceRefresh) {
+            Cache::forget($cacheKey);
+        }
+
         return Cache::remember(
-            "erp.cnpj.lookup.{$cnpj}",
+            $cacheKey,
             now()->addDays(self::CACHE_TTL_DAYS),
             fn (): array => $this->fetchFromProviders($cnpj),
         );

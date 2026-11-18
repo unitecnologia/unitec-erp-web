@@ -17,7 +17,9 @@ use App\Models\ProductGrade;
 use App\Models\PromocaoItem;
 use App\Models\Vendedor;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\DescontoReaisItemCalculator;
 use App\Support\Erp\EmpresaModulos;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpMoney;
@@ -31,6 +33,7 @@ use App\Support\Erp\Orcamento\OrcamentoTotaisService;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Erp\ProductTabelaPrecoService;
 use App\Support\Erp\Promocao\ProdutoPromocaoIndicador;
+use App\Support\VendasInternas\VendasInternasEdicaoLockService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -40,6 +43,7 @@ use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -2294,7 +2298,7 @@ trait ErpOrcamentoFormPage
 
     public function abrirModalDescontoItem(): void
     {
-        if ($this->orcamentoReadOnly() || $this->descontoModalOpen) {
+        if ($this->orcamentoReadOnly()) {
             return;
         }
 
@@ -2311,9 +2315,10 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        $this->itemAjusteTipo = 'desconto';
+        $seed = $this->seedItemAjusteModal();
+        $this->itemAjusteTipo = $seed['tipo'];
         $this->itemAjusteModo = 'percentual';
-        $this->itemAjusteValor = '0,00';
+        $this->itemAjusteValor = $seed['pct'];
         $this->descontoModalOpen = true;
     }
 
@@ -2323,48 +2328,82 @@ trait ErpOrcamentoFormPage
         $this->itemAjusteAlvo = null;
     }
 
-    public function setItemAjusteTipo(string $tipo): void
-    {
-        $this->itemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
-    }
-
-    public function setItemAjusteModo(string $modo): void
-    {
-        $this->itemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
-    }
-
     /**
-     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
+     * @return array{descricao: string, baseRaw: float, qtdRaw: float, tipo: string, pct: string, reais: string, modoReais: string}
      */
-    public function getItemAjustePreviewProperty(): array
+    public function getItemAjusteModalProperty(): array
     {
         $ctx = $this->contextoItemAjuste();
-
-        if ($ctx === null) {
-            return [
-                'descricao' => '',
-                'base' => ErpMoney::formatBr(0),
-                'novoPreco' => ErpMoney::formatBr(0),
-                'total' => ErpMoney::formatBr(0),
-                'tipo' => $this->itemAjusteTipo,
-                'temAjuste' => false,
-            ];
-        }
-
-        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
+        $seed = $this->seedItemAjusteModal();
 
         return [
-            'descricao' => $ctx['descricao'],
-            'base' => ErpMoney::formatBr($calc['base']),
-            'novoPreco' => ErpMoney::formatBr($calc['novoPreco']),
-            'total' => ErpMoney::formatBr($calc['total']),
-            'tipo' => $this->itemAjusteTipo,
-            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
+            'descricao' => $ctx['descricao'] ?? '',
+            'baseRaw' => (float) ($ctx['preco'] ?? 0),
+            'qtdRaw' => (float) ($ctx['quantidade'] ?? 0),
+            'tipo' => $seed['tipo'],
+            'pct' => $seed['pct'],
+            'reais' => $seed['reais'],
+            'modoReais' => EmpresaParametros::descontoReaisItemModo(),
         ];
     }
 
-    public function confirmarItemAjuste(): void
+    /**
+     * @return array{tipo: string, pct: string, reais: string}
+     */
+    protected function seedItemAjusteModal(): array
     {
+        $ctx = $this->contextoItemAjuste();
+        $preco = (float) ($ctx['preco'] ?? 0);
+        $qtd = (float) ($ctx['quantidade'] ?? 0);
+        $bruto = max(0.0, round($preco * $qtd, 2));
+        $ajuste = 0.0;
+        $tipo = 'desconto';
+
+        if ($this->itemAjusteAlvo === 'form') {
+            $desc = ErpMoney::parseBr($this->itemPendingDesconto);
+            $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        } elseif ($this->itemAjusteAlvo === 'grid' && $this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $item = $this->itens[$this->selectedItemIndex];
+            $desc = ErpMoney::parseBr($item['desconto'] ?? 0);
+            $acr = ErpMoney::parseBr($item['acrescimo'] ?? 0);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        }
+
+        $pct = $bruto > 0 && $ajuste > 0 ? round(($ajuste / $bruto) * 100, 2) : 0.0;
+
+        return [
+            'tipo' => $tipo,
+            'pct' => ErpMoney::formatBr($pct),
+            'reais' => ErpMoney::formatBr($ajuste),
+        ];
+    }
+
+    public function confirmarItemAjuste(
+        ?string $valorInformado = null,
+        ?string $modoEntrada = null,
+        ?string $tipoInformado = null,
+    ): void {
+        if ($tipoInformado !== null && $tipoInformado !== '') {
+            $this->itemAjusteTipo = $tipoInformado === 'acrescimo' ? 'acrescimo' : 'desconto';
+        }
+        if ($modoEntrada !== null && $modoEntrada !== '') {
+            $this->itemAjusteModo = $modoEntrada === 'valor' ? 'valor' : 'percentual';
+        }
+        if ($valorInformado !== null && trim($valorInformado) !== '') {
+            $this->itemAjusteValor = ErpMoney::formatBr(ErpMoney::parseBr($valorInformado));
+        }
+
         $ctx = $this->contextoItemAjuste();
 
         if ($ctx === null) {
@@ -2374,7 +2413,7 @@ trait ErpOrcamentoFormPage
         }
 
         $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
-        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+        $ajusteLinha = round((float) $calc['ajusteLinha'], 2);
 
         if ($this->itemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
             Notification::make()->title('Desconto inválido.')->warning()->send();
@@ -2382,8 +2421,12 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        if ($this->itemAjusteAlvo === 'form') {
-            if ($this->itemAjusteTipo === 'desconto') {
+        $tipo = $this->itemAjusteTipo;
+        $alvo = $this->itemAjusteAlvo;
+        $this->descontoModalOpen = false;
+
+        if ($alvo === 'form') {
+            if ($tipo === 'desconto') {
                 $this->itemPendingDesconto = ErpMoney::formatBr($ajusteLinha);
                 $this->itemPendingAcrescimo = '0,00';
             } else {
@@ -2393,9 +2436,8 @@ trait ErpOrcamentoFormPage
 
             $this->recalcEntryRowFromPending();
 
-            $tipo = $this->itemAjusteTipo;
             $pendingAntes = $this->itemPendingProductId;
-            $this->fecharModalDescontoItem();
+            $this->itemAjusteAlvo = null;
             $this->confirmPendingItemEntry();
 
             if ($pendingAntes !== null && $this->itemPendingProductId === null) {
@@ -2411,7 +2453,7 @@ trait ErpOrcamentoFormPage
             $itens = $this->itens;
             $item = $itens[$index];
 
-            if ($this->itemAjusteTipo === 'desconto') {
+            if ($tipo === 'desconto') {
                 $item['desconto'] = ErpMoney::formatBr($ajusteLinha);
                 $item['acrescimo'] = ErpMoney::formatBr(0);
             } else {
@@ -2424,8 +2466,7 @@ trait ErpOrcamentoFormPage
             $this->recalcHeaderFromItens();
         }
 
-        $tipo = $this->itemAjusteTipo;
-        $this->fecharModalDescontoItem();
+        $this->itemAjusteAlvo = null;
         Notification::make()
             ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
             ->success()
@@ -2459,34 +2500,17 @@ trait ErpOrcamentoFormPage
     }
 
     /**
-     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     * @return array{base: float, deltaUnit: float, ajusteLinha: float, novoPreco: float, total: float}
      */
     protected function calcularItemAjuste(float $base, float $quantidade): array
     {
-        $valor = ErpMoney::parseBr($this->itemAjusteValor);
-
-        if ($this->itemAjusteModo === 'percentual') {
-            $deltaUnit = round($base * ($valor / 100), 2);
-        } else {
-            $deltaUnit = round($valor, 2);
-        }
-
-        $novoPreco = $this->itemAjusteTipo === 'acrescimo'
-            ? round($base + $deltaUnit, 2)
-            : round($base - $deltaUnit, 2);
-
-        if ($novoPreco < 0) {
-            $novoPreco = 0.0;
-        }
-
-        $total = round(max(0, $novoPreco * $quantidade), 2);
-
-        return [
-            'base' => $base,
-            'deltaUnit' => abs($deltaUnit),
-            'novoPreco' => $novoPreco,
-            'total' => $total,
-        ];
+        return DescontoReaisItemCalculator::calcular(
+            $base,
+            $quantidade,
+            ErpMoney::parseBr($this->itemAjusteValor),
+            $this->itemAjusteTipo,
+            $this->itemAjusteModo,
+        );
     }
 
     public function itensResumoBrutoDisplay(): string
@@ -2728,6 +2752,7 @@ trait ErpOrcamentoFormPage
                 ->success()
                 ->send();
 
+            $this->liberarLockEdicaoErpViOrcamento();
             $this->redirectToErpFormReturnOr(
                 OrcamentoResource::getUrl('index'),
                 'Orçamentos',
@@ -2739,6 +2764,15 @@ trait ErpOrcamentoFormPage
 
     protected function persistOrcamento(bool $finalizar): bool
     {
+        if ($this->isEditingOrcamento() && $this->record instanceof Orcamento) {
+            $viLocks = app(VendasInternasEdicaoLockService::class);
+            $viLocks->assertOrcamentoLivre($this->record);
+            $user = Auth::user();
+            if ($user instanceof \App\Models\User) {
+                $viLocks->tocarErpPorOrcamentoId((int) $this->record->id, $user);
+            }
+        }
+
         $subtotal = ErpMoney::parseBr($this->subtotalDisplay);
         $desconto = ErpMoney::parseBr($this->descontoValorDisplay);
         $percentual = ErpMoney::parseBr($this->percentualDescontoDisplay);
@@ -3082,6 +3116,7 @@ trait ErpOrcamentoFormPage
     public function sairAposGravarOrcamento(): void
     {
         $this->postSavePromptOpen = false;
+        $this->liberarLockEdicaoErpViOrcamento();
 
         $this->redirectToErpFormReturnOr(
             OrcamentoResource::getUrl('index'),
@@ -3092,6 +3127,7 @@ trait ErpOrcamentoFormPage
     public function iniciarNovoOrcamento(): void
     {
         $this->postSavePromptOpen = false;
+        $this->liberarLockEdicaoErpViOrcamento();
         ErpScreen::set('Lançamento de Orçamento');
         $this->redirect(
             $this->orcamentoUrlWithReturn(OrcamentoResource::getUrl('create')),
@@ -3101,10 +3137,34 @@ trait ErpOrcamentoFormPage
 
     public function cancelForm(): void
     {
+        $this->liberarLockEdicaoErpViOrcamento();
         $this->redirectToErpFormReturnOr(
             OrcamentoResource::getUrl('index'),
             'Orçamentos',
         );
+    }
+
+    /**
+     * Libera EM EDIÇÃO NO ERP do orçamento VI-linked aberto neste formulário.
+     */
+    protected function liberarLockEdicaoErpViOrcamento(): void
+    {
+        $orcamento = $this->record ?? null;
+        if (! $orcamento instanceof Orcamento) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user instanceof \App\Models\User) {
+            return;
+        }
+
+        try {
+            app(VendasInternasEdicaoLockService::class)
+                ->liberarErpPorOrcamentoId((int) $orcamento->id, $user);
+        } catch (\Throwable) {
+            // Saída do formulário não deve falhar por lock.
+        }
     }
 
     public function openProdutosCadastro(): void

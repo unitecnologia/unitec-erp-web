@@ -67,12 +67,7 @@ class Pedido extends Model
 
     public static function nextNumero(): string
     {
-        $max = static::query()
-            ->pluck('numero')
-            ->map(fn (string $numero): int => (int) preg_replace('/\D/', '', $numero))
-            ->max();
-
-        return str_pad((string) (($max ?? 0) + 1), 6, '0', STR_PAD_LEFT);
+        return app(\App\Support\Erp\PedidoNumeroService::class)->proximo();
     }
 
     public function horaExibicao(): ?string

@@ -32,6 +32,10 @@ class ForcaVendasMonitorDetalhePanel extends Component
 
     public bool $clonarProgressOpen = false;
 
+    public bool $nfceImprimirConfirmOpen = false;
+
+    public bool $nfceTransmitindo = false;
+
     /**
      * @param  array<int, string|int>  $selecionados
      */
@@ -44,6 +48,8 @@ class ForcaVendasMonitorDetalhePanel extends Component
         bool $cancelarProgressOpen = false,
         bool $reabrirProgressOpen = false,
         bool $clonarProgressOpen = false,
+        bool $nfceImprimirConfirmOpen = false,
+        bool $nfceTransmitindo = false,
     ): void {
         $this->selecionados = array_values(array_map(
             static fn ($id): string => (string) $id,
@@ -55,6 +61,8 @@ class ForcaVendasMonitorDetalhePanel extends Component
         $this->cancelarProgressOpen = $cancelarProgressOpen;
         $this->reabrirProgressOpen = $reabrirProgressOpen;
         $this->clonarProgressOpen = $clonarProgressOpen;
+        $this->nfceImprimirConfirmOpen = $nfceImprimirConfirmOpen;
+        $this->nfceTransmitindo = $nfceTransmitindo;
 
         if ($this->margemModalOpen) {
             $this->fecharMargemVenda();
@@ -68,6 +76,7 @@ class ForcaVendasMonitorDetalhePanel extends Component
             $this->custosUnitariosGrade,
             $this->nfeEmitirEstado,
             $this->nfeAbrirEstado,
+            $this->nfceEmitirEstado,
             $this->faturarEstado,
             $this->reabrirEstado,
             $this->telaVendaEstado,

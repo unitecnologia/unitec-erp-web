@@ -2,15 +2,15 @@
 ; Compilar apos: .\scripts\build-setup.ps1
 ;
 ; Fluxo:
-; - Pasta nova (sem .env / sem tools\mysql\data) Ã¢â€ â€™ instalaÃƒÂ§ÃƒÂ£o do zero
-; - Pasta jÃƒÂ¡ existente Ã¢â€ â€™ recupera (atualiza arquivos, NÃƒÆ’O apaga o banco)
+; - Pasta nova (sem .env / sem tools\mysql\data) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ instalaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o do zero
+; - Pasta jÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ existente ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ recupera (atualiza arquivos, NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢O apaga o banco)
 ;
 ; Atalhos: somente bin\Unitec ERP.exe
 ; Auto-start: servico Windows UnitecErpServer (Automatic)
 ; Sem PowerShell no atalho do cliente.
 
 #define MyAppName "UNI SISTEMAS 3.0"
-#define MyAppVersion "6.4.1.264"
+#define MyAppVersion "6.4.1.268"
 #define MyAppVerName "UNI SISTEMAS 3.0"
 #define MyAppPublisher "UNITECNOLOGIA"
 #define MyAppURL "https://unitecnologiasc.com.br/"
@@ -46,7 +46,7 @@ SetupIconFile={#MyAppIcon}
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
-; Sem task de atalho no Inno Ã¢â‚¬â€ evita duplicar com New-UnitecDesktopShortcuts.
+; Sem task de atalho no Inno ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â evita duplicar com New-UnitecDesktopShortcuts.
 
 [Files]
 ; Nao sobrescreve dados do cliente em pacote padrao.
@@ -60,7 +60,7 @@ Name: "{group}\Unitec ERP"; Filename: "{app}\bin\Unitec ERP.exe"; Parameters: "-
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
-; Nao apaga a pasta inteira no desinstalar Ã¢â‚¬â€ preserva banco (tools\mysql\data) e .env.
+; Nao apaga a pasta inteira no desinstalar ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â preserva banco (tools\mysql\data) e .env.
 [UninstallDelete]
 Type: files; Name: "{app}\.unitec-serve.pid"
 
@@ -80,12 +80,12 @@ var
 
 function IsExistingUnitecInstall(): Boolean;
 begin
-  { Sinais duraveis de instalacao anterior Ã¢â‚¬â€ nao usa so index.php (Setup sempre copia). }
+  { Sinais duraveis de ERP ja configurado ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â nao usa so index.php (Setup sempre copia). }
+  { ibdata1 sozinho NAO conta: MariaDB novo cria esse arquivo na 1a subida. }
   Result :=
     FileExists(ExpandConstant('{#MyAppDir}\.env')) or
     FileExists(ExpandConstant('{#MyAppDir}\.env.backup')) or
     FileExists(ExpandConstant('{#MyAppDir}\.env.production')) or
-    FileExists(ExpandConstant('{#MyAppDir}\tools\mysql\data\ibdata1')) or
     DirExists(ExpandConstant('{#MyAppDir}\tools\mysql\data\unitec_erp'));
 end;
 

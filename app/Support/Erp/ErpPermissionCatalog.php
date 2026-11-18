@@ -255,6 +255,43 @@ class ErpPermissionCatalog
           'print' => 'Imprimir',
         ],
       ],
+      'conciliacao_bancaria' => [
+        'label' => 'Conciliação Bancária',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+          'import' => 'Importar extrato',
+          'conciliar' => 'Conciliar',
+          'desfazer' => 'Desfazer conciliação',
+        ],
+      ],
+      'tef_liquidacao_destino' => [
+        'label' => 'Destinos SuperTEF',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+          'create' => 'Incluir',
+          'update' => 'Alterar',
+          'delete' => 'Excluir',
+        ],
+      ],
+      'tef_liquidacao_lote' => [
+        'label' => 'Lotes TEF',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+          'create' => 'Incluir lote',
+          'update' => 'Alterar situação',
+          'cancel' => 'Cancelar lote',
+        ],
+      ],
+      'dre_gerencial' => [
+        'label' => 'DRE Gerencial',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+        ],
+      ],
       'nfce' => [
         'label' => 'NFC-e',
         'group' => 'Fiscal',
@@ -306,7 +343,10 @@ class ErpPermissionCatalog
       'terminais' => [
         'label' => 'Terminais',
         'group' => 'Configurações',
-        'actions' => static::crudPrintActions(),
+        'actions' => [
+          ...static::crudPrintActions(),
+          'tef' => 'TEF / SuperTEF',
+        ],
       ],
       'config_fiscais' => [
         'label' => 'Config. Fiscais',
@@ -398,6 +438,56 @@ class ErpPermissionCatalog
         'group' => 'RH',
         'actions' => static::crudPrintActions(),
       ],
+      'rh.documentos' => [
+        'label' => 'Documentos',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.epis' => [
+        'label' => 'EPIs',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.uniformes' => [
+        'label' => 'Uniformes',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.exames' => [
+        'label' => 'Exames / ASO',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.ferias' => [
+        'label' => 'Férias',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.holerites' => [
+        'label' => 'Holerites',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.beneficios' => [
+        'label' => 'Benefícios',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.ocorrencias' => [
+        'label' => 'Ocorrências',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.treinamentos' => [
+        'label' => 'Treinamentos',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.escalas' => [
+        'label' => 'Escalas',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
       'tomadores_servico' => [
         'label' => 'Tomador de Serviço',
         'group' => 'Logística',
@@ -412,6 +502,13 @@ class ErpPermissionCatalog
         'label' => 'Remetente',
         'group' => 'Logística',
         'actions' => static::crudPrintActions(),
+      ],
+      'auditoria' => [
+        'label' => 'Log de Operações',
+        'group' => 'Auditoria',
+        'actions' => [
+          'access' => 'Acessar',
+        ],
       ],
     ];
   }
@@ -630,6 +727,16 @@ class ErpPermissionCatalog
               ['label' => 'Contador', 'module' => 'contadores', 'access' => 'contadores.access'],
               ['label' => 'Cargos', 'module' => 'rh.cargos', 'access' => 'rh.cargos.access'],
               ['label' => 'Departamentos', 'module' => 'rh.departamentos', 'access' => 'rh.departamentos.access'],
+              ['label' => 'Documentos', 'module' => 'rh.documentos', 'access' => 'rh.documentos.access'],
+              ['label' => 'EPIs', 'module' => 'rh.epis', 'access' => 'rh.epis.access'],
+              ['label' => 'Uniformes', 'module' => 'rh.uniformes', 'access' => 'rh.uniformes.access'],
+              ['label' => 'Exames / ASO', 'module' => 'rh.exames', 'access' => 'rh.exames.access'],
+              ['label' => 'Férias', 'module' => 'rh.ferias', 'access' => 'rh.ferias.access'],
+              ['label' => 'Holerites', 'module' => 'rh.holerites', 'access' => 'rh.holerites.access'],
+              ['label' => 'Benefícios', 'module' => 'rh.beneficios', 'access' => 'rh.beneficios.access'],
+              ['label' => 'Ocorrências', 'module' => 'rh.ocorrencias', 'access' => 'rh.ocorrencias.access'],
+              ['label' => 'Treinamentos', 'module' => 'rh.treinamentos', 'access' => 'rh.treinamentos.access'],
+              ['label' => 'Escalas', 'module' => 'rh.escalas', 'access' => 'rh.escalas.access'],
             ],
           ],
         ],
@@ -664,11 +771,19 @@ class ErpPermissionCatalog
             ],
           ],
           [
-            'label' => 'Ajusta estoque, ajuste por grupo, zera negativo e outras saídas',
+            'label' => 'Ajusta estoque, ajuste por grupo, zera negativo, transferência e outras saídas',
             'module' => 'ajuste_estoque',
             'access' => 'ajuste_estoque.access',
             'actions' => [
               ['label' => 'Incluir', 'key' => 'ajuste_estoque.create'],
+            ],
+          ],
+          [
+            'label' => 'Transferência de Estoque',
+            'module' => 'transferencia_estoque',
+            'access' => 'transferencia_estoque.access',
+            'actions' => [
+              ['label' => 'Confirmar transferência', 'key' => 'transferencia_estoque.create'],
             ],
           ],
           [
@@ -736,7 +851,7 @@ class ErpPermissionCatalog
           ],
           ['label' => 'PDV', 'module' => 'pdv', 'access' => 'pdv.access'],
           [
-            'label' => 'Lista de Vendas, Tela de Venda, Monitor e Log',
+            'label' => 'Lista de Vendas, Tela de Venda e Monitor',
             'module' => 'vendas',
             'access' => 'vendas.access',
             'actions' => [
@@ -873,6 +988,42 @@ class ErpPermissionCatalog
               ['label' => 'Alterar configuração', 'key' => 'boletos.update'],
             ],
           ],
+          [
+            'label' => 'Conciliação Bancária',
+            'module' => 'conciliacao_bancaria',
+            'access' => 'conciliacao_bancaria.access',
+            'actions' => [
+              ['label' => 'Importar extrato', 'key' => 'conciliacao_bancaria.import'],
+              ['label' => 'Conciliar', 'key' => 'conciliacao_bancaria.conciliar'],
+              ['label' => 'Desfazer conciliação', 'key' => 'conciliacao_bancaria.desfazer'],
+            ],
+          ],
+          [
+            'label' => 'Destinos SuperTEF',
+            'module' => 'tef_liquidacao_destino',
+            'access' => 'tef_liquidacao_destino.access',
+            'actions' => [
+              ['label' => 'Incluir', 'key' => 'tef_liquidacao_destino.create'],
+              ['label' => 'Alterar', 'key' => 'tef_liquidacao_destino.update'],
+              ['label' => 'Excluir', 'key' => 'tef_liquidacao_destino.delete'],
+            ],
+          ],
+          [
+            'label' => 'Lotes TEF',
+            'module' => 'tef_liquidacao_lote',
+            'access' => 'tef_liquidacao_lote.access',
+            'actions' => [
+              ['label' => 'Incluir lote', 'key' => 'tef_liquidacao_lote.create'],
+              ['label' => 'Alterar situação', 'key' => 'tef_liquidacao_lote.update'],
+              ['label' => 'Cancelar lote', 'key' => 'tef_liquidacao_lote.cancel'],
+            ],
+          ],
+          [
+            'label' => 'DRE Gerencial',
+            'module' => 'dre_gerencial',
+            'access' => 'dre_gerencial.access',
+            'actions' => [],
+          ],
         ],
       ],
       [
@@ -934,6 +1085,17 @@ class ErpPermissionCatalog
         ],
       ],
       [
+        'id' => 'auditoria',
+        'label' => 'Auditoria',
+        'items' => [
+          [
+            'label' => 'Log de Operações',
+            'module' => 'auditoria',
+            'access' => 'auditoria.access',
+          ],
+        ],
+      ],
+      [
         'id' => 'configuracoes',
         'label' => 'Configurações',
         'items' => [
@@ -951,6 +1113,7 @@ class ErpPermissionCatalog
             'access' => 'terminais.access',
             'actions' => [
               ['label' => 'Alterar', 'key' => 'terminais.update'],
+              ['label' => 'TEF / SuperTEF', 'key' => 'terminais.tef'],
             ],
           ],
           ['label' => 'Config. Fiscais', 'module' => 'config_fiscais', 'access' => 'config_fiscais.access'],

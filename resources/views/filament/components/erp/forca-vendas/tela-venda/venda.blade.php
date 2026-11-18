@@ -44,6 +44,13 @@
                     this.rotulo = nome;
                     this.open = false;
                     $wire.set('vendedorId', id);
+                    this.$nextTick(() => {
+                        const el = document.getElementById('fv-tv-barcode');
+                        if (! el) return;
+                        el.removeAttribute('readonly');
+                        el.focus();
+                        el.select?.();
+                    });
                 },
             }"
             @click.outside="open = false"
@@ -51,11 +58,12 @@
         >
             <button
                 type="button"
+                id="fv-tv-vendedor-btn"
                 class="erp-fv-tv__combo-btn"
                 @click="open ? open = false : abrir()"
                 @keydown.arrow-down.prevent="mover(1)"
                 @keydown.arrow-up.prevent="mover(-1)"
-                @keydown.enter.prevent="open ? confirmar() : abrir()"
+                @keydown.enter.prevent="open ? confirmar() : (valor ? (() => { const el = document.getElementById('fv-tv-barcode'); if (!el) return; el.removeAttribute('readonly'); el.focus(); el.select?.(); })() : abrir())"
                 :aria-expanded="open.toString()"
             >
                 <span class="erp-fv-tv__combo-btn-label" x-text="rotulo"></span>

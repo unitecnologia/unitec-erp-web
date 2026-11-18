@@ -104,6 +104,7 @@ trait ManagesProductUltimosPrecos
     {
         $this->syncProductGrades($product);
         $this->syncProductCompositions($product);
+        $this->syncProductReceita($product);
         $this->syncProductPriceTableItems($product);
         $this->syncProductImeis($product);
         $this->syncProductEmpresaPrecos($product);
@@ -118,6 +119,10 @@ trait ManagesProductUltimosPrecos
 
         if ($this->productCompositionsHydrated) {
             $this->loadProductCompositions($product);
+        }
+
+        if ($this->productReceitaHydrated ?? false) {
+            $this->loadProductReceita($product);
         }
 
         if ($this->productTabPrecoHydrated) {

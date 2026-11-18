@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PersonResource\Pages\Concerns;
 
 use App\Models\Person;
 use App\Models\TabelaPrazo;
+use App\Support\Erp\PersonCnpjFieldDiff;
 use Filament\Notifications\Notification;
 
 trait ManagesPersonFormUi
@@ -95,18 +96,18 @@ trait ManagesPersonFormUi
 
         $ie = mb_strtoupper(trim((string) ($this->data['rg_ie'] ?? '')), 'UTF-8');
 
+        // Edição manual: IE vazia ⇒ NÃO CONTRIBUINTE. Consulta CNPJ usa outro fluxo
+        // (não presume quando a API omite a IE).
         if ($ie === '' || $ie === '-') {
             $this->data['tipo_contribuinte'] = 'nao_contribuinte';
 
             return;
         }
 
-        if (in_array($ie, ['ISENTO', 'ISENTA'], true)) {
-            $this->data['tipo_contribuinte'] = 'isento';
+        $tipo = PersonCnpjFieldDiff::tipoFromIe($ie);
 
-            return;
+        if ($tipo !== null) {
+            $this->data['tipo_contribuinte'] = $tipo;
         }
-
-        $this->data['tipo_contribuinte'] = 'contribuinte';
     }
 }

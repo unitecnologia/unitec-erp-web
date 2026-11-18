@@ -2,6 +2,7 @@
     class="erp-os-window"
     x-data
     x-on:erp-os-focus-cliente.window="$nextTick(() => { const el = document.getElementById('os-cliente'); if (!el || el.disabled) return; el.removeAttribute('readonly'); el.focus(); })"
+    x-on:erp-os-focus-atendente.window="$nextTick(() => { const el = document.getElementById('os-atendente'); if (!el || el.disabled) return; el.focus(); })"
 >
     <header class="erp-os-window__titlebar">
         <span>Lançamento OS</span>

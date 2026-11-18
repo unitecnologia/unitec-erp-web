@@ -43,7 +43,8 @@ trait ManagesForcaVendasMonitorNfeEmitenteModal
         $this->nfeEmitentePendingVendaIds = array_values(array_map('intval', $vendaIds));
         $this->nfeEmitentePendingMode = $mode === 'lote' ? 'lote' : 'single';
         $this->nfeEmitenteOpcoes = $opcoes;
-        $this->nfeEmpresaEmitenteId = count($opcoes) === 1 ? (int) $opcoes[0]['id'] : null;
+        // Empresa logada vem primeiro em opcoesParaUsuario(); default = ela.
+        $this->nfeEmpresaEmitenteId = (int) $opcoes[0]['id'];
         $this->nfeEmitenteModalOpen = true;
     }
 
@@ -74,10 +75,14 @@ trait ManagesForcaVendasMonitorNfeEmitenteModal
 
         $vendaIds = $this->nfeEmitentePendingVendaIds;
         $mode = $this->nfeEmitentePendingMode;
+        $matrizId = (int) ($matriz?->id ?? 0);
+        // Empresa logada = fluxo normal (sem pin de emitente). Outra autorizada = comportamento atual.
+        $emitentePin = ($matrizId > 0 && $emitenteId === $matrizId) ? null : $emitenteId;
 
         Log::info('monitor.nfe.emitente.selecionada', [
             'matriz_empresa_id' => $matriz?->id,
             'emitente_empresa_id' => $emitenteId,
+            'emitente_pin' => $emitentePin,
             'venda_ids' => $vendaIds,
             'mode' => $mode,
             'user_id' => Auth::id(),
@@ -85,7 +90,7 @@ trait ManagesForcaVendasMonitorNfeEmitenteModal
 
         if ($mode === 'lote') {
             $this->closeNfeEmitenteModal();
-            $this->iniciarNfeLote($vendaIds, $emitenteId);
+            $this->iniciarNfeLote($vendaIds, $emitentePin);
 
             return;
         }
@@ -102,10 +107,10 @@ trait ManagesForcaVendasMonitorNfeEmitenteModal
 
         $vendaId = (int) $vendaIds[0];
         $this->closeNfeEmitenteModal();
-        $this->redirect(
-            NfeResource::getUrl('index')
-            .'?venda_id='.$vendaId
-            .'&empresa_emitente_id='.$emitenteId
-        );
+        $url = NfeResource::getUrl('index').'?venda_id='.$vendaId;
+        if ($emitentePin !== null) {
+            $url .= '&empresa_emitente_id='.$emitentePin;
+        }
+        $this->redirect($url);
     }
 }

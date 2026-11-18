@@ -201,10 +201,12 @@ final class PdvNfceSimuladaService
     private function ambienteLabel(?\App\Models\PdvVendaNfce $documento): string
     {
         if ($documento !== null && ! $documento->simulada) {
-            if ($documento->status === \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA) {
-                return $documento->ambiente === \App\Models\PdvVendaNfce::AMBIENTE_PRODUCAO
-                    ? 'CONTINGÊNCIA — PRODUÇÃO'
-                    : 'CONTINGÊNCIA — HOMOLOGAÇÃO';
+            // Pendente/contingência: destaque fixo no cupom (mesmo texto do DANFE A4).
+            if (in_array((string) $documento->status, [
+                \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA,
+                \App\Models\PdvVendaNfce::STATUS_PENDENTE,
+            ], true)) {
+                return \App\Support\Erp\Nfce\NfceDanfeA4Data::MSG_CONTINGENCIA;
             }
 
             return $documento->ambiente === \App\Models\PdvVendaNfce::AMBIENTE_PRODUCAO
@@ -252,7 +254,8 @@ final class PdvNfceSimuladaService
     {
         if ($documento !== null && ! $documento->simulada) {
             return match ($documento->status) {
-                \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA => 'CONTINGÊNCIA',
+                \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA,
+                \App\Models\PdvVendaNfce::STATUS_PENDENTE => \App\Support\Erp\Nfce\NfceDanfeA4Data::MSG_CONTINGENCIA,
                 \App\Models\PdvVendaNfce::STATUS_AUTORIZADA => 'AUTORIZADA',
                 \App\Models\PdvVendaNfce::STATUS_CANCELADA => 'CANCELADA',
                 \App\Models\PdvVendaNfce::STATUS_REJEITADA => 'REJEITADA',

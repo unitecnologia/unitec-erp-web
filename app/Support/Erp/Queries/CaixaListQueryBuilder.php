@@ -141,13 +141,13 @@ class CaixaListQueryBuilder
     }
 
     /**
-     * Conta tipo PDV: movimentação da sessão PDV + lançamentos da conta (leitura).
+     * Conta tipo PDV (ou filtro virtual de sessões sem caixa): query unificada de leitura.
      */
     public function isContaPdv(): bool
     {
         if ($this->contaPdv === null) {
             $this->contaPdv = is_numeric($this->contaFilter)
-                && CaixaPdvMovimentacaoQuery::isContaPdv((int) $this->contaFilter);
+                && CaixaPdvMovimentacaoQuery::usaQueryVirtual((int) $this->contaFilter);
         }
 
         return $this->contaPdv;

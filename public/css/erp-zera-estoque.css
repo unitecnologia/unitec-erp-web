@@ -1,0 +1,434 @@
+/* ERP — Zera Estoque (lote / balanço) */
+
+.fi-body:has(.erp-zera-estoque-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.48) !important;
+}
+
+.fi-body:has(.erp-zera-estoque-page) .erp-menu-bar,
+.fi-body:has(.erp-zera-estoque-page) .erp-shortcut-bar,
+.fi-body:has(.erp-zera-estoque-page) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-zera-estoque-page) .erp-title-bar {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-zera-estoque-page) .fi-layout,
+.fi-body:has(.erp-zera-estoque-page) .fi-main-ctn {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-zera-estoque-page) .fi-main,
+.fi-main:has(.erp-zera-estoque-page) {
+    display: flex !important;
+    flex: 1 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.45rem 0.65rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-zera-estoque-page) .fi-main > *,
+.fi-main:has(.erp-zera-estoque-page) > :has(.erp-zera-estoque-page) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: min(68rem, 97vw) !important;
+    max-width: min(68rem, 97vw) !important;
+    height: min(44rem, calc(100dvh - 3.5rem)) !important;
+    max-height: calc(100dvh - 3.5rem) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.fi-page.erp-zera-estoque-page.erp-list-page,
+.fi-page.erp-zera-estoque-page {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 68rem !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #7f96b3 !important;
+    border-radius: 6px !important;
+    background: #f4f7fb !important;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.28) !important;
+}
+
+.erp-zera-estoque-page .fi-header {
+    display: none !important;
+}
+
+.erp-zera-estoque-page .fi-page-main,
+.erp-zera-estoque-page .fi-page-content,
+.erp-zera-estoque-page .fi-sc {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+.erp-zera-estoque-page .fi-sc > div:not(.fi-hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.erp-zera-estoque {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0.55rem 0.65rem 0.5rem;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: #1e293b;
+}
+
+.erp-zera-estoque__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.erp-zera-estoque__toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.erp-zera-estoque__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 1.85rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.75rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.erp-zera-estoque__btn:hover:not(:disabled) {
+    background: #eef2f7;
+}
+
+.erp-zera-estoque__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-zera-estoque__btn kbd {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0 0.2rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    background: #f8fafc;
+}
+
+.erp-zera-estoque__btn--primary {
+    border-color: #3b82f6;
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+    color: #fff;
+}
+
+.erp-zera-estoque__btn--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.erp-zera-estoque__btn--danger {
+    border-color: #b91c1c;
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+    color: #fff;
+    font-weight: 750;
+}
+
+.erp-zera-estoque__btn--ghost {
+    border: none;
+    background: transparent;
+    color: #1d4ed8;
+    font-weight: 700;
+}
+
+.erp-zera-estoque__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1e3a8a;
+    font-weight: 700;
+    font-size: 0.72rem;
+}
+
+.erp-zera-estoque__filters {
+    display: grid;
+    grid-template-columns: 1.4fr 0.9fr 0.9fr 0.9fr 1.2fr 1.2fr auto;
+    gap: 0.35rem 0.45rem;
+    padding: 0.45rem;
+    border: 1px solid #c5d0de;
+    border-radius: 5px;
+    background: #eef2f7;
+}
+
+.erp-zera-estoque__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.erp-zera-estoque__field--grow { grid-column: span 1; }
+.erp-zera-estoque__field--wide { min-width: 0; }
+.erp-zera-estoque__field--disabled { opacity: 0.65; }
+
+.erp-zera-estoque__label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-zera-estoque__label em {
+    font-style: normal;
+    color: #b91c1c;
+    font-weight: 800;
+}
+
+.erp-zera-estoque__input,
+.erp-zera-estoque__select {
+    width: 100%;
+    min-height: 1.85rem;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 0.75rem;
+    color: #0f172a;
+}
+
+.erp-zera-estoque__seg {
+    display: inline-flex;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.erp-zera-estoque__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.85rem;
+    padding: 0 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 650;
+    cursor: pointer;
+    border-right: 1px solid #cbd5e1;
+}
+
+.erp-zera-estoque__chip:last-child { border-right: none; }
+.erp-zera-estoque__chip input { position: absolute; opacity: 0; pointer-events: none; }
+.erp-zera-estoque__chip.is-active { background: #dbeafe; color: #1e3a8a; }
+
+.erp-zera-estoque__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #c5d0de;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.erp-zera-estoque__table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.erp-zera-estoque__table th,
+.erp-zera-estoque__table td {
+    padding: 0.28rem 0.4rem;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-zera-estoque__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #e8eef6;
+    font-size: 0.68rem;
+    font-weight: 750;
+    color: #334155;
+    text-transform: uppercase;
+}
+
+.erp-zera-estoque__table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.erp-zera-estoque__table .is-neg { color: #b91c1c; font-weight: 700; }
+
+.erp-zera-estoque__th-check,
+.erp-zera-estoque__td-check {
+    width: 2rem;
+    text-align: center;
+}
+
+.erp-zera-estoque__desc { max-width: 0; }
+
+.erp-zera-estoque__empty {
+    text-align: center !important;
+    padding: 1.5rem 0.75rem !important;
+    color: #64748b;
+    white-space: normal !important;
+}
+
+.erp-zera-estoque__footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding-top: 0.15rem;
+}
+
+.erp-zera-estoque__pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #475569;
+    font-weight: 650;
+}
+
+.erp-zera-estoque__actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.erp-zera-estoque__motivo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 16rem;
+}
+
+.erp-zera-estoque__modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.erp-zera-estoque__modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.erp-zera-estoque__modal-box {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, 94vw);
+    padding: 1rem 1.1rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28);
+}
+
+.erp-zera-estoque__modal-title {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.erp-zera-estoque__modal-text {
+    margin: 0 0 0.55rem;
+    line-height: 1.4;
+}
+
+.erp-zera-estoque__modal-list {
+    margin: 0 0 0.65rem;
+    padding-left: 1.1rem;
+    line-height: 1.45;
+}
+
+.erp-zera-estoque__modal-warn {
+    margin: 0 0 0.85rem;
+    font-size: 0.72rem;
+    color: #9a3412;
+    font-weight: 650;
+}
+
+.erp-zera-estoque__modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+}
+
+@media (max-width: 1100px) {
+    .erp-zera-estoque__filters {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .erp-zera-estoque__filters {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .fi-body:has(.erp-zera-estoque-page) .fi-main > *,
+    .fi-main:has(.erp-zera-estoque-page) > :has(.erp-zera-estoque-page) {
+        width: min(96vw, 68rem) !important;
+        height: min(92dvh, calc(100dvh - 2rem)) !important;
+    }
+}

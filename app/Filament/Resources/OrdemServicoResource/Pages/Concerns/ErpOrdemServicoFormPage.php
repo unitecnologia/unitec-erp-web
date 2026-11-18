@@ -15,6 +15,7 @@ use App\Models\OsVeiculo;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\Vendedor;
+use App\Support\Erp\DescontoReaisItemCalculator;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\EstoqueReservaService;
@@ -661,7 +662,9 @@ trait ErpOrdemServicoFormPage
     {
         $momento = ErpTimezone::toLocal();
 
-        $this->atendenteId = Auth::user()?->vendedor_id;
+        $this->atendenteId = EmpresaParametros::solicitarVendedorCadaVenda(ErpContext::currentEmpresaId())
+            ? null
+            : Auth::user()?->vendedor_id;
         $this->dataInicio = $momento->format('Y-m-d');
         $this->horaInicio = $momento->format('H:i');
         $this->previsaoEntrega = '';
@@ -1779,6 +1782,10 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
+        if (! $this->garantirTecnicoSelecionadoParaItem()) {
+            return;
+        }
+
         if (is_string($qtdRaw)) {
             $this->itemQtdInput = $qtdRaw;
         }
@@ -1989,6 +1996,10 @@ trait ErpOrdemServicoFormPage
 
     protected function stageProductForEntry(Product $product): void
     {
+        if (! $this->garantirTecnicoSelecionadoParaItem()) {
+            return;
+        }
+
         $esperadoServico = $this->activeItemTab === 'servicos';
 
         if ((bool) $product->is_servico !== $esperadoServico) {
@@ -2204,7 +2215,7 @@ trait ErpOrdemServicoFormPage
 
     public function abrirModalDescontoItem(): void
     {
-        if ($this->osReadOnly() || $this->descontoModalOpen) {
+        if ($this->osReadOnly()) {
             return;
         }
 
@@ -2221,9 +2232,10 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $this->itemAjusteTipo = 'desconto';
+        $seed = $this->seedItemAjusteModal();
+        $this->itemAjusteTipo = $seed['tipo'];
         $this->itemAjusteModo = 'percentual';
-        $this->itemAjusteValor = '0,00';
+        $this->itemAjusteValor = $seed['pct'];
         $this->descontoModalOpen = true;
     }
 
@@ -2231,6 +2243,67 @@ trait ErpOrdemServicoFormPage
     {
         $this->descontoModalOpen = false;
         $this->itemAjusteAlvo = null;
+    }
+
+    /**
+     * @return array{descricao: string, baseRaw: float, qtdRaw: float, tipo: string, pct: string, reais: string, modoReais: string}
+     */
+    public function getItemAjusteModalProperty(): array
+    {
+        $ctx = $this->contextoItemAjuste();
+        $seed = $this->seedItemAjusteModal();
+
+        return [
+            'descricao' => $ctx['descricao'] ?? '',
+            'baseRaw' => (float) ($ctx['preco'] ?? 0),
+            'qtdRaw' => (float) ($ctx['quantidade'] ?? 0),
+            'tipo' => $seed['tipo'],
+            'pct' => $seed['pct'],
+            'reais' => $seed['reais'],
+            'modoReais' => EmpresaParametros::descontoReaisItemModo(),
+        ];
+    }
+
+    /**
+     * @return array{tipo: string, pct: string, reais: string}
+     */
+    protected function seedItemAjusteModal(): array
+    {
+        $ctx = $this->contextoItemAjuste();
+        $preco = (float) ($ctx['preco'] ?? 0);
+        $qtd = (float) ($ctx['quantidade'] ?? 0);
+        $bruto = max(0.0, round($preco * $qtd, 2));
+        $ajuste = 0.0;
+        $tipo = 'desconto';
+
+        if ($this->itemAjusteAlvo === 'form') {
+            $desc = ErpMoney::parseBr($this->itemPendingDesconto);
+            $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        } elseif ($this->itemAjusteAlvo === 'grid' && $this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $item = $this->itens[$this->selectedItemIndex];
+            $desc = ErpMoney::parseBr($item['desconto'] ?? 0);
+            $acr = ErpMoney::parseBr($item['acrescimo'] ?? 0);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        }
+
+        $pct = $bruto > 0 && $ajuste > 0 ? round(($ajuste / $bruto) * 100, 2) : 0.0;
+
+        return [
+            'tipo' => $tipo,
+            'pct' => ErpMoney::formatBr($pct),
+            'reais' => ErpMoney::formatBr($ajuste),
+        ];
     }
 
     public function abrirModalServicoPrestadoByKey(string $key): void
@@ -2284,48 +2357,21 @@ trait ErpOrdemServicoFormPage
         return $index !== null ? (string) ($this->itens[$index]['discriminacao'] ?? '') : '';
     }
 
-    public function setItemAjusteTipo(string $tipo): void
-    {
-        $this->itemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
-    }
-
-    public function setItemAjusteModo(string $modo): void
-    {
-        $this->itemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
-    }
-
-    /**
-     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
-     */
-    public function getItemAjustePreviewProperty(): array
-    {
-        $ctx = $this->contextoItemAjuste();
-
-        if ($ctx === null) {
-            return [
-                'descricao' => '',
-                'base' => ErpMoney::formatBr(0),
-                'novoPreco' => ErpMoney::formatBr(0),
-                'total' => ErpMoney::formatBr(0),
-                'tipo' => $this->itemAjusteTipo,
-                'temAjuste' => false,
-            ];
+    public function confirmarItemAjuste(
+        ?string $valorInformado = null,
+        ?string $modoEntrada = null,
+        ?string $tipoInformado = null,
+    ): void {
+        if ($tipoInformado !== null && $tipoInformado !== '') {
+            $this->itemAjusteTipo = $tipoInformado === 'acrescimo' ? 'acrescimo' : 'desconto';
+        }
+        if ($modoEntrada !== null && $modoEntrada !== '') {
+            $this->itemAjusteModo = $modoEntrada === 'valor' ? 'valor' : 'percentual';
+        }
+        if ($valorInformado !== null && trim($valorInformado) !== '') {
+            $this->itemAjusteValor = ErpMoney::formatBr(ErpMoney::parseBr($valorInformado));
         }
 
-        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
-
-        return [
-            'descricao' => $ctx['descricao'],
-            'base' => ErpMoney::formatBr($calc['base']),
-            'novoPreco' => ErpMoney::formatBr($calc['novoPreco']),
-            'total' => ErpMoney::formatBr($calc['total']),
-            'tipo' => $this->itemAjusteTipo,
-            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
-        ];
-    }
-
-    public function confirmarItemAjuste(): void
-    {
         $ctx = $this->contextoItemAjuste();
 
         if ($ctx === null) {
@@ -2335,7 +2381,7 @@ trait ErpOrdemServicoFormPage
         }
 
         $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
-        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+        $ajusteLinha = round((float) $calc['ajusteLinha'], 2);
 
         if ($this->itemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
             Notification::make()->title('Desconto inválido.')->warning()->send();
@@ -2343,8 +2389,12 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        if ($this->itemAjusteAlvo === 'form') {
-            if ($this->itemAjusteTipo === 'desconto') {
+        $tipo = $this->itemAjusteTipo;
+        $alvo = $this->itemAjusteAlvo;
+        $this->descontoModalOpen = false;
+
+        if ($alvo === 'form') {
+            if ($tipo === 'desconto') {
                 $this->itemPendingDesconto = ErpMoney::formatBr($ajusteLinha);
                 $this->itemPendingAcrescimo = '0,00';
             } else {
@@ -2354,9 +2404,8 @@ trait ErpOrdemServicoFormPage
 
             $this->recalcOsEntryRowFromPending();
 
-            $tipo = $this->itemAjusteTipo;
             $pendingAntes = $this->itemPendingProductId;
-            $this->fecharModalDescontoItem();
+            $this->itemAjusteAlvo = null;
             $this->confirmPendingItemEntry();
 
             if ($pendingAntes !== null && $this->itemPendingProductId === null) {
@@ -2372,7 +2421,7 @@ trait ErpOrdemServicoFormPage
             $itens = $this->itens;
             $item = $itens[$index];
 
-            if ($this->itemAjusteTipo === 'desconto') {
+            if ($tipo === 'desconto') {
                 $item['desconto'] = ErpMoney::formatBr($ajusteLinha);
                 $item['acrescimo'] = ErpMoney::formatBr(0);
             } else {
@@ -2385,8 +2434,7 @@ trait ErpOrdemServicoFormPage
             $this->recalcTotais();
         }
 
-        $tipo = $this->itemAjusteTipo;
-        $this->fecharModalDescontoItem();
+        $this->itemAjusteAlvo = null;
         Notification::make()
             ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
             ->success()
@@ -2420,34 +2468,17 @@ trait ErpOrdemServicoFormPage
     }
 
     /**
-     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     * @return array{base: float, deltaUnit: float, ajusteLinha: float, novoPreco: float, total: float}
      */
     protected function calcularItemAjuste(float $base, float $quantidade): array
     {
-        $valor = ErpMoney::parseBr($this->itemAjusteValor);
-
-        if ($this->itemAjusteModo === 'percentual') {
-            $deltaUnit = round($base * ($valor / 100), 2);
-        } else {
-            $deltaUnit = round($valor, 2);
-        }
-
-        $novoPreco = $this->itemAjusteTipo === 'acrescimo'
-            ? round($base + $deltaUnit, 2)
-            : round($base - $deltaUnit, 2);
-
-        if ($novoPreco < 0) {
-            $novoPreco = 0.0;
-        }
-
-        $total = round(max(0, $novoPreco * $quantidade), 2);
-
-        return [
-            'base' => $base,
-            'deltaUnit' => abs($deltaUnit),
-            'novoPreco' => $novoPreco,
-            'total' => $total,
-        ];
+        return DescontoReaisItemCalculator::calcular(
+            $base,
+            $quantidade,
+            ErpMoney::parseBr($this->itemAjusteValor),
+            $this->itemAjusteTipo,
+            $this->itemAjusteModo,
+        );
     }
 
     protected function appendProductItem(
@@ -2621,7 +2652,8 @@ trait ErpOrdemServicoFormPage
         }
 
         if ($this->atendenteId === null) {
-            Notification::make()->title('Informe o Técnico!')->warning()->send();
+            Notification::make()->title('Selecione o técnico.')->warning()->send();
+            $this->dispatch('erp-os-focus-atendente');
 
             return false;
         }
@@ -2731,6 +2763,22 @@ trait ErpOrdemServicoFormPage
         }
 
         $this->abrirModalFaturamentoOs(resetPagamentos: ! $reabrindo);
+    }
+
+    protected function garantirTecnicoSelecionadoParaItem(): bool
+    {
+        if (! EmpresaParametros::solicitarVendedorCadaVenda(ErpContext::currentEmpresaId())) {
+            return true;
+        }
+
+        if ((int) ($this->atendenteId ?? 0) > 0) {
+            return true;
+        }
+
+        Notification::make()->title('Selecione o técnico.')->warning()->send();
+        $this->dispatch('erp-os-focus-atendente');
+
+        return false;
     }
 
     /**
@@ -3147,6 +3195,10 @@ trait ErpOrdemServicoFormPage
         }
 
         if ($this->osTabelaPrazoConsulta) {
+            return;
+        }
+
+        if (! $this->garantirTecnicoSelecionadoParaItem()) {
             return;
         }
 

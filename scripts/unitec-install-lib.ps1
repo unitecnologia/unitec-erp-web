@@ -852,6 +852,65 @@ function Ensure-Directory {
     }
 }
 
+<#
+.SYNOPSIS
+    Remove pasta de forma robusta (paths longos, junctions e residuos de staging).
+    Usa robocopy /MIR em pasta vazia + rmdir — evita falha do Remove-Item em vendor/filament.
+#>
+function Remove-UnitecDirectoryTree {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+
+    $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+    if (-not (Test-Path -LiteralPath $full)) {
+        return
+    }
+
+    # 1) Tentativa direta (rapida quando nao ha path longo).
+    try {
+        Remove-Item -LiteralPath $full -Recurse -Force -ErrorAction Stop
+        return
+    } catch {
+        # segue para limpeza via robocopy
+    }
+
+    $empty = Join-Path ([System.IO.Path]::GetTempPath()) ('unitec-empty-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $empty -Force | Out-Null
+    try {
+        # Espelha pasta vazia sobre o alvo: apaga arquivos mesmo com path > 260.
+        & robocopy $empty $full /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /NC /NS | Out-Null
+        # robocopy /MIR em destino existente retorna >=1 mesmo em sucesso parcial.
+        if ($LASTEXITCODE -ge 8) {
+            throw ("robocopy falhou ao limpar {0} (codigo {1})" -f $full, $LASTEXITCODE)
+        }
+
+        cmd.exe /c "rmdir /s /q `"$full`"" | Out-Null
+        if (Test-Path -LiteralPath $full) {
+            # Prefixo \\?\ para paths longos remanescentes.
+            $extended = if ($full.StartsWith('\\?\')) { $full } else { '\\?\' + $full }
+            try {
+                [System.IO.Directory]::Delete($extended, $true)
+            } catch {
+                throw ("Nao foi possivel remover staging/pasta: {0}. Detalhe: {1}" -f $full, $_.Exception.Message)
+            }
+        }
+    } finally {
+        if (Test-Path -LiteralPath $empty) {
+            Remove-Item -LiteralPath $empty -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (Test-Path -LiteralPath $full) {
+        throw ("Pasta ainda existe apos limpeza robusta: {0}" -f $full)
+    }
+}
+
 function Set-UnitecUtf8NoBomFile {
     param(
         [string]$Path,
@@ -1632,6 +1691,27 @@ function Publish-UnitecRuntimeUpdateToStaging {
     }
     if (-not (Test-Path -LiteralPath (Join-Path $destBin 'Unitec.ErpCommon.dll'))) {
         throw 'runtime-update: Unitec.ErpCommon.dll ausente apos copia.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $destBin 'Unitec ERP.exe'))) {
+        throw 'runtime-update: Unitec ERP.exe ausente apos copia.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $destBin 'coreclr.dll')) -or
+        -not (Test-Path -LiteralPath (Join-Path $destBin 'hostfxr.dll'))) {
+        throw 'runtime-update: bin desktop nao self-contained (coreclr/hostfxr ausentes). Rode scripts\build-erp-desktop.ps1.'
+    }
+    foreach ($rtName in @(
+            'Unitec ERP.runtimeconfig.json',
+            'UnitecErpServer.runtimeconfig.json',
+            'Unitec Atualizador.runtimeconfig.json'
+        )) {
+        $rtPath = Join-Path $destBin $rtName
+        if (-not (Test-Path -LiteralPath $rtPath)) {
+            throw ("runtime-update: {0} ausente apos copia." -f $rtName)
+        }
+        $rt = Get-Content -LiteralPath $rtPath -Raw -ErrorAction SilentlyContinue
+        if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+            throw ("runtime-update: {0} nao e self-contained. Rode scripts\build-erp-desktop.ps1." -f $rtName)
+        }
     }
 
     $scriptSrc = Join-Path $SourceRoot 'scripts\apply-desktop-runtime-update.ps1'
@@ -3332,6 +3412,9 @@ function Copy-UnitecProjectTree {
         'suporte',
         'importar',
         'staging',
+        '_tmp_ssl_audit',
+        '_tmp',
+        'tools\_tmp_ssl_audit',
         # Migracoes one-off (SCV etc.): nunca no UPDATE/instalador do cliente.
         'migracoes'
     )
@@ -3659,9 +3742,32 @@ function Assert-UnitecStagingReady {
         throw 'Staging incompleto: tools\frankenphp ausente (obrigatorio no instalador).'
     }
 
-    foreach ($rel in @('bin\UnitecErpServer.exe', 'bin\Unitec.ErpCommon.dll')) {
+    foreach ($rel in @(
+            'bin\UnitecErpServer.exe',
+            'bin\Unitec.ErpCommon.dll',
+            'bin\Unitec ERP.exe',
+            'bin\Unitec Atualizador.exe',
+            'bin\coreclr.dll',
+            'bin\hostfxr.dll'
+        )) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $rel))) {
             throw ("Staging incompleto: {0} ausente (obrigatorio no instalador). Rode scripts\build-erp-desktop.ps1." -f $rel)
+        }
+    }
+
+    # Desktop deve ir self-contained (cliente sem .NET Desktop Runtime instalado).
+    foreach ($rtRel in @(
+            'bin\Unitec ERP.runtimeconfig.json',
+            'bin\UnitecErpServer.runtimeconfig.json',
+            'bin\Unitec Atualizador.runtimeconfig.json'
+        )) {
+        $rtPath = Join-Path $Root $rtRel
+        if (-not (Test-Path -LiteralPath $rtPath)) {
+            throw ("Staging incompleto: {0} ausente. Rode scripts\build-erp-desktop.ps1." -f $rtRel)
+        }
+        $rt = Get-Content -LiteralPath $rtPath -Raw -ErrorAction SilentlyContinue
+        if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+            throw ("Staging incompleto: {0} nao e self-contained (sem includedFrameworks). Rode scripts\build-erp-desktop.ps1." -f $rtRel)
         }
     }
 
@@ -5067,8 +5173,11 @@ function Test-UnitecErpDataPresent {
 .SYNOPSIS
     True se a pasta ja e uma instalacao Unitec (modo recupera — nao zerar banco).
 .DESCRIPTION
-    Detecta sinais duraveis: .env, backup de .env ou datadir do MariaDB embutido.
+    Detecta sinais duraveis de ERP ja configurado: .env, backup de .env
+    ou schema unitec_erp no datadir do MariaDB embutido.
     Nao usa so public/index.php (o Setup sempre copia isso antes do pos-install).
+    Nao usa ibdata1 sozinho: a inicializacao do MariaDB em instalacao nova
+    cria ibdata1 e nao pode disparar modo recupera nem pular a base padrao.
 #>
 function Test-UnitecExistingInstall {
     param([string]$AppPath)
@@ -5085,10 +5194,6 @@ function Test-UnitecExistingInstall {
     }
 
     $dataDir = Join-Path (Get-UnitecMysqlRoot -AppPath $AppPath) 'data'
-    if (Test-Path (Join-Path $dataDir 'ibdata1')) {
-        return $true
-    }
-
     if (Test-UnitecErpDataPresent -DataDir $dataDir) {
         return $true
     }

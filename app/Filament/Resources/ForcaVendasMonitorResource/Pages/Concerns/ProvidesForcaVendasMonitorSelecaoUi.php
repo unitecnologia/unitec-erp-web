@@ -7,9 +7,12 @@ use App\Models\ContaReceber;
 use App\Models\ForcaVendasOrder;
 use App\Models\Nfe;
 use App\Models\PixCobranca;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Financeiro\FaturamentoPendenciaFinanceiraGuard;
+use App\Support\Erp\Nfce\NfceRegularizacaoService;
 use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
@@ -312,6 +315,8 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         $motivos = [];
         /** @var array<int|string, array{cliente_id: ?int, nome: string, campos: list<string>}> $pendencias */
         $pendencias = [];
+        $permitirCf = EmpresaParametros::permitirIniciarNfeConsumidorFinal();
+        $selecaoLote = $orders->count() > 1;
 
         foreach ($orders as $order) {
             $dav = 'DAV '.($order->pedido?->numero ?? $order->id);
@@ -332,6 +337,35 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
             // Cliente: NfeClienteCadastro (inclui IE) sobre relação já eager-loaded — sem query extra.
             $faltando = NfeClienteCadastro::camposFaltantesDoCliente($venda->cliente);
+            $cfParaIniciar = $permitirCf
+                && ! $selecaoLote
+                && NfeClienteCadastro::ehConsumidorFinalParaBloqueioNfe($venda->cliente);
+
+            if ($faltando !== [] && $cfParaIniciar) {
+                if ($venda->itens->isEmpty()) {
+                    $motivos[] = $dav.': a venda não possui itens para emitir NF-e.';
+
+                    continue;
+                }
+
+                if ($serv->temNfeAtiva($venda)) {
+                    $motivos[] = $dav.': esta venda já possui NF-e vinculada.';
+
+                    continue;
+                }
+
+                try {
+                    $serv->validar($venda, null, true);
+                } catch (\Throwable $e) {
+                    $motivos[] = $dav.': '.$e->getMessage();
+
+                    continue;
+                }
+
+                $vendaIds[] = (int) $venda->id;
+
+                continue;
+            }
 
             if ($faltando !== []) {
                 if ($venda->itens->isEmpty()) {
@@ -501,6 +535,82 @@ trait ProvidesForcaVendasMonitorSelecaoUi
     }
 
     /**
+     * NFC-e de pedido já faturado sem documento fiscal (reusa NfceRegularizacaoService).
+     *
+     * @return array{enabled: bool, label: string, title: string, venda_id: int|null}
+     */
+    #[Computed]
+    public function nfceEmitirEstado(): array
+    {
+        $disabled = [
+            'enabled' => false,
+            'label' => 'Emitir NFC-e',
+            'title' => 'Selecione um pedido faturado sem NFC-e/NF-e.',
+            'venda_id' => null,
+        ];
+
+        if (! ErpAccess::currentCan('nfce.access')) {
+            $disabled['title'] = 'Sem permissão para emitir NFC-e.';
+
+            return $disabled;
+        }
+
+        $orders = $this->pedidosSelecionados();
+
+        if ($orders->isEmpty() && $this->highlightedRecordId) {
+            $orders = ForcaVendasMonitorResource::ordersQuery()
+                ->whereKey((int) $this->highlightedRecordId)
+                ->with(['pedido', 'venda'])
+                ->get();
+        }
+
+        if ($orders->isEmpty()) {
+            return $disabled;
+        }
+
+        if ($orders->count() > 1) {
+            $disabled['title'] = 'Selecione apenas um pedido para emitir NFC-e.';
+
+            return $disabled;
+        }
+
+        $order = $orders->first();
+        $dav = 'DAV '.($order->pedido?->numero ?? $order->id);
+
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO) {
+            $disabled['title'] = $dav.': pedido cancelado.';
+
+            return $disabled;
+        }
+
+        if ($order->situacao !== ForcaVendasOrder::SITUACAO_FATURADO || ! $order->venda_id) {
+            $disabled['title'] = $dav.': não faturado.';
+
+            return $disabled;
+        }
+
+        $vendaId = (int) $order->venda_id;
+        $motivo = app(NfceRegularizacaoService::class)->validar(
+            $vendaId,
+            ErpContext::currentEmpresaId(),
+            false,
+        );
+
+        if ($motivo !== null) {
+            $disabled['title'] = $dav.': '.$motivo;
+
+            return $disabled;
+        }
+
+        return [
+            'enabled' => true,
+            'label' => 'Emitir NFC-e',
+            'title' => 'Emitir NFC-e do pedido faturado (só fiscal; não altera estoque/financeiro).',
+            'venda_id' => $vendaId,
+        ];
+    }
+
+    /**
      * @return array{enabled: bool, title: string}
      */
     #[Computed]
@@ -526,13 +636,19 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
         $faturaveis = [];
         $semForma = [];
+        $podeFaturarFinanceiro = FaturamentoPendenciaFinanceiraGuard::podeFaturarSemLiberacaoFinanceira(
+            ErpContext::currentEmpresaId(),
+        );
 
         foreach ($orders as $order) {
             if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
                 continue;
             }
 
-            if ($order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+            if (
+                $order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO
+                && ! $podeFaturarFinanceiro
+            ) {
                 continue;
             }
 

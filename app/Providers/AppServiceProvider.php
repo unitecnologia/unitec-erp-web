@@ -12,9 +12,11 @@ use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpFilamentNotification;
 use App\Support\Erp\Nfse\NfseSefinEnvio;
 use App\Support\Erp\Nfse\NfseSefinHttp;
+use App\Support\Erp\WindowsSafeFilesystem;
 use Filament\Notifications\Notification;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +29,18 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         require_once app_path('helpers.php');
+
+        // Windows: packages.php / views compiladas usam rename(); code:5 derruba o boot.
+        $this->app->singleton('files', fn () => new WindowsSafeFilesystem);
+        $this->app->singleton(Filesystem::class, fn ($app) => $app->make('files'));
+
+        // Pail fica em dont-discover (producao). Em DEV so registra se o pacote estiver no disco.
+        // Nao usar class_exists() cego: autoload do Composer fatala se a pasta foi removida.
+        $pailProvider = 'Laravel\\Pail\\PailServiceProvider';
+        $pailFile = base_path('vendor/laravel/pail/src/PailServiceProvider.php');
+        if (is_file($pailFile) && class_exists($pailProvider)) {
+            $this->app->register($pailProvider);
+        }
 
         $this->app->singleton(LoginResponseContract::class, LoginResponse::class);
         $this->app->bind(Notification::class, ErpFilamentNotification::class);

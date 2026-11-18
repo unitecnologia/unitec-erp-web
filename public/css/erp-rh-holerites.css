@@ -1,0 +1,120 @@
+/* RH — Holerites: ajustes finos sobre erp-rh-list + erp-list-ui */
+
+.erp-rh-holerites-page .erp-rh-holerites__status-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.75rem;
+}
+
+.erp-rh-holerites-page .erp-rh-holerites__status--competencia {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-rh-holerites-page .erp-rh-holerites__comp-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-rh-holerites-page .erp-rh-holerites__comp-input,
+.erp-rh-holerites-page .erp-rh-holerites__comp-select {
+    font-size: 0.78rem;
+    min-height: 1.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+}
+
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem !important;
+    max-width: 4.25rem;
+}
+
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 30% !important;
+}
+
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 7.75rem !important;
+    text-align: center;
+}
+
+.erp-rh-holerites-page .fi-ta-empty-state {
+    padding: 1.25rem 0.75rem !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+}
+
+.erp-rh-holerites-page .fi-ta-empty-state-heading {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-form-modal .erp-contador-form-modal__window {
+    width: min(calc(34rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-import-modal .erp-contador-form-modal__window--wide {
+    width: min(calc(42rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-form-modal .erp-pcad-form__input--date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-form-modal .erp-pcad-form__input--file {
+    flex: 1 1 auto;
+    font-size: 0.78rem;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-form-modal__hint {
+    display: block;
+    width: 100%;
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    color: #475569;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-form-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-import-modal__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    margin: 0.5rem 0;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-import-modal__table th,
+.erp-rh-holerites-page .erp-rh-holerite-import-modal__table td {
+    border: 1px solid #e2e8f0;
+    padding: 0.25rem 0.35rem;
+    vertical-align: middle;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-import-modal__ok td {
+    background: #f0fdf4;
+}
+
+.erp-rh-holerites-page .erp-rh-holerite-import-modal__err td {
+    background: #fef2f2;
+}

@@ -1,0 +1,100 @@
+/* RH — Exames / ASO: ajustes finos sobre erp-rh-list + erp-list-ui */
+
+.erp-rh-exames-page .erp-rh-exames__status-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.75rem;
+}
+
+.erp-rh-exames-page .erp-rh-exames__status--alerta {
+    margin-left: auto;
+}
+
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem !important;
+    max-width: 4.25rem;
+}
+
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 28% !important;
+}
+
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 16% !important;
+}
+
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(6),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 7.75rem !important;
+    text-align: center;
+}
+
+.erp-rh-exames-page .fi-ta-empty-state {
+    padding: 1.25rem 0.75rem !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+}
+
+.erp-rh-exames-page .fi-ta-empty-state-heading {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-rh-exames-page .erp-rh-exame-form-modal .erp-contador-form-modal__window {
+    width: min(calc(34rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-exames-page .erp-rh-exame-form-modal .erp-pcad-form__input--date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.erp-rh-exames-page .erp-rh-exame-form-modal .erp-pcad-form__input--file {
+    flex: 1 1 auto;
+    font-size: 0.78rem;
+}
+
+.erp-rh-exames-page .erp-rh-exame-form-modal__hint {
+    display: block;
+    width: 100%;
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    color: #475569;
+}
+
+.erp-rh-exames-page .erp-rh-exame-form-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-rh-exames-page .erp-contador-delete-modal__window {
+    width: min(26rem, calc(100vw - 2rem));
+}
+
+.erp-rh-exames-page .erp-contador-delete-modal__body {
+    padding: 0.85rem 0.9rem;
+}
+
+.erp-rh-exames-page .erp-contador-delete-modal__message {
+    margin: 0 0 0.35rem;
+    font-weight: 700;
+    color: #0f2847;
+}
+
+.erp-rh-exames-page .erp-contador-delete-modal__detail {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #334155;
+}

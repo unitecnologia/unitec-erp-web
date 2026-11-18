@@ -33,6 +33,8 @@ class EstoqueMovimentacao extends Model
 
     public const TIPO_SISTEMA = 'sistema';
 
+    public const TIPO_FABRICACAO = 'fabricacao';
+
     /**
      * @return array<string, string>
      */
@@ -47,6 +49,7 @@ class EstoqueMovimentacao extends Model
             self::TIPO_INVENTARIO => 'Inventário',
             self::TIPO_TRANSFERENCIA => 'Transferência',
             self::TIPO_CANCELAMENTO_ESTORNO => 'Cancelamento/estorno',
+            self::TIPO_FABRICACAO => 'Fabricação',
             self::TIPO_SISTEMA => 'Sistema',
         ];
     }
@@ -106,6 +109,8 @@ class EstoqueMovimentacao extends Model
             'devolucao_compra' => 'Devolução',
             'ajuste_estoque' => 'Ajuste',
             'ordem_servico' => 'OS',
+            'estoque_transferencia' => 'Transferência',
+            'fabricacao' => 'Fabricação',
         ];
 
         $tipo = (string) ($origemTipo ?? '');

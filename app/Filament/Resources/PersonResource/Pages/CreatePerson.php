@@ -5,8 +5,10 @@ namespace App\Filament\Resources\PersonResource\Pages;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\PersonResource\Pages\Concerns\ErpPersonFormPage;
 use App\Models\Person;
+use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
 
 class CreatePerson extends CreateRecord
 {
@@ -16,6 +18,8 @@ class CreatePerson extends CreateRecord
 
     public function mount(): void
     {
+        ErpAccess::authorize(Auth::user(), 'pessoas.create');
+
         if (request()->boolean('pdv')) {
             $this->embedsInPdv = true;
         }

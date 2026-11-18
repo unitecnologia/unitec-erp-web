@@ -48,7 +48,7 @@
         x-on:erp-nfe-focus-item-codigo.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-inclusao-produto'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
         x-on:erp-nfe-focus-item-quantidade.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-qtd'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
         x-on:erp-nfe-focus-item-preco.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-preco'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
-        x-on:erp-nfe-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-nfe-desconto-preco'); el?.focus(); el?.select?.(); })"
+        x-on:erp-nfe-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-nfe-desconto-pct'); el?.removeAttribute('readonly'); el?.focus(); el?.select?.(); })"
         x-on:erp-nfe-focus-info-adicionais.window="$nextTick(() => { const el = document.getElementById('erp-nfe-info-adicionais-texto'); el?.focus(); el?.select?.(); })"
         x-on:keydown.ctrl.d.window.prevent="if (!$wire.nfeDescontoModalOpen) $wire.abrirNfeModalDescontoItem()"
     >

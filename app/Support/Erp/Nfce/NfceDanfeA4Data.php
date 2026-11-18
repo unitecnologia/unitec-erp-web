@@ -77,6 +77,7 @@ final class NfceDanfeA4Data
         $contingencia = ! $simulada && (
             $tpEmis === '9'
             || $status === PdvVendaNfce::STATUS_CONTINGENCIA
+            || $status === PdvVendaNfce::STATUS_PENDENTE
             || (string) ($base['operacao'] ?? '') === PdvFinalizarOperacao::NFCE_CONTINGENCIA
         );
         $autorizada = ! $simulada && in_array($status, [PdvVendaNfce::STATUS_AUTORIZADA, PdvVendaNfce::STATUS_CANCELADA], true);

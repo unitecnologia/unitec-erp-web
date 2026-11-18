@@ -85,13 +85,13 @@ class PdvPage extends Page
 
         if ($user && ! $user->podeOperarComCaixaPdv()) {
             $this->openPdvAcessoNegado(
-                'Sem caixa PDV liberado',
+                'Sem caixa PDV vinculado',
                 [
-                    'O PDV só opera com conta caixa do tipo <strong>PDV</strong>.',
-                    'Cadastre/libere um caixa PDV em Usuários e permissões → Caixas, ou ajuste o tipo em Contas Caixa.',
+                    'O PDV só opera com conta caixa do tipo <strong>PDV</strong> vinculada ao usuário.',
+                    'Em Usuários e permissões → Caixas, vincule um Caixa PDV e marque o padrão.',
                 ],
                 true,
-                'Subcaixa (ex.: CAIXA GERAL) não serve para operar o PDV.',
+                'Sem vínculo não é permitido abrir o PDV no Caixa Geral.',
             );
 
             return;

@@ -7,6 +7,7 @@ use App\Models\OrdemServico;
 use App\Models\OrdemServicoItem;
 use App\Models\Venda;
 use App\Models\VendaItem;
+use App\Support\Erp\Dre\VendaItemCustoHistorico;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Facades\Schema;
@@ -147,7 +148,10 @@ final class OsVendaEspelhoService
 
     private function sincronizarItens(Venda $venda, OrdemServico $os): void
     {
+        $custoPreservado = VendaItemCustoHistorico::mapaPreservarPorProduto((int) $venda->id);
         VendaItem::query()->where('venda_id', (int) $venda->id)->delete();
+
+        $empresaId = (int) ($venda->empresa_id ?? $os->empresa_id ?? 0);
 
         foreach ($os->itens as $item) {
             if (! $item instanceof OrdemServicoItem || ! $item->product_id) {
@@ -163,6 +167,16 @@ final class OsVendaEspelhoService
             $total = round((float) ($item->total ?? 0), 2);
             $valorItem = round($total / $qtd, 2);
 
+            $custoSnap = [];
+            if (VendaItemCustoHistorico::tabelaTemCusto('venda_itens')) {
+                $custoSnap = VendaItemCustoHistorico::dePreservadoOuResolver(
+                    (int) $item->product_id,
+                    $qtd,
+                    $empresaId > 0 ? $empresaId : null,
+                    $custoPreservado,
+                );
+            }
+
             VendaItem::query()->create([
                 'venda_id' => $venda->id,
                 'product_id' => (int) $item->product_id,
@@ -170,6 +184,7 @@ final class OsVendaEspelhoService
                 'valor_item' => $valorItem,
                 'total' => $total,
                 'comissao_pct' => 0,
+                ...$custoSnap,
             ]);
         }
     }

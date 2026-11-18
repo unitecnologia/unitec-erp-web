@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\SafeEncryptedString;
 use App\Support\Erp\EmpresaParametros;
+use App\Support\Pix\PixContaBancariaVinculo;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
@@ -49,7 +50,7 @@ use Illuminate\Database\QueryException;
     'param_monitor_vendas_imp_valor_liquido',
     'param_monitor_vendas_imp_sem_coluna_desconto',
 ])]
-#[Hidden(['param_consulta_placa_token'])]
+#[Hidden(['param_consulta_placa_token', 'param_tef_supertef_softhouse_token'])]
 class Empresa extends Model
 {
     public const PESSOA_FISICA = 'fisica';
@@ -66,6 +67,13 @@ class Empresa extends Model
         ]));
 
         parent::__construct($attributes);
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Empresa $empresa): void {
+            PixContaBancariaVinculo::validarEmpresaOuFalhar($empresa);
+        });
     }
 
     protected function casts(): array
@@ -86,6 +94,12 @@ class Empresa extends Model
 
         foreach (array_keys(EmpresaParametros::planoContaFields()) as $field) {
             $casts[$field] = 'integer';
+        }
+
+        foreach (EmpresaParametros::pixFields() as $field => $meta) {
+            if (($meta['type'] ?? '') === 'integer') {
+                $casts[$field] = 'integer';
+            }
         }
 
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
@@ -125,6 +139,7 @@ class Empresa extends Model
         $casts['param_api_servicos_timeout'] = 'integer';
         $casts['param_consulta_placa_timeout'] = 'integer';
         $casts['param_consulta_placa_token'] = SafeEncryptedString::class;
+        $casts['param_tef_supertef_softhouse_token'] = SafeEncryptedString::class;
         $casts['param_licenca_api_timeout'] = 'integer';
         $casts['param_whatsapp_timeout'] = 'integer';
         $casts['param_whatsapp_gateway_port'] = 'integer';

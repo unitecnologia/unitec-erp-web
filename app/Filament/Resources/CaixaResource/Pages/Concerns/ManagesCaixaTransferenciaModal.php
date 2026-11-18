@@ -29,6 +29,16 @@ trait ManagesCaixaTransferenciaModal
             return;
         }
 
+        if ($this->contaFiltroEhPdv()) {
+            Notification::make()
+                ->title('Conta PDV — somente consulta')
+                ->body('Conta PDV operacional: na retaguarda é somente consulta. Opere pelo PDV.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $contas = $this->contasTransferenciaOptions;
         if (count($contas) < 2) {
             Notification::make()

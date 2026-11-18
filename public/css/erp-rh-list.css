@@ -1,8 +1,18 @@
-/* ERP — Mini RH listagens (funcionários, cargos, departamentos) — gerado a partir de erp-logistica-simple.css */
+/* ERP — Mini RH listagens (funcionários, cargos, departamentos, documentos, EPIs, exames) — gerado a partir de erp-logistica-simple.css */
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios,
 .erp-rh-cargos-page .erp-rh-cargos,
-.erp-rh-departamentos-page .erp-rh-departamentos {
+.erp-rh-departamentos-page .erp-rh-departamentos,
+.erp-rh-documentos-page .erp-rh-documentos,
+.erp-rh-epis-page .erp-rh-epis,
+.erp-rh-uniformes-page .erp-rh-uniformes,
+.erp-rh-exames-page .erp-rh-exames,
+.erp-rh-treinamentos-page .erp-rh-treinamentos,
+.erp-rh-holerites-page .erp-rh-holerites,
+.erp-rh-beneficios-page .erp-rh-beneficios,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias,
+.erp-rh-ferias-page .erp-rh-ferias,
+.erp-rh-escalas-page .erp-rh-escalas {
     padding: 0.5rem 0.65rem 0;
     margin: -1mm 0 0;
     background: var(--erp-bg-app);
@@ -16,7 +26,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__filters,
 .erp-rh-cargos-page .erp-rh-cargos__filters,
-.erp-rh-departamentos-page .erp-rh-departamentos__filters {
+.erp-rh-departamentos-page .erp-rh-departamentos__filters,
+.erp-rh-documentos-page .erp-rh-documentos__filters,
+.erp-rh-epis-page .erp-rh-epis__filters,
+.erp-rh-uniformes-page .erp-rh-uniformes__filters,
+.erp-rh-exames-page .erp-rh-exames__filters,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__filters,
+.erp-rh-holerites-page .erp-rh-holerites__filters,
+.erp-rh-beneficios-page .erp-rh-beneficios__filters,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__filters,
+.erp-rh-ferias-page .erp-rh-ferias__filters,
+.erp-rh-escalas-page .erp-rh-escalas__filters {
     flex-shrink: 0;
     padding: 0.35rem 0.75rem !important;
     margin: 0 0 0.35rem !important;
@@ -31,7 +51,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__filters-row,
 .erp-rh-cargos-page .erp-rh-cargos__filters-row,
-.erp-rh-departamentos-page .erp-rh-departamentos__filters-row {
+.erp-rh-departamentos-page .erp-rh-departamentos__filters-row,
+.erp-rh-documentos-page .erp-rh-documentos__filters-row,
+.erp-rh-epis-page .erp-rh-epis__filters-row,
+.erp-rh-uniformes-page .erp-rh-uniformes__filters-row,
+.erp-rh-exames-page .erp-rh-exames__filters-row,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__filters-row,
+.erp-rh-holerites-page .erp-rh-holerites__filters-row,
+.erp-rh-beneficios-page .erp-rh-beneficios__filters-row,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__filters-row,
+.erp-rh-ferias-page .erp-rh-ferias__filters-row,
+.erp-rh-escalas-page .erp-rh-escalas__filters-row {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
@@ -42,14 +72,34 @@
 @media (max-width: 900px) {
     .erp-rh-funcionarios-page .erp-rh-funcionarios__filters-row,
     .erp-rh-cargos-page .erp-rh-cargos__filters-row,
-    .erp-rh-departamentos-page .erp-rh-departamentos__filters-row {
+    .erp-rh-departamentos-page .erp-rh-departamentos__filters-row,
+    .erp-rh-documentos-page .erp-rh-documentos__filters-row,
+    .erp-rh-epis-page .erp-rh-epis__filters-row,
+    .erp-rh-uniformes-page .erp-rh-uniformes__filters-row,
+    .erp-rh-exames-page .erp-rh-exames__filters-row,
+    .erp-rh-treinamentos-page .erp-rh-treinamentos__filters-row,
+    .erp-rh-holerites-page .erp-rh-holerites__filters-row,
+    .erp-rh-beneficios-page .erp-rh-beneficios__filters-row,
+    .erp-rh-ocorrencias-page .erp-rh-ocorrencias__filters-row,
+    .erp-rh-ferias-page .erp-rh-ferias__filters-row,
+    .erp-rh-escalas-page .erp-rh-escalas__filters-row {
         flex-wrap: wrap;
     }
 }
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__search-group,
 .erp-rh-cargos-page .erp-rh-cargos__search-group,
-.erp-rh-departamentos-page .erp-rh-departamentos__search-group {
+.erp-rh-departamentos-page .erp-rh-departamentos__search-group,
+.erp-rh-documentos-page .erp-rh-documentos__search-group,
+.erp-rh-epis-page .erp-rh-epis__search-group,
+.erp-rh-uniformes-page .erp-rh-uniformes__search-group,
+.erp-rh-exames-page .erp-rh-exames__search-group,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__search-group,
+.erp-rh-holerites-page .erp-rh-holerites__search-group,
+.erp-rh-beneficios-page .erp-rh-beneficios__search-group,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__search-group,
+.erp-rh-ferias-page .erp-rh-ferias__search-group,
+.erp-rh-escalas-page .erp-rh-escalas__search-group {
     display: inline-flex;
     flex: 0 1 auto;
     align-items: center;
@@ -59,7 +109,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__locate-label,
 .erp-rh-cargos-page .erp-rh-cargos__locate-label,
-.erp-rh-departamentos-page .erp-rh-departamentos__locate-label {
+.erp-rh-departamentos-page .erp-rh-departamentos__locate-label,
+.erp-rh-documentos-page .erp-rh-documentos__locate-label,
+.erp-rh-epis-page .erp-rh-epis__locate-label,
+.erp-rh-uniformes-page .erp-rh-uniformes__locate-label,
+.erp-rh-exames-page .erp-rh-exames__locate-label,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__locate-label,
+.erp-rh-holerites-page .erp-rh-holerites__locate-label,
+.erp-rh-beneficios-page .erp-rh-beneficios__locate-label,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__locate-label,
+.erp-rh-ferias-page .erp-rh-ferias__locate-label,
+.erp-rh-escalas-page .erp-rh-escalas__locate-label {
     font-size: var(--erp-font-size-xs);
     font-weight: 700;
     text-transform: uppercase;
@@ -69,7 +129,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__search-field,
 .erp-rh-cargos-page .erp-rh-cargos__search-field,
-.erp-rh-departamentos-page .erp-rh-departamentos__search-field {
+.erp-rh-departamentos-page .erp-rh-departamentos__search-field,
+.erp-rh-documentos-page .erp-rh-documentos__search-field,
+.erp-rh-epis-page .erp-rh-epis__search-field,
+.erp-rh-uniformes-page .erp-rh-uniformes__search-field,
+.erp-rh-exames-page .erp-rh-exames__search-field,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__search-field,
+.erp-rh-holerites-page .erp-rh-holerites__search-field,
+.erp-rh-beneficios-page .erp-rh-beneficios__search-field,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__search-field,
+.erp-rh-ferias-page .erp-rh-ferias__search-field,
+.erp-rh-escalas-page .erp-rh-escalas__search-field {
     width: auto;
     min-width: 6.75rem;
     flex-shrink: 0;
@@ -77,7 +147,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__search-text,
 .erp-rh-cargos-page .erp-rh-cargos__search-text,
-.erp-rh-departamentos-page .erp-rh-departamentos__search-text {
+.erp-rh-departamentos-page .erp-rh-departamentos__search-text,
+.erp-rh-documentos-page .erp-rh-documentos__search-text,
+.erp-rh-epis-page .erp-rh-epis__search-text,
+.erp-rh-uniformes-page .erp-rh-uniformes__search-text,
+.erp-rh-exames-page .erp-rh-exames__search-text,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__search-text,
+.erp-rh-holerites-page .erp-rh-holerites__search-text,
+.erp-rh-beneficios-page .erp-rh-beneficios__search-text,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__search-text,
+.erp-rh-ferias-page .erp-rh-ferias__search-text,
+.erp-rh-escalas-page .erp-rh-escalas__search-text {
     flex: 0 0 auto;
     width: 11cm;
     max-width: 11cm;
@@ -86,7 +166,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__search-actions,
 .erp-rh-cargos-page .erp-rh-cargos__search-actions,
-.erp-rh-departamentos-page .erp-rh-departamentos__search-actions {
+.erp-rh-departamentos-page .erp-rh-departamentos__search-actions,
+.erp-rh-documentos-page .erp-rh-documentos__search-actions,
+.erp-rh-epis-page .erp-rh-epis__search-actions,
+.erp-rh-uniformes-page .erp-rh-uniformes__search-actions,
+.erp-rh-exames-page .erp-rh-exames__search-actions,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__search-actions,
+.erp-rh-holerites-page .erp-rh-holerites__search-actions,
+.erp-rh-beneficios-page .erp-rh-beneficios__search-actions,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__search-actions,
+.erp-rh-ferias-page .erp-rh-ferias__search-actions,
+.erp-rh-escalas-page .erp-rh-escalas__search-actions {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -97,7 +187,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-group,
 .erp-rh-cargos-page .erp-rh-cargos__page-size-group,
-.erp-rh-departamentos-page .erp-rh-departamentos__page-size-group {
+.erp-rh-departamentos-page .erp-rh-departamentos__page-size-group,
+.erp-rh-documentos-page .erp-rh-documentos__page-size-group,
+.erp-rh-epis-page .erp-rh-epis__page-size-group,
+.erp-rh-uniformes-page .erp-rh-uniformes__page-size-group,
+.erp-rh-exames-page .erp-rh-exames__page-size-group,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__page-size-group,
+.erp-rh-holerites-page .erp-rh-holerites__page-size-group,
+.erp-rh-beneficios-page .erp-rh-beneficios__page-size-group,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__page-size-group,
+.erp-rh-ferias-page .erp-rh-ferias__page-size-group,
+.erp-rh-escalas-page .erp-rh-escalas__page-size-group {
     display: inline-flex;
     align-items: center;
     flex: 0 0 auto;
@@ -108,7 +208,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-label,
 .erp-rh-cargos-page .erp-rh-cargos__page-size-label,
-.erp-rh-departamentos-page .erp-rh-departamentos__page-size-label {
+.erp-rh-departamentos-page .erp-rh-departamentos__page-size-label,
+.erp-rh-documentos-page .erp-rh-documentos__page-size-label,
+.erp-rh-epis-page .erp-rh-epis__page-size-label,
+.erp-rh-uniformes-page .erp-rh-uniformes__page-size-label,
+.erp-rh-exames-page .erp-rh-exames__page-size-label,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__page-size-label,
+.erp-rh-holerites-page .erp-rh-holerites__page-size-label,
+.erp-rh-beneficios-page .erp-rh-beneficios__page-size-label,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__page-size-label,
+.erp-rh-ferias-page .erp-rh-ferias__page-size-label,
+.erp-rh-escalas-page .erp-rh-escalas__page-size-label {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
@@ -120,7 +230,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-select,
 .erp-rh-cargos-page .erp-rh-cargos__page-size-select,
-.erp-rh-departamentos-page .erp-rh-departamentos__page-size-select {
+.erp-rh-departamentos-page .erp-rh-departamentos__page-size-select,
+.erp-rh-documentos-page .erp-rh-documentos__page-size-select,
+.erp-rh-epis-page .erp-rh-epis__page-size-select,
+.erp-rh-uniformes-page .erp-rh-uniformes__page-size-select,
+.erp-rh-exames-page .erp-rh-exames__page-size-select,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__page-size-select,
+.erp-rh-holerites-page .erp-rh-holerites__page-size-select,
+.erp-rh-beneficios-page .erp-rh-beneficios__page-size-select,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__page-size-select,
+.erp-rh-ferias-page .erp-rh-ferias__page-size-select,
+.erp-rh-escalas-page .erp-rh-escalas__page-size-select {
     width: auto;
     min-width: 4.25rem;
 }
@@ -128,9 +248,29 @@
 .erp-rh-funcionarios-page .erp-rh-funcionarios__select,
 .erp-rh-cargos-page .erp-rh-cargos__select,
 .erp-rh-departamentos-page .erp-rh-departamentos__select,
+.erp-rh-documentos-page .erp-rh-documentos__select,
+.erp-rh-epis-page .erp-rh-epis__select,
+.erp-rh-uniformes-page .erp-rh-uniformes__select,
+.erp-rh-exames-page .erp-rh-exames__select,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__select,
+.erp-rh-holerites-page .erp-rh-holerites__select,
+.erp-rh-beneficios-page .erp-rh-beneficios__select,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__select,
+.erp-rh-ferias-page .erp-rh-ferias__select,
+.erp-rh-escalas-page .erp-rh-escalas__select,
 .erp-rh-funcionarios-page .erp-rh-funcionarios__input,
 .erp-rh-cargos-page .erp-rh-cargos__input,
-.erp-rh-departamentos-page .erp-rh-departamentos__input {
+.erp-rh-departamentos-page .erp-rh-departamentos__input,
+.erp-rh-documentos-page .erp-rh-documentos__input,
+.erp-rh-epis-page .erp-rh-epis__input,
+.erp-rh-uniformes-page .erp-rh-uniformes__input,
+.erp-rh-exames-page .erp-rh-exames__input,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__input,
+.erp-rh-holerites-page .erp-rh-holerites__input,
+.erp-rh-beneficios-page .erp-rh-beneficios__input,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__input,
+.erp-rh-ferias-page .erp-rh-ferias__input,
+.erp-rh-escalas-page .erp-rh-escalas__input {
     font-family: inherit;
     font-size: var(--erp-font-size-xs);
     border: 1px solid var(--erp-border-light);
@@ -143,7 +283,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__btn,
 .erp-rh-cargos-page .erp-rh-cargos__btn,
-.erp-rh-departamentos-page .erp-rh-departamentos__btn {
+.erp-rh-departamentos-page .erp-rh-departamentos__btn,
+.erp-rh-documentos-page .erp-rh-documentos__btn,
+.erp-rh-epis-page .erp-rh-epis__btn,
+.erp-rh-uniformes-page .erp-rh-uniformes__btn,
+.erp-rh-exames-page .erp-rh-exames__btn,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__btn,
+.erp-rh-holerites-page .erp-rh-holerites__btn,
+.erp-rh-beneficios-page .erp-rh-beneficios__btn,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__btn,
+.erp-rh-ferias-page .erp-rh-ferias__btn,
+.erp-rh-escalas-page .erp-rh-escalas__btn {
     font-family: inherit;
     font-size: var(--erp-font-size-xs);
     font-weight: 700;
@@ -159,7 +309,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__btn--secondary,
 .erp-rh-cargos-page .erp-rh-cargos__btn--secondary,
-.erp-rh-departamentos-page .erp-rh-departamentos__btn--secondary {
+.erp-rh-departamentos-page .erp-rh-departamentos__btn--secondary,
+.erp-rh-documentos-page .erp-rh-documentos__btn--secondary,
+.erp-rh-epis-page .erp-rh-epis__btn--secondary,
+.erp-rh-uniformes-page .erp-rh-uniformes__btn--secondary,
+.erp-rh-exames-page .erp-rh-exames__btn--secondary,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__btn--secondary,
+.erp-rh-holerites-page .erp-rh-holerites__btn--secondary,
+.erp-rh-beneficios-page .erp-rh-beneficios__btn--secondary,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__btn--secondary,
+.erp-rh-ferias-page .erp-rh-ferias__btn--secondary,
+.erp-rh-escalas-page .erp-rh-escalas__btn--secondary {
     background: var(--erp-bg-muted);
     color: var(--erp-text);
     border-color: var(--erp-border-light);
@@ -167,7 +327,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__hint,
 .erp-rh-cargos-page .erp-rh-cargos__hint,
-.erp-rh-departamentos-page .erp-rh-departamentos__hint {
+.erp-rh-departamentos-page .erp-rh-departamentos__hint,
+.erp-rh-documentos-page .erp-rh-documentos__hint,
+.erp-rh-epis-page .erp-rh-epis__hint,
+.erp-rh-uniformes-page .erp-rh-uniformes__hint,
+.erp-rh-exames-page .erp-rh-exames__hint,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__hint,
+.erp-rh-holerites-page .erp-rh-holerites__hint,
+.erp-rh-beneficios-page .erp-rh-beneficios__hint,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__hint,
+.erp-rh-ferias-page .erp-rh-ferias__hint,
+.erp-rh-escalas-page .erp-rh-escalas__hint {
     margin: 0 0.65rem 0.25rem;
     font-size: var(--erp-font-size-xs);
     color: var(--erp-text-muted);
@@ -176,14 +346,34 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__status-wrap,
 .erp-rh-cargos-page .erp-rh-cargos__status-wrap,
-.erp-rh-departamentos-page .erp-rh-departamentos__status-wrap {
+.erp-rh-departamentos-page .erp-rh-departamentos__status-wrap,
+.erp-rh-documentos-page .erp-rh-documentos__status-wrap,
+.erp-rh-epis-page .erp-rh-epis__status-wrap,
+.erp-rh-uniformes-page .erp-rh-uniformes__status-wrap,
+.erp-rh-exames-page .erp-rh-exames__status-wrap,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__status-wrap,
+.erp-rh-holerites-page .erp-rh-holerites__status-wrap,
+.erp-rh-beneficios-page .erp-rh-beneficios__status-wrap,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__status-wrap,
+.erp-rh-ferias-page .erp-rh-ferias__status-wrap,
+.erp-rh-escalas-page .erp-rh-escalas__status-wrap {
     flex-shrink: 0;
     margin: 0 0.65rem 0;
 }
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__status,
 .erp-rh-cargos-page .erp-rh-cargos__status,
-.erp-rh-departamentos-page .erp-rh-departamentos__status {
+.erp-rh-departamentos-page .erp-rh-departamentos__status,
+.erp-rh-documentos-page .erp-rh-documentos__status,
+.erp-rh-epis-page .erp-rh-epis__status,
+.erp-rh-uniformes-page .erp-rh-uniformes__status,
+.erp-rh-exames-page .erp-rh-exames__status,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__status,
+.erp-rh-holerites-page .erp-rh-holerites__status,
+.erp-rh-beneficios-page .erp-rh-beneficios__status,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__status,
+.erp-rh-ferias-page .erp-rh-ferias__status,
+.erp-rh-escalas-page .erp-rh-escalas__status {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
@@ -191,7 +381,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios__tab,
 .erp-rh-cargos-page .erp-rh-cargos__tab,
-.erp-rh-departamentos-page .erp-rh-departamentos__tab {
+.erp-rh-departamentos-page .erp-rh-departamentos__tab,
+.erp-rh-documentos-page .erp-rh-documentos__tab,
+.erp-rh-epis-page .erp-rh-epis__tab,
+.erp-rh-uniformes-page .erp-rh-uniformes__tab,
+.erp-rh-exames-page .erp-rh-exames__tab,
+.erp-rh-treinamentos-page .erp-rh-treinamentos__tab,
+.erp-rh-holerites-page .erp-rh-holerites__tab,
+.erp-rh-beneficios-page .erp-rh-beneficios__tab,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__tab,
+.erp-rh-ferias-page .erp-rh-ferias__tab,
+.erp-rh-escalas-page .erp-rh-escalas__tab {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -205,20 +405,50 @@
 
 .erp-rh-funcionarios-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
 .erp-rh-cargos-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
-.erp-rh-departamentos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+.erp-rh-departamentos-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-documentos-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-epis-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-uniformes-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-exames-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-treinamentos-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-holerites-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-beneficios-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-ocorrencias-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-ferias-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-escalas-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
     display: none !important;
 }
 
 .erp-rh-funcionarios-page .fi-sc > div:not(.fi-hidden),
 .erp-rh-cargos-page .fi-sc > div:not(.fi-hidden),
-.erp-rh-departamentos-page .fi-sc > div:not(.fi-hidden) {
+.erp-rh-departamentos-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-documentos-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-epis-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-uniformes-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-exames-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-treinamentos-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-holerites-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-beneficios-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-ocorrencias-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-ferias-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-escalas-page .fi-sc > div:not(.fi-hidden) {
     margin-top: 0;
     margin-bottom: 0;
 }
 
 .erp-rh-funcionarios-page.fi-page,
 .erp-rh-cargos-page.fi-page,
-.erp-rh-departamentos-page.fi-page {
+.erp-rh-departamentos-page.fi-page,
+.erp-rh-documentos-page.fi-page,
+.erp-rh-epis-page.fi-page,
+.erp-rh-uniformes-page.fi-page,
+.erp-rh-exames-page.fi-page,
+.erp-rh-treinamentos-page.fi-page,
+.erp-rh-holerites-page.fi-page,
+.erp-rh-beneficios-page.fi-page,
+.erp-rh-ocorrencias-page.fi-page,
+.erp-rh-ferias-page.fi-page,
+.erp-rh-escalas-page.fi-page {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -227,7 +457,17 @@
 
 .erp-rh-funcionarios-page .fi-sc > div:has(.fi-ta),
 .erp-rh-cargos-page .fi-sc > div:has(.fi-ta),
-.erp-rh-departamentos-page .fi-sc > div:has(.fi-ta) {
+.erp-rh-departamentos-page .fi-sc > div:has(.fi-ta),
+.erp-rh-documentos-page .fi-sc > div:has(.fi-ta),
+.erp-rh-epis-page .fi-sc > div:has(.fi-ta),
+.erp-rh-uniformes-page .fi-sc > div:has(.fi-ta),
+.erp-rh-exames-page .fi-sc > div:has(.fi-ta),
+.erp-rh-treinamentos-page .fi-sc > div:has(.fi-ta),
+.erp-rh-holerites-page .fi-sc > div:has(.fi-ta),
+.erp-rh-beneficios-page .fi-sc > div:has(.fi-ta),
+.erp-rh-ocorrencias-page .fi-sc > div:has(.fi-ta),
+.erp-rh-ferias-page .fi-sc > div:has(.fi-ta),
+.erp-rh-escalas-page .fi-sc > div:has(.fi-ta) {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -239,13 +479,33 @@
 
 .erp-rh-funcionarios-page .fi-ta-ctn,
 .erp-rh-cargos-page .fi-ta-ctn,
-.erp-rh-departamentos-page .fi-ta-ctn {
+.erp-rh-departamentos-page .fi-ta-ctn,
+.erp-rh-documentos-page .fi-ta-ctn,
+.erp-rh-epis-page .fi-ta-ctn,
+.erp-rh-uniformes-page .fi-ta-ctn,
+.erp-rh-exames-page .fi-ta-ctn,
+.erp-rh-treinamentos-page .fi-ta-ctn,
+.erp-rh-holerites-page .fi-ta-ctn,
+.erp-rh-beneficios-page .fi-ta-ctn,
+.erp-rh-ocorrencias-page .fi-ta-ctn,
+.erp-rh-ferias-page .fi-ta-ctn,
+.erp-rh-escalas-page .fi-ta-ctn {
     margin: 0 0.65rem !important;
 }
 
 .erp-rh-funcionarios-page .fi-ta-header-cell,
 .erp-rh-cargos-page .fi-ta-header-cell,
-.erp-rh-departamentos-page .fi-ta-header-cell {
+.erp-rh-departamentos-page .fi-ta-header-cell,
+.erp-rh-documentos-page .fi-ta-header-cell,
+.erp-rh-epis-page .fi-ta-header-cell,
+.erp-rh-uniformes-page .fi-ta-header-cell,
+.erp-rh-exames-page .fi-ta-header-cell,
+.erp-rh-treinamentos-page .fi-ta-header-cell,
+.erp-rh-holerites-page .fi-ta-header-cell,
+.erp-rh-beneficios-page .fi-ta-header-cell,
+.erp-rh-ocorrencias-page .fi-ta-header-cell,
+.erp-rh-ferias-page .fi-ta-header-cell,
+.erp-rh-escalas-page .fi-ta-header-cell {
     padding: 0.28rem 0.22rem !important;
     line-height: 1.15 !important;
     font-size: var(--erp-font-size-grid, 0.8125rem) !important;
@@ -258,7 +518,17 @@
 
 .erp-rh-funcionarios-page .fi-ta-cell,
 .erp-rh-cargos-page .fi-ta-cell,
-.erp-rh-departamentos-page .fi-ta-cell {
+.erp-rh-departamentos-page .fi-ta-cell,
+.erp-rh-documentos-page .fi-ta-cell,
+.erp-rh-epis-page .fi-ta-cell,
+.erp-rh-uniformes-page .fi-ta-cell,
+.erp-rh-exames-page .fi-ta-cell,
+.erp-rh-treinamentos-page .fi-ta-cell,
+.erp-rh-holerites-page .fi-ta-cell,
+.erp-rh-beneficios-page .fi-ta-cell,
+.erp-rh-ocorrencias-page .fi-ta-cell,
+.erp-rh-ferias-page .fi-ta-cell,
+.erp-rh-escalas-page .fi-ta-cell {
     padding: 0.05rem 0.22rem !important;
     height: 1.375rem !important;
     max-height: 1.375rem !important;
@@ -271,45 +541,115 @@
 
 .erp-rh-funcionarios-page .fi-ta-row,
 .erp-rh-cargos-page .fi-ta-row,
-.erp-rh-departamentos-page .fi-ta-row {
+.erp-rh-departamentos-page .fi-ta-row,
+.erp-rh-documentos-page .fi-ta-row,
+.erp-rh-epis-page .fi-ta-row,
+.erp-rh-uniformes-page .fi-ta-row,
+.erp-rh-exames-page .fi-ta-row,
+.erp-rh-treinamentos-page .fi-ta-row,
+.erp-rh-holerites-page .fi-ta-row,
+.erp-rh-beneficios-page .fi-ta-row,
+.erp-rh-ocorrencias-page .fi-ta-row,
+.erp-rh-ferias-page .fi-ta-row,
+.erp-rh-escalas-page .fi-ta-row {
     height: 1.375rem;
     background: transparent !important;
 }
 
 .erp-rh-funcionarios-page .fi-ta-row:nth-child(even) .fi-ta-cell,
 .erp-rh-cargos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
-.erp-rh-departamentos-page .fi-ta-row:nth-child(even) .fi-ta-cell {
+.erp-rh-departamentos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-documentos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-epis-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-uniformes-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-exames-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-treinamentos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-holerites-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-beneficios-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-ocorrencias-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-ferias-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-escalas-page .fi-ta-row:nth-child(even) .fi-ta-cell {
     background: var(--erp-row-zebra, #f8fafc) !important;
 }
 
 .erp-rh-funcionarios-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
 .erp-rh-cargos-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
-.erp-rh-departamentos-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+.erp-rh-departamentos-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-documentos-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-epis-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-uniformes-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-exames-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-treinamentos-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-holerites-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-beneficios-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-ocorrencias-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-ferias-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-escalas-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
     background: var(--erp-bg-panel, #fff) !important;
 }
 
 .erp-rh-funcionarios-page .fi-ta-row:hover .fi-ta-cell,
 .erp-rh-cargos-page .fi-ta-row:hover .fi-ta-cell,
-.erp-rh-departamentos-page .fi-ta-row:hover .fi-ta-cell {
+.erp-rh-departamentos-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-documentos-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-epis-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-uniformes-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-exames-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-treinamentos-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-holerites-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-beneficios-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-ocorrencias-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-ferias-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-escalas-page .fi-ta-row:hover .fi-ta-cell {
     background: var(--erp-row-hover, #e8f2ff) !important;
 }
 
 .erp-rh-funcionarios-page .fi-ta-row.erp-row-selected,
 .erp-rh-cargos-page .fi-ta-row.erp-row-selected,
-.erp-rh-departamentos-page .fi-ta-row.erp-row-selected {
+.erp-rh-departamentos-page .fi-ta-row.erp-row-selected,
+.erp-rh-documentos-page .fi-ta-row.erp-row-selected,
+.erp-rh-epis-page .fi-ta-row.erp-row-selected,
+.erp-rh-uniformes-page .fi-ta-row.erp-row-selected,
+.erp-rh-exames-page .fi-ta-row.erp-row-selected,
+.erp-rh-treinamentos-page .fi-ta-row.erp-row-selected,
+.erp-rh-holerites-page .fi-ta-row.erp-row-selected,
+.erp-rh-beneficios-page .fi-ta-row.erp-row-selected,
+.erp-rh-ocorrencias-page .fi-ta-row.erp-row-selected,
+.erp-rh-ferias-page .fi-ta-row.erp-row-selected,
+.erp-rh-escalas-page .fi-ta-row.erp-row-selected {
     box-shadow: inset 5px 0 0 #1e3a8a;
 }
 
 .erp-rh-funcionarios-page .fi-ta-row.erp-row-selected .fi-ta-cell,
 .erp-rh-cargos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
-.erp-rh-departamentos-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+.erp-rh-departamentos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-documentos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-epis-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-uniformes-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-exames-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-treinamentos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-holerites-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-beneficios-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-ocorrencias-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-ferias-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-escalas-page .fi-ta-row.erp-row-selected .fi-ta-cell {
     background: #60a5fa !important;
     color: #0f172a !important;
 }
 
 .erp-rh-funcionarios-page .fi-pagination,
 .erp-rh-cargos-page .fi-pagination,
-.erp-rh-departamentos-page .fi-pagination {
+.erp-rh-departamentos-page .fi-pagination,
+.erp-rh-documentos-page .fi-pagination,
+.erp-rh-epis-page .fi-pagination,
+.erp-rh-uniformes-page .fi-pagination,
+.erp-rh-exames-page .fi-pagination,
+.erp-rh-treinamentos-page .fi-pagination,
+.erp-rh-holerites-page .fi-pagination,
+.erp-rh-beneficios-page .fi-pagination,
+.erp-rh-ocorrencias-page .fi-pagination,
+.erp-rh-ferias-page .fi-pagination,
+.erp-rh-escalas-page .fi-pagination {
     padding: 0.25rem 0.5rem !important;
     font-size: var(--erp-font-size-xs, 0.75rem);
 }
@@ -318,7 +658,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios-actions,
 .erp-rh-cargos-page .erp-rh-cargos-actions,
-.erp-rh-departamentos-page .erp-rh-departamentos-actions {
+.erp-rh-departamentos-page .erp-rh-departamentos-actions,
+.erp-rh-documentos-page .erp-rh-documentos-actions,
+.erp-rh-epis-page .erp-rh-epis-actions,
+.erp-rh-uniformes-page .erp-rh-uniformes-actions,
+.erp-rh-exames-page .erp-rh-exames-actions,
+.erp-rh-treinamentos-page .erp-rh-treinamentos-actions,
+.erp-rh-holerites-page .erp-rh-holerites-actions,
+.erp-rh-beneficios-page .erp-rh-beneficios-actions,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias-actions,
+.erp-rh-ferias-page .erp-rh-ferias-actions,
+.erp-rh-escalas-page .erp-rh-escalas-actions {
     flex-shrink: 0;
     gap: 0.35rem;
     padding: 0.4rem 0.65rem;
@@ -330,7 +680,17 @@
 
 .erp-rh-funcionarios-page .erp-rh-funcionarios-actions__btn,
 .erp-rh-cargos-page .erp-rh-cargos-actions__btn,
-.erp-rh-departamentos-page .erp-rh-departamentos-actions__btn {
+.erp-rh-departamentos-page .erp-rh-departamentos-actions__btn,
+.erp-rh-documentos-page .erp-rh-documentos-actions__btn,
+.erp-rh-epis-page .erp-rh-epis-actions__btn,
+.erp-rh-uniformes-page .erp-rh-uniformes-actions__btn,
+.erp-rh-exames-page .erp-rh-exames-actions__btn,
+.erp-rh-treinamentos-page .erp-rh-treinamentos-actions__btn,
+.erp-rh-holerites-page .erp-rh-holerites-actions__btn,
+.erp-rh-beneficios-page .erp-rh-beneficios-actions__btn,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias-actions__btn,
+.erp-rh-ferias-page .erp-rh-ferias-actions__btn,
+.erp-rh-escalas-page .erp-rh-escalas-actions__btn {
     min-width: 5.4rem;
     height: 3rem;
     padding: 0.2rem 0.35rem;
@@ -343,7 +703,27 @@
 .erp-rh-cargos-page .fi-ta-header-cell:nth-child(1),
 .erp-rh-cargos-page .fi-ta-row .fi-ta-cell:nth-child(1),
 .erp-rh-departamentos-page .fi-ta-header-cell:nth-child(1),
-.erp-rh-departamentos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+.erp-rh-documentos-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-epis-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-escalas-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-departamentos-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-documentos-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-epis-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-escalas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
     width: 12%;
 }
 
@@ -352,7 +732,27 @@
 .erp-rh-cargos-page .fi-ta-header-cell:nth-child(2),
 .erp-rh-cargos-page .fi-ta-row .fi-ta-cell:nth-child(2),
 .erp-rh-departamentos-page .fi-ta-header-cell:nth-child(2),
-.erp-rh-departamentos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+.erp-rh-documentos-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-epis-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-exames-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-treinamentos-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-holerites-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-beneficios-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-ferias-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-escalas-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-departamentos-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-documentos-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-epis-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-exames-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-treinamentos-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-holerites-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-beneficios-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-ferias-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-escalas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
     width: 88%;
 }
 
@@ -360,7 +760,17 @@
 
 .erp-rh-funcionarios-page .erp-lookup-modal,
 .erp-rh-cargos-page .erp-lookup-modal,
-.erp-rh-departamentos-page .erp-lookup-modal {
+.erp-rh-departamentos-page .erp-lookup-modal,
+.erp-rh-documentos-page .erp-lookup-modal,
+.erp-rh-epis-page .erp-lookup-modal,
+.erp-rh-uniformes-page .erp-lookup-modal,
+.erp-rh-exames-page .erp-lookup-modal,
+.erp-rh-treinamentos-page .erp-lookup-modal,
+.erp-rh-holerites-page .erp-lookup-modal,
+.erp-rh-beneficios-page .erp-lookup-modal,
+.erp-rh-ocorrencias-page .erp-lookup-modal,
+.erp-rh-ferias-page .erp-lookup-modal,
+.erp-rh-escalas-page .erp-lookup-modal {
     position: fixed;
     inset: 0;
     z-index: 250;
@@ -372,7 +782,17 @@
 
 .erp-rh-funcionarios-page .erp-lookup-modal__backdrop,
 .erp-rh-cargos-page .erp-lookup-modal__backdrop,
-.erp-rh-departamentos-page .erp-lookup-modal__backdrop {
+.erp-rh-departamentos-page .erp-lookup-modal__backdrop,
+.erp-rh-documentos-page .erp-lookup-modal__backdrop,
+.erp-rh-epis-page .erp-lookup-modal__backdrop,
+.erp-rh-uniformes-page .erp-lookup-modal__backdrop,
+.erp-rh-exames-page .erp-lookup-modal__backdrop,
+.erp-rh-treinamentos-page .erp-lookup-modal__backdrop,
+.erp-rh-holerites-page .erp-lookup-modal__backdrop,
+.erp-rh-beneficios-page .erp-lookup-modal__backdrop,
+.erp-rh-ocorrencias-page .erp-lookup-modal__backdrop,
+.erp-rh-ferias-page .erp-lookup-modal__backdrop,
+.erp-rh-escalas-page .erp-lookup-modal__backdrop {
     position: absolute;
     inset: 0;
     background: rgb(0 0 0 / 35%);
@@ -380,7 +800,17 @@
 
 .erp-rh-funcionarios-page .erp-lookup-modal__window,
 .erp-rh-cargos-page .erp-lookup-modal__window,
-.erp-rh-departamentos-page .erp-lookup-modal__window {
+.erp-rh-departamentos-page .erp-lookup-modal__window,
+.erp-rh-documentos-page .erp-lookup-modal__window,
+.erp-rh-epis-page .erp-lookup-modal__window,
+.erp-rh-uniformes-page .erp-lookup-modal__window,
+.erp-rh-exames-page .erp-lookup-modal__window,
+.erp-rh-treinamentos-page .erp-lookup-modal__window,
+.erp-rh-holerites-page .erp-lookup-modal__window,
+.erp-rh-beneficios-page .erp-lookup-modal__window,
+.erp-rh-ocorrencias-page .erp-lookup-modal__window,
+.erp-rh-ferias-page .erp-lookup-modal__window,
+.erp-rh-escalas-page .erp-lookup-modal__window {
     position: relative;
     z-index: 1;
     display: flex;
@@ -397,7 +827,17 @@
 
 .erp-rh-funcionarios-page .erp-lookup-modal__titlebar,
 .erp-rh-cargos-page .erp-lookup-modal__titlebar,
-.erp-rh-departamentos-page .erp-lookup-modal__titlebar {
+.erp-rh-departamentos-page .erp-lookup-modal__titlebar,
+.erp-rh-documentos-page .erp-lookup-modal__titlebar,
+.erp-rh-epis-page .erp-lookup-modal__titlebar,
+.erp-rh-uniformes-page .erp-lookup-modal__titlebar,
+.erp-rh-exames-page .erp-lookup-modal__titlebar,
+.erp-rh-treinamentos-page .erp-lookup-modal__titlebar,
+.erp-rh-holerites-page .erp-lookup-modal__titlebar,
+.erp-rh-beneficios-page .erp-lookup-modal__titlebar,
+.erp-rh-ocorrencias-page .erp-lookup-modal__titlebar,
+.erp-rh-ferias-page .erp-lookup-modal__titlebar,
+.erp-rh-escalas-page .erp-lookup-modal__titlebar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -410,7 +850,17 @@
 
 .erp-rh-funcionarios-page .erp-lookup-modal__close,
 .erp-rh-cargos-page .erp-lookup-modal__close,
-.erp-rh-departamentos-page .erp-lookup-modal__close {
+.erp-rh-departamentos-page .erp-lookup-modal__close,
+.erp-rh-documentos-page .erp-lookup-modal__close,
+.erp-rh-epis-page .erp-lookup-modal__close,
+.erp-rh-uniformes-page .erp-lookup-modal__close,
+.erp-rh-exames-page .erp-lookup-modal__close,
+.erp-rh-treinamentos-page .erp-lookup-modal__close,
+.erp-rh-holerites-page .erp-lookup-modal__close,
+.erp-rh-beneficios-page .erp-lookup-modal__close,
+.erp-rh-ocorrencias-page .erp-lookup-modal__close,
+.erp-rh-ferias-page .erp-lookup-modal__close,
+.erp-rh-escalas-page .erp-lookup-modal__close {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -427,7 +877,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
 .erp-rh-cargos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
-.erp-rh-departamentos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-documentos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-epis-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-uniformes-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-exames-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-holerites-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-beneficios-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-ferias-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-escalas-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body {
     padding: 0.55rem 0.65rem 0.5rem;
     background: linear-gradient(180deg, #d9e6f5 0%, #e8f0fa 42%, #eef4fb 100%);
 }
@@ -435,6 +895,16 @@
 .erp-rh-funcionarios-page .erp-codigo-nome-form__section,
 .erp-rh-cargos-page .erp-codigo-nome-form__section,
 .erp-rh-departamentos-page .erp-codigo-nome-form__section,
+.erp-rh-documentos-page .erp-codigo-nome-form__section,
+.erp-rh-epis-page .erp-codigo-nome-form__section,
+.erp-rh-uniformes-page .erp-codigo-nome-form__section,
+.erp-rh-exames-page .erp-codigo-nome-form__section,
+.erp-rh-treinamentos-page .erp-codigo-nome-form__section,
+.erp-rh-holerites-page .erp-codigo-nome-form__section,
+.erp-rh-beneficios-page .erp-codigo-nome-form__section,
+.erp-rh-ocorrencias-page .erp-codigo-nome-form__section,
+.erp-rh-ferias-page .erp-codigo-nome-form__section,
+.erp-rh-escalas-page .erp-codigo-nome-form__section,
 .erp-transportadoras-page .erp-codigo-nome-form__section,
 .erp-veiculos-page .erp-codigo-nome-form__section {
     margin: 0;
@@ -450,7 +920,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-form__section-title,
 .erp-rh-cargos-page .erp-codigo-nome-form__section-title,
-.erp-rh-departamentos-page .erp-codigo-nome-form__section-title {
+.erp-rh-departamentos-page .erp-codigo-nome-form__section-title,
+.erp-rh-documentos-page .erp-codigo-nome-form__section-title,
+.erp-rh-epis-page .erp-codigo-nome-form__section-title,
+.erp-rh-uniformes-page .erp-codigo-nome-form__section-title,
+.erp-rh-exames-page .erp-codigo-nome-form__section-title,
+.erp-rh-treinamentos-page .erp-codigo-nome-form__section-title,
+.erp-rh-holerites-page .erp-codigo-nome-form__section-title,
+.erp-rh-beneficios-page .erp-codigo-nome-form__section-title,
+.erp-rh-ocorrencias-page .erp-codigo-nome-form__section-title,
+.erp-rh-ferias-page .erp-codigo-nome-form__section-title,
+.erp-rh-escalas-page .erp-codigo-nome-form__section-title {
     margin: 0 0 0.45rem;
     padding: 0 0 0.3rem;
     border-bottom: 1px solid #d4e0ef;
@@ -463,7 +943,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-form__section-grid,
 .erp-rh-cargos-page .erp-codigo-nome-form__section-grid,
-.erp-rh-departamentos-page .erp-codigo-nome-form__section-grid {
+.erp-rh-departamentos-page .erp-codigo-nome-form__section-grid,
+.erp-rh-documentos-page .erp-codigo-nome-form__section-grid,
+.erp-rh-epis-page .erp-codigo-nome-form__section-grid,
+.erp-rh-uniformes-page .erp-codigo-nome-form__section-grid,
+.erp-rh-exames-page .erp-codigo-nome-form__section-grid,
+.erp-rh-treinamentos-page .erp-codigo-nome-form__section-grid,
+.erp-rh-holerites-page .erp-codigo-nome-form__section-grid,
+.erp-rh-beneficios-page .erp-codigo-nome-form__section-grid,
+.erp-rh-ocorrencias-page .erp-codigo-nome-form__section-grid,
+.erp-rh-ferias-page .erp-codigo-nome-form__section-grid,
+.erp-rh-escalas-page .erp-codigo-nome-form__section-grid {
     display: flex;
     flex-direction: column;
     gap: 0.28rem;
@@ -471,7 +961,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-form__row.erp-pcad-form__row,
 .erp-rh-cargos-page .erp-codigo-nome-form__row.erp-pcad-form__row,
-.erp-rh-departamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row {
+.erp-rh-departamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-documentos-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-epis-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-uniformes-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-exames-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-treinamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-holerites-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-beneficios-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-ocorrencias-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-ferias-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-escalas-page .erp-codigo-nome-form__row.erp-pcad-form__row {
     display: grid;
     grid-template-columns: 5.8rem minmax(0, 1fr);
     align-items: center;
@@ -484,13 +984,33 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
 .erp-rh-cargos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
-.erp-rh-departamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even) {
+.erp-rh-departamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-documentos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-epis-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-uniformes-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-exames-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-treinamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-holerites-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-beneficios-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-ocorrencias-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-ferias-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-escalas-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even) {
     background: rgb(227 236 247 / 68%);
 }
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
 .erp-rh-cargos-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
-.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__label {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-documentos-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-epis-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-uniformes-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-exames-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-holerites-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-beneficios-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-ferias-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-escalas-page .erp-codigo-nome-modal__form .erp-pcad-form__label {
     width: auto;
     min-width: 0;
     text-align: right;
@@ -501,7 +1021,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
 .erp-rh-cargos-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
-.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-documentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-epis-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-uniformes-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-exames-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-holerites-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-beneficios-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-ferias-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-escalas-page .erp-codigo-nome-modal__form .erp-pcad-form__input {
     min-height: 1.65rem;
     padding: 0.2rem 0.4rem;
     font-size: 0.78rem;
@@ -513,14 +1043,34 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
 .erp-rh-cargos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
-.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly] {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-documentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-epis-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-uniformes-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-exames-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-holerites-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-beneficios-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-ferias-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-escalas-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly] {
     background: #edf2f8;
     color: #475569;
 }
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__actions,
 .erp-rh-cargos-page .erp-codigo-nome-modal__actions,
-.erp-rh-departamentos-page .erp-codigo-nome-modal__actions {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__actions,
+.erp-rh-documentos-page .erp-codigo-nome-modal__actions,
+.erp-rh-epis-page .erp-codigo-nome-modal__actions,
+.erp-rh-uniformes-page .erp-codigo-nome-modal__actions,
+.erp-rh-exames-page .erp-codigo-nome-modal__actions,
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__actions,
+.erp-rh-holerites-page .erp-codigo-nome-modal__actions,
+.erp-rh-beneficios-page .erp-codigo-nome-modal__actions,
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__actions,
+.erp-rh-ferias-page .erp-codigo-nome-modal__actions,
+.erp-rh-escalas-page .erp-codigo-nome-modal__actions {
     padding: 0.45rem 0.65rem 0.55rem;
     border-top: 1px solid #a8bdd4;
     background: linear-gradient(180deg, #dce8f6 0%, #d2e0f0 100%);
@@ -529,7 +1079,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
 .erp-rh-cargos-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
-.erp-rh-departamentos-page .erp-codigo-nome-modal__actions.erp-pcad-actions {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-documentos-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-epis-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-uniformes-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-exames-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-holerites-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-beneficios-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-ferias-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-escalas-page .erp-codigo-nome-modal__actions.erp-pcad-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem;
@@ -537,7 +1097,17 @@
 
 .erp-rh-funcionarios-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
 .erp-rh-cargos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
-.erp-rh-departamentos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn {
+.erp-rh-departamentos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-documentos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-epis-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-uniformes-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-exames-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-treinamentos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-holerites-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-beneficios-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-ocorrencias-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-ferias-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-escalas-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -548,7 +1118,17 @@
 
 .erp-rh-funcionarios-page .erp-contador-form-modal__error--row,
 .erp-rh-cargos-page .erp-contador-form-modal__error--row,
-.erp-rh-departamentos-page .erp-contador-form-modal__error--row {
+.erp-rh-departamentos-page .erp-contador-form-modal__error--row,
+.erp-rh-documentos-page .erp-contador-form-modal__error--row,
+.erp-rh-epis-page .erp-contador-form-modal__error--row,
+.erp-rh-uniformes-page .erp-contador-form-modal__error--row,
+.erp-rh-exames-page .erp-contador-form-modal__error--row,
+.erp-rh-treinamentos-page .erp-contador-form-modal__error--row,
+.erp-rh-holerites-page .erp-contador-form-modal__error--row,
+.erp-rh-beneficios-page .erp-contador-form-modal__error--row,
+.erp-rh-ocorrencias-page .erp-contador-form-modal__error--row,
+.erp-rh-ferias-page .erp-contador-form-modal__error--row,
+.erp-rh-escalas-page .erp-contador-form-modal__error--row {
     grid-column: 1 / -1;
     margin: 0 0 0 5.8rem;
     font-size: 0.68rem;
@@ -569,7 +1149,27 @@
     .erp-rh-cargos-page .erp-rh-cargos__search-actions,
     .erp-rh-cargos-page .erp-rh-cargos__page-size-group,
     .erp-rh-departamentos-page .erp-rh-departamentos__search-actions,
-    .erp-rh-departamentos-page .erp-rh-departamentos__page-size-group {
+    .erp-rh-documentos-page .erp-rh-documentos__search-actions,
+    .erp-rh-epis-page .erp-rh-epis__search-actions,
+    .erp-rh-uniformes-page .erp-rh-uniformes__search-actions,
+    .erp-rh-exames-page .erp-rh-exames__search-actions,
+    .erp-rh-treinamentos-page .erp-rh-treinamentos__search-actions,
+    .erp-rh-holerites-page .erp-rh-holerites__search-actions,
+    .erp-rh-beneficios-page .erp-rh-beneficios__search-actions,
+    .erp-rh-ocorrencias-page .erp-rh-ocorrencias__search-actions,
+    .erp-rh-ferias-page .erp-rh-ferias__search-actions,
+    .erp-rh-escalas-page .erp-rh-escalas__search-actions,
+    .erp-rh-departamentos-page .erp-rh-departamentos__page-size-group,
+    .erp-rh-documentos-page .erp-rh-documentos__page-size-group,
+    .erp-rh-epis-page .erp-rh-epis__page-size-group,
+    .erp-rh-uniformes-page .erp-rh-uniformes__page-size-group,
+    .erp-rh-exames-page .erp-rh-exames__page-size-group,
+    .erp-rh-treinamentos-page .erp-rh-treinamentos__page-size-group,
+    .erp-rh-holerites-page .erp-rh-holerites__page-size-group,
+    .erp-rh-beneficios-page .erp-rh-beneficios__page-size-group,
+    .erp-rh-ocorrencias-page .erp-rh-ocorrencias__page-size-group,
+    .erp-rh-ferias-page .erp-rh-ferias__page-size-group,
+    .erp-rh-escalas-page .erp-rh-escalas__page-size-group {
         flex-basis: auto;
         padding-left: 0;
         border-left: none;

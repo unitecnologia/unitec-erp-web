@@ -33,7 +33,7 @@
                 type="number"
                 wire:model.live="form.serie_nfe"
                 class="erp-pcad-form__input erp-pcad-form__input--xs"
-                min="1"
+                min="0"
                 max="999"
             >
 

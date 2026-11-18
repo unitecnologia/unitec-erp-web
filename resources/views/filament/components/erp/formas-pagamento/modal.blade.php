@@ -238,105 +238,109 @@
 
                 @if ($mostraBandeiras)
                     <div class="erp-fpgto-cartao-lookups">
-                        <fieldset class="erp-fpgto-fieldset erp-fpgto-bandeiras">
-                            <legend>Bandeiras de Cartão</legend>
-                            <div class="erp-fpgto-bandeiras__toolbar">
-                                <p class="erp-fpgto-bandeiras__hint">Cadastre aqui as bandeiras usadas no canhoto do PDV (POS).</p>
-                                <button type="button" class="erp-fpgto-parcelas__btn erp-fpgto-parcelas__btn--apply" wire:click="createBandeira">
-                                    + Nova bandeira
-                                </button>
-                            </div>
-                            <div class="erp-fpgto-bandeiras__grid-wrap">
-                                <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
-                                    <colgroup>
-                                        <col class="erp-fpgto-bandeiras__col-codigo">
-                                        <col class="erp-fpgto-bandeiras__col-nome">
-                                        <col class="erp-fpgto-bandeiras__col-ativo">
-                                        <col class="erp-fpgto-bandeiras__col-acoes">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th>Código</th>
-                                            <th>Nome</th>
-                                            <th>Ativo</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($this->bandeirasLista as $bandeira)
-                                            <tr wire:key="fpgto-bandeira-{{ $bandeira['id'] }}" class="erp-pdv__grid-row">
-                                                <td>{{ $bandeira['codigo'] }}</td>
-                                                <td>{{ $bandeira['nome'] }}</td>
-                                                <td class="erp-pdv__grid-col-center">{{ $bandeira['ativo'] ? 'Sim' : 'Não' }}</td>
-                                                <td class="erp-pdv__grid-col-center erp-bandeiras-modal__actions">
-                                                    <button type="button" class="erp-bandeiras-modal__link" wire:click="editBandeira({{ $bandeira['id'] }})">Alterar</button>
-                                                    <button
-                                                        type="button"
-                                                        class="erp-bandeiras-modal__link erp-bandeiras-modal__link--danger"
-                                                        wire:click="deleteBandeira({{ $bandeira['id'] }})"
-                                                        wire:confirm="Excluir a bandeira {{ $bandeira['nome'] }}?"
-                                                    >Excluir</button>
-                                                </td>
+                        <details class="erp-fpgto-fieldset erp-fpgto-bandeiras erp-fpgto-bandeiras--collapsible">
+                            <summary class="erp-fpgto-bandeiras__summary">Bandeiras de Cartão</summary>
+                            <div class="erp-fpgto-bandeiras__body">
+                                <div class="erp-fpgto-bandeiras__toolbar">
+                                    <p class="erp-fpgto-bandeiras__hint">Cadastre aqui as bandeiras usadas no canhoto do PDV (POS).</p>
+                                    <button type="button" class="erp-fpgto-parcelas__btn erp-fpgto-parcelas__btn--apply" wire:click="createBandeira">
+                                        + Nova bandeira
+                                    </button>
+                                </div>
+                                <div class="erp-fpgto-bandeiras__grid-wrap">
+                                    <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
+                                        <colgroup>
+                                            <col class="erp-fpgto-bandeiras__col-codigo">
+                                            <col class="erp-fpgto-bandeiras__col-nome">
+                                            <col class="erp-fpgto-bandeiras__col-ativo">
+                                            <col class="erp-fpgto-bandeiras__col-acoes">
+                                        </colgroup>
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>Nome</th>
+                                                <th>Ativo</th>
+                                                <th>Ações</th>
                                             </tr>
-                                        @empty
-                                            <tr class="erp-pdv__grid-empty">
-                                                <td colspan="4">Nenhuma bandeira cadastrada. Clique em Nova bandeira.</td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            @forelse ($this->bandeirasLista as $bandeira)
+                                                <tr wire:key="fpgto-bandeira-{{ $bandeira['id'] }}" class="erp-pdv__grid-row">
+                                                    <td>{{ $bandeira['codigo'] }}</td>
+                                                    <td>{{ $bandeira['nome'] }}</td>
+                                                    <td class="erp-pdv__grid-col-center">{{ $bandeira['ativo'] ? 'Sim' : 'Não' }}</td>
+                                                    <td class="erp-pdv__grid-col-center erp-bandeiras-modal__actions">
+                                                        <button type="button" class="erp-bandeiras-modal__link" wire:click="editBandeira({{ $bandeira['id'] }})">Alterar</button>
+                                                        <button
+                                                            type="button"
+                                                            class="erp-bandeiras-modal__link erp-bandeiras-modal__link--danger"
+                                                            wire:click="deleteBandeira({{ $bandeira['id'] }})"
+                                                            wire:confirm="Excluir a bandeira {{ $bandeira['nome'] }}?"
+                                                        >Excluir</button>
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr class="erp-pdv__grid-empty">
+                                                    <td colspan="4">Nenhuma bandeira cadastrada. Clique em Nova bandeira.</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </fieldset>
+                        </details>
 
-                        <fieldset class="erp-fpgto-fieldset erp-fpgto-bandeiras">
-                            <legend>Maquininhas (POS)</legend>
-                            <div class="erp-fpgto-bandeiras__toolbar">
-                                <p class="erp-fpgto-bandeiras__hint">Cadastre as adquirentes/maquininhas usadas nas vendas com cartão.</p>
-                                <button type="button" class="erp-fpgto-parcelas__btn erp-fpgto-parcelas__btn--apply" wire:click="createMaquininha">
-                                    + Nova maquininha
-                                </button>
-                            </div>
-                            <div class="erp-fpgto-bandeiras__grid-wrap">
-                                <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
-                                    <colgroup>
-                                        <col class="erp-fpgto-bandeiras__col-codigo">
-                                        <col class="erp-fpgto-bandeiras__col-nome">
-                                        <col class="erp-fpgto-bandeiras__col-ativo">
-                                        <col class="erp-fpgto-bandeiras__col-acoes">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th>Código</th>
-                                            <th>Nome</th>
-                                            <th>Ativo</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($this->maquininhasLista as $maquininha)
-                                            <tr wire:key="fpgto-maquininha-{{ $maquininha['id'] }}" class="erp-pdv__grid-row">
-                                                <td>{{ $maquininha['codigo'] }}</td>
-                                                <td>{{ $maquininha['nome'] }}</td>
-                                                <td class="erp-pdv__grid-col-center">{{ $maquininha['ativo'] ? 'Sim' : 'Não' }}</td>
-                                                <td class="erp-pdv__grid-col-center erp-bandeiras-modal__actions">
-                                                    <button type="button" class="erp-bandeiras-modal__link" wire:click="editMaquininha({{ $maquininha['id'] }})">Alterar</button>
-                                                    <button
-                                                        type="button"
-                                                        class="erp-bandeiras-modal__link erp-bandeiras-modal__link--danger"
-                                                        wire:click="deleteMaquininha({{ $maquininha['id'] }})"
-                                                        wire:confirm="Excluir a maquininha {{ $maquininha['nome'] }}?"
-                                                    >Excluir</button>
-                                                </td>
+                        <details class="erp-fpgto-fieldset erp-fpgto-bandeiras erp-fpgto-bandeiras--collapsible">
+                            <summary class="erp-fpgto-bandeiras__summary">Maquininhas (POS)</summary>
+                            <div class="erp-fpgto-bandeiras__body">
+                                <div class="erp-fpgto-bandeiras__toolbar">
+                                    <p class="erp-fpgto-bandeiras__hint">Cadastre as adquirentes/maquininhas usadas nas vendas com cartão.</p>
+                                    <button type="button" class="erp-fpgto-parcelas__btn erp-fpgto-parcelas__btn--apply" wire:click="createMaquininha">
+                                        + Nova maquininha
+                                    </button>
+                                </div>
+                                <div class="erp-fpgto-bandeiras__grid-wrap">
+                                    <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
+                                        <colgroup>
+                                            <col class="erp-fpgto-bandeiras__col-codigo">
+                                            <col class="erp-fpgto-bandeiras__col-nome">
+                                            <col class="erp-fpgto-bandeiras__col-ativo">
+                                            <col class="erp-fpgto-bandeiras__col-acoes">
+                                        </colgroup>
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>Nome</th>
+                                                <th>Ativo</th>
+                                                <th>Ações</th>
                                             </tr>
-                                        @empty
-                                            <tr class="erp-pdv__grid-empty">
-                                                <td colspan="4">Nenhuma maquininha cadastrada. Clique em Nova maquininha.</td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            @forelse ($this->maquininhasLista as $maquininha)
+                                                <tr wire:key="fpgto-maquininha-{{ $maquininha['id'] }}" class="erp-pdv__grid-row">
+                                                    <td>{{ $maquininha['codigo'] }}</td>
+                                                    <td>{{ $maquininha['nome'] }}</td>
+                                                    <td class="erp-pdv__grid-col-center">{{ $maquininha['ativo'] ? 'Sim' : 'Não' }}</td>
+                                                    <td class="erp-pdv__grid-col-center erp-bandeiras-modal__actions">
+                                                        <button type="button" class="erp-bandeiras-modal__link" wire:click="editMaquininha({{ $maquininha['id'] }})">Alterar</button>
+                                                        <button
+                                                            type="button"
+                                                            class="erp-bandeiras-modal__link erp-bandeiras-modal__link--danger"
+                                                            wire:click="deleteMaquininha({{ $maquininha['id'] }})"
+                                                            wire:confirm="Excluir a maquininha {{ $maquininha['nome'] }}?"
+                                                        >Excluir</button>
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr class="erp-pdv__grid-empty">
+                                                    <td colspan="4">Nenhuma maquininha cadastrada. Clique em Nova maquininha.</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </fieldset>
+                        </details>
                     </div>
                 @endif
 
@@ -349,14 +353,26 @@
                         @if ($ui['aparece_contas_receber'])
                             <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.aparece_contas_receber"> Aparece no Contas à Receber</label>
                         @endif
+                        @if ($ui['usa_pos'])
+                            <label class="erp-fpgto-check" title="Canhoto da maquininha manual no PDV (NSU, autorização, bandeira).">
+                                <input type="checkbox" wire:model.live="form.usa_pos"> Usa POS (maquininha manual)
+                            </label>
+                        @endif
                         @if ($ui['usa_tef'])
-                            <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.usa_tef"> Usa TEF</label>
+                            <label class="erp-fpgto-check"><input type="checkbox" wire:model.live="form.usa_tef"> Usa TEF</label>
                         @endif
                         @if ($ui['usa_super_tef'])
-                            <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.usa_super_tef"> Usa SuperTEF</label>
+                            <label class="erp-fpgto-check"><input type="checkbox" wire:model.live="form.usa_super_tef"> Usa SuperTEF</label>
+                        @endif
+                        @if (! empty($ui['considerar_a_vista']))
+                            <label class="erp-fpgto-check" title="No PDV não solicita parcelas; trata como 1x à vista.">
+                                <input type="checkbox" wire:model="form.considerar_a_vista"> Considerar à vista (não solicitar parcelas)
+                            </label>
                         @endif
                         @if ($ui['nfce'])
-                            <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.nfce"> NFC-e</label>
+                            <label class="erp-fpgto-check" title="No PDV online, finaliza com NFC-e automática (transmitir) quando esta forma tiver valor.">
+                                <input type="checkbox" wire:model="form.nfce"> NFC-e (PDV)
+                            </label>
                         @endif
                         <label class="erp-fpgto-check"><input type="checkbox" wire:model="form.nao_pagar_comissao"> Não pagar comissão</label>
                         @if ($ui['gerar_qrcode_pdv'])

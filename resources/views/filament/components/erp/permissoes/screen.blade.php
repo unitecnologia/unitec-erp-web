@@ -93,14 +93,20 @@
                         @if ($isProfile)
                             <label>
                                 <span>Nome do perfil</span>
-                                <input type="text" wire:model="profileNome" data-erp-uppercase placeholder="Ex.: CAIXA">
+                                <input
+                                    type="text"
+                                    wire:model="profileNome"
+                                    data-erp-uppercase
+                                    placeholder="Ex.: CAIXA"
+                                    @readonly($this->permissionLocked || $this->profileIsSystem)
+                                >
                             </label>
                             <label>
                                 <span>Descrição</span>
-                                <input type="text" wire:model="profileDescricao" placeholder="Descrição do perfil">
+                                <input type="text" wire:model="profileDescricao" placeholder="Descrição do perfil" @disabled($this->permissionLocked)>
                             </label>
                             @if ($this->permissionLocked)
-                                <p class="erp-permissoes__notice">Perfil do sistema: somente consulta.</p>
+                                <p class="erp-permissoes__notice">Perfil ADMINISTRADOR: somente consulta.</p>
                             @else
                                 <p class="erp-permissoes__hint">Crie ou ajuste o perfil aqui e configure os acessos na aba Permissões.</p>
                             @endif

@@ -16,4 +16,5 @@
     </div>
 
     @include('filament.components.erp.pessoas.form.documento-duplicado-modal')
+    @include('filament.components.erp.pessoas.form.cnpj-alteracoes-modal')
 </div>

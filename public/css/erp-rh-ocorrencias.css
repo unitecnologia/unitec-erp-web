@@ -1,0 +1,125 @@
+/* RH — Ocorrências: ajustes finos sobre erp-rh-list + erp-list-ui */
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__status-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.75rem;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__status--tipo,
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__status--periodo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__period-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencias__period-input {
+    flex: 0 0 9.25rem;
+    width: 9.25rem;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem !important;
+    max-width: 4.25rem;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 22% !important;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 11% !important;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 6.5rem !important;
+    text-align: center;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: auto !important;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-header-cell:nth-child(6),
+.erp-rh-ocorrencias-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 7.25rem !important;
+    text-align: center;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-empty-state {
+    padding: 1.25rem 0.75rem !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+}
+
+.erp-rh-ocorrencias-page .fi-ta-empty-state-heading {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencia-form-modal .erp-contador-form-modal__window {
+    width: min(calc(36rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencia-form-modal .erp-pcad-form__input--date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencia-form-modal .erp-pcad-form__input--file {
+    flex: 1 1 auto;
+    font-size: 0.78rem;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencia-form-modal__hint {
+    display: block;
+    width: 100%;
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    color: #475569;
+}
+
+.erp-rh-ocorrencias-page .erp-rh-ocorrencia-form-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-rh-ocorrencias-page .erp-contador-delete-modal__window {
+    width: min(28rem, calc(100vw - 2rem));
+}
+
+.erp-rh-ocorrencias-page .erp-contador-delete-modal__body {
+    padding: 0.85rem 0.9rem;
+}
+
+.erp-rh-ocorrencias-page .erp-contador-delete-modal__message {
+    margin: 0 0 0.35rem;
+    font-weight: 700;
+    color: #0f2847;
+}
+
+.erp-rh-ocorrencias-page .erp-contador-delete-modal__detail {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    color: #334155;
+}

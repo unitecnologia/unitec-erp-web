@@ -5,6 +5,7 @@ namespace App\Support\Erp\Financeiro;
 use App\Models\CaixaLancamento;
 use App\Models\ContaPagar;
 use App\Models\ContaPagarPagamento;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -53,6 +54,18 @@ final class ContaPagarEstornoService
                 throw new InvalidArgumentException('Parcela sem valor pago para estornar.');
             }
 
+            $snapshotPagamento = [
+                'pagamento_id' => (int) $pagamento->id,
+                'data' => optional($pagamento->data)?->toDateString(),
+                'valor_pago' => $valorPago,
+                'juros' => $juros,
+                'multa' => $multa,
+                'desconto' => $desconto,
+                'forma_pagamento_id' => $pagamento->forma_pagamento_id ? (int) $pagamento->forma_pagamento_id : null,
+                'caixa_conta_id' => $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null,
+                'plano_conta_id' => $pagamento->plano_conta_id ? (int) $pagamento->plano_conta_id : null,
+            ];
+
             $conta->valor_pago = round(max(0, (float) $conta->valor_pago - $valorPago), 2);
             $conta->juros = round(max(0, (float) $conta->juros - $juros), 2);
             $conta->multa = round(max(0, (float) ($conta->multa ?? 0) - $multa), 2);
@@ -72,6 +85,26 @@ final class ContaPagarEstornoService
             $pagamento->delete();
 
             app(ComissaoPeriodoService::class)->syncStatusPagaFromContaPagar($conta->fresh() ?? $conta);
+
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'ESTORNAR_BAIXA_CONTAS_PAGAR',
+                resumo: 'Estornada baixa de CP #'.($conta->numero ?: $conta->id).' (R$ '.number_format($valorPago, 2, ',', '.').').',
+                origem: 'contas_pagar',
+                documentoTipo: 'conta_pagar',
+                documentoId: (int) $conta->id,
+                documentoNumero: (string) ($conta->numero ?: $conta->id),
+                detalhes: [
+                    'conta' => [
+                        'id' => (int) $conta->id,
+                        'numero' => $conta->numero,
+                        'documento' => $conta->documento,
+                        'fornecedor_id' => $conta->fornecedor_id ? (int) $conta->fornecedor_id : null,
+                        'valor' => (float) $conta->valor,
+                    ],
+                    'pagamento' => $snapshotPagamento,
+                ],
+                empresaId: $conta->empresa_id ? (int) $conta->empresa_id : ErpContext::currentEmpresaId(),
+            );
 
             return [
                 'ok' => true,

@@ -101,10 +101,8 @@ class ForcaVendasMonitorResource extends Resource
         'situacao' => 'text',
         'cliente' => 'text',
         'vendedor' => 'text',
-        'data_abert' => 'date',
-        'hora_abert' => 'time',
-        'data_fech' => 'date',
-        'hora_fech' => 'time',
+        'data_abert' => 'datetime',
+        'data_fech' => 'datetime',
         'sincronizado' => 'datetime',
         'desconto' => 'money',
         'acrescimo' => 'money',
@@ -187,32 +185,28 @@ class ForcaVendasMonitorResource extends Resource
                         ?? '—'),
                 TextColumn::make('data_abert')
                     ->label('Data Abert.')
-                    ->state(fn (ForcaVendasOrder $record): string => $record->dataAberturaAt() ? ErpTimezone::toLocal($record->dataAberturaAt())->format('d/m/Y') : '—')
-                    ->alignCenter(),
-                TextColumn::make('hora_abert')
-                    ->label('Hora Abert.')
-                    ->state(fn (ForcaVendasOrder $record): string => $record->dataAberturaAt() ? ErpTimezone::toLocal($record->dataAberturaAt())->format('H:i') : '—')
-                    ->alignCenter(),
+                    ->state(fn (ForcaVendasOrder $record): string => $record->dataAberturaAt()
+                        ? ErpTimezone::toLocal($record->dataAberturaAt())->format('d/m/Y H:i')
+                        : '—')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'erp-fv-mon-dt'])
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-dt']),
                 TextColumn::make('data_fech')
                     ->label('Data Fech.')
                     ->state(function (ForcaVendasOrder $record): string {
                         $fech = $record->faturado_at ?? $record->confirmed_at;
 
-                        return $fech ? ErpTimezone::toLocal($fech)->format('d/m/Y') : '—';
+                        return $fech ? ErpTimezone::toLocal($fech)->format('d/m/Y H:i') : '—';
                     })
-                    ->alignCenter(),
-                TextColumn::make('hora_fech')
-                    ->label('Hora Fech.')
-                    ->state(function (ForcaVendasOrder $record): string {
-                        $fech = $record->faturado_at ?? $record->confirmed_at;
-
-                        return $fech ? ErpTimezone::toLocal($fech)->format('H:i') : '—';
-                    })
-                    ->alignCenter(),
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'erp-fv-mon-dt'])
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-dt']),
                 TextColumn::make('sincronizado')
                     ->label('Sincronizado')
                     ->state(fn (ForcaVendasOrder $record): string => $record->received_at ? ErpTimezone::toLocal($record->received_at)->format('d/m/Y H:i') : '—')
-                    ->alignCenter(),
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'erp-fv-mon-dt'])
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-dt']),
                 ViewColumn::make('desconto')
                     ->label('Desc.')
                     ->state(fn (ForcaVendasOrder $record): float => self::totalDesconto($record))
@@ -253,7 +247,9 @@ class ForcaVendasMonitorResource extends Resource
                     })
                     ->html()
                     ->placeholder('—')
-                    ->wrap(false),
+                    ->wrap(false)
+                    ->extraHeaderAttributes(['class' => 'erp-fv-mon-meio'])
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-meio']),
                 TextColumn::make('plataforma')
                     ->label('Plataforma')
                     ->state(fn (ForcaVendasOrder $record): string => self::plataformaLabel($record))

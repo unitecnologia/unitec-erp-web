@@ -1,0 +1,192 @@
+/* RH — Escalas (vínculos + calendário leve) */
+
+.erp-rh-escalas-page .erp-rh-escalas__status-wrap {
+    margin: 0.35rem 0.5rem 0;
+}
+
+.erp-rh-escalas-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-escalas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.5rem;
+    max-width: 4.5rem;
+}
+
+.erp-rh-escalas-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-escalas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    min-width: 10rem;
+}
+
+.erp-rh-escalas-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.35rem 0.5rem 0.5rem;
+    border-top: 1px solid var(--erp-border-soft, #dbe4f0);
+}
+
+.erp-rh-escalas-actions__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.22rem 0.45rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #fff 0%, #eef4fb 100%);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.erp-rh-escalas-actions__btn--close {
+    margin-left: auto;
+    border-color: #fca5a5;
+    background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+.erp-rh-escalas__escala-row {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    flex: 1;
+}
+
+.erp-rh-escalas__mini-btn {
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #f8fafc;
+    padding: 0.2rem 0.45rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.erp-rh-escalas__dias-grid {
+    margin-top: 0.5rem;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.erp-rh-escalas__dias-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-rh-escalas__dias-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.erp-rh-escalas__dia-chip {
+    min-width: 2.2rem;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #f1f5f9;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.erp-rh-escalas__dia-chip--on {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    color: #1e3a8a;
+}
+
+.erp-rh-escalas__dia-chip--folga.erp-rh-escalas__dia-chip--on {
+    background: #dcfce7;
+    border-color: #22c55e;
+    color: #14532d;
+}
+
+.erp-rh-escalas__hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.68rem;
+    color: #64748b;
+}
+
+.erp-rh-escala-calendario-modal__window {
+    max-width: 42rem;
+    width: min(42rem, 96vw);
+}
+
+.erp-rh-escalas-cal__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.erp-rh-escalas-cal__mes {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.erp-rh-escalas-cal__nav,
+.erp-rh-escalas-cal__print {
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #f8fafc;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.erp-rh-escalas-cal__table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.65rem;
+}
+
+.erp-rh-escalas-cal__table th {
+    padding: 0.25rem;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+    text-align: center;
+    font-weight: 700;
+}
+
+.erp-rh-escalas-cal__cell {
+    vertical-align: top;
+    height: 3.4rem;
+    border: 1px solid #e2e8f0;
+    padding: 0.15rem;
+    background: #fff;
+}
+
+.erp-rh-escalas-cal__cell--trabalho {
+    background: #eff6ff;
+}
+
+.erp-rh-escalas-cal__cell--folga {
+    background: #f0fdf4;
+}
+
+.erp-rh-escalas-cal__cell--plantao {
+    background: #fff7ed;
+}
+
+.erp-rh-escalas-cal__cell--ajuste {
+    outline: 2px solid #f59e0b;
+    outline-offset: -2px;
+}
+
+.erp-rh-escalas-cal__dia-num {
+    display: block;
+    font-weight: 700;
+    font-size: 0.7rem;
+}
+
+.erp-rh-escalas-cal__dia-label {
+    display: block;
+    line-height: 1.1;
+}
+
+.erp-rh-escalas-cal__hora {
+    display: block;
+    color: #475569;
+    font-size: 0.6rem;
+}

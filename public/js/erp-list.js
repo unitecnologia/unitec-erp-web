@@ -321,14 +321,22 @@ function resolvePageConfig(page) {
     return window.__erpListConfigByClass[pageClass] || null;
 }
 
+const ERP_LIST_KEYS_VERSION = 2;
+
 function ensureKeyboardShortcutsBound() {
-    if (window.__erpListKeysBound === true) {
+    // wire:navigate pode recarregar este arquivo sem limpar o listener antigo.
+    if (window.__erpListKeysVersion === ERP_LIST_KEYS_VERSION && window.__erpListKeysBound === true) {
         return;
     }
 
+    if (typeof window.__erpListKeysHandler === 'function') {
+        document.removeEventListener('keydown', window.__erpListKeysHandler);
+    }
+
+    window.__erpListKeysVersion = ERP_LIST_KEYS_VERSION;
     window.__erpListKeysBound = true;
 
-    document.addEventListener('keydown', (event) => {
+    window.__erpListKeysHandler = (event) => {
         const activePage = document.querySelector('.erp-list-page');
 
         if (! activePage) {
@@ -364,12 +372,38 @@ function ensureKeyboardShortcutsBound() {
             return;
         }
 
-        if (event.target.matches('input, textarea, select, [contenteditable="true"]')) {
+        if (
+            event.target instanceof Element
+            && event.target.matches('input, textarea, select, [contenteditable="true"]')
+        ) {
             const searchFocusKey = config.searchFocusKey ?? 'F6';
 
             if (event.key !== searchFocusKey) {
                 return;
             }
+        }
+
+        // Link SPA (wire:navigate): atalho clica o mesmo controle visual — sem /livewire/update.
+        const keyedControl = activePage.querySelector(`[data-erp-key="${event.key}"]`);
+
+        if (keyedControl instanceof HTMLButtonElement && keyedControl.disabled) {
+            event.preventDefault();
+
+            return;
+        }
+
+        if (
+            keyedControl instanceof HTMLElement
+            && (
+                keyedControl.getAttribute('data-erp-spa-nav') === '1'
+                || keyedControl.hasAttribute('wire:navigate')
+                || (keyedControl instanceof HTMLAnchorElement && keyedControl.getAttribute('href'))
+            )
+        ) {
+            event.preventDefault();
+            keyedControl.click();
+
+            return;
         }
 
         const component = getLivewireComponent(activePage);
@@ -420,15 +454,6 @@ function ensureKeyboardShortcutsBound() {
             return;
         }
 
-        // Se existir botão com data-erp-key, respeita disabled (ex.: compra devolvida).
-        const keyedButton = activePage.querySelector(`[data-erp-key="${event.key}"]`);
-
-        if (keyedButton instanceof HTMLButtonElement && keyedButton.disabled) {
-            event.preventDefault();
-
-            return;
-        }
-
         event.preventDefault();
 
         // Abre o shell do envio na hora (antes do roundtrip Livewire).
@@ -462,7 +487,9 @@ function ensureKeyboardShortcutsBound() {
         } else {
             component.call(method);
         }
-    });
+    };
+
+    document.addEventListener('keydown', window.__erpListKeysHandler);
 }
 
 function isDataRow(page, row) {

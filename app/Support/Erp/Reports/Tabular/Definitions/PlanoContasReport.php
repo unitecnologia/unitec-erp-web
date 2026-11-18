@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\CaixaLancamento;
+use App\Models\PlanoConta;
 use App\Support\Erp\Financeiro\CaixaTransferencia;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
@@ -48,18 +49,37 @@ class PlanoContasReport extends AbstractTabularReport
 
     public function filterFields(): array
     {
-        return $this->withColumnsField($this->periodFilterFields());
+        return $this->withColumnsField([
+            ...$this->periodFilterFields(),
+            [
+                'key' => 'plano',
+                'label' => 'Plano de Contas',
+                'type' => 'lookup',
+                'placeholder' => 'Todos os planos',
+                'options' => $this->planoOptions(),
+            ],
+        ]);
     }
 
     public function build(Request $request): array
     {
         [$de, $ate] = $this->periodFromRequest($request);
         $columns = $this->resolveColumns($request->query('cols'));
+        $planoId = (int) $request->query('plano', 0);
+        $planoFiltro = $planoId > 0 ? $this->resolverPlanoComSubplanos($planoId) : null;
 
         $query = CaixaLancamento::query()
             ->leftJoin('planos_contas', 'planos_contas.id', '=', 'caixa_lancamentos.plano_conta_id')
             ->whereBetween('caixa_lancamentos.emissao', [$de->toDateString(), $ate->toDateString()]);
         CaixaTransferencia::excluirDoQuery($query, 'caixa_lancamentos.documento');
+
+        if ($planoFiltro !== null) {
+            if ($planoFiltro['ids'] === []) {
+                $query->whereRaw('0 = 1');
+            } else {
+                $query->whereIn('caixa_lancamentos.plano_conta_id', $planoFiltro['ids']);
+            }
+        }
 
         $rows = $query
             ->groupBy(
@@ -93,11 +113,116 @@ class PlanoContasReport extends AbstractTabularReport
             })
             ->all();
 
+        $summary = ['PERÍODO: ' . $this->periodLabel($de, $ate)];
+
+        if ($planoFiltro !== null) {
+            $plano = $planoFiltro['plano'];
+            if (! $plano instanceof PlanoConta) {
+                $summary[] = 'PLANO: não encontrado';
+            } else {
+                $linha = 'PLANO: ' . $this->rotuloPlano($plano);
+                if (count($planoFiltro['ids']) > 1) {
+                    $linha .= ' (inclui subplanos)';
+                }
+                $summary[] = $linha;
+            }
+        }
+
         return $this->result(
-            ['de' => $de->toDateString(), 'ate' => $ate->toDateString(), 'cols' => $columns],
+            [
+                'de' => $de->toDateString(),
+                'ate' => $ate->toDateString(),
+                'plano' => $planoId > 0 ? (string) $planoId : '',
+                'cols' => $columns,
+            ],
             $columns,
             $rows,
-            ['PERÍODO: ' . $this->periodLabel($de, $ate)],
+            $summary,
         );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function planoOptions(): array
+    {
+        $options = [];
+
+        foreach (
+            PlanoConta::query()
+                ->orderBy('codigo')
+                ->get(['id', 'codigo', 'conta_completa', 'descricao']) as $plano
+        ) {
+            $options[(string) $plano->id] = $this->rotuloPlano($plano);
+        }
+
+        return $options;
+    }
+
+    /**
+     * Plano escolhido e descendentes: filhos por pai_codigo e por conta completa (1, 1.01, 1.01.001).
+     *
+     * @return array{plano: ?PlanoConta, ids: list<int>}
+     */
+    private function resolverPlanoComSubplanos(int $planoId): array
+    {
+        $raiz = PlanoConta::query()->whereKey($planoId)->first(['id', 'codigo', 'conta_completa', 'descricao']);
+
+        if (! $raiz instanceof PlanoConta) {
+            return ['plano' => null, 'ids' => []];
+        }
+
+        $ids = [(int) $raiz->id => true];
+        $codigosVistos = [(int) $raiz->codigo => true];
+        $pendentes = [(int) $raiz->codigo];
+
+        $conta = trim((string) ($raiz->conta_completa ?? ''));
+
+        if ($conta !== '') {
+            $prefixo = addcslashes($conta, '\\%_') . '.%';
+
+            foreach (
+                PlanoConta::query()
+                    ->where('conta_completa', 'like', $prefixo)
+                    ->get(['id', 'codigo']) as $filho
+            ) {
+                $ids[(int) $filho->id] = true;
+                $codigo = (int) $filho->codigo;
+
+                if (! isset($codigosVistos[$codigo])) {
+                    $codigosVistos[$codigo] = true;
+                    $pendentes[] = $codigo;
+                }
+            }
+        }
+
+        for ($nivel = 0; $nivel < 12 && $pendentes !== []; $nivel++) {
+            $lote = $pendentes;
+            $pendentes = [];
+
+            foreach (
+                PlanoConta::query()
+                    ->whereIn('pai_codigo', $lote)
+                    ->get(['id', 'codigo']) as $filho
+            ) {
+                $ids[(int) $filho->id] = true;
+                $codigo = (int) $filho->codigo;
+
+                if (! isset($codigosVistos[$codigo])) {
+                    $codigosVistos[$codigo] = true;
+                    $pendentes[] = $codigo;
+                }
+            }
+        }
+
+        return ['plano' => $raiz, 'ids' => array_map('intval', array_keys($ids))];
+    }
+
+    private function rotuloPlano(PlanoConta $plano): string
+    {
+        $conta = trim((string) ($plano->conta_completa ?? ''));
+        $codigo = $conta !== '' ? $conta : (string) $plano->codigo;
+
+        return $codigo . ' — ' . mb_strtoupper((string) $plano->descricao, 'UTF-8');
     }
 }

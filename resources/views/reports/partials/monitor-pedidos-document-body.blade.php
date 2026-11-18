@@ -3,7 +3,58 @@
 
     $blocos = $blocos ?? [];
     $impSemColunaDesconto = filter_var($impSemColunaDesconto ?? true, FILTER_VALIDATE_BOOLEAN);
+    $exibirCabecalhoEmpresa = filter_var($exibirCabecalhoEmpresa ?? false, FILTER_VALIDATE_BOOLEAN);
     $colSpanVazio = $impSemColunaDesconto ? 6 : 7;
+
+    $empresaCabecalho = null;
+    if ($exibirCabecalhoEmpresa && isset($empresa) && $empresa) {
+        $razao = trim((string) ($empresa->razao_social ?: $empresa->nome ?: ''));
+        $fantasia = trim((string) ($empresa->fantasia ?: ''));
+        if ($fantasia !== '' && $razao !== '' && mb_strtoupper($fantasia, 'UTF-8') === mb_strtoupper($razao, 'UTF-8')) {
+            $fantasia = '';
+        }
+
+        $enderecoPartes = array_values(array_filter([
+            filled($empresa->endereco) ? trim((string) $empresa->endereco) : null,
+            filled($empresa->numero) ? trim((string) $empresa->numero) : null,
+            filled($empresa->complemento) ? trim((string) $empresa->complemento) : null,
+            filled($empresa->bairro) ? trim((string) $empresa->bairro) : null,
+        ], static fn ($v) => $v !== null && $v !== ''));
+
+        $enderecoLinha = '';
+        if ($enderecoPartes !== []) {
+            $enderecoLinha = array_shift($enderecoPartes);
+            if ($enderecoPartes !== []) {
+                $enderecoLinha .= ', '.implode(' - ', $enderecoPartes);
+            }
+        }
+
+        $cidadeUf = trim(implode('/', array_filter([
+            filled($empresa->cidade) ? trim((string) $empresa->cidade) : null,
+            filled($empresa->uf) ? trim((string) $empresa->uf) : null,
+        ])));
+
+        $logoSrc = filled($logoDataUri ?? null)
+            ? (string) $logoDataUri
+            : (filled($logoUrl ?? null) ? (string) $logoUrl : '');
+
+        $empresaCabecalho = [
+            'logo' => $logoSrc,
+            'razao' => $razao,
+            'fantasia' => $fantasia,
+            'cnpj' => filled($empresa->cnpj) ? trim((string) $empresa->cnpj) : '',
+            'ie' => filled($empresa->ie) ? trim((string) $empresa->ie) : '',
+            'endereco' => $enderecoLinha,
+            'cidade_uf' => $cidadeUf,
+            'cep' => filled($empresa->cep) ? trim((string) $empresa->cep) : '',
+            'telefone' => filled($empresa->telefone) ? trim((string) $empresa->telefone) : '',
+        ];
+
+        $temAlgumDado = collect($empresaCabecalho)->contains(static fn ($v) => $v !== '');
+        if (! $temAlgumDado) {
+            $empresaCabecalho = null;
+        }
+    }
 @endphp
 
 <div class="monitor-pedidos-doc">
@@ -20,6 +71,61 @@
                     <td>
                         <div class="monitor-pedidos-doc__block">
                             <div class="monitor-pedidos-doc__keep-start">
+                                @if ($empresaCabecalho !== null)
+                                    <div class="monitor-pedidos-doc__empresa-cab">
+                                        <table class="monitor-pedidos-doc__empresa-cab-table">
+                                            <tr>
+                                                @if ($empresaCabecalho['logo'] !== '')
+                                                    <td class="monitor-pedidos-doc__empresa-cab-logo">
+                                                        <img src="{{ $empresaCabecalho['logo'] }}" alt="Logomarca">
+                                                    </td>
+                                                @endif
+                                                <td class="monitor-pedidos-doc__empresa-cab-dados">
+                                                    @if ($empresaCabecalho['razao'] !== '')
+                                                        <div class="monitor-pedidos-doc__empresa-cab-nome">{{ mb_strtoupper($empresaCabecalho['razao'], 'UTF-8') }}</div>
+                                                    @endif
+                                                    @if ($empresaCabecalho['fantasia'] !== '')
+                                                        <div class="monitor-pedidos-doc__empresa-cab-line">{{ mb_strtoupper($empresaCabecalho['fantasia'], 'UTF-8') }}</div>
+                                                    @endif
+                                                    @if ($empresaCabecalho['cnpj'] !== '' || $empresaCabecalho['ie'] !== '')
+                                                        <div class="monitor-pedidos-doc__empresa-cab-line">
+                                                            @if ($empresaCabecalho['cnpj'] !== '')
+                                                                <span class="monitor-pedidos-doc__meta-label">CNPJ:</span> {{ $empresaCabecalho['cnpj'] }}
+                                                            @endif
+                                                            @if ($empresaCabecalho['cnpj'] !== '' && $empresaCabecalho['ie'] !== '')
+                                                                &nbsp;&nbsp;
+                                                            @endif
+                                                            @if ($empresaCabecalho['ie'] !== '')
+                                                                <span class="monitor-pedidos-doc__meta-label">IE:</span> {{ $empresaCabecalho['ie'] }}
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                    @if ($empresaCabecalho['endereco'] !== '')
+                                                        <div class="monitor-pedidos-doc__empresa-cab-line">{{ mb_strtoupper($empresaCabecalho['endereco'], 'UTF-8') }}</div>
+                                                    @endif
+                                                    @if ($empresaCabecalho['cidade_uf'] !== '' || $empresaCabecalho['cep'] !== '')
+                                                        <div class="monitor-pedidos-doc__empresa-cab-line">
+                                                            @if ($empresaCabecalho['cidade_uf'] !== '')
+                                                                {{ mb_strtoupper($empresaCabecalho['cidade_uf'], 'UTF-8') }}
+                                                            @endif
+                                                            @if ($empresaCabecalho['cidade_uf'] !== '' && $empresaCabecalho['cep'] !== '')
+                                                                &nbsp;&nbsp;
+                                                            @endif
+                                                            @if ($empresaCabecalho['cep'] !== '')
+                                                                <span class="monitor-pedidos-doc__meta-label">CEP:</span> {{ $empresaCabecalho['cep'] }}
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                    @if ($empresaCabecalho['telefone'] !== '')
+                                                        <div class="monitor-pedidos-doc__empresa-cab-line">
+                                                            <span class="monitor-pedidos-doc__meta-label">Tel:</span> {{ $empresaCabecalho['telefone'] }}
+                                                        </div>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                @endif
                                 <div class="monitor-pedidos-doc__meta-wrap">
                                     @if (filled($bloco['status_label'] ?? null))
                                         <span class="monitor-pedidos-doc__status monitor-pedidos-doc__status--{{ $bloco['status_key'] ?? 'pendente' }}">

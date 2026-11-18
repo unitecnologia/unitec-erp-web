@@ -56,7 +56,9 @@ class LicencaRemotaService
     }
 
     /**
-     * Única verificação “pesada” da sessão: no login (barra Abrindo o sistema).
+     * Verificação da sessão no login (barra Abrindo o sistema).
+     * Consulta /api/licenca só se não houver cache/grace. Mensalidade (portal de
+     * pagamento) é agendada pós-resposta — não segura a tela de boot.
      * Depois disso o middleware só lê o gate da sessão — sem HTTP.
      *
      * Portal offline: mantém grace/INDISPONIVEL (libera), exceto se mensalidade local estiver vencida.
@@ -87,14 +89,15 @@ class LicencaRemotaService
         }
 
         // Licença em cache/grace ainda vale e bloqueia se estiver vencida ou bloqueada.
-        // Sem cache, consulta o portal uma vez. A mensalidade já em cache também bloqueia;
-        // só busca o vencimento no portal quando ainda não há cache.
+        // Sem cache, consulta o portal uma vez. Mensalidade (portal de pagamento) NÃO
+        // bloqueia o login: agenda pós-resposta — sync síncrono custava 1,5–3s+ e
+        // segurava a tela "Abrindo o sistema". Bloqueio usa status/valido_ate/cache.
         $snapshot = $this->checkCnpj($cnpj, forceRefresh: false);
         $this->rememberLoginGate($snapshot);
         $this->hydrateMensalidadeFromCache($cnpj);
 
         if ($this->mensalidadeFromCache($cnpj) === null) {
-            $this->syncMensalidadeNoGate($cnpj);
+            $this->scheduleMensalidadeSync($cnpj);
         }
 
         $this->rememberLoginGate($snapshot);
@@ -114,7 +117,7 @@ class LicencaRemotaService
             $this->hydrateMensalidadeFromCache($this->currentCnpj());
 
             if ($this->loginGateMensalidadeDueDate() === null) {
-                $this->syncMensalidadeNoGate($this->currentCnpj());
+                $this->scheduleMensalidadeSync($this->currentCnpj());
             }
 
             return $this->applyMensalidadeExpiry($existing);
@@ -150,7 +153,7 @@ class LicencaRemotaService
             $this->hydrateMensalidadeFromCache($cnpj);
 
             if ($this->loginGateMensalidadeDueDate() === null) {
-                $this->syncMensalidadeNoGate($cnpj);
+                $this->scheduleMensalidadeSync($cnpj);
             }
 
             return $this->applyMensalidadeExpiry($local);
@@ -166,7 +169,7 @@ class LicencaRemotaService
         $this->hydrateMensalidadeFromCache($cnpj);
 
         if ($this->loginGateMensalidadeDueDate() === null) {
-            $this->syncMensalidadeNoGate($cnpj);
+            $this->scheduleMensalidadeSync($cnpj);
         }
 
         return $this->applyMensalidadeExpiry($snapshot);

@@ -18,7 +18,10 @@ use RuntimeException;
 
 class NfeVendaMercadoriaService
 {
-    public function validar(Venda $venda, ?Empresa $empresaEmitente = null): void
+    /**
+     * @param  bool  $permitirConsumidorFinalIncompleto  Rascunho manual (Monitor): permite CF quando o parâmetro Fiscal estiver ativo. Lote/transmissão devem permanecer false.
+     */
+    public function validar(Venda $venda, ?Empresa $empresaEmitente = null, bool $permitirConsumidorFinalIncompleto = false): void
     {
         $venda->loadMissing(['itens', 'cliente', 'vendedor', 'forcaVendasOrder.pedido']);
 
@@ -42,8 +45,15 @@ class NfeVendaMercadoriaService
             throw new RuntimeException('Empresa não identificada para a venda.');
         }
 
-        $this->assertClienteAptoParaNfe($venda->cliente);
-        $this->resolveCfop($empresa, $venda->cliente);
+        $cliente = $venda->cliente;
+        $pularCadastroCf = $permitirConsumidorFinalIncompleto
+            && NfeClienteCadastro::ehConsumidorFinalParaBloqueioNfe($cliente);
+
+        if (! $pularCadastroCf) {
+            $this->assertClienteAptoParaNfe($cliente);
+        }
+
+        $this->resolveCfop($empresa, $cliente);
 
         if ($this->temNfeAtiva($venda)) {
             throw new RuntimeException('Esta venda já possui NF-e vinculada.');
@@ -146,10 +156,11 @@ class NfeVendaMercadoriaService
      */
     /**
      * @param  Empresa|null  $empresaEmitente  Quando informada (Monitor multi-empresa), CFOP/natureza usam esta empresa; itens/valores/faturas continuam da venda da Matriz.
+     * @param  bool  $permitirConsumidorFinalIncompleto  Somente rascunho (abrir NF-e); não usar no lote auto-transmitido.
      */
-    public function montarPayload(Venda $venda, ?Empresa $empresaEmitente = null): array
+    public function montarPayload(Venda $venda, ?Empresa $empresaEmitente = null, bool $permitirConsumidorFinalIncompleto = false): array
     {
-        $this->validar($venda, $empresaEmitente);
+        $this->validar($venda, $empresaEmitente, $permitirConsumidorFinalIncompleto);
 
         $venda->loadMissing(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.pedido']);
 

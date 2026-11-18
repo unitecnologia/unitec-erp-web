@@ -13,6 +13,7 @@ use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\CaixaAbertoGuard;
+use App\Support\Pix\PixPdvLivroCaixaService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
@@ -129,6 +130,7 @@ final class PdvCaixaFechamentoService
      */
     private function saldoTransferivel(iterable $movimentos): float
     {
+        $pixNoBanco = $this->vendasPixJaNoBanco($movimentos);
         $saldo = 0.0;
 
         foreach ($movimentos as $movimento) {
@@ -136,10 +138,41 @@ final class PdvCaixaFechamentoService
                 continue;
             }
 
+            $forma = mb_strtoupper(trim((string) ($movimento->forma_pagamento ?? '')), 'UTF-8');
+            $vendaId = (int) ($movimento->pdv_venda_id ?? 0);
+            if ($vendaId > 0 && str_contains($forma, 'PIX') && isset($pixNoBanco[$vendaId])) {
+                continue;
+            }
+
             $saldo += (float) $movimento->entrada - (float) $movimento->saida;
         }
 
         return round($saldo, 2);
+    }
+
+    /**
+     * @param  iterable<PdvCaixaMovimento>  $movimentos
+     * @return array<int, true>
+     */
+    private function vendasPixJaNoBanco(iterable $movimentos): array
+    {
+        $vendaIds = [];
+
+        foreach ($movimentos as $movimento) {
+            $forma = mb_strtoupper(trim((string) ($movimento->forma_pagamento ?? '')), 'UTF-8');
+            $vendaId = (int) ($movimento->pdv_venda_id ?? 0);
+            if ($vendaId > 0 && str_contains($forma, 'PIX')) {
+                $vendaIds[] = $vendaId;
+            }
+        }
+
+        $ids = PixPdvLivroCaixaService::pdvVendaIdsJaNoBanco($vendaIds);
+        $map = [];
+        foreach ($ids as $id) {
+            $map[$id] = true;
+        }
+
+        return $map;
     }
 
     /**

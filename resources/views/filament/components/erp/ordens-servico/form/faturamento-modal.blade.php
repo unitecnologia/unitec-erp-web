@@ -337,6 +337,8 @@
                                             inputmode="decimal"
                                             autocomplete="off"
                                             aria-label="Acréscimo percentual"
+                                            x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                            x-on:mouseup.stop.prevent="$el.select()"
                                         >
                                     </label>
                                     <label class="erp-fv-fin__ajuste-field">
@@ -349,6 +351,8 @@
                                             inputmode="decimal"
                                             autocomplete="off"
                                             aria-label="Acréscimo em reais"
+                                            x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                            x-on:mouseup.stop.prevent="$el.select()"
                                         >
                                     </label>
                                 </div>
@@ -365,6 +369,8 @@
                                             inputmode="decimal"
                                             autocomplete="off"
                                             aria-label="Desconto percentual"
+                                            x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                            x-on:mouseup.stop.prevent="$el.select()"
                                         >
                                     </label>
                                     <label class="erp-fv-fin__ajuste-field">
@@ -377,6 +383,8 @@
                                             inputmode="decimal"
                                             autocomplete="off"
                                             aria-label="Desconto em reais"
+                                            x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                            x-on:mouseup.stop.prevent="$el.select()"
                                         >
                                     </label>
                                 </div>

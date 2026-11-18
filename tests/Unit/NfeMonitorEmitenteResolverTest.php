@@ -34,7 +34,7 @@ class NfeMonitorEmitenteResolverTest extends TestCase
         $this->assertTrue((new NfeMonitorEmitenteResolver())->flagAtivo($matriz));
     }
 
-    public function test_opcoes_pivot_intersect_acesso_intersect_ativas(): void
+    public function test_opcoes_incluem_matriz_mais_pivot_acessivel_ativo(): void
     {
         [$matriz, $acessivel, $semAcesso, $user] = $this->seedMatrizComDuasEmitentes();
 
@@ -43,21 +43,21 @@ class NfeMonitorEmitenteResolverTest extends TestCase
             array_column((new NfeMonitorEmitenteResolver())->opcoesParaUsuario($matriz, $user), 'id')
         );
 
-        $this->assertSame([(int) $acessivel->id], $ids);
+        $this->assertSame([(int) $matriz->id, (int) $acessivel->id], $ids);
         $this->assertNotContains((int) $semAcesso->id, $ids);
     }
 
-    public function test_empresa_inativa_nao_aparece(): void
+    public function test_emitente_pivot_inativa_some_mas_matriz_permanece(): void
     {
         [$matriz, $acessivel, $semAcesso, $user] = $this->seedMatrizComDuasEmitentes();
         $acessivel->update(['ativo' => false]);
 
-        $ids = array_column(
-            (new NfeMonitorEmitenteResolver())->opcoesParaUsuario($matriz->fresh(), $user),
-            'id'
+        $ids = array_map(
+            'intval',
+            array_column((new NfeMonitorEmitenteResolver())->opcoesParaUsuario($matriz->fresh(), $user), 'id')
         );
 
-        $this->assertSame([], $ids);
+        $this->assertSame([(int) $matriz->id], $ids);
     }
 
     public function test_empresa_fora_do_pivot_nao_aparece_mesmo_com_acesso(): void
@@ -81,7 +81,7 @@ class NfeMonitorEmitenteResolverTest extends TestCase
             array_column((new NfeMonitorEmitenteResolver())->opcoesParaUsuario($matriz, $user->fresh()), 'id')
         );
 
-        $this->assertSame([(int) $acessivel->id], $ids);
+        $this->assertSame([(int) $matriz->id, (int) $acessivel->id], $ids);
         $this->assertNotContains((int) $foraPivot->id, $ids);
     }
 
@@ -90,12 +90,13 @@ class NfeMonitorEmitenteResolverTest extends TestCase
         [$matriz, $acessivel, $semAcesso, $user] = $this->seedMatrizComDuasEmitentes();
         $resolver = new NfeMonitorEmitenteResolver();
 
+        $this->assertTrue($resolver->emitentePermitida((int) $matriz->id, $matriz, $user));
         $this->assertTrue($resolver->emitentePermitida((int) $acessivel->id, $matriz, $user));
         $this->assertFalse($resolver->emitentePermitida((int) $semAcesso->id, $matriz, $user));
         $this->assertFalse($resolver->emitentePermitida(999999, $matriz, $user));
     }
 
-    public function test_opcoes_vazias_quando_sem_emitentes_configuradas(): void
+    public function test_somente_matriz_quando_sem_emitentes_no_pivot(): void
     {
         $matriz = Empresa::query()->create([
             'nome' => 'MATRIZ SEM PIVOT',
@@ -109,7 +110,12 @@ class NfeMonitorEmitenteResolverTest extends TestCase
         ]);
         $user->empresas()->sync([(int) $matriz->id]);
 
-        $this->assertSame([], (new NfeMonitorEmitenteResolver())->opcoesParaUsuario($matriz, $user));
+        $ids = array_map(
+            'intval',
+            array_column((new NfeMonitorEmitenteResolver())->opcoesParaUsuario($matriz, $user), 'id')
+        );
+
+        $this->assertSame([(int) $matriz->id], $ids);
     }
 
     public function test_nenhuma_nfe_criada_pelo_resolver(): void

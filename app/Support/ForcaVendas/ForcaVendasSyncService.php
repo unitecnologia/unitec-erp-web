@@ -28,10 +28,12 @@ use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\FaturamentoPendenciaFinanceiraGuard;
 use App\Support\Erp\PersonCpfCnpjUnicidade;
 use App\Support\Erp\PersonDocumentoDuplicadoException;
 use App\Support\Erp\ProductAppCatalog;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Support\Erp\ProductTabelaPrecoService;
 use App\Support\Pix\PixProviderManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +69,7 @@ class ForcaVendasSyncService
                 'pix_api_habilitada' => app(PixProviderManager::class)->apiHabilitadaParaEmpresa($empresaId),
                 'empresa_id' => $empresaId,
                 'ver_todos_clientes' => $verTodosClientes,
+                'alterar_preco_unitario' => $this->alterarPrecoUnitarioPermitido($empresaId),
                 'desconto_reais_item_modo' => $this->descontoReaisItemModo($empresaId),
                 'imp_valor_liquido' => $this->impressaoPedidoValorLiquido($empresaId),
                 'imp_sem_coluna_desconto' => $this->impressaoPedidoSemColunaDesconto($empresaId),
@@ -968,22 +971,62 @@ class ForcaVendasSyncService
                 }
 
                 $linha = 1;
+                $empresaIdPedido = $user->empresa_id ? (int) $user->empresa_id : null;
+                $podeAlterarPreco = $this->alterarPrecoUnitarioPermitido($empresaIdPedido);
+                $tabSvc = app(ProductTabelaPrecoService::class);
 
                 foreach ($itens as $item) {
                     $productId = (int) ($item['product_id'] ?? 0);
+                    $product = $productId > 0
+                        ? Product::query()->find($productId)
+                        : null;
 
-                    if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
+                    if (! $product) {
                         throw new \RuntimeException('Produto inválido no item '.$linha.'.');
                     }
 
                     $quantidade = (float) ($item['quantidade'] ?? 0);
-                    $preco = (float) ($item['preco_unitario'] ?? 0);
-                    $descItem = (float) ($item['desconto'] ?? 0);
-                    $totalItem = round(($quantidade * $preco) - $descItem, 2);
-                    $subtotal += $totalItem;
+                    $preco = round((float) ($item['preco_unitario'] ?? 0), 2);
+                    $descItem = round((float) ($item['desconto'] ?? 0), 2);
+
+                    if ($quantidade <= 0) {
+                        throw new \RuntimeException('Quantidade inválida no item '.$linha.'.');
+                    }
+
+                    if ($preco <= 0) {
+                        throw new \RuntimeException('Preço unitário inválido no item '.$linha.'.');
+                    }
+
+                    if ($descItem < 0) {
+                        throw new \RuntimeException('Desconto inválido no item '.$linha.'.');
+                    }
 
                     $nivelItem = strtolower(trim((string) ($item['tabela_nivel'] ?? $item['nivel'] ?? '')));
                     $priceTableItem = (int) ($item['price_table_id'] ?? 0);
+                    $precoEsperado = $this->precoEsperadoItemApp(
+                        $product,
+                        $quantidade,
+                        $nivelItem !== '' ? $nivelItem : null,
+                        $priceTableItem > 0 ? $priceTableItem : null,
+                        $empresaIdPedido,
+                        $tabSvc,
+                    );
+
+                    if (! $podeAlterarPreco && abs($preco - $precoEsperado) > 0.009) {
+                        throw new \RuntimeException(
+                            'Preço unitário diferente do cadastro/tabela no item '.$linha
+                            .'. A empresa não permite alterar preço no App Força de Vendas.'
+                        );
+                    }
+
+                    $totalItem = round(($quantidade * $preco) - $descItem, 2);
+
+                    if ($totalItem < 0) {
+                        throw new \RuntimeException('Total do item '.$linha.' ficou negativo.');
+                    }
+
+                    $subtotal += $totalItem;
+
                     $itensTable = $isPedido ? 'pedido_itens' : 'orcamento_itens';
 
                     $itemAttrs = [
@@ -1026,7 +1069,13 @@ class ForcaVendasSyncService
 
                 // Pedido com restrição financeira fica em "financeiro" até liberação
                 // no Monitor de Vendas. Demais chegam como "pendente".
-                $restricaoFinanceira = $isPedido && ! empty($order['restricao_financeira']);
+                // Financeiro → "Ignorar financeiro" marcado: não retém (fatura direto).
+                $empresaSyncId = (int) ($user->empresa_id ?? 0);
+                $restricaoFinanceira = $isPedido
+                    && ! empty($order['restricao_financeira'])
+                    && FaturamentoPendenciaFinanceiraGuard::deveReterPorPendenciaCliente(
+                        $empresaSyncId > 0 ? $empresaSyncId : null,
+                    );
 
                 $fvOrder = ForcaVendasOrder::query()->create([
                     'uuid' => $uuid,
@@ -1471,19 +1520,44 @@ class ForcaVendasSyncService
             ->value('param_forca_vendas_ver_todos_clientes');
     }
 
+    private function alterarPrecoUnitarioPermitido(?int $empresaId): bool
+    {
+        return EmpresaParametros::forcaVendasAlterarPrecoUnitario($empresaId);
+    }
+
+    /**
+     * Preço de catálogo/tabela esperado para o item (mesma lógica do app).
+     */
+    private function precoEsperadoItemApp(
+        Product $product,
+        float $quantidade,
+        ?string $nivel,
+        ?int $priceTableId,
+        ?int $empresaId,
+        ProductTabelaPrecoService $tabSvc,
+    ): float {
+        $nivelNorm = $tabSvc->normalizarNivel($nivel)
+            ?? $tabSvc->nivelDaTabelaId($priceTableId)
+            ?? ProductTabelaPrecoService::NIVEL_VAREJO;
+
+        if ($product->usa_tab_preco ?? false) {
+            if ($tabSvc->habilitaNivel($product, $nivelNorm)) {
+                return $tabSvc->resolvePrecoNivel($product, $nivelNorm, $quantidade, $empresaId);
+            }
+
+            $habilitados = $tabSvc->niveisHabilitados($product);
+
+            if ($habilitados !== []) {
+                return $tabSvc->resolvePrecoNivel($product, $habilitados[0], $quantidade, $empresaId);
+            }
+        }
+
+        return $tabSvc->resolvePrecoNivel($product, $nivelNorm, $quantidade, $empresaId);
+    }
+
     private function descontoReaisItemModo(?int $empresaId): string
     {
-        if ($empresaId === null || $empresaId <= 0) {
-            return EmpresaParametros::DESCONTO_REAIS_ITEM_UNITARIO;
-        }
-
-        if (! Schema::hasColumn('empresas', 'param_monitor_vendas_desconto_reais_item_modo')) {
-            return EmpresaParametros::DESCONTO_REAIS_ITEM_UNITARIO;
-        }
-
-        return EmpresaParametros::normalizarDescontoReaisItemModo(
-            Empresa::query()->whereKey($empresaId)->value('param_monitor_vendas_desconto_reais_item_modo'),
-        );
+        return EmpresaParametros::descontoReaisItemModo($empresaId);
     }
 
     public function impressaoPedidoValorLiquido(?int $empresaId): bool

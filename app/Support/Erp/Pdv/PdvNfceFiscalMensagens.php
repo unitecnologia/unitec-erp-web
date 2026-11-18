@@ -9,6 +9,32 @@ final class PdvNfceFiscalMensagens
 {
     public const CSTAT_PRAZO_CANCELAMENTO = '501';
 
+    /** Mensagens curtas do PDV após gravação da venda (sem cStat/XML/SEFAZ ao operador). */
+    public const PDV_VENDA_CONCLUIDA = 'Venda concluída';
+
+    public const PDV_VENDA_NFCE_PENDENTE = 'Venda registrada. NFC-e pendente';
+
+    /**
+     * Texto discreto para o caixa após finalizar venda com NFC-e.
+     *
+     * @param  'autorizada'|'pendente'  $resultado
+     * @return array{titulo: string, corpo: string|null}
+     */
+    public static function mensagemPdvAposVenda(string $resultado): array
+    {
+        if ($resultado === 'autorizada') {
+            return [
+                'titulo' => self::PDV_VENDA_CONCLUIDA,
+                'corpo' => null,
+            ];
+        }
+
+        return [
+            'titulo' => self::PDV_VENDA_NFCE_PENDENTE,
+            'corpo' => null,
+        ];
+    }
+
     /**
      * @param  string|null  $ufEmitente  Sigla do emitente (SC/PR). Null/vazio preserva mensagens SC (compatibilidade).
      * @return array{titulo: string, corpo: string|null, modal: bool}

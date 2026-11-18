@@ -54,6 +54,13 @@ trait ProvidesPdvErpUiDefaults
     public string $reimprimirSearch = '';
 
     /** @var array<int, array<string, mixed>> */
+    public array $reimprimirNfceResults = [];
+
+    public ?int $selectedReimprimirNfceIndex = null;
+
+    public string $reimprimirNfceSearch = '';
+
+    /** @var array<int, array<string, mixed>> */
     public array $receberResults = [];
 
     public ?int $selectedReceberIndex = null;
@@ -108,6 +115,141 @@ trait ProvidesPdvErpUiDefaults
 
     /** @var array{desconto?: string, acrescimo?: string} */
     public array $descontoItemForm = ['desconto' => '0,00', 'acrescimo' => '0,00'];
+
+    /** SuperTEF (ERP): stubs para o blade compartilhado no offline. */
+    public bool $finalizarSuperTefAberta = false;
+
+    public bool $finalizarSuperTefConfirmado = false;
+
+    public bool $finalizarSuperTefEnviando = false;
+
+    public bool $finalizarSuperTefAguardandoConclusao = false;
+
+    public ?int $finalizarSuperTefIntencaoId = null;
+
+    public string $finalizarSuperTefValorLabel = '';
+
+    public string $finalizarSuperTefStatus = '';
+
+    public string $finalizarSuperTefErro = '';
+
+    public string $finalizarSuperTefOrderId = '';
+
+    public string $finalizarSuperTefPosLabel = '';
+
+    public bool $finalizarSuperTefEnvioLock = false;
+
+    public bool $finalizarSuperTefCancelando = false;
+
+    public bool $finalizarSuperTefConfirmNovaCobranca = false;
+
+    public ?int $finalizarSuperTefConfirmOcupanteId = null;
+
+    public bool $finalizarSuperTefNovaCobrancaAutorizada = false;
+
+    public bool $finalizarSuperTefResolverAberta = false;
+
+    public ?int $finalizarSuperTefResolverIntencaoId = null;
+
+    public bool $finalizarSuperTefResolverVerificado = false;
+
+    public bool $finalizarSuperTefResolverConfirmCancelar = false;
+
+    public bool $finalizarSuperTefResolverBusy = false;
+
+    public string $finalizarSuperTefResolverStatusLabel = '';
+
+    public string $finalizarSuperTefResolverDetalhe = '';
+
+    public function finalizarTemSuperTefComValor(): bool
+    {
+        return false;
+    }
+
+    public function finalizarSuperTefDevePollar(): bool
+    {
+        return false;
+    }
+
+    public function finalizarSuperTefPodeCancelarPagamento(): bool
+    {
+        return false;
+    }
+
+    public function enviarSuperTefPdvAgora(): void
+    {
+        //
+    }
+
+    public function concluirVendaAposSuperTefPago(): void
+    {
+        //
+    }
+
+    public function pollFinalizarSuperTef(): void
+    {
+        //
+    }
+
+    public function cancelFinalizarSuperTef(): void
+    {
+        //
+    }
+
+    public function cancelarPagamentoSuperTef(): void
+    {
+        //
+    }
+
+    public function voltarConfirmacaoNovaCobrancaSuperTef(): void
+    {
+        //
+    }
+
+    public function confirmarNovaCobrancaSuperTef(): void
+    {
+        //
+    }
+
+    public function voltarResolverPagamentoAnteriorSuperTef(): void
+    {
+        //
+    }
+
+    public function verificarPagamentoAnteriorSuperTef(): void
+    {
+        //
+    }
+
+    public function solicitarCancelamentoPagamentoAnteriorSuperTef(): void
+    {
+        //
+    }
+
+    public function confirmarCancelamentoPagamentoAnteriorSuperTef(): void
+    {
+        //
+    }
+
+    public function tratarPagamentoAnteriorAprovadoSuperTef(): void
+    {
+        //
+    }
+
+    public function finalizarSuperTefResolverPodeCancelar(): bool
+    {
+        return false;
+    }
+
+    public function finalizarSuperTefResolverPodeTratarPago(): bool
+    {
+        return false;
+    }
+
+    public function finalizarSuperTefResolverPosLiberada(): bool
+    {
+        return false;
+    }
 
     /**
      * Stub: offline não tem PdvConfig Filament; evita erro em blades que chamam.

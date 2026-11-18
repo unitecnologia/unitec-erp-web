@@ -2,16 +2,17 @@
     $columns = [
         ['key' => 'selecao', 'label' => '', 'sortable' => false, 'align' => 'center'],
         ['key' => 'numero', 'label' => 'Número', 'sortable' => true, 'align' => 'center'],
-        ['key' => 'npedido', 'label' => 'Ped/OS', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'serie', 'label' => 'Série', 'sortable' => true, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-serie', 'cellClass' => 'fi-ta-cell-serie'],
+        ['key' => 'npedido', 'label' => 'Ped/OS', 'sortable' => false, 'align' => 'start', 'headerClass' => 'fi-ta-header-cell-npedido', 'cellClass' => 'fi-ta-cell-npedido'],
         ['key' => 'data_emissao', 'label' => 'Dt.Emissão', 'sortable' => true, 'align' => 'center'],
         ['key' => 'data_saida', 'label' => 'Dt.Saída', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start'],
-        ['key' => 'chave', 'label' => 'Chave', 'sortable' => false, 'align' => 'start'],
-        ['key' => 'protocolo', 'label' => 'Protocolo', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'finalidade', 'label' => 'Finalidade', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'status', 'label' => 'Situação', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'total', 'label' => 'Total', 'sortable' => false, 'align' => 'end'],
-        ['key' => 'historico', 'label' => '', 'sortable' => false, 'align' => 'center'],
+        ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start', 'headerClass' => 'fi-ta-header-cell-cliente.nome-razao', 'cellClass' => 'fi-ta-cell-cliente.nome-razao'],
+        ['key' => 'chave', 'label' => 'Chave', 'sortable' => false, 'align' => 'start', 'headerClass' => 'fi-ta-header-cell-chave', 'cellClass' => 'fi-ta-cell-chave'],
+        ['key' => 'protocolo', 'label' => 'Protocolo', 'sortable' => false, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-protocolo', 'cellClass' => 'fi-ta-cell-protocolo'],
+        ['key' => 'finalidade', 'label' => 'Finalidade', 'sortable' => false, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-finalidade', 'cellClass' => 'fi-ta-cell-finalidade'],
+        ['key' => 'status', 'label' => 'Situação', 'sortable' => false, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-status', 'cellClass' => 'fi-ta-cell-status'],
+        ['key' => 'total', 'label' => 'Total', 'sortable' => false, 'align' => 'end', 'headerClass' => 'fi-ta-header-cell-total', 'cellClass' => 'fi-ta-cell-total'],
+        ['key' => 'historico', 'label' => '', 'sortable' => false, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-historico', 'cellClass' => 'fi-ta-cell-historico'],
     ];
 @endphp
 
@@ -26,10 +27,11 @@
                     @endphp
                     <th
                         scope="col"
-                        @class([
+                        @class(array_filter([
                             'fi-ta-header-cell',
-                            'text-' . $column['align'] => filled($column['align'] ?? null),
-                        ])
+                            'text-' . ($column['align'] ?? '') => filled($column['align'] ?? null),
+                            $column['headerClass'] ?? null,
+                        ]))
                         aria-sort="{{ $ariaSort }}"
                     >
                         @if ($column['sortable'] ?? false)
@@ -70,13 +72,17 @@
                     </td>
                     @foreach ($columns as $column)
                         @continue(in_array($column['key'], ['selecao', 'historico'], true))
-                        <td @class(['fi-ta-cell', 'text-' . $column['align'] => filled($column['align'] ?? null)])>
+                        <td @class(array_filter([
+                            'fi-ta-cell',
+                            'text-' . ($column['align'] ?? '') => filled($column['align'] ?? null),
+                            $column['cellClass'] ?? null,
+                        ]))>
                             <div class="fi-size-sm fi-font-semibold fi-ta-text-item {{ ($column['align'] ?? '') === 'center' ? 'fi-align-center' : '' }} {{ ($column['align'] ?? '') === 'end' ? 'fi-align-end' : '' }}">
                                 {!! $cells[$column['key']] ?? '—' !!}
                             </div>
                         </td>
                     @endforeach
-                    <td class="fi-ta-cell text-center">
+                    <td class="fi-ta-cell fi-ta-cell-historico text-center">
                         <span
                             role="button"
                             tabindex="0"

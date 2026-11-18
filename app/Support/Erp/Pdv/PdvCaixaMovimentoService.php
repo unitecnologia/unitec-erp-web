@@ -87,6 +87,12 @@ final class PdvCaixaMovimentoService
                 continue;
             }
 
+            // PIX Ailos (QR do PDV) já vai à conta BANCO na confirmação — não entra no CAIXA GERAL.
+            $pagId = (int) ($pagamento['pdv_venda_pagamento_id'] ?? 0);
+            if ($pagId > 0 && \App\Support\Pix\PixPdvLivroCaixaService::jaLancadoPagamento($pagId)) {
+                continue;
+            }
+
             $liquido = $valor;
 
             if ($forma === 'DINHEIRO' && $trocoRestante > 0) {

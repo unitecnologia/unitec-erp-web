@@ -24,6 +24,10 @@ class PdvVendaItem extends Model
         'desconto',
         'acrescimo',
         'total',
+        'custo_unitario',
+        'custo_total',
+        'custo_origem',
+        'custo_situacao',
     ];
 
     protected function casts(): array
@@ -34,6 +38,8 @@ class PdvVendaItem extends Model
             'desconto' => 'decimal:2',
             'acrescimo' => 'decimal:2',
             'total' => 'decimal:2',
+            'custo_unitario' => 'decimal:4',
+            'custo_total' => 'decimal:2',
         ];
     }
 

@@ -69,6 +69,84 @@ PHP;
     }
 
     #[Test]
+    public function find_forbidden_dev_markers_detecta_pail_em_services_php(): void
+    {
+        $services = <<<'PHP'
+<?php
+return [
+    'providers' => ['Laravel\\Pail\\PailServiceProvider'],
+    'eager' => ['Laravel\\Pail\\PailServiceProvider'],
+    'deferred' => [],
+];
+PHP;
+        file_put_contents($this->tmp.'/bootstrap/cache/services.php', $services);
+
+        $hits = $this->invoke('findForbiddenDevMarkersInManifest', [$this->tmp]);
+
+        $this->assertNotEmpty($hits);
+        $this->assertTrue(
+            collect($hits)->contains(fn ($h) => str_contains((string) $h, 'services.php') && str_contains((string) $h, 'Pail'))
+        );
+    }
+
+    #[Test]
+    public function sanitize_bootstrap_cache_remove_pail_de_packages_e_services(): void
+    {
+        $packages = <<<'PHP'
+<?php
+return [
+    'packages' => [
+        'laravel/pail' => ['providers' => ['Laravel\\Pail\\PailServiceProvider']],
+        'filament/filament' => ['providers' => ['Filament\\FilamentServiceProvider']],
+    ],
+];
+PHP;
+        $services = <<<'PHP'
+<?php
+return [
+    'providers' => [
+        'Filament\\FilamentServiceProvider',
+        'Laravel\\Pail\\PailServiceProvider',
+    ],
+    'eager' => [
+        'Filament\\FilamentServiceProvider',
+        'Laravel\\Pail\\PailServiceProvider',
+    ],
+    'deferred' => [],
+];
+PHP;
+        file_put_contents($this->tmp.'/bootstrap/cache/packages.php', $packages);
+        file_put_contents($this->tmp.'/bootstrap/cache/services.php', $services);
+
+        $this->invoke('sanitizeBootstrapCacheManifests', [$this->tmp]);
+
+        $hits = $this->invoke('findForbiddenDevMarkersInManifest', [$this->tmp]);
+        $this->assertSame([], $hits);
+
+        /** @var array<string, mixed> $cleanPackages */
+        $cleanPackages = include $this->tmp.'/bootstrap/cache/packages.php';
+        $this->assertArrayHasKey('filament/filament', $cleanPackages['packages']);
+        $this->assertArrayNotHasKey('laravel/pail', $cleanPackages['packages']);
+
+        /** @var array<string, mixed> $cleanServices */
+        $cleanServices = include $this->tmp.'/bootstrap/cache/services.php';
+        $this->assertNotContains('Laravel\\Pail\\PailServiceProvider', $cleanServices['providers']);
+        $this->assertContains('Filament\\FilamentServiceProvider', $cleanServices['providers']);
+    }
+
+    #[Test]
+    public function purge_forbidden_dev_vendor_residues_remove_pail(): void
+    {
+        $pail = $this->tmp.'/vendor/laravel/pail';
+        mkdir($pail, 0777, true);
+        file_put_contents($pail.'/composer.json', '{"name":"laravel/pail"}');
+
+        $this->invoke('purgeForbiddenDevVendorResidues', [$this->tmp]);
+
+        $this->assertDirectoryDoesNotExist($pail);
+    }
+
+    #[Test]
     public function find_forbidden_dev_markers_limpo_retorna_vazio(): void
     {
         $manifest = <<<'PHP'

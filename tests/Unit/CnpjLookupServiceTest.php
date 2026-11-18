@@ -3,15 +3,12 @@
 namespace Tests\Unit;
 
 use App\Support\Erp\CnpjLookupService;
-use Tests\Concerns\MigratesSqliteMemory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CnpjLookupServiceTest extends TestCase
 {
-    use MigratesSqliteMemory;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -112,5 +109,49 @@ class CnpjLookupServiceTest extends TestCase
         $service->fetch('22469772000100');
 
         Http::assertSentCount(3);
+    }
+
+    public function test_it_bypasses_cache_when_force_refresh(): void
+    {
+        Http::fake([
+            'api.opencnpj.org/*' => Http::sequence()
+                ->push([
+                    'cnpj' => '22469772000100',
+                    'razao_social' => 'EMPRESA ANTIGA LTDA',
+                    'logradouro' => 'RUA A',
+                    'numero' => '10',
+                    'cep' => '88337040',
+                    'uf' => 'SC',
+                    'municipio' => 'BALNEARIO CAMBORIU',
+                ])
+                ->push([
+                    'cnpj' => '22469772000100',
+                    'razao_social' => 'EMPRESA NOVA LTDA',
+                    'logradouro' => 'RUA B',
+                    'numero' => '20',
+                    'cep' => '88337040',
+                    'uf' => 'SC',
+                    'municipio' => 'BALNEARIO CAMBORIU',
+                ]),
+            'brasilapi.com.br/*' => Http::response(['cnpj' => '22469772000100']),
+            'publica.cnpj.ws/*' => Http::response([
+                'estabelecimento' => [
+                    'cnpj' => '22469772000100',
+                    'estado' => ['sigla' => 'SC'],
+                ],
+            ]),
+        ]);
+
+        $service = app(CnpjLookupService::class);
+
+        $first = $service->fetch('22469772000100');
+        $cached = $service->fetch('22469772000100');
+        $refreshed = $service->fetch('22469772000100', forceRefresh: true);
+
+        $this->assertSame('EMPRESA ANTIGA LTDA', $first['nome_razao']);
+        $this->assertSame('EMPRESA ANTIGA LTDA', $cached['nome_razao']);
+        $this->assertSame('EMPRESA NOVA LTDA', $refreshed['nome_razao']);
+        $this->assertSame('RUA B', $refreshed['endereco']);
+        $this->assertSame('20', $refreshed['numero']);
     }
 }

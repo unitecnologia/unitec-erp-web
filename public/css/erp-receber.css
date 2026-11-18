@@ -287,7 +287,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.15rem;
-    margin: 0 var(--erp-receber-gutter) 0.35rem;
+    margin: 0 var(--erp-receber-gutter) 0;
     align-items: flex-end;
 }
 
@@ -359,7 +359,10 @@
 .erp-list-page.erp-receber-page .erp-list-grid-area .fi-ta-ctn {
     width: 100% !important;
     max-width: 100% !important;
-    overflow: hidden !important;
+    min-height: 100%;
+    height: auto;
+    overflow: visible;
+    box-sizing: border-box;
 }
 
 .erp-list-page.erp-receber-page .erp-list-grid-area .fi-ta-table {

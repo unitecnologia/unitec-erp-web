@@ -8,6 +8,8 @@ use App\Models\Cfop;
 use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\Product;
+use App\Support\Erp\DescontoReaisItemCalculator;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\EstoqueReservaService;
@@ -360,9 +362,10 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $this->nfeItemAjusteTipo = 'desconto';
+        $seed = $this->seedNfeItemAjusteModal();
+        $this->nfeItemAjusteTipo = $seed['tipo'];
         $this->nfeItemAjusteModo = 'percentual';
-        $this->nfeItemAjusteValor = '0,00';
+        $this->nfeItemAjusteValor = $seed['pct'];
         $this->nfeDescontoModalOpen = true;
         $this->dispatch('erp-nfe-focus-desconto-item');
     }
@@ -372,6 +375,72 @@ trait ManagesNfeItemGrid
         $this->nfeDescontoModalOpen = false;
         $this->nfeItemAjusteAlvo = null;
         $this->nfeItemAjusteRowIndex = null;
+    }
+
+    /**
+     * @return array{descricao: string, baseRaw: float, qtdRaw: float, tipo: string, pct: string, reais: string, modoReais: string}
+     */
+    public function getNfeItemAjusteModalProperty(): array
+    {
+        $ctx = $this->contextoNfeItemAjuste();
+        $seed = $this->seedNfeItemAjusteModal();
+
+        return [
+            'descricao' => $ctx['descricao'] ?? '',
+            'baseRaw' => (float) ($ctx['preco'] ?? 0),
+            'qtdRaw' => (float) ($ctx['quantidade'] ?? 0),
+            'tipo' => $seed['tipo'],
+            'pct' => $seed['pct'],
+            'reais' => $seed['reais'],
+            'modoReais' => EmpresaParametros::descontoReaisItemModo(),
+        ];
+    }
+
+    /**
+     * @return array{tipo: string, pct: string, reais: string}
+     */
+    protected function seedNfeItemAjusteModal(): array
+    {
+        $ctx = $this->contextoNfeItemAjuste();
+        $preco = (float) ($ctx['preco'] ?? 0);
+        $qtd = (float) ($ctx['quantidade'] ?? 0);
+        $bruto = max(0.0, round($preco * $qtd, 2));
+        $ajuste = 0.0;
+        $tipo = 'desconto';
+
+        if ($this->nfeItemAjusteAlvo === 'form') {
+            $desc = ErpMoney::parseBr($this->nfeItemEntryDesconto, 2);
+            $acr = ErpMoney::parseBr($this->nfeItemEntryOutros, 2);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        } elseif ($this->nfeItemAjusteAlvo === 'grid') {
+            $index = $this->nfeItemAjusteRowIndex !== null
+                ? (int) $this->nfeItemAjusteRowIndex
+                : (int) $this->nfeSelectedRowIndex;
+            if (isset($this->nfeModalRows[$index])) {
+                $item = $this->nfeModalRows[$index];
+                $desc = ErpMoney::parseBr($item['desconto'] ?? 0, 2);
+                $acr = ErpMoney::parseBr($item['outros'] ?? 0, 2);
+                if ($acr > 0.0001) {
+                    $tipo = 'acrescimo';
+                    $ajuste = $acr;
+                } elseif ($desc > 0.0001) {
+                    $ajuste = $desc;
+                }
+            }
+        }
+
+        $pct = $bruto > 0 && $ajuste > 0 ? round(($ajuste / $bruto) * 100, 2) : 0.0;
+
+        return [
+            'tipo' => $tipo,
+            'pct' => ErpMoney::formatBr($pct, 2),
+            'reais' => ErpMoney::formatBr($ajuste, 2),
+        ];
     }
 
     public function abrirNfeInfoAdicionaisModal(int $index): void
@@ -501,56 +570,22 @@ trait ManagesNfeItemGrid
         $this->closeNfeModal();
     }
 
-    public function updatedNfeItemAjusteValor(): void
-    {
-        $raw = preg_replace('/[^\d,.\-]/', '', (string) $this->nfeItemAjusteValor) ?? '';
-        $this->nfeItemAjusteValor = $raw === '' ? '0,00' : $raw;
-    }
-
-    public function setNfeItemAjusteTipo(string $tipo): void
-    {
-        $this->nfeItemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
-    }
-
-    public function setNfeItemAjusteModo(string $modo): void
-    {
-        $this->nfeItemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
-    }
-
-    /**
-     * @return array{descricao: string, base: string, novoPreco: string, total: string, ajuste: string, tipo: string, temAjuste: bool}
-     */
-    public function getNfeItemAjustePreviewProperty(): array
-    {
-        $ctx = $this->contextoNfeItemAjuste();
-
-        if ($ctx === null) {
-            return [
-                'descricao' => '',
-                'base' => ErpMoney::formatBr(0, 2),
-                'novoPreco' => ErpMoney::formatBr(0, 2),
-                'total' => ErpMoney::formatBr(0, 3),
-                'ajuste' => ErpMoney::formatBr(0, 2),
-                'tipo' => $this->nfeItemAjusteTipo,
-                'temAjuste' => false,
-            ];
+    public function confirmarNfeItemAjuste(
+        ?string $valorInformado = null,
+        ?string $modoEntrada = null,
+        ?string $tipoInformado = null,
+    ): void {
+        if ($tipoInformado !== null && $tipoInformado !== '') {
+            $this->nfeItemAjusteTipo = $tipoInformado === 'acrescimo' ? 'acrescimo' : 'desconto';
+        }
+        if ($modoEntrada !== null && $modoEntrada !== '') {
+            $this->nfeItemAjusteModo = $modoEntrada === 'valor' ? 'valor' : 'percentual';
+        }
+        if ($valorInformado !== null && trim($valorInformado) !== '') {
+            $raw = preg_replace('/[^\d,.\-]/', '', $valorInformado) ?? '';
+            $this->nfeItemAjusteValor = $raw === '' ? '0,00' : $raw;
         }
 
-        $calc = $this->calcularNfeItemAjuste($ctx['preco'], $ctx['quantidade']);
-
-        return [
-            'descricao' => $ctx['descricao'],
-            'base' => ErpMoney::formatBr($calc['base'], 2),
-            'novoPreco' => ErpMoney::formatBr($calc['novoPreco'], 2),
-            'total' => ErpMoney::formatBr($calc['total'], 3),
-            'ajuste' => ErpMoney::formatBr($calc['ajusteLinha'], 2),
-            'tipo' => $this->nfeItemAjusteTipo,
-            'temAjuste' => abs($calc['ajusteLinha']) > 0.0001,
-        ];
-    }
-
-    public function confirmarNfeItemAjuste(): void
-    {
         $ctx = $this->contextoNfeItemAjuste();
 
         if ($ctx === null) {
@@ -576,6 +611,7 @@ trait ManagesNfeItemGrid
 
         $alvo = $this->nfeItemAjusteAlvo;
         $tipo = $this->nfeItemAjusteTipo;
+        $this->nfeDescontoModalOpen = false;
 
         if ($alvo === 'form') {
             if ($tipo === 'desconto') {
@@ -659,39 +695,15 @@ trait ManagesNfeItemGrid
      */
     protected function calcularNfeItemAjuste(float $base, float $quantidade): array
     {
-        $valor = ErpMoney::parseBr($this->nfeItemAjusteValor, 2);
-        $qtd = max(0.0, $quantidade);
-
-        if ($this->nfeItemAjusteModo === 'percentual') {
-            // % sobre o preço unitário → valor da linha = delta × qtd
-            $deltaUnit = round($base * ($valor / 100), 2);
-            $ajusteLinha = round($deltaUnit * $qtd, 2);
-        } else {
-            // R$ = valor absoluto na linha (vDesc / vOutro da NF-e)
-            $ajusteLinha = round($valor, 2);
-            $deltaUnit = $qtd > 0 ? round($ajusteLinha / $qtd, 2) : $ajusteLinha;
-        }
-
-        $novoPreco = $this->nfeItemAjusteTipo === 'acrescimo'
-            ? round($base + $deltaUnit, 2)
-            : round($base - $deltaUnit, 2);
-
-        if ($novoPreco < 0) {
-            $novoPreco = 0.0;
-        }
-
-        $subtotal = round($qtd * $base, 3);
-        $total = $this->nfeItemAjusteTipo === 'acrescimo'
-            ? round($subtotal + $ajusteLinha, 3)
-            : round(max(0, $subtotal - $ajusteLinha), 3);
-
-        return [
-            'base' => $base,
-            'deltaUnit' => $deltaUnit,
-            'ajusteLinha' => $ajusteLinha,
-            'novoPreco' => $novoPreco,
-            'total' => $total,
-        ];
+        // NF-e: R$ digitado = vDesc/vOutro da linha (sempre total da linha).
+        return DescontoReaisItemCalculator::calcular(
+            $base,
+            $quantidade,
+            ErpMoney::parseBr($this->nfeItemAjusteValor, 2),
+            $this->nfeItemAjusteTipo,
+            $this->nfeItemAjusteModo,
+            EmpresaParametros::DESCONTO_REAIS_ITEM_LINHA,
+        );
     }
 
     public function handleNfeItemProdutoEnter(?string $term = null): void

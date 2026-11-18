@@ -9,6 +9,7 @@ use App\Models\CaixaLivroMovimentoEvento;
 use App\Models\User;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Queries\CaixaPdvMovimentacaoQuery;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -18,7 +19,9 @@ use Throwable;
 final class CaixaLivroMovimentoService
 {
     /**
-     * Contas elegíveis ao F8 Abrir/Fechar (não PDV operacional).
+     * Contas elegíveis ao F8 Abrir/Fechar.
+     * BANCO não abre/fecha (movimenta livre; PIX/conciliação intactos).
+     * PDV operacional fecha só pelo PDV.
      *
      * @return list<string>
      */
@@ -27,13 +30,45 @@ final class CaixaLivroMovimentoService
         return [
             CaixaConta::TIPO_SUBCAIXA,
             CaixaConta::TIPO_COFRE,
-            CaixaConta::TIPO_BANCO,
         ];
     }
 
     public function exigeTroco(CaixaConta $conta): bool
     {
         return (string) $conta->tipo !== CaixaConta::TIPO_BANCO;
+    }
+
+    public function isContaTipoPdv(CaixaConta|string|null $contaOuTipo): bool
+    {
+        $tipo = $contaOuTipo instanceof CaixaConta
+            ? (string) ($contaOuTipo->tipo ?? '')
+            : (string) ($contaOuTipo ?? '');
+
+        return in_array($tipo, [CaixaConta::TIPO_PDV, 'CAIXA', 'X'], true);
+    }
+
+    /**
+     * Retaguarda: conta PDV (e filtro de sessões sem caixa) é só consulta.
+     */
+    public function assertContaRetaguardaMutavel(int $contaId): void
+    {
+        if (CaixaPdvMovimentacaoQuery::isFiltroSessoesSemConta($contaId)) {
+            throw new InvalidArgumentException(
+                'Sessões PDV sem caixa: na retaguarda é somente consulta. Não altere nem transfira por aqui.'
+            );
+        }
+
+        if ($contaId <= 0) {
+            return;
+        }
+
+        $tipo = (string) (CaixaConta::query()->whereKey($contaId)->value('tipo') ?? '');
+
+        if ($this->isContaTipoPdv($tipo)) {
+            throw new InvalidArgumentException(
+                'Conta PDV operacional: na retaguarda é somente consulta. Opere abertura, vendas e fechamento pelo PDV.'
+            );
+        }
     }
 
     public function tabelaPronta(): bool
@@ -67,9 +102,15 @@ final class CaixaLivroMovimentoService
             throw new InvalidArgumentException('Conta inválida, inativa ou de outra empresa.');
         }
 
+        if ((string) $conta->tipo === CaixaConta::TIPO_BANCO) {
+            throw new InvalidArgumentException(
+                'Contas bancárias não possuem abertura ou fechamento de caixa. Use lançamentos, PIX e conciliação normalmente.'
+            );
+        }
+
         if (! in_array((string) $conta->tipo, $this->tiposElegiveis(), true)) {
             throw new InvalidArgumentException(
-                'Contas PDV operacionais usam o fechamento do PDV. Use Abrir/Fechar apenas em SUBCAIXA, COFRE ou BANCO.'
+                'Contas PDV operacionais usam o fechamento do PDV. Use Abrir/Fechar apenas em SUBCAIXA ou COFRE (ex.: CAIXA GERAL).'
             );
         }
 

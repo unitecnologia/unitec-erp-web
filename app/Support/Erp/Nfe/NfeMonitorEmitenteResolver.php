@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Resolve empresas emitentes autorizadas no Monitor (config Matriz ∩ acesso do usuário ∩ ativas).
+ * Inclui sempre a empresa logada (Matriz) como opção implícita, selecionável no modal.
  */
 final class NfeMonitorEmitenteResolver
 {
@@ -48,33 +49,28 @@ final class NfeMonitorEmitenteResolver
             return [];
         }
 
-        return $matriz->nfeEmitentes()
+        $opcoes = [];
+        $matrizId = (int) $matriz->id;
+
+        // Empresa logada: sempre disponível no modal (fluxo normal), se ativa e acessível.
+        if ($matriz->ativo && in_array($matrizId, $acessiveis, true)) {
+            $opcoes[] = $this->toOpcao($matriz);
+        }
+
+        $autorizadas = $matriz->nfeEmitentes()
             ->where('empresas.ativo', true)
             ->whereIn('empresas.id', $acessiveis)
             ->orderBy('empresas.nome')
-            ->get(['empresas.id', 'empresas.nome', 'empresas.fantasia', 'empresas.razao_social', 'empresas.cnpj'])
-            ->map(function (Empresa $e): array {
-                $nome = trim((string) ($e->razao_social ?: $e->nome ?: ''));
-                $fantasia = trim((string) ($e->fantasia ?: ''));
-                $cnpj = $this->formatCnpj((string) ($e->cnpj ?? ''));
-                $titulo = $nome !== '' ? $nome : ($fantasia !== '' ? $fantasia : 'Empresa #'.$e->id);
-                if ($fantasia !== '' && $fantasia !== $titulo) {
-                    $titulo .= ' / '.$fantasia;
-                }
-                if ($cnpj !== '') {
-                    $titulo .= ' — CNPJ '.$cnpj;
-                }
+            ->get(['empresas.id', 'empresas.nome', 'empresas.fantasia', 'empresas.razao_social', 'empresas.cnpj']);
 
-                return [
-                    'id' => (int) $e->id,
-                    'nome' => $nome,
-                    'fantasia' => $fantasia,
-                    'cnpj' => $cnpj,
-                    'label' => $titulo,
-                ];
-            })
-            ->values()
-            ->all();
+        foreach ($autorizadas as $empresa) {
+            if ((int) $empresa->id === $matrizId) {
+                continue;
+            }
+            $opcoes[] = $this->toOpcao($empresa);
+        }
+
+        return $opcoes;
     }
 
     public function emitentePermitida(int $emitenteId, ?Empresa $matriz = null, ?User $user = null): bool
@@ -90,6 +86,31 @@ final class NfeMonitorEmitenteResolver
         }
 
         return false;
+    }
+
+    /**
+     * @return array{id: int, nome: string, fantasia: string, cnpj: string, label: string}
+     */
+    private function toOpcao(Empresa $e): array
+    {
+        $nome = trim((string) ($e->razao_social ?: $e->nome ?: ''));
+        $fantasia = trim((string) ($e->fantasia ?: ''));
+        $cnpj = $this->formatCnpj((string) ($e->cnpj ?? ''));
+        $titulo = $nome !== '' ? $nome : ($fantasia !== '' ? $fantasia : 'Empresa #'.$e->id);
+        if ($fantasia !== '' && $fantasia !== $titulo) {
+            $titulo .= ' / '.$fantasia;
+        }
+        if ($cnpj !== '') {
+            $titulo .= ' — CNPJ '.$cnpj;
+        }
+
+        return [
+            'id' => (int) $e->id,
+            'nome' => $nome,
+            'fantasia' => $fantasia,
+            'cnpj' => $cnpj,
+            'label' => $titulo,
+        ];
     }
 
     private function formatCnpj(string $raw): string

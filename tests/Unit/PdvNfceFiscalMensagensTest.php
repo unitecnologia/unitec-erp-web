@@ -37,4 +37,18 @@ class PdvNfceFiscalMensagensTest extends TestCase
         $this->assertFalse($resolvido['modal']);
         $this->assertSame('Duplicidade de NF-e', $resolvido['titulo']);
     }
+
+    public function test_mensagens_pdv_apos_venda_sao_curtas_sem_cstat(): void
+    {
+        $ok = PdvNfceFiscalMensagens::mensagemPdvAposVenda('autorizada');
+        $this->assertSame('Venda concluída', $ok['titulo']);
+        $this->assertNull($ok['corpo']);
+
+        $pendente = PdvNfceFiscalMensagens::mensagemPdvAposVenda('pendente');
+        $this->assertSame('Venda registrada. NFC-e pendente', $pendente['titulo']);
+        $this->assertNull($pendente['corpo']);
+        $this->assertStringNotContainsString('cStat', $pendente['titulo']);
+        $this->assertStringNotContainsString('392', $pendente['titulo']);
+        $this->assertStringNotContainsString('cartão', mb_strtolower($pendente['titulo'], 'UTF-8'));
+    }
 }

@@ -19,6 +19,10 @@ final class NfeListRowFormatter
             ? (string) $record->numero
             : '—';
 
+        $serie = $record->serie !== null && $record->serie !== ''
+            ? (string) $record->serie
+            : '—';
+
         $dataEmissao = filled($record->data_emissao)
             ? $record->data_emissao->format('d/m/Y')
             : '—';
@@ -49,6 +53,7 @@ final class NfeListRowFormatter
 
         return [
             'numero' => e($numero),
+            'serie' => e($serie),
             'npedido' => NfeResource::formatNumeroPedido($record),
             'data_emissao' => e($dataEmissao),
             'data_saida' => e($dataSaida),

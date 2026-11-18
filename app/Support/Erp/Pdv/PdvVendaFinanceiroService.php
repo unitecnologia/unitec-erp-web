@@ -57,6 +57,11 @@ final class PdvVendaFinanceiroService
 
             ConsumidorFinalGuard::assertPagamentoPermitido($cliente, $pagamento);
 
+            // SuperTEF: parcelas da adquirente ≠ títulos CR próprios.
+            if (PdvFinalizarPagamentosHelper::isFormaSuperTef($pagamento)) {
+                continue;
+            }
+
             if (
                 ! FormaPagamentoDestino::geraContasReceber($pagamento)
                 && ! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)

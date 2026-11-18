@@ -9,6 +9,10 @@ use App\Models\OrcamentoItem;
 use App\Models\PdvVendaItem;
 use App\Models\Product;
 use App\Models\ProductComposition;
+use App\Models\Fabricacao;
+use App\Models\FabricacaoItem;
+use App\Models\ProductReceita;
+use App\Models\ProductReceitaItem;
 use App\Models\VendaItem;
 
 final class ProductDeletionGuard
@@ -64,6 +68,14 @@ final class ProductDeletionGuard
             'Composição de outros produtos' => ProductComposition::query()
                 ->where('component_product_id', $productId)
                 ->exists(),
+            'Receita de fabricação' => ErpSchema::hasTable('product_receitas')
+                && ProductReceita::query()->where('product_id', $productId)->exists(),
+            'Ingrediente de receita' => ErpSchema::hasTable('product_receita_itens')
+                && ProductReceitaItem::query()->where('component_product_id', $productId)->exists(),
+            'Fabricação (acabado)' => ErpSchema::hasTable('fabricacoes')
+                && Fabricacao::query()->where('product_id', $productId)->exists(),
+            'Fabricação (ingrediente)' => ErpSchema::hasTable('fabricacao_itens')
+                && FabricacaoItem::query()->where('component_product_id', $productId)->exists(),
         ];
     }
 }

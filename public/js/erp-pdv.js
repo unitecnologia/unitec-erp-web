@@ -14,11 +14,11 @@ let erpPdvPersonOverlayObserver = null;
 let erpPdvCapsLockOn = null;
 /** @type {boolean|null} */
 let erpPdvNumLockOn = null;
-/** Evita atalho de pagamento (D/P/…) enquanto digita o cliente no finalizar. */
+/** Evita atalho de pagamento (D/P/â€¦) enquanto digita o cliente no finalizar. */
 let erpPdvFinalizarClienteTyping = false;
 /** Evita duplo F10/Enter em Concluir enquanto a venda grava. */
 let erpPdvFinalizarSubmitting = false;
-/** Control físico pressionado (Chrome pode entregar KeyD com ctrlKey:false). */
+/** Control fÃ­sico pressionado (Chrome pode entregar KeyD com ctrlKey:false). */
 let pdvCtrlLatch = false;
 window.__erpPdvCtrlLatch = false;
 
@@ -39,12 +39,12 @@ const ERP_PDV_FN_SHORTCUTS = {
 
 /** @type {Record<string, [string, ...unknown[]]>} */
 const ERP_PDV_CTRL_SHORTCUTS = {
-    // Desconto/Acréscimo (Ctrl+D): handlePdvModifierCapture + btn.click.
+    // Desconto/AcrÃ©scimo (Ctrl+D): handlePdvModifierCapture + btn.click.
     a: ['abrirGaveta'],
     r: ['openReceberModal'],
     l: ['openBuscaPrecoModal'],
     t: ['moduleStubTef'],
-    i: ['moduleStubNfce'],
+    i: ['openReimprimirNfceModal'],
     p: ['openReimprimirModal'],
     o: ['openConsultaVendaModal'],
     s: ['moduleStubMesa', 'Imprimir Pedido'],
@@ -95,6 +95,9 @@ function bindErpPdvLivewireEvents() {
                     || document.getElementById('erp-pdv-remover-itens-sim')?.focus();
             } else if (payload?.modal === 'finalizar') {
                 focusPdvFinalizarPagamento(0);
+            } else if (payload?.modal === 'vendedor_venda') {
+                bindPdvVendedorVendaModal();
+                document.getElementById('erp-pdv-vendedor-venda-search')?.focus();
             } else if (payload?.modal === 'abrir_caixa' || payload?.modal === 'fechar_caixa') {
                 focusPdvModalField();
             } else {
@@ -115,7 +118,7 @@ function bindErpPdvLivewireEvents() {
         window.__erpPdvForceSearchFocusUntil = Date.now() + 3000;
         focusPdvSearchField();
 
-        // Flash é só visual: limpa no browser sem round-trip Livewire (não bloqueia a fila).
+        // Flash Ã© sÃ³ visual: limpa no browser sem round-trip Livewire (nÃ£o bloqueia a fila).
         window.setTimeout(() => {
             clearPdvFlashLancamentoLocal();
             window.__erpPdvForceSearchFocusUntil = Date.now() + 2500;
@@ -217,7 +220,7 @@ function bindErpPdvLivewireEvents() {
     window.Livewire.on('erp-pdv-focus-finalizar-aviso', () => {
         erpPdvFinalizarSubmitting = false;
         // Atraso: o Enter que disparou o aviso ainda pode soltar (keyup) e
-        // ativar o botão OK se ele receber foco cedo demais.
+        // ativar o botÃ£o OK se ele receber foco cedo demais.
         window.setTimeout(() => {
             const ok = document.getElementById('erp-pdv-finalizar-aviso-ok');
             const aviso = document.querySelector('.erp-pdv-finalizar-aviso');
@@ -305,7 +308,7 @@ function bindErpPdvLivewireEvents() {
         if (el?.querySelector?.('.erp-pdv-finalizar__cliente-list')) {
             erpPdvFinalizarClienteTyping = true;
             scrollPdvFinalizarClienteIntoView();
-            // Remontagem Livewire pode tirar o foco do input no meio da digitação.
+            // Remontagem Livewire pode tirar o foco do input no meio da digitaÃ§Ã£o.
             window.requestAnimationFrame(() => {
                 const input = document.getElementById('erp-pdv-finalizar-cliente');
                 const active = document.activeElement;
@@ -451,6 +454,12 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-focus-reimprimir-nfce', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-reimprimir-nfce-search')?.focus();
+        }, 50);
+    });
+
     window.Livewire.on('erp-pdv-focus-consulta-venda', () => {
         window.setTimeout(() => {
             document.getElementById('erp-pdv-consulta-venda-search')?.focus();
@@ -518,6 +527,22 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-supertef-opened', () => {
+        erpPdvFinalizarSubmitting = false;
+        hidePdvFiscalTransmitProgress();
+        window.setTimeout(() => {
+            document.querySelector('#erp-pdv-supertef-title')
+                ?.closest('.erp-pdv-pix-qr')
+                ?.querySelector('.erp-pdv-modal__btn')
+                ?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-supertef-paid', () => {
+        erpPdvFinalizarSubmitting = false;
+        hidePdvFiscalTransmitProgress();
+    });
+
     /**
      * Contagem regressiva do QR Pix no PDV (Alpine).
      * @param {number} endsAtTs unix seconds
@@ -569,7 +594,7 @@ function bindErpPdvLivewireEvents() {
         };
     };
 
-    // "Erro ao carregar a página" / timeout: Livewire morre sem hide — fecha o overlay na hora.
+    // "Erro ao carregar a pÃ¡gina" / timeout: Livewire morre sem hide â€” fecha o overlay na hora.
     window.Livewire.hook('request', ({ fail }) => {
         fail(() => {
             const overlay = getPdvFiscalTransmitProgressOverlay();
@@ -579,12 +604,13 @@ function bindErpPdvLivewireEvents() {
             }
 
             forceHidePdvFiscalTransmitProgressStuck(
-                'A finalização falhou (comunicação ou erro no servidor). Se a venda não aparecer em Vendas, tente de novo. Se aparecer sem NFC-e, transmita ou use contingência na tela NFC-e.'
+                'A finalizaÃ§Ã£o falhou (comunicaÃ§Ã£o ou erro no servidor). Se a venda nÃ£o aparecer em Vendas, tente de novo. Se aparecer sem NFC-e, transmita ou use contingÃªncia na tela NFC-e.'
             );
         });
     });
 
     window.Livewire.on('erp-pdv-imprimir-pos-venda-opened', () => {
+        erpPdvFinalizarSubmitting = false;
         hidePdvFiscalTransmitProgress();
         window.setTimeout(() => {
             document.getElementById('erp-pdv-imprimir-pos-venda-nao')?.focus();
@@ -604,6 +630,7 @@ function bindErpPdvLivewireEvents() {
     });
 
     window.Livewire.on('erp-pdv-finalizar-imprimir-opened', () => {
+        erpPdvFinalizarSubmitting = false;
         hidePdvFiscalTransmitProgress();
         window.setTimeout(() => {
             document.getElementById('erp-pdv-finalizar-imprimir-nao')?.focus();
@@ -648,8 +675,8 @@ function bindErpPdvLivewireEvents() {
                 return;
             }
             new FilamentNotification()
-                .title('Não foi possível abrir a gaveta')
-                .body(err?.message || 'Device Service indisponível.')
+                .title('NÃ£o foi possÃ­vel abrir a gaveta')
+                .body(err?.message || 'Device Service indisponÃ­vel.')
                 .warning()
                 .send();
         });
@@ -677,7 +704,7 @@ window.addEventListener('message', (event) => {
 
 /**
  * Para timers/observers do PDV ao sair da tela (SPA). Listeners de atalho
- * permanecem, mas já fazem early-return sem .erp-pdv — custo desprezível.
+ * permanecem, mas jÃ¡ fazem early-return sem .erp-pdv â€” custo desprezÃ­vel.
  */
 function teardownErpPdvRuntime() {
     if (erpPdvSearchFocusTrapTimer !== null) {
@@ -738,7 +765,7 @@ function initErpPdv() {
 
     armPdvKioskFullscreen();
 
-    // Overlay NFC-e às vezes fica preso com is-visible (wire:ignore) e engole o PDV.
+    // Overlay NFC-e Ã s vezes fica preso com is-visible (wire:ignore) e engole o PDV.
     document.querySelectorAll('[data-erp-pdv-fiscal-progress].is-visible').forEach((overlay) => {
         if (! pdvFiscalProgressActive) {
             overlay.classList.remove('is-visible');
@@ -760,8 +787,8 @@ window.teardownErpPdvRuntime = teardownErpPdvRuntime;
 window.bindErpPdvLivewireEvents = bindErpPdvLivewireEvents;
 
 /**
- * Clientes no PDV: listagem usa painel alto; create/edit acompanha a altura do formulário.
- * Detecta o estado pela URL do iframe (same-origin) — sem postMessage.
+ * Clientes no PDV: listagem usa painel alto; create/edit acompanha a altura do formulÃ¡rio.
+ * Detecta o estado pela URL do iframe (same-origin) â€” sem postMessage.
  */
 function bindPdvPersonOverlayHeight() {
     const sync = () => {
@@ -926,9 +953,9 @@ function syncPdvPersonOverlays() {
 /**
  * Tela cheia "quiosque" ao abrir o PDV (esconde a barra do Windows).
  *
- * O navegador só permite fullscreen com gesto do usuário. Em PWA standalone
- * o clique no atalho PDV já é o gesto — tentamos na hora e, se falhar,
- * armamos de novo no próximo clique/tecla dentro do PDV.
+ * O navegador sÃ³ permite fullscreen com gesto do usuÃ¡rio. Em PWA standalone
+ * o clique no atalho PDV jÃ¡ Ã© o gesto â€” tentamos na hora e, se falhar,
+ * armamos de novo no prÃ³ximo clique/tecla dentro do PDV.
  */
 function isErpPwaStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches
@@ -944,7 +971,7 @@ function armPdvKioskFullscreen() {
         return;
     }
 
-    // Em PWA, tenta entrar já (pode falhar se não houver gesto nesta carga).
+    // Em PWA, tenta entrar jÃ¡ (pode falhar se nÃ£o houver gesto nesta carga).
     if (isErpPwaStandalone()) {
         enterPdvFullscreen();
         if (document.fullscreenElement) {
@@ -979,7 +1006,7 @@ function enterPdvFullscreen() {
     const target = document.documentElement;
     const request = typeof target.requestFullscreen === 'function'
         ? target.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
-            // Alguns Chromium/PWA rejeitam navigationUI — tenta sem opções.
+            // Alguns Chromium/PWA rejeitam navigationUI â€” tenta sem opÃ§Ãµes.
             return target.requestFullscreen();
         })
         : (typeof target.webkitRequestFullscreen === 'function'
@@ -993,7 +1020,7 @@ function enterPdvFullscreen() {
     }
 
     return request.then(lockPdvEscapeKey).catch(() => {
-        // Bloqueado pelo navegador: mantém janela normal do PWA.
+        // Bloqueado pelo navegador: mantÃ©m janela normal do PWA.
     });
 }
 
@@ -1003,7 +1030,7 @@ function lockPdvEscapeKey() {
             navigator.keyboard.lock(['Escape']).catch(() => {});
         }
     } catch (error) {
-        // Keyboard Lock indisponível: Esc sai da tela cheia (fallback do navegador).
+        // Keyboard Lock indisponÃ­vel: Esc sai da tela cheia (fallback do navegador).
     }
 }
 
@@ -1099,12 +1126,12 @@ function bindPdvFiscalTransmitTriggers() {
         window.setTimeout(() => {
             const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
 
-            // Pix QR pendente: não inicia overlay fiscal (ele cobria o QR).
-            if (footer?.dataset?.pixQr === '1') {
+            // Pix / SuperTEF pendente: nÃ£o inicia overlay fiscal (cobria o modal).
+            if (footer?.dataset?.pixQr === '1' || footer?.dataset?.supertef === '1') {
                 return;
             }
 
-            if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, #erp-pdv-canhoto-title, .erp-pdv-finalizar-aviso')) {
+            if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, #erp-pdv-supertef-title, #erp-pdv-canhoto-title, .erp-pdv-finalizar-aviso')) {
                 return;
             }
 
@@ -1114,8 +1141,8 @@ function bindPdvFiscalTransmitTriggers() {
 }
 
 /**
- * No PDV, clique do mouse só vale em botões, grid, inputs e modais.
- * Clique em área “morta” (título, foto, totais, status…) devolve o foco ao código.
+ * No PDV, clique do mouse sÃ³ vale em botÃµes, grid, inputs e modais.
+ * Clique em Ã¡rea â€œmortaâ€ (tÃ­tulo, foto, totais, statusâ€¦) devolve o foco ao cÃ³digo.
  */
 function bindPdvClickGuard() {
     if (window.__erpPdvClickGuardBound) {
@@ -1173,7 +1200,7 @@ function bindPdvClickGuard() {
             return;
         }
 
-        // Qualquer clique dentro de modal/overlay fiscal é válido.
+        // Qualquer clique dentro de modal/overlay fiscal Ã© vÃ¡lido.
         if (target.closest('.erp-pdv-modal, .erp-pdv-overlay, .erp-pdv-naoencontrado, [data-erp-pdv-fiscal-progress]')) {
             return;
         }
@@ -1196,10 +1223,10 @@ function bindPdvClickGuard() {
 }
 
 /**
- * Fluxo normal (sem Caixa Rápido): clique volta o passo do lançamento.
- * Qtde volta do Preço; Código volta de Qtde/Preço.
- * Feito no JS porque o campo do passo inativo é readonly e wire:mousedown não
- * chega ao servidor — mesmo padrão do Enter nas grades.
+ * Fluxo normal (sem Caixa RÃ¡pido): clique volta o passo do lanÃ§amento.
+ * Qtde volta do PreÃ§o; CÃ³digo volta de Qtde/PreÃ§o.
+ * Feito no JS porque o campo do passo inativo Ã© readonly e wire:mousedown nÃ£o
+ * chega ao servidor â€” mesmo padrÃ£o do Enter nas grades.
  */
 function bindPdvLaunchStepBack() {
     if (window.__erpPdvLaunchStepBackBound) {
@@ -1230,7 +1257,7 @@ function bindPdvLaunchStepBack() {
         const passoQtd = qtdBox.classList.contains('erp-pdv__total-box--active');
         const passoPreco = precoBox.classList.contains('erp-pdv__total-box--active');
 
-        // Sem lançamento em andamento: nada a voltar.
+        // Sem lanÃ§amento em andamento: nada a voltar.
         if (! passoQtd && ! passoPreco) {
             return;
         }
@@ -1250,7 +1277,7 @@ function bindPdvLaunchStepBack() {
         if (passoPreco && qtdBox.contains(target)) {
             event.preventDefault();
 
-            // Libera e foca na hora: o clique já deixa o caret na quantidade.
+            // Libera e foca na hora: o clique jÃ¡ deixa o caret na quantidade.
             qtdInput.removeAttribute('readonly');
 
             try {
@@ -1308,7 +1335,7 @@ function resetPdvFiscalTransmitProgressUi(overlay) {
     });
 
     if (statusEl && steps[0]) {
-        statusEl.textContent = `${steps[0].textContent.trim()}…`;
+        statusEl.textContent = `${steps[0].textContent.trim()}â€¦`;
     }
 
     if (barEl) {
@@ -1317,7 +1344,7 @@ function resetPdvFiscalTransmitProgressUi(overlay) {
 }
 
 /**
- * Etapa real reportada pelo servidor (0..4). Sem avanço por timer.
+ * Etapa real reportada pelo servidor (0..4). Sem avanÃ§o por timer.
  */
 function setPdvFiscalTransmitProgressStep(stepIndex, label) {
     const overlay = getPdvFiscalTransmitProgressOverlay();
@@ -1348,7 +1375,7 @@ function setPdvFiscalTransmitProgressStep(stepIndex, label) {
     const text = (label && String(label).trim()) || (steps[target] ? steps[target].textContent.trim() : '');
 
     if (statusEl && text) {
-        statusEl.textContent = text.endsWith('…') || text.endsWith('...') ? text : `${text}…`;
+        statusEl.textContent = text.endsWith('â€¦') || text.endsWith('...') ? text : `${text}â€¦`;
     }
 
     if (barEl && steps.length > 0) {
@@ -1410,7 +1437,7 @@ function stopPdvFiscalTransmitProgress() {
     }
 }
 
-function notifyPdvFiscalProgressStuck(message, title = 'NFC-e — atenção') {
+function notifyPdvFiscalProgressStuck(message, title = 'NFC-e â€” atenÃ§Ã£o') {
     try {
         if (typeof FilamentNotification !== 'undefined') {
             new FilamentNotification()
@@ -1441,12 +1468,12 @@ function forceHidePdvFiscalTransmitProgressStuck(reason) {
     hidePdvFiscalTransmitProgress();
     notifyPdvFiscalProgressStuck(
         reason
-        || 'A finalização da NFC-e não respondeu a tempo. Confira em Vendas/NFC-e: se a venda não aparecer, tente de novo; se aparecer sem NFC-e, transmita ou use contingência.'
+        || 'A finalizaÃ§Ã£o da NFC-e nÃ£o respondeu a tempo. Confira em Vendas/NFC-e: se a venda nÃ£o aparecer, tente de novo; se aparecer sem NFC-e, transmita ou use contingÃªncia.'
     );
 }
 
 function startPdvFiscalTransmitProgress() {
-    if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title')) {
+    if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, #erp-pdv-supertef-title')) {
         return;
     }
 
@@ -1464,11 +1491,11 @@ function startPdvFiscalTransmitProgress() {
     resetPdvFiscalTransmitProgressUi(overlay);
     setPdvFiscalTransmitProgressStep(0, 'Validando dados da NFC-e');
 
-    // Livewire/SEFAZ podem morrer sem dispatch de hide — não deixar o operador preso.
+    // Livewire/SEFAZ podem morrer sem dispatch de hide â€” nÃ£o deixar o operador preso.
     pdvFiscalProgressWatchdogTimer = window.setTimeout(() => {
         pdvFiscalProgressWatchdogTimer = null;
         forceHidePdvFiscalTransmitProgressStuck(
-            'A transmissão da NFC-e demorou demais ou a conexão caiu. Confira em Vendas/NFC-e: se a venda não aparecer, tente de novo; se aparecer sem NFC-e, transmita ou use contingência.'
+            'A transmissÃ£o da NFC-e demorou demais ou a conexÃ£o caiu. Confira em Vendas/NFC-e: se a venda nÃ£o aparecer, tente de novo; se aparecer sem NFC-e, transmita ou use contingÃªncia.'
         );
     }, PDV_FISCAL_PROGRESS_WATCHDOG_MS);
 }
@@ -1570,7 +1597,7 @@ function setPdvScaleReadingStatus(message) {
 
     if (message) {
         if (legend.dataset.erpScaleLegend == null) {
-            legend.dataset.erpScaleLegend = legend.textContent || 'Código:';
+            legend.dataset.erpScaleLegend = legend.textContent || 'CÃ³digo:';
         }
 
         legend.textContent = message;
@@ -1610,7 +1637,7 @@ function withPdvTimeout(promise, ms, message) {
 
     const timeout = new Promise((_, reject) => {
         timer = window.setTimeout(() => {
-            reject(new Error(message || 'Tempo esgotado ao ler a balança.'));
+            reject(new Error(message || 'Tempo esgotado ao ler a balanÃ§a.'));
         }, ms);
     });
 
@@ -1633,11 +1660,11 @@ async function callPdvScaleFallback(component, message) {
 
             return;
         } catch (error) {
-            console.warn('[PDV balança] fallback Livewire falhou:', error);
+            console.warn('[PDV balanÃ§a] fallback Livewire falhou:', error);
         }
     }
 
-    window.alert('Não foi possível ler a balança.\n' + text);
+    window.alert('NÃ£o foi possÃ­vel ler a balanÃ§a.\n' + text);
 }
 
 async function readPdvScaleWeightAndConfirm(settingsFromServer) {
@@ -1646,7 +1673,7 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
     }
 
     window.__erpPdvScaleReading = true;
-    setPdvScaleReadingStatus('Lendo balança…');
+    setPdvScaleReadingStatus('Lendo balanÃ§aâ€¦');
 
     let component = null;
 
@@ -1658,9 +1685,9 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
         }
 
         if (! component || typeof component.call !== 'function') {
-            console.warn('[PDV balança] componente Livewire não encontrado.');
+            console.warn('[PDV balanÃ§a] componente Livewire nÃ£o encontrado.');
             setPdvScaleReadingStatus(null);
-            window.alert('Não foi possível ler a balança.\nRecarregue o PDV (Ctrl+F5) e tente de novo.');
+            window.alert('NÃ£o foi possÃ­vel ler a balanÃ§a.\nRecarregue o PDV (Ctrl+F5) e tente de novo.');
 
             return;
         }
@@ -1671,14 +1698,14 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
         if (! settings?.port) {
             await callPdvScaleFallback(
                 component,
-                'Configure a porta COM da balança no terminal e recarregue o PDV (Ctrl+F5).',
+                'Configure a porta COM da balanÃ§a no terminal e recarregue o PDV (Ctrl+F5).',
             );
 
             return;
         }
 
         if (! window.ErpDeviceService?.readScale) {
-            await callPdvScaleFallback(component, 'Device Service não está disponível neste navegador.');
+            await callPdvScaleFallback(component, 'Device Service nÃ£o estÃ¡ disponÃ­vel neste navegador.');
 
             return;
         }
@@ -1690,24 +1717,24 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
         );
 
         if (! ensured?.ok) {
-            throw new Error('Device Service local não está em execução.');
+            throw new Error('Device Service local nÃ£o estÃ¡ em execuÃ§Ã£o.');
         }
 
         if (ensured.started) {
-            setPdvScaleReadingStatus('Iniciando balança…');
+            setPdvScaleReadingStatus('Iniciando balanÃ§aâ€¦');
             await waitPdvMs(1200);
         }
 
-        setPdvScaleReadingStatus(`Lendo ${settings.port}…`);
+        setPdvScaleReadingStatus(`Lendo ${settings.port}â€¦`);
         const result = await withPdvTimeout(
             window.ErpDeviceService.readScale(settings),
             8000,
-            'Tempo esgotado ao ler a balança. Confira a COM e o simulador.',
+            'Tempo esgotado ao ler a balanÃ§a. Confira a COM e o simulador.',
         );
         const weight = Number(result?.weightKg);
 
         if (! Number.isFinite(weight) || weight <= 0) {
-            throw new Error(result?.message || 'Peso inválido retornado pela balança.');
+            throw new Error(result?.message || 'Peso invÃ¡lido retornado pela balanÃ§a.');
         }
 
         setPdvScaleReadingStatus(null);
@@ -1716,7 +1743,7 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
             : getErpPdvComponent();
 
         if (! livewire || typeof livewire.call !== 'function') {
-            throw new Error('Componente Livewire do PDV não disponível. Recarregue (Ctrl+F5).');
+            throw new Error('Componente Livewire do PDV nÃ£o disponÃ­vel. Recarregue (Ctrl+F5).');
         }
 
         await Promise.resolve(livewire.call('applyScaleWeightAndConfirm', weight));
@@ -1724,7 +1751,7 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
         setPdvScaleReadingStatus(null);
         await callPdvScaleFallback(
             component,
-            error?.message || 'Não foi possível comunicar com a balança.',
+            error?.message || 'NÃ£o foi possÃ­vel comunicar com a balanÃ§a.',
         );
     } finally {
         window.__erpPdvScaleReading = false;
@@ -1734,7 +1761,7 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
 
 window.readPdvScaleWeightAndConfirm = readPdvScaleWeightAndConfirm;
 
-/** Fila de leituras do scanner: captura instantânea, processamento sequencial. */
+/** Fila de leituras do scanner: captura instantÃ¢nea, processamento sequencial. */
 const pdvScanQueue = [];
 let pdvScanProcessing = false;
 
@@ -1775,7 +1802,7 @@ function isValidEan13(code) {
 }
 
 /**
- * Fallback: só divide 26 dígitos quando os dois blocos são EAN-13 válidos.
+ * Fallback: sÃ³ divide 26 dÃ­gitos quando os dois blocos sÃ£o EAN-13 vÃ¡lidos.
  *
  * @returns {string[]|null}
  */
@@ -1809,7 +1836,7 @@ function trySplitConcatenatedEan13(code) {
 }
 
 /**
- * Enter/CR é o delimitador principal; não descarta códigos longos genericamente.
+ * Enter/CR Ã© o delimitador principal; nÃ£o descarta cÃ³digos longos genericamente.
  *
  * @returns {string[]}
  */
@@ -1931,7 +1958,7 @@ function findPdvHotPathComponent() {
     return null;
 }
 
-/** Preferência: child leve do bip; fallback: página PDV. */
+/** PreferÃªncia: child leve do bip; fallback: pÃ¡gina PDV. */
 function findPdvScanComponent() {
     return findPdvHotPathComponent() || findPdvLivewireComponent();
 }
@@ -1953,7 +1980,7 @@ function syncPdvHotPathChrome() {
     const flashTotal = meta.getAttribute('data-flash-total');
     if (qtd) {
         const boxes = document.querySelectorAll('.erp-pdv__totals .erp-pdv__total-box:not(.erp-pdv__total-box--grand)');
-        // Layout lateral: últimos 3 boxes antes do grand são qtd/preço/subtotal (quando não em launch).
+        // Layout lateral: Ãºltimos 3 boxes antes do grand sÃ£o qtd/preÃ§o/subtotal (quando nÃ£o em launch).
         const flashTargets = Array.from(document.querySelectorAll('.erp-pdv__totals .erp-pdv__total-box'))
             .filter((el) => ! el.classList.contains('erp-pdv__total-box--grand'));
         if (flashTargets.length >= 3) {
@@ -1985,7 +2012,7 @@ function syncPdvHotPathChrome() {
 function clearPdvFlashLancamentoLocal() {
     const component = findPdvHotPathComponent() || findPdvLivewireComponent();
 
-    // Atualiza snapshot Livewire sem request (não compete com a fila do bip).
+    // Atualiza snapshot Livewire sem request (nÃ£o compete com a fila do bip).
     if (component && typeof component.set === 'function') {
         try {
             component.set('pdvFlashQtd', null, false);
@@ -2013,8 +2040,8 @@ function clearPdvFlashLancamentoLocal() {
 }
 
 function findPdvLivewireComponent() {
-    // Mesma resolução do restante do PDV (Livewire.find / wire:id).
-    // Livewire.all() pode devolver instâncias internas sem .call().
+    // Mesma resoluÃ§Ã£o do restante do PDV (Livewire.find / wire:id).
+    // Livewire.all() pode devolver instÃ¢ncias internas sem .call().
     return getErpPdvComponent();
 }
 
@@ -2023,8 +2050,8 @@ function pdvHasBlockingUi(pdv) {
         return true;
     }
 
-    // Aviso "produto não encontrado" NÃO bloqueia (permite seguir bipando).
-    // Confirmações/fiscal (classes extras) bloqueiam.
+    // Aviso "produto nÃ£o encontrado" NÃƒO bloqueia (permite seguir bipando).
+    // ConfirmaÃ§Ãµes/fiscal (classes extras) bloqueiam.
     const candidates = pdv.querySelectorAll(
         '.erp-pdv-modal, .erp-pdv-overlay, .erp-pdv-confirm-overlay, .erp-pdv-fiscal-overlay, [data-erp-pdv-fiscal-progress].is-visible',
     );
@@ -2049,12 +2076,12 @@ function tryFocusPdvSearchField() {
         return false;
     }
 
-    // Não rouba foco enquanto houver modal/overlay PDV visível.
+    // NÃ£o rouba foco enquanto houver modal/overlay PDV visÃ­vel.
     if (pdvHasBlockingUi(pdv)) {
         return false;
     }
 
-    // Em fluxo normal (sem Caixa Rápido): respeita o passo Qtde/Preço.
+    // Em fluxo normal (sem Caixa RÃ¡pido): respeita o passo Qtde/PreÃ§o.
     const launchQtd = document.getElementById('erp-pdv-launch-qtd');
     const launchPreco = document.getElementById('erp-pdv-launch-preco');
 
@@ -2085,7 +2112,7 @@ function tryFocusPdvSearchField() {
         // ignore
     }
 
-    // Garante caret visível em alguns browsers após morph do Livewire.
+    // Garante caret visÃ­vel em alguns browsers apÃ³s morph do Livewire.
     if (document.activeElement !== input) {
         try {
             input.focus({ preventScroll: true });
@@ -2126,8 +2153,8 @@ function restorePdvBuscaAvancadaFocus() {
 }
 
 /**
- * Trap estilo PDV: se o foco “sumiu” (body / área morta), devolve ao Código.
- * Não interfere em inputs/botões/modais em uso.
+ * Trap estilo PDV: se o foco â€œsumiuâ€ (body / Ã¡rea morta), devolve ao CÃ³digo.
+ * NÃ£o interfere em inputs/botÃµes/modais em uso.
  */
 function bindPdvSearchFocusTrap() {
     if (erpPdvSearchFocusTrapTimer !== null) {
@@ -2167,7 +2194,7 @@ function bindPdvSearchFocusTrap() {
             }
         }
 
-        // Força após lançamento, ou quando o foco caiu fora do PDV / no body.
+        // ForÃ§a apÃ³s lanÃ§amento, ou quando o foco caiu fora do PDV / no body.
         const forceUntil = window.__erpPdvForceSearchFocusUntil || 0;
         const lostFocus = ! active
             || active === document.body
@@ -2401,7 +2428,7 @@ function getErpPdvComponent(page = document.querySelector('.erp-pdv-page')) {
         return null;
     }
 
-    // Filament pode pôr wire:id no .erp-pdv-page, no ancestral ou num filho.
+    // Filament pode pÃ´r wire:id no .erp-pdv-page, no ancestral ou num filho.
     const wireId = page.getAttribute('wire:id')
         ?? page.querySelector('[wire\\:id]')?.getAttribute('wire:id')
         ?? page.closest('[wire\\:id]')?.getAttribute('wire:id');
@@ -2422,7 +2449,7 @@ function getErpPdvComponent(page = document.querySelector('.erp-pdv-page')) {
                 return root.__livewire.$wire;
             }
         } catch {
-            // ignore — fallback exhausted
+            // ignore â€” fallback exhausted
         }
     }
 
@@ -2494,7 +2521,7 @@ function bindErpPdvKeys() {
                 return;
             }
 
-            // Mantém bloqueio dos atalhos enquanto a lista de clientes estiver aberta.
+            // MantÃ©m bloqueio dos atalhos enquanto a lista de clientes estiver aberta.
             if (document.querySelector('.erp-pdv-finalizar__cliente-list')
                 || document.querySelector('.erp-pdv-finalizar[data-cliente-consulta="1"]')) {
                 return;
@@ -2506,7 +2533,7 @@ function bindErpPdvKeys() {
 }
 
 /**
- * Letra do atalho Ctrl (ex.: KeyD → "d"). Preferir code (layout/IME); fallback key.
+ * Letra do atalho Ctrl (ex.: KeyD â†’ "d"). Preferir code (layout/IME); fallback key.
  *
  * @param {KeyboardEvent} event
  * @returns {string}
@@ -2528,7 +2555,7 @@ function resolvePdvCtrlLetter(event) {
 }
 
 /**
- * Ctrl/Meta + A/C/V/X = clipboard no input (não bloquear).
+ * Ctrl/Meta + A/C/V/X = clipboard no input (nÃ£o bloquear).
  *
  * @param {KeyboardEvent} event
  * @returns {boolean}
@@ -2544,7 +2571,7 @@ function isPdvClipboardShortcut(event) {
 }
 
 /**
- * Campos onde letra com modificador não pode virar digitação/pesquisa.
+ * Campos onde letra com modificador nÃ£o pode virar digitaÃ§Ã£o/pesquisa.
  *
  * @param {EventTarget|null} target
  * @returns {boolean}
@@ -2601,7 +2628,7 @@ function resolvePdvWireComponent(page) {
         }
     }
 
-    // Filament: wire:id costuma ficar no ancestral da page class, não no .erp-pdv-page.
+    // Filament: wire:id costuma ficar no ancestral da page class, nÃ£o no .erp-pdv-page.
     if (! component && page && window.Livewire?.find) {
         const wireEl = page.closest('[wire\\:id]') || document.querySelector('.fi-page[wire\\:id], [wire\\:id].erp-pdv-page');
         const wireId = wireEl?.getAttribute('wire:id');
@@ -2640,7 +2667,7 @@ function resolvePdvWireComponent(page) {
 }
 
 /**
- * Modal desconto já aberto?
+ * Modal desconto jÃ¡ aberto?
  *
  * @returns {boolean}
  */
@@ -2650,7 +2677,7 @@ function isPdvDescontoModalOpen() {
 }
 
 /**
- * Abre Desconto/Acréscimo — mesmo caminho do menu Opções (wire:click no botão invisível).
+ * Abre Desconto/AcrÃ©scimo â€” mesmo caminho do menu OpÃ§Ãµes (wire:click no botÃ£o invisÃ­vel).
  */
 function openPdvDescontoFromShortcut() {
     if (isPdvDescontoModalOpen()) {
@@ -2677,7 +2704,7 @@ function openPdvDescontoFromShortcut() {
 }
 
 /**
- * Remove D deixado no Código por atalho Ctrl+D.
+ * Remove D deixado no CÃ³digo por atalho Ctrl+D.
  *
  * @param {KeyboardEvent} event
  */
@@ -2709,7 +2736,7 @@ function stripPdvSearchDescontoLetter(event) {
 }
 
 /**
- * Latch do Control físico (ControlLeft/ControlRight).
+ * Latch do Control fÃ­sico (ControlLeft/ControlRight).
  *
  * @param {KeyboardEvent} event
  */
@@ -2737,7 +2764,7 @@ function handlePdvCtrlLatchKeyup(event) {
 }
 
 /**
- * Ctrl pressionado (inclui latch, getModifierState — CAPS/IME).
+ * Ctrl pressionado (inclui latch, getModifierState â€” CAPS/IME).
  *
  * @param {KeyboardEvent} event
  * @returns {boolean}
@@ -2749,7 +2776,7 @@ function isPdvCtrlPressed(event) {
 }
 
 /**
- * Executa atalho Ctrl+letra no capture (com foco no Código).
+ * Executa atalho Ctrl+letra no capture (com foco no CÃ³digo).
  *
  * @param {KeyboardEvent} event
  * @returns {boolean}
@@ -2776,7 +2803,7 @@ function tryDispatchPdvCtrlShortcut(event) {
 
     const letter = resolvePdvCtrlLetter(event);
 
-    // Desconto: Ctrl+D — btn.click (igual Opções).
+    // Desconto: Ctrl+D â€” btn.click (igual OpÃ§Ãµes).
     if (event.code === 'KeyD' || letter === 'd') {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -2817,7 +2844,7 @@ function tryDispatchPdvCtrlShortcut(event) {
 }
 
 /**
- * Capture cedo: Ctrl+letra executa ação aqui (não só preventDefault no Código).
+ * Capture cedo: Ctrl+letra executa aÃ§Ã£o aqui (nÃ£o sÃ³ preventDefault no CÃ³digo).
  *
  * @param {KeyboardEvent} event
  */
@@ -2838,7 +2865,7 @@ function handlePdvModifierCapture(event) {
         return;
     }
 
-    // Ctrl+letra sem mapa ou Alt/Meta: não digitar no Código (clipboard liberado).
+    // Ctrl+letra sem mapa ou Alt/Meta: nÃ£o digitar no CÃ³digo (clipboard liberado).
     if (event.key.length === 1
         && isPdvSearchTypingTarget(event.target)
         && ! isPdvClipboardShortcut(event)
@@ -2848,7 +2875,7 @@ function handlePdvModifierCapture(event) {
 }
 
 /**
- * Bloqueia insertText d quando Control pressionado (fallback pós-keydown).
+ * Bloqueia insertText d quando Control pressionado (fallback pÃ³s-keydown).
  *
  * @param {InputEvent} event
  */
@@ -2895,7 +2922,7 @@ function dispatchPdvShortcut(event, component) {
         return true;
     }
 
-    // Caixa fechado: só F1 (Opções) e F2 (Abrir Caixa) ficam ativos.
+    // Caixa fechado: sÃ³ F1 (OpÃ§Ãµes) e F2 (Abrir Caixa) ficam ativos.
     if (! caixaAberto) {
         if (event.key === 'F1' || event.key === 'F2') {
             const callArgs = ERP_PDV_FN_SHORTCUTS[event.key];
@@ -2969,7 +2996,7 @@ function handlePdvKeydown(event) {
         return;
     }
 
-    // Qualquer tecla no PDV (ex.: F2 Abrir caixa) é gesto válido para esconder a taskbar.
+    // Qualquer tecla no PDV (ex.: F2 Abrir caixa) Ã© gesto vÃ¡lido para esconder a taskbar.
     ensurePdvFullscreenFromUserGesture();
 
     const overlayOpen = pdvRoot.querySelector('.erp-pdv-overlay') !== null;
@@ -3000,7 +3027,7 @@ function handlePdvKeydown(event) {
     const launchPrecoFocused = document.activeElement?.id === 'erp-pdv-launch-preco';
 
     if (launchQtdFocused || launchPrecoFocused) {
-        // Esc volta o passo (preço → qtd → código); demais teclas não viram atalho.
+        // Esc volta o passo (preÃ§o â†’ qtd â†’ cÃ³digo); demais teclas nÃ£o viram atalho.
         if (event.key === 'Escape') {
             event.preventDefault();
             component.call('handlePdvEscape');
@@ -3042,7 +3069,7 @@ function handlePdvKeydown(event) {
 /**
  * Coleta os atalhos das formas de pagamento renderizadas no modal de finalizar.
  * Os meios de pagamento (e seus atalhos) seguem o cadastro do ERP, por isso a
- * lista é dinâmica e lida diretamente do DOM.
+ * lista Ã© dinÃ¢mica e lida diretamente do DOM.
  *
  * @returns {Set<string>}
  */
@@ -3052,7 +3079,7 @@ function collectFinalizarAtalhos() {
     document.querySelectorAll('.erp-pdv-finalizar__kbd').forEach((el) => {
         const valor = (el.textContent || '').trim().toUpperCase();
 
-        // Letras A–Z ou teclas F1–F12 conforme cadastro da forma de pagamento.
+        // Letras Aâ€“Z ou teclas F1â€“F12 conforme cadastro da forma de pagamento.
         if (/^[A-Z]$/.test(valor) || /^F([1-9]|1[0-2])$/.test(valor)) {
             atalhos.add(valor);
         }
@@ -3176,11 +3203,11 @@ function triggerFinalizarOperacao(component, atalho) {
         window.setTimeout(() => {
             const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
 
-            if (footer?.dataset?.pixQr === '1') {
+            if (footer?.dataset?.pixQr === '1' || footer?.dataset?.supertef === '1') {
                 return;
             }
 
-            if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, .erp-pdv-finalizar-aviso')) {
+            if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, #erp-pdv-supertef-title, .erp-pdv-finalizar-aviso')) {
                 return;
             }
 
@@ -3493,7 +3520,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
     }
 
     // Campo / lista de cliente: digitar nome livremente (ex.: "AD").
-    // Não capturar atalhos de pagamento (D=Dinheiro, P=Pix…) até confirmar com Enter.
+    // NÃ£o capturar atalhos de pagamento (D=Dinheiro, P=Pixâ€¦) atÃ© confirmar com Enter.
     if (clienteTyping) {
         if (event.key === 'Escape') {
             event.preventDefault();
@@ -3518,7 +3545,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
             return;
         }
 
-        // Letras/números/espaço etc. ficam no input — não viram atalho de pagamento.
+        // Letras/nÃºmeros/espaÃ§o etc. ficam no input â€” nÃ£o viram atalho de pagamento.
         return;
     }
 
@@ -3530,7 +3557,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
-    // Fiscais F3–F6 (atalhos dos botões do terminal) — preservados; meios não usam essas teclas.
+    // Fiscais F3â€“F6 (atalhos dos botÃµes do terminal) â€” preservados; meios nÃ£o usam essas teclas.
     if (['F3', 'F4', 'F5', 'F6'].includes(event.key)) {
         if (triggerFinalizarOperacao(component, event.key)) {
             event.preventDefault();
@@ -3539,8 +3566,8 @@ function handlePdvFinalizarModalKeydown(event, component) {
         }
     }
 
-    // Concluir: somente o atalho configurado (F7/F9/F10) — o <kbd> do botão.
-    // F7 em canhoto/parcelas já retorna acima. F7 NÃO conclui se a config for F9/F10.
+    // Concluir: somente o atalho configurado (F7/F9/F10) â€” o <kbd> do botÃ£o.
+    // F7 em canhoto/parcelas jÃ¡ retorna acima. F7 NÃƒO conclui se a config for F9/F10.
     const atalhoConcluir = (document.querySelector('.erp-pdv-finalizar__footer-actions')?.dataset?.erpAtalhoConcluir
         || 'F10').toUpperCase();
     if (event.key === atalhoConcluir) {
@@ -3550,7 +3577,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
-    // F8 = próxima forma no PDV (Tela de Venda: só setas).
+    // F8 = prÃ³xima forma no PDV (Tela de Venda: sÃ³ setas).
     if (event.key === 'F8') {
         event.preventDefault();
         component.call('movePagamentoSelection', 1);
@@ -3573,7 +3600,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
-    // Meios de pagamento (letra ou F livre do cadastro) — após Concluir/fiscais/F8.
+    // Meios de pagamento (letra ou F livre do cadastro) â€” apÃ³s Concluir/fiscais/F8.
     if (! event.ctrlKey && ! event.altKey && ! event.metaKey && ! cpfFocused && ! informacoesFocused) {
         const tecla = (event.key || '').toUpperCase();
 
@@ -3623,7 +3650,7 @@ function handlePdvModalKeydown(event, component, isFormModal) {
             return;
         }
 
-        // Não vazar F10/outros atalhos para o PDV enquanto conta moedas.
+        // NÃ£o vazar F10/outros atalhos para o PDV enquanto conta moedas.
         return;
     }
 
@@ -3985,7 +4012,7 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         return;
     }
 
-    // Caixa NÃO usa --form/--small; tratar F2/F10 pelo título, fora de isFormModal.
+    // Caixa NÃƒO usa --form/--small; tratar F2/F10 pelo tÃ­tulo, fora de isFormModal.
     const caixaTitle = document.getElementById('erp-pdv-caixa-title');
 
     if (caixaTitle) {
@@ -4032,7 +4059,7 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         }
     }
 
-    // F2 continua Abrir Caixa. Com o Menu Fiscal aberto, teclas de função não vazam.
+    // F2 continua Abrir Caixa. Com o Menu Fiscal aberto, teclas de funÃ§Ã£o nÃ£o vazam.
     if (document.getElementById('erp-pdv-menu-fiscal-panel')
         || document.getElementById('erp-pdv-menu-fiscal-identificacao-title')
         || document.getElementById('erp-pdv-menu-fiscal-xml-title')
@@ -4048,7 +4075,154 @@ function handlePdvModalKeydown(event, component, isFormModal) {
     dispatchPdvShortcut(event, component);
 }
 
+function pdvVendedorVendaRows() {
+    return Array.from(document.querySelectorAll('#erp-pdv-vendedor-venda-list [data-vendedor-id]'))
+        .filter((row) => ! row.hidden && ! row.closest('li')?.hidden);
+}
+
+function selectPdvVendedorVendaRow(row) {
+    const rows = Array.from(document.querySelectorAll('#erp-pdv-vendedor-venda-list [data-vendedor-id]'));
+
+    rows.forEach((item) => {
+        const selected = item === row;
+        item.classList.toggle('erp-pdv-vendedor-row--selected', selected);
+        item.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+
+    row?.scrollIntoView({ block: 'nearest' });
+}
+
+function movePdvVendedorVendaSelection(delta) {
+    const rows = pdvVendedorVendaRows();
+
+    if (! rows.length) {
+        return;
+    }
+
+    const current = rows.findIndex((row) => row.classList.contains('erp-pdv-vendedor-row--selected'));
+    const base = current >= 0 ? current : 0;
+    const next = Math.max(0, Math.min(rows.length - 1, base + delta));
+    selectPdvVendedorVendaRow(rows[next]);
+}
+
+function filterPdvVendedorVendaRows() {
+    const input = document.getElementById('erp-pdv-vendedor-venda-search');
+    const term = (input?.value || '').trim().toLocaleUpperCase('pt-BR');
+    const rows = Array.from(document.querySelectorAll('#erp-pdv-vendedor-venda-list [data-vendedor-id]'));
+    let first = null;
+
+    rows.forEach((row) => {
+        const blob = String(row.dataset.busca || '').toLocaleUpperCase('pt-BR');
+        const show = term === '' || blob.includes(term);
+        row.hidden = ! show;
+        const item = row.closest('li');
+
+        if (item) {
+            item.hidden = ! show;
+        }
+
+        if (show && first === null) {
+            first = row;
+        }
+    });
+
+    if (first) {
+        selectPdvVendedorVendaRow(first);
+    }
+}
+
+function confirmPdvVendedorVenda(component) {
+    const row = pdvVendedorVendaRows().find((item) => item.classList.contains('erp-pdv-vendedor-row--selected'))
+        || pdvVendedorVendaRows()[0];
+
+    if (! row || ! component) {
+        return;
+    }
+
+    const id = Number.parseInt(row.dataset.vendedorId || '', 10);
+
+    if (! Number.isFinite(id) || id <= 0) {
+        return;
+    }
+
+    component.call('confirmarVendedorDaVenda', id);
+}
+
+function bindPdvVendedorVendaModal() {
+    const root = document.getElementById('erp-pdv-vendedor-venda');
+
+    if (! root || root.dataset.bound === '1') {
+        filterPdvVendedorVendaRows();
+
+        return;
+    }
+
+    root.dataset.bound = '1';
+
+    const search = document.getElementById('erp-pdv-vendedor-venda-search');
+    const list = document.getElementById('erp-pdv-vendedor-venda-list');
+    const confirm = document.getElementById('erp-pdv-vendedor-venda-confirm');
+
+    search?.addEventListener('input', filterPdvVendedorVendaRows);
+    confirm?.addEventListener('click', () => {
+        const page = document.querySelector('.erp-pdv-page') ?? document.querySelector('.erp-pdv');
+        const component = page ? getErpPdvComponent(page) : null;
+        confirmPdvVendedorVenda(component);
+    });
+    list?.addEventListener('click', (event) => {
+        const row = event.target.closest('[data-vendedor-id]');
+
+        if (row) {
+            selectPdvVendedorVendaRow(row);
+        }
+    });
+    list?.addEventListener('dblclick', (event) => {
+        const row = event.target.closest('[data-vendedor-id]');
+
+        if (! row) {
+            return;
+        }
+
+        selectPdvVendedorVendaRow(row);
+        const page = document.querySelector('.erp-pdv-page') ?? document.querySelector('.erp-pdv');
+        const component = page ? getErpPdvComponent(page) : null;
+        confirmPdvVendedorVenda(component);
+    });
+
+    filterPdvVendedorVendaRows();
+}
+
+function handlePdvVendedorVendaKeydown(event, component) {
+    if (! document.getElementById('erp-pdv-vendedor-venda')) {
+        return false;
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        movePdvVendedorVendaSelection(event.key === 'ArrowDown' ? 1 : -1);
+
+        return true;
+    }
+
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        confirmPdvVendedorVenda(component);
+
+        return true;
+    }
+
+    if (/^F\d{1,2}$/.test(event.key)) {
+        event.preventDefault();
+    }
+
+    return true;
+}
+
 function handlePdvListModalKeydown(event, component) {
+    if (handlePdvVendedorVendaKeydown(event, component)) {
+        return true;
+    }
+
     const importarMenu = document.getElementById('erp-pdv-importar-menu-panel');
 
     if (importarMenu) {
@@ -4379,6 +4553,29 @@ function handlePdvListModalKeydown(event, component) {
         return false;
     }
 
+    const reimprimirNfceSearch = document.getElementById('erp-pdv-reimprimir-nfce-search');
+
+    if (reimprimirNfceSearch) {
+        const reimprimirNfceFocused = document.activeElement?.id === 'erp-pdv-reimprimir-nfce-search';
+
+        if (reimprimirNfceFocused && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            component.call('moveReimprimirNfceSelection', event.key === 'ArrowDown' ? 1 : -1);
+            scrollPdvModalRowIntoView('erp-pdv-reimprimir-nfce-row-');
+
+            return true;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('confirmReimprimirNfce');
+
+            return true;
+        }
+
+        return false;
+    }
+
     const consultaVendaSearch = document.getElementById('erp-pdv-consulta-venda-search');
 
     if (consultaVendaSearch) {
@@ -4450,7 +4647,7 @@ function handlePdvListModalKeydown(event, component) {
             return true;
         }
 
-        // ↑/↓ locais (sem Livewire). No motivo, setas movem o cursor do texto.
+        // â†‘/â†“ locais (sem Livewire). No motivo, setas movem o cursor do texto.
         if (! inMotivo && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault();
             moveVendasEsperaSelectionLocal(event.key === 'ArrowDown' ? 1 : -1);
@@ -4469,7 +4666,7 @@ function handlePdvListModalKeydown(event, component) {
             event.preventDefault();
             const index = getVendasEsperaSelectedIndex();
             if (index !== null) {
-                // Só sincroniza índice (foco no motivo); sem re-render da grade.
+                // SÃ³ sincroniza Ã­ndice (foco no motivo); sem re-render da grade.
                 component.call('selectVendaEsperaRow', index);
             }
 
@@ -4497,7 +4694,7 @@ function handlePdvListModalKeydown(event, component) {
 
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            // Navegação 100% local — sem round-trip Livewire (evita delay das setas).
+            // NavegaÃ§Ã£o 100% local â€” sem round-trip Livewire (evita delay das setas).
             moveTabelaPrecoSelectionLocal(event.key === 'ArrowDown' ? 1 : -1);
 
             return true;
@@ -4687,9 +4884,9 @@ window.erpPdvSelectVendaEsperaRow = function erpPdvSelectVendaEsperaRow(index) {
     selectVendasEsperaRowLocal(idx);
 
     const component = getErpPdvLivewireComponent();
-    // Livewire.find → component.$wire; Alpine fallback pode já devolver $wire.
+    // Livewire.find â†’ component.$wire; Alpine fallback pode jÃ¡ devolver $wire.
     const wire = component?.$wire ?? component;
-    // Sincroniza índice sem re-render (Enter/Descartar usam o índice local de qualquer forma).
+    // Sincroniza Ã­ndice sem re-render (Enter/Descartar usam o Ã­ndice local de qualquer forma).
     if (wire && typeof wire.set === 'function') {
         wire.set('selectedVendaEsperaIndex', idx, false);
     }
@@ -4785,7 +4982,7 @@ function playPdvBeep() {
         oscillator.start(ctx.currentTime);
         oscillator.stop(ctx.currentTime + 0.18);
     } catch (error) {
-        // Áudio indisponível/bloqueado pelo navegador — ignora silenciosamente.
+        // Ãudio indisponÃ­vel/bloqueado pelo navegador â€” ignora silenciosamente.
     }
 }
 
@@ -4818,7 +5015,7 @@ function playPdvErrorBeep() {
         gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
         gain.connect(ctx.destination);
 
-        // Tom grave/buzzer com duas descidas — distinto do bip de sucesso.
+        // Tom grave/buzzer com duas descidas â€” distinto do bip de sucesso.
         const oscillator = ctx.createOscillator();
         oscillator.type = 'sawtooth';
         oscillator.frequency.setValueAtTime(320, ctx.currentTime);
@@ -4829,12 +5026,12 @@ function playPdvErrorBeep() {
         oscillator.start(ctx.currentTime);
         oscillator.stop(ctx.currentTime + 0.55);
     } catch (error) {
-        // Áudio indisponível/bloqueado pelo navegador — ignora silenciosamente.
+        // Ãudio indisponÃ­vel/bloqueado pelo navegador â€” ignora silenciosamente.
     }
 }
 
 function focusPdvLaunchField(field) {
-    // Evita o trap do Código roubar o foco no passo Qtde/Preço.
+    // Evita o trap do CÃ³digo roubar o foco no passo Qtde/PreÃ§o.
     window.__erpPdvForceSearchFocusUntil = 0;
 
     const id = field === 'preco' ? 'erp-pdv-launch-preco' : 'erp-pdv-launch-qtd';
@@ -4856,7 +5053,7 @@ function focusPdvLaunchField(field) {
         }
     };
 
-    // Tenta focar imediatamente via rAF (campo já pode estar no DOM após render).
+    // Tenta focar imediatamente via rAF (campo jÃ¡ pode estar no DOM apÃ³s render).
     const tryRaf = (maxFrames = 20) => {
         const input = document.getElementById(id);
 
@@ -4871,7 +5068,7 @@ function focusPdvLaunchField(field) {
         }
     };
 
-    // Primeiro rAF: pega logo após o próximo paint do Livewire.
+    // Primeiro rAF: pega logo apÃ³s o prÃ³ximo paint do Livewire.
     window.requestAnimationFrame(() => tryRaf(20));
 }
 
@@ -5097,7 +5294,7 @@ function focusPdvModalField() {
             ?? abertura.closest('.erp-pdv-modal')
             ?? document;
 
-        // Garante máscara de dinheiro no modal recém-aberto (Livewire morph).
+        // Garante mÃ¡scara de dinheiro no modal recÃ©m-aberto (Livewire morph).
         delete abertura.dataset.erpMaskBound;
         window.ErpMasks?.refresh(modal);
 
@@ -5114,7 +5311,7 @@ function focusPdvModalField() {
             } catch (_) {
                 abertura.focus();
             }
-            // Seleção total (azul) para digitar por cima.
+            // SeleÃ§Ã£o total (azul) para digitar por cima.
             abertura.select();
             if (typeof abertura.setSelectionRange === 'function') {
                 abertura.setSelectionRange(0, abertura.value.length);
@@ -5126,7 +5323,7 @@ function focusPdvModalField() {
             abertura.addEventListener('focus', () => {
                 window.requestAnimationFrame(selectAll);
             });
-            // Evita o Chrome “desselecionar” no clique.
+            // Evita o Chrome â€œdesselecionarâ€ no clique.
             abertura.addEventListener('mouseup', (event) => {
                 if (abertura.selectionStart === abertura.selectionEnd) {
                     event.preventDefault();
@@ -5135,7 +5332,7 @@ function focusPdvModalField() {
             });
         }
 
-        // Com troca de usuário: foco na senha; senão no valor de abertura.
+        // Com troca de usuÃ¡rio: foco na senha; senÃ£o no valor de abertura.
         if (senha) {
             window.requestAnimationFrame(() => {
                 try {
@@ -5206,7 +5403,7 @@ window.ErpPdvPrint = {
     },
 
     /**
-     * Imprime relatório em iframe oculto (sem abrir aba no navegador).
+     * Imprime relatÃ³rio em iframe oculto (sem abrir aba no navegador).
      * @param {string} url
      */
     printUrl(url) {
@@ -5231,7 +5428,7 @@ window.ErpPdvPrint = {
         const iframe = document.createElement('iframe');
         iframe.id = 'erp-pdv-print-frame';
         iframe.src = printUrl;
-        iframe.title = 'Impressão PDV';
+        iframe.title = 'ImpressÃ£o PDV';
         iframe.setAttribute('aria-hidden', 'true');
         iframe.style.cssText = [
             'position:fixed',
@@ -5269,8 +5466,8 @@ window.ErpPdvPrint = {
         window.addEventListener('message', onMessage);
 
         iframe.addEventListener('load', () => {
-            // O relatório com ?auto=1 dispara window.print() sozinho.
-            // Só limpamos o iframe após afterprint (postMessage) ou timeout.
+            // O relatÃ³rio com ?auto=1 dispara window.print() sozinho.
+            // SÃ³ limpamos o iframe apÃ³s afterprint (postMessage) ou timeout.
             window.setTimeout(cleanup, 120000);
         }, { once: true });
 
@@ -5283,8 +5480,8 @@ initErpPdv();
 /**
  * Descanso de tela:
  * - Header: letreiro (marquee) se configurado
- * - Painel da foto: carrossel de promoções (7s) se houver itens mostrar_pdv
- * Regra: após 30s SEM atividade e SEM venda em andamento (cupom vazio).
+ * - Painel da foto: carrossel de promoÃ§Ãµes (7s) se houver itens mostrar_pdv
+ * Regra: apÃ³s 30s SEM atividade e SEM venda em andamento (cupom vazio).
  */
 (function initPdvScreensaver() {
     const IDLE_MS = 30000;
@@ -5481,7 +5678,7 @@ initErpPdv();
                 window.Livewire.hook('morph.updated', apply);
             }
         } catch (e) {
-            // Hook indisponível: o timer de inatividade ainda funciona.
+            // Hook indisponÃ­vel: o timer de inatividade ainda funciona.
         }
     });
 
@@ -5490,7 +5687,7 @@ initErpPdv();
 })();
 
 // Stepper "Dividir a conta" vive em public/js/erp-dividir-conta.js (shell).
-// Mantém alias se o PDV carregar sem o shell ter definido (dev/testes isolados).
+// MantÃ©m alias se o PDV carregar sem o shell ter definido (dev/testes isolados).
 if (typeof window.erpDividirContaStepper !== 'function') {
-    console.warn('[erp-pdv] erpDividirContaStepper ausente — carregue js/erp-dividir-conta.js');
+    console.warn('[erp-pdv] erpDividirContaStepper ausente â€” carregue js/erp-dividir-conta.js');
 }

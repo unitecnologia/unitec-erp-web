@@ -20,7 +20,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'atalho',
     'tipo_movimento',
     'usa_tef',
+    'usa_pos',
     'usa_super_tef',
+    'considerar_a_vista',
     'aparece_venda',
     'aparece_contas_receber',
     'nfce',
@@ -48,7 +50,9 @@ class FormaPagamento extends Model
             'max_parcelas' => 'integer',
             'intervalo_parcelas' => 'integer',
             'usa_tef' => 'boolean',
+            'usa_pos' => 'boolean',
             'usa_super_tef' => 'boolean',
+            'considerar_a_vista' => 'boolean',
             'aparece_venda' => 'boolean',
             'aparece_contas_receber' => 'boolean',
             'nfce' => 'boolean',
@@ -180,7 +184,9 @@ class FormaPagamento extends Model
      *     tabelas_prazo: bool,
      *     bandeiras: bool,
      *     usa_tef: bool,
+     *     usa_pos: bool,
      *     usa_super_tef: bool,
+     *     considerar_a_vista: bool,
      *     gerar_qrcode_pdv: bool,
      *     conta_destino: bool,
      *     nfce: bool,
@@ -192,6 +198,7 @@ class FormaPagamento extends Model
         $tipo = mb_strtolower(trim((string) $tipo), 'UTF-8');
 
         $isCartao = in_array($tipo, ['cartao_credito', 'cartao_debito', 'tef'], true);
+        $isCartaoCredito = $tipo === 'cartao_credito';
         $isCarne = in_array($tipo, ['boleto', 'cheque', 'crediario'], true);
         $isPix = $tipo === 'pix';
 
@@ -202,7 +209,9 @@ class FormaPagamento extends Model
             'taxa_cartao' => $isCartao,
             'prazo_cartao' => $isCartao,
             'usa_tef' => $isCartao,
+            'usa_pos' => $isCartao,
             'usa_super_tef' => $isCartao,
+            'considerar_a_vista' => $isCartaoCredito,
             'bandeiras' => $isCartao,
             // Cartão segue o mesmo financeiro do carnê: flag Financeiro ou Tabela de Prazo.
             'max_parcelas' => $isCartao || $isCarne,
@@ -211,7 +220,7 @@ class FormaPagamento extends Model
             'tabelas_prazo' => $isCartao || $isCarne,
             // QR Code PDV: exclusivo PIX (PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv).
             'gerar_qrcode_pdv' => $isPix,
-            // Flags gerais sem vínculo exclusivo a um tipo no código.
+            // NFC-e (PDV): no PDV online, forma com valor força transmissão automática.
             'nfce' => true,
             'aparece_contas_receber' => true,
         ];

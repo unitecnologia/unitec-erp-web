@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,6 +13,7 @@ class RhFuncionario extends Model
     protected $table = 'rh_funcionarios';
 
     protected $fillable = [
+        'empresa_id',
         'codigo',
         'nome',
         'cpf',
@@ -35,6 +37,7 @@ class RhFuncionario extends Model
         'cargo_id',
         'departamento_id',
         'tipo_salario',
+        'tipo_vinculo',
         'salario',
         'data_admissao',
         'data_demissao',
@@ -52,6 +55,11 @@ class RhFuncionario extends Model
             ->max();
 
         return (string) (($max ?? 0) + 1);
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
     }
 
     public function cargo(): BelongsTo
@@ -88,9 +96,27 @@ class RhFuncionario extends Model
         return Storage::disk('public')->url((string) $this->foto_path);
     }
 
+    public function feriasPeriodos(): HasMany
+    {
+        return $this->hasMany(RhFeriasPeriodo::class, 'funcionario_id');
+    }
+
+    public function feriasGozos(): HasMany
+    {
+        return $this->hasMany(RhFeriasGozo::class, 'funcionario_id');
+    }
+
     public function emFeriasHoje(): bool
     {
-        return false;
+        $hoje = now()->toDateString();
+
+        return RhFeriasGozo::query()
+            ->where('funcionario_id', $this->getKey())
+            ->where('ativo', true)
+            ->where('situacao', RhFeriasGozo::SIT_EM_ANDAMENTO)
+            ->whereDate('gozo_inicio', '<=', $hoje)
+            ->whereDate('gozo_fim', '>=', $hoje)
+            ->exists();
     }
 
     protected function casts(): array

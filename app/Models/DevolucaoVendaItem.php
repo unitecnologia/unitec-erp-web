@@ -19,6 +19,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'preco',
     'total',
     'grade_legado',
+    'custo_unitario',
+    'custo_total',
+    'custo_origem',
+    'custo_situacao',
 ])]
 class DevolucaoVendaItem extends Model
 {
@@ -46,6 +50,8 @@ class DevolucaoVendaItem extends Model
             'qtd_vendida' => 'decimal:3',
             'preco' => 'decimal:4',
             'total' => 'decimal:2',
+            'custo_unitario' => 'decimal:4',
+            'custo_total' => 'decimal:2',
         ];
     }
 }

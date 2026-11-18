@@ -1,7 +1,22 @@
 document.addEventListener('DOMContentLoaded', initErpPessoasForm);
 document.addEventListener('livewire:navigated', initErpPessoasForm);
+// wire:navigate pode injetar este script DEPOIS de livewire:navigated —
+// sem o boot imediato, o 1º cadastro fica sem o clique de Pesquisar Pessoa Jurídica.
+if (document.readyState !== 'loading') {
+    queueMicrotask(() => initErpPessoasForm());
+}
 
-document.addEventListener('livewire:init', () => {
+bindSearchPessoaJuridica();
+bootErpPessoasLivewire();
+document.addEventListener('livewire:init', bootErpPessoasLivewire);
+
+function bootErpPessoasLivewire() {
+    if (window.__erpPessoasLivewireBound || ! window.Livewire) {
+        return;
+    }
+
+    window.__erpPessoasLivewireBound = true;
+
     window.Livewire.on('erp-masks-refresh', () => {
         const page = document.querySelector('.erp-pessoas-form-page');
 
@@ -27,7 +42,7 @@ document.addEventListener('livewire:init', () => {
 
         refocusErpPessoaAfterMorph();
     });
-});
+}
 
 function initErpPessoasForm() {
     const page = document.querySelector('.erp-pessoas-form-page');
@@ -38,7 +53,7 @@ function initErpPessoasForm() {
 
     initErpMasks(page);
     bindErpPessoasFormKeys(page);
-    bindSearchPessoaJuridica(page);
+    bindSearchPessoaJuridica();
     bindErpPessoaCidadeEnter();
 }
 
@@ -179,34 +194,94 @@ function erpPessoasModalAberto() {
     });
 }
 
-function bindSearchPessoaJuridica(page) {
-    if (page.dataset.erpSearchPjBound === '1') {
+function notifyErpPessoaCnpj(body, type = 'warning') {
+    if (typeof notifyErp === 'function') {
+        notifyErp(body, type === 'danger' ? 'danger' : 'info', 'Consulta de CNPJ');
+
         return;
     }
 
-    page.dataset.erpSearchPjBound = '1';
+    if (typeof FilamentNotification !== 'undefined') {
+        const notification = new FilamentNotification().title('Consulta de CNPJ').body(body);
 
-    page.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-erp-search-pj]');
+        if (type === 'danger') {
+            notification.danger();
+        } else {
+            notification.warning();
+        }
 
-        if (! button || ! page.contains(button)) {
+        notification.send();
+
+        return;
+    }
+
+    window.alert(body);
+}
+
+function bindSearchPessoaJuridica() {
+    if (window.__erpPessoasSearchPjBound) {
+        return;
+    }
+
+    window.__erpPessoasSearchPjBound = true;
+
+    // Listener no document: sobrevive a morph, troca de cadastro e script injetado tarde.
+    document.addEventListener('click', (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest('[data-erp-search-pj]')
+            : null;
+
+        if (! button) {
+            return;
+        }
+
+        const page = document.querySelector('.erp-pessoas-form-page');
+
+        if (! page || ! page.contains(button)) {
             return;
         }
 
         event.preventDefault();
 
-        const input = document.getElementById('pcad-cpf');
-        const component = getErpPessoasLivewireComponent();
-
-        if (! component) {
+        if (button.disabled || window.__erpPessoasCnpjBusy) {
             return;
         }
 
+        const input = page.querySelector('#pcad-cpf') || document.getElementById('pcad-cpf');
+
+        // Só formata o valor visível — wire.set aqui corre com a consulta e o clique some.
         if (input && window.ErpMasks) {
-            window.ErpMasks.apply(input);
+            window.ErpMasks.apply(input, { sync: false });
         }
 
-        component.call('searchPessoaJuridica', input?.value ?? '');
+        const cnpj = String(input?.value ?? '').trim();
+        const componentEl = button.closest('[wire\\:id]')
+            || page.closest('[wire\\:id]')
+            || (page.hasAttribute('wire:id') ? page : null);
+        const component = componentEl
+            ? window.Livewire?.find(componentEl.getAttribute('wire:id'))
+            : getErpPessoasLivewireComponent();
+
+        if (! component || typeof component.call !== 'function') {
+            notifyErpPessoaCnpj('Não foi possível iniciar a consulta. Recarregue a tela e tente novamente.', 'danger');
+
+            return;
+        }
+
+        window.__erpPessoasCnpjBusy = true;
+        button.disabled = true;
+
+        Promise.resolve(component.call('searchPessoaJuridica', cnpj))
+            .catch(() => {
+                notifyErpPessoaCnpj('Não foi possível consultar o CNPJ agora. Tente novamente.', 'danger');
+            })
+            .finally(() => {
+                window.__erpPessoasCnpjBusy = false;
+
+                if (button.isConnected) {
+                    button.disabled = false;
+                }
+            });
     });
 }
 

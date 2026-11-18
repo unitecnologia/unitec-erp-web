@@ -202,7 +202,11 @@ final class PdvNfceTransmissaoService
             }
         }
 
+        // SuperTEF com XML antigo (tpIntegra=1 / sem CNPJ): remonta para tpIntegra=2 antes de reenviar.
+        $forcarRemontagem = $this->payloadBuilder->vendaTemPagamentoCartaoSuperTef($nfce->pdvVenda);
+
         if (! $novoNumero
+            && ! $forcarRemontagem
             && $nfce->status === PdvVendaNfce::STATUS_PENDENTE
             && filled($nfce->chave)
             && NfceXmlProtocolo::tpEmis(NfceXmlProtocolo::nfe($nfce->xml)) === 1) {

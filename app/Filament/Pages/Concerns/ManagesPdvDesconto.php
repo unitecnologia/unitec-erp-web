@@ -3,6 +3,8 @@
 namespace App\Filament\Pages\Concerns;
 
 use App\Models\Product;
+use App\Support\Erp\DescontoReaisItemCalculator;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpMoney;
 use Filament\Notifications\Notification;
 
@@ -57,22 +59,70 @@ trait ManagesPdvDesconto
             return;
         }
 
-        $this->descontoItemTipo = 'desconto';
+        $seed = $this->seedDescontoItemModal($item);
+        $this->descontoItemTipo = $seed['tipo'];
         $this->descontoItemModo = 'percentual';
-        $this->descontoItemValor = '0,00';
+        $this->descontoItemValor = $seed['pct'];
 
         $this->openPdvModal('desconto_item');
         $this->dispatch('erp-pdv-focus-desconto');
     }
 
-    public function setDescontoItemTipo(string $tipo): void
+    /**
+     * @return array{descricao: string, baseRaw: float, qtdRaw: float, tipo: string, pct: string, reais: string, modoReais: string}
+     */
+    public function getDescontoItemModalProperty(): array
     {
-        $this->descontoItemTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
+        $item = $this->cupomItemSelecionado;
+        $seed = $item ? $this->seedDescontoItemModal($item) : [
+            'tipo' => 'desconto',
+            'pct' => '0,00',
+            'reais' => '0,00',
+        ];
+        $base = $item ? $this->descontoItemPrecoBase($item) : 0.0;
+        $qtd = $item ? (float) ($item['quantidade'] ?? 1) : 0.0;
+
+        return [
+            'descricao' => (string) ($item['descricao'] ?? ''),
+            'baseRaw' => $base,
+            'qtdRaw' => $qtd,
+            'tipo' => $seed['tipo'],
+            'pct' => $seed['pct'],
+            'reais' => $seed['reais'],
+            'modoReais' => EmpresaParametros::descontoReaisItemModo(),
+        ];
     }
 
-    public function setDescontoItemModo(string $modo): void
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array{tipo: string, pct: string, reais: string}
+     */
+    protected function seedDescontoItemModal(array $item): array
     {
-        $this->descontoItemModo = $modo === 'valor' ? 'valor' : 'percentual';
+        $base = $this->descontoItemPrecoBase($item);
+        $qtd = (float) ($item['quantidade'] ?? 1);
+        $bruto = max(0.0, round($base * $qtd, 2));
+        $desc = (float) ($item['desconto'] ?? 0);
+        $acr = (float) ($item['acrescimo'] ?? 0);
+        // Preferir ajuste de linha fixo quando existir.
+        $ajusteLinha = (float) ($item['ajuste_linha_fixo'] ?? 0);
+        $tipo = 'desconto';
+        $ajuste = 0.0;
+
+        if ($acr > 0.0001 || (($item['acrescimo_linha_fixo'] ?? false) && $ajusteLinha > 0)) {
+            $tipo = 'acrescimo';
+            $ajuste = $ajusteLinha > 0 ? $ajusteLinha : round($acr * $qtd, 2);
+        } elseif ($desc > 0.0001 || (($item['desconto_linha_fixo'] ?? false) && $ajusteLinha > 0)) {
+            $ajuste = $ajusteLinha > 0 ? $ajusteLinha : round($desc * $qtd, 2);
+        }
+
+        $pct = $bruto > 0 && $ajuste > 0 ? round(($ajuste / $bruto) * 100, 2) : 0.0;
+
+        return [
+            'tipo' => $tipo,
+            'pct' => ErpMoney::formatBr($pct),
+            'reais' => ErpMoney::formatBr($ajuste),
+        ];
     }
 
     /**
@@ -86,34 +136,54 @@ trait ManagesPdvDesconto
     /**
      * Calcula o resultado do desconto/acréscimo para o item informado.
      *
-     * @return array{base: float, delta: float, novoPreco: float, total: float, quantidade: float}
+     * @return array{base: float, delta: float, deltaUnit: float, ajusteLinha: float, novoPreco: float, total: float, quantidade: float, modoReais: string}
      */
     protected function calcularDescontoItem(array $item): array
     {
         $base = $this->descontoItemPrecoBase($item);
         $quantidade = (float) ($item['quantidade'] ?? 1);
         $valor = ErpMoney::parseBr($this->descontoItemValor, 2);
+        $modoReais = EmpresaParametros::descontoReaisItemModo();
+        $calc = DescontoReaisItemCalculator::calcular(
+            $base,
+            $quantidade,
+            $valor,
+            $this->descontoItemTipo,
+            $this->descontoItemModo,
+            $modoReais,
+        );
 
-        if ($this->descontoItemModo === 'percentual') {
-            $deltaUnit = round($base * ($valor / 100), 2);
+        // PDV persiste preço líquido unitário; o total comercial usa o ajuste de linha.
+        $deltaUnit = (float) $calc['deltaUnit'];
+        $ajusteLinha = (float) $calc['ajusteLinha'];
+        $novoPreco = (float) $calc['novoPreco'];
+
+        if ($this->descontoItemModo === 'valor'
+            && $modoReais === EmpresaParametros::DESCONTO_REAIS_ITEM_LINHA
+            && $quantidade > 0) {
+            // Evita erro de centavos: total = bruto ± linha; unitário derivado.
+            $bruto = round($quantidade * $base, 2);
+            $total = $this->descontoItemTipo === 'acrescimo'
+                ? round($bruto + $ajusteLinha, 2)
+                : round(max(0, $bruto - $ajusteLinha), 2);
+            $novoPreco = round($total / $quantidade, 4);
+            if ($novoPreco < 0) {
+                $novoPreco = 0.0;
+            }
+            $deltaUnit = abs(round($novoPreco - $base, 4));
         } else {
-            $deltaUnit = round($valor, 2);
-        }
-
-        $novoPreco = $this->descontoItemTipo === 'acrescimo'
-            ? round($base + $deltaUnit, 2)
-            : round($base - $deltaUnit, 2);
-
-        if ($novoPreco < 0) {
-            $novoPreco = 0.0;
+            $total = (float) $calc['total'];
         }
 
         return [
             'base' => $base,
-            'delta' => round($novoPreco - $base, 2),
+            'delta' => round($novoPreco - $base, 4),
+            'deltaUnit' => $deltaUnit,
+            'ajusteLinha' => $ajusteLinha,
             'novoPreco' => $novoPreco,
-            'total' => round($quantidade * $novoPreco, 2),
+            'total' => $total,
             'quantidade' => $quantidade,
+            'modoReais' => $modoReais,
         ];
     }
 
@@ -147,8 +217,21 @@ trait ManagesPdvDesconto
         ];
     }
 
-    public function confirmDescontoItem(): void
-    {
+    public function confirmDescontoItem(
+        ?string $valorInformado = null,
+        ?string $modoEntrada = null,
+        ?string $tipoInformado = null,
+    ): void {
+        if ($tipoInformado !== null && $tipoInformado !== '') {
+            $this->descontoItemTipo = $tipoInformado === 'acrescimo' ? 'acrescimo' : 'desconto';
+        }
+        if ($modoEntrada !== null && $modoEntrada !== '') {
+            $this->descontoItemModo = $modoEntrada === 'valor' ? 'valor' : 'percentual';
+        }
+        if ($valorInformado !== null && trim($valorInformado) !== '') {
+            $this->descontoItemValor = ErpMoney::formatBr(ErpMoney::parseBr($valorInformado));
+        }
+
         if ($this->mesaBloqueiaAlteracao()) {
             $this->closePdvModal();
 
@@ -220,22 +303,84 @@ trait ManagesPdvDesconto
             }
         }
 
-        $delta = round($novoPreco - $base, 2);
+        $delta = (float) $calc['delta'];
+        $ajusteLinha = (float) $calc['ajusteLinha'];
+        $modoReais = (string) ($calc['modoReais'] ?? EmpresaParametros::descontoReaisItemModo());
+        $descontoFixoLinha = $this->descontoItemModo === 'valor'
+            && $modoReais === EmpresaParametros::DESCONTO_REAIS_ITEM_LINHA
+            && $this->descontoItemTipo === 'desconto'
+            && $ajusteLinha > 0;
+        $acrescimoFixoLinha = $this->descontoItemModo === 'valor'
+            && $modoReais === EmpresaParametros::DESCONTO_REAIS_ITEM_LINHA
+            && $this->descontoItemTipo === 'acrescimo'
+            && $ajusteLinha > 0;
+        $tipo = $this->descontoItemTipo;
+
+        // Fecha antes de persistir (evita remorph reabrir o diálogo).
+        $this->activeModal = null;
 
         $this->cupomItens[$index]['preco_base'] = $base;
-        $this->cupomItens[$index]['preco'] = $novoPreco;
-        $this->cupomItens[$index]['total'] = round($quantidade * $novoPreco, 2);
-        $this->cupomItens[$index]['desconto'] = $delta < 0 ? abs($delta) : 0.0;
-        $this->cupomItens[$index]['acrescimo'] = $delta > 0 ? $delta : 0.0;
+        $this->cupomItens[$index]['preco'] = round($novoPreco, 4);
+        $this->cupomItens[$index]['total'] = (float) $calc['total'];
+        // Compat fiscal/cardex: desconto/acréscimo unitários.
+        $this->cupomItens[$index]['desconto'] = $delta < 0 ? abs(round($delta, 4)) : 0.0;
+        $this->cupomItens[$index]['acrescimo'] = $delta > 0 ? round($delta, 4) : 0.0;
+        $this->cupomItens[$index]['desconto_linha_fixo'] = $descontoFixoLinha;
+        $this->cupomItens[$index]['acrescimo_linha_fixo'] = $acrescimoFixoLinha;
+        $this->cupomItens[$index]['ajuste_linha_fixo'] = $descontoFixoLinha || $acrescimoFixoLinha
+            ? $ajusteLinha
+            : 0.0;
 
         $this->persistCupomToSession();
-        $this->closePdvModal();
 
         Notification::make()
-            ->title($this->descontoItemTipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+            ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
             ->success()
             ->send();
 
         $this->dispatch('erp-pdv-focus-search');
+    }
+
+    /**
+     * Recalcula preço/total do item do cupom após mudança de quantidade,
+     * respeitando desconto/acréscimo "total da linha" fixo.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    protected function pdvRecalcularItemPorQuantidade(array $item, float $novaQuantidade): array
+    {
+        $novaQuantidade = max(0.001, round($novaQuantidade, 3));
+        $base = round((float) ($item['preco_base'] ?? $item['preco'] ?? 0), 2);
+        $ajusteFixo = round((float) ($item['ajuste_linha_fixo'] ?? 0), 2);
+        $descontoFixo = ! empty($item['desconto_linha_fixo']) && $ajusteFixo > 0;
+        $acrescimoFixo = ! empty($item['acrescimo_linha_fixo']) && $ajusteFixo > 0;
+
+        if ($descontoFixo || $acrescimoFixo) {
+            $bruto = round($novaQuantidade * $base, 2);
+            $total = $descontoFixo
+                ? round(max(0, $bruto - $ajusteFixo), 2)
+                : round($bruto + $ajusteFixo, 2);
+            $novoPreco = round($total / $novaQuantidade, 4);
+            $delta = round($novoPreco - $base, 4);
+
+            $item['quantidade'] = $novaQuantidade;
+            $item['preco_base'] = $base;
+            $item['preco'] = $novoPreco;
+            $item['total'] = $total;
+            $item['desconto'] = $delta < 0 ? abs($delta) : 0.0;
+            $item['acrescimo'] = $delta > 0 ? $delta : 0.0;
+            $item['ajuste_linha_fixo'] = $ajusteFixo;
+            $item['desconto_linha_fixo'] = $descontoFixo;
+            $item['acrescimo_linha_fixo'] = $acrescimoFixo;
+
+            return $item;
+        }
+
+        $preco = round((float) ($item['preco'] ?? $base), 4);
+        $item['quantidade'] = $novaQuantidade;
+        $item['total'] = round($novaQuantidade * $preco, 2);
+
+        return $item;
     }
 }

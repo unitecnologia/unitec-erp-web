@@ -44,7 +44,7 @@ class MonitorNfeEmitenteModalTest extends TestCase
         $this->assertSame(0, Nfe::query()->count());
     }
 
-    public function test_flag_true_abre_modal_somente_com_emitente_acessivel(): void
+    public function test_flag_true_abre_modal_com_matriz_e_emitente_acessivel(): void
     {
         [$matriz, $acessivel, $semAcesso, $user] = $this->seedCenarioCompleto();
 
@@ -59,10 +59,10 @@ class MonitorNfeEmitenteModalTest extends TestCase
 
         $opcoes = $component->get('nfeEmitenteOpcoes');
         $ids = array_map('intval', array_column($opcoes, 'id'));
-        $this->assertSame([(int) $acessivel->id], $ids);
+        $this->assertSame([(int) $matriz->id, (int) $acessivel->id], $ids);
         $this->assertNotContains((int) $semAcesso->id, $ids);
 
-        $component->assertSet('nfeEmpresaEmitenteId', (int) $acessivel->id);
+        $component->assertSet('nfeEmpresaEmitenteId', (int) $matriz->id);
         $this->assertSame($antes, Nfe::query()->count());
     }
 
@@ -83,20 +83,23 @@ class MonitorNfeEmitenteModalTest extends TestCase
             ->assertNoRedirect();
 
         $ids = array_map('intval', array_column($component->get('nfeEmitenteOpcoes'), 'id'));
-        $this->assertSame([(int) $acessivel->id], $ids);
+        $this->assertSame([(int) $matriz->id, (int) $acessivel->id], $ids);
         $this->assertNotContains((int) $semAcesso->id, $ids);
         $this->assertSame(0, Nfe::query()->count());
     }
 
-    public function test_sem_emitente_valida_mostra_mensagem_e_nao_abre_modal(): void
+    public function test_somente_matriz_abre_modal_selecionada_por_padrao(): void
     {
         [$matriz, $user] = $this->seedUsuarioComAcessoMonitor(flag: true);
 
         $component = $this->livewireMonitor($user, $matriz);
         $component
             ->call('abrirModalEmpresaEmitenteNfe', [10], 'single')
-            ->assertSet('nfeEmitenteModalOpen', false)
-            ->assertNotified();
+            ->assertSet('nfeEmitenteModalOpen', true)
+            ->assertSet('nfeEmpresaEmitenteId', (int) $matriz->id);
+
+        $ids = array_map('intval', array_column($component->get('nfeEmitenteOpcoes'), 'id'));
+        $this->assertSame([(int) $matriz->id], $ids);
     }
 
     public function test_confirmar_rejeita_empresa_sem_acesso_e_nao_cria_nfe(): void
@@ -122,7 +125,8 @@ class MonitorNfeEmitenteModalTest extends TestCase
         $component = $this->livewireMonitor($user, $matriz);
         $component->call('abrirModalEmpresaEmitenteNfe', [88], 'single');
         $component->assertSet('nfeEmitenteModalOpen', true);
-        $component->assertSet('nfeEmpresaEmitenteId', (int) $acessivel->id);
+        $component->assertSet('nfeEmpresaEmitenteId', (int) $matriz->id);
+        unset($acessivel);
 
         $component->call('closeNfeEmitenteModal');
 
@@ -130,6 +134,23 @@ class MonitorNfeEmitenteModalTest extends TestCase
         $component->assertSet('nfeEmpresaEmitenteId', null);
         $component->assertSet('nfeEmitentePendingVendaIds', []);
         $component->assertSet('nfeEmitenteOpcoes', []);
+    }
+
+    public function test_confirmar_matriz_segue_fluxo_normal_sem_empresa_emitente_id(): void
+    {
+        [$matriz, , , $user] = $this->seedCenarioCompleto();
+
+        $antes = Nfe::query()->count();
+
+        $component = $this->livewireMonitor($user, $matriz);
+        $component->call('abrirModalEmpresaEmitenteNfe', [99], 'single');
+        $component->assertSet('nfeEmpresaEmitenteId', (int) $matriz->id);
+        $component
+            ->call('confirmarEmpresaEmitenteNfe')
+            ->assertRedirect(NfeResource::getUrl('index').'?venda_id=99');
+
+        $this->assertSame($antes, Nfe::query()->count());
+        $this->assertSame((int) $matriz->id, (int) session('erp_empresa_id'));
     }
 
     public function test_confirmar_single_redireciona_com_empresa_emitente_id(): void

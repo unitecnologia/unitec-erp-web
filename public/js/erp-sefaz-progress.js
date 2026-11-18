@@ -33,6 +33,9 @@
     let falhaRede = false;
     let encerrando = false;
 
+    /** Flag global: telas com poll (Monitor) pausam enquanto o overlay SEFAZ está aberto. */
+    window.__erpSefazProgressAtivo = false;
+
     const overlayFor = (method) => (method
         ? document.querySelector(`[data-erp-sefaz-progress="${CSS.escape(method)}"]`)
         : null);
@@ -195,6 +198,7 @@
         resetVisual(overlay);
         overlay.classList.add('is-visible');
         overlay.setAttribute('aria-busy', 'true');
+        window.__erpSefazProgressAtivo = true;
 
         if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
@@ -257,6 +261,7 @@
                 ativo = null;
                 pendentes = 0;
                 encerrando = false;
+                window.__erpSefazProgressAtivo = false;
             }
         }, FADE_MS);
     }
@@ -352,6 +357,7 @@
             ativo = null;
             pendentes = 0;
             encerrando = false;
+            window.__erpSefazProgressAtivo = false;
         }
     });
 })();

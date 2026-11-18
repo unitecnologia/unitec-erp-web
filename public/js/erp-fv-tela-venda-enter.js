@@ -584,6 +584,67 @@
         }
     }
 
+    /**
+     * Pós-F10 com skipRender: remove modal F4, zera grade/totais e sincroniza cabeçalho.
+     * Sem isso o skipRender deixaria a Forma de Pagamento aberta.
+     */
+    function applyAfterConcluir(data) {
+        const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+        document.querySelectorAll('.erp-fv-fin').forEach((el) => {
+            try { el.remove(); } catch (e) { /* ignore */ }
+        });
+
+        window.__erpFvFinClosing = false;
+        window.__erpFvConcluirLock = false;
+        window.__erpFvPayNav = { index: 0, focusEpoch: 0, navigating: false, concluirFocused: false };
+        window.erpFvSetConcluirBusy?.(false);
+
+        const tbody = document.querySelector('.erp-fv-tv__grid tbody');
+        if (tbody) {
+            const colspan = Number(data?.colspan) > 0 ? Number(data.colspan) : 10;
+            tbody.innerHTML = '<tr class="erp-fv-tv__empty"><td colspan="' + colspan
+                + '">Nenhum item — informe o código e pressione Enter</td></tr>';
+        }
+
+        applyTotais(data?.totais || {
+            bruto: '0,00',
+            acrescimos: '0,00',
+            descontos: '0,00',
+            liquido: '0,00',
+            itens_qtd_label: '0,000 itens',
+            has_itens: false,
+        });
+        applyItemFoto(null, '');
+        clearItemBarLocal();
+        setEditingKey(null);
+        setIncluding(false);
+        window.__erpFvTvIncluding = false;
+        window.__erpFvTvEditing = false;
+        window.__erpFvTvInitialFocusDone = true;
+
+        const cliBusca = document.getElementById('fv-tv-cliente-busca');
+        if (cliBusca && data?.cliente_busca != null) {
+            cliBusca.value = String(data.cliente_busca || '');
+        }
+        const cliCodigo = document.querySelector('.erp-fv-tv__field--cod input');
+        if (cliCodigo && data?.cliente_codigo != null) {
+            cliCodigo.value = String(data.cliente_codigo || '');
+        }
+        const meta = document.querySelector('.erp-fv-tv__topbar-meta');
+        if (meta && data?.abertura_data && data?.abertura_hora) {
+            meta.textContent = String(data.abertura_data) + ' · ' + String(data.abertura_hora);
+        }
+
+        const ms = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
+        window.__erpFvAposConcluirUiMs = Math.round(ms * 10) / 10;
+        try {
+            if (window.__erpFvDebugAposConcluir) {
+                console.info('[fv] apos-concluir-ui ms=', window.__erpFvAposConcluirUiMs);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
     function setIncluding(on) {
         including = !! on;
         window.__erpFvTvIncluding = including;
@@ -878,6 +939,11 @@
             applyItemDeleted(detail || {});
         });
 
+        Livewire.on('erp-fv-apos-concluir-ui', (payload) => {
+            const detail = Array.isArray(payload) ? payload[0] : payload;
+            applyAfterConcluir(detail || {});
+        });
+
         Livewire.hook('commit', ({ succeed }) => {
             succeed(() => {
                 if (including) {
@@ -891,4 +957,5 @@
     window.erpFvTvIsIncluding = () => including;
     window.erpFvTvShouldAcceptFocusQtd = shouldAcceptFocusQtd;
     window.erpFvTvBarValues = barValues;
+    window.erpFvTvApplyAfterConcluir = applyAfterConcluir;
 })();

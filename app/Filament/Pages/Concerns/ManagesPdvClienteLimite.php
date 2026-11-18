@@ -3,6 +3,8 @@
 namespace App\Filament\Pages\Concerns;
 
 use App\Models\Person;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\Financeiro\FaturamentoPendenciaFinanceiraGuard;
 use App\Support\Erp\Pdv\PdvClienteLimiteService;
 
 trait ManagesPdvClienteLimite
@@ -21,6 +23,10 @@ trait ManagesPdvClienteLimite
             return null;
         }
 
+        if (! FaturamentoPendenciaFinanceiraGuard::deveReterPorPendenciaCliente(ErpContext::currentEmpresaId())) {
+            return null;
+        }
+
         return (new PdvClienteLimiteService())->resumo(
             $this->finalizarClienteId,
             $this->finalizarTotalVendaValor(),
@@ -30,6 +36,10 @@ trait ManagesPdvClienteLimite
     protected function validaLimiteClienteFinalizar(float $totalVenda): ?string
     {
         if (! $this->pdvConfig()->checarLimiteCliente() || ! $this->finalizarClienteId) {
+            return null;
+        }
+
+        if (! FaturamentoPendenciaFinanceiraGuard::deveReterPorPendenciaCliente(ErpContext::currentEmpresaId())) {
             return null;
         }
 

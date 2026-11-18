@@ -54,7 +54,8 @@ class VendasInternasSyncService
         $parts = [
             'vendedor:'.($vendedorId ?? 0),
             'empresa:'.($empresaId ?? 0),
-            'vi_config:'.$viConfig['tipos_venda'].':'.((int) $viConfig['fechar_orcamento_auto']),
+            'vi_config:'.$viConfig['tipos_venda'].':'.((int) $viConfig['fechar_orcamento_auto'])
+                .':'.((int) ($viConfig['permitir_reabrir_pedido'] ?? false)),
         ];
 
         foreach ([
@@ -98,18 +99,23 @@ class VendasInternasSyncService
             }
 
             $existing = VendasInternasOrder::query()->where('uuid', $uuid)->first();
+            $payload = $this->normalizeCaixaNoPayload($order, $user);
 
             if ($existing !== null) {
-                $results[] = $this->orderPushResult($existing, duplicado: true);
+                $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+
+                if (! EmpresaParametros::vendasInternasPermitirReabrirPedido($empresaId)) {
+                    $results[] = $this->orderPushResult($existing, duplicado: true);
+
+                    continue;
+                }
+
+                $results[] = $this->updateOrder($existing, $payload, $user, (string) ($payload['device_uuid'] ?? ''));
 
                 continue;
             }
 
-            $results[] = $this->createOrder(
-                $uuid,
-                $this->normalizeCaixaNoPayload($order, $user),
-                $user,
-            );
+            $results[] = $this->createOrder($uuid, $payload, $user);
         }
 
         return $results;
@@ -383,13 +389,24 @@ class VendasInternasSyncService
                     : ($order->orcamento ?? $order->forcaVendasOrder?->pedido);
 
                 $itens = $doc?->itens
-                    ->map(fn ($item): array => [
-                        'product_id' => $item->product_id,
-                        'descricao' => $item->descricao ?: $item->product?->descricao,
-                        'quantidade' => (float) $item->quantidade,
-                        'preco_unitario' => (float) $item->preco_unitario,
-                        'desconto' => (float) ($item->desconto ?? 0),
-                    ])
+                    ->map(function ($item): array {
+                        $row = [
+                            'product_id' => $item->product_id,
+                            'descricao' => $item->descricao ?: $item->product?->descricao,
+                            'quantidade' => (float) $item->quantidade,
+                            'preco_unitario' => (float) $item->preco_unitario,
+                            'desconto' => (float) ($item->desconto ?? 0),
+                        ];
+                        if (isset($item->price_table_id) && (int) $item->price_table_id > 0) {
+                            $row['price_table_id'] = (int) $item->price_table_id;
+                        }
+                        if (isset($item->tabela_nivel) && trim((string) $item->tabela_nivel) !== '') {
+                            $row['tabela_nivel'] = (string) $item->tabela_nivel;
+                            $row['nivel'] = (string) $item->tabela_nivel;
+                        }
+
+                        return $row;
+                    })
                     ->values()
                     ->all() ?? [];
 
@@ -405,11 +422,13 @@ class VendasInternasSyncService
                     'cliente_nome' => $order->clienteNome(),
                     'observacoes' => $doc?->observacoes,
                     'desconto_valor' => (float) ($doc?->desconto_valor ?? 0),
+                    'percentual_desconto' => (float) ($doc?->percentual_desconto ?? 0),
                     'itens' => $itens,
                     'data' => optional($order->dataAberturaAt())->toDateString(),
                     'created_at' => optional($order->client_created_at ?? $order->received_at)->toIso8601String(),
                     'updated_at' => optional($order->updated_at)->toIso8601String(),
                     'pago_at' => optional($order->pago_at)->toIso8601String(),
+                    ...app(VendasInternasEdicaoLockService::class)->flagsParaApp($order),
                 ];
             })
             ->all();
@@ -451,6 +470,370 @@ class VendasInternasSyncService
         }
 
         return (string) $order->situacao;
+    }
+
+    /**
+     * Expõe as regras de reabertura para o bloqueio de edição (API lock).
+     */
+    public function assertPodeReabrirPedidoPublico(VendasInternasOrder $order, User $user): void
+    {
+        $order->loadMissing(['forcaVendasOrder.venda', 'orcamento']);
+        $this->assertPodeReabrirPedido($order, $user);
+    }
+
+    /**
+     * Reabre/edita documento VI existente (mesmo UUID), sem duplicar pedido/itens/estoque.
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function updateOrder(VendasInternasOrder $existing, array $order, User $user, string $deviceUuid = ''): array
+    {
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+
+        try {
+            return DB::transaction(function () use ($existing, $order, $user, $empresaId, $deviceUuid): array {
+                $vi = VendasInternasOrder::query()->lockForUpdate()->findOrFail($existing->id);
+                $vi->loadMissing(['forcaVendasOrder', 'orcamento']);
+
+                $this->assertPodeReabrirPedido($vi, $user);
+                app(VendasInternasEdicaoLockService::class)->assertPodeAplicarReabertura($vi, $deviceUuid);
+
+                $tipo = (string) ($vi->tipo ?? VendasInternasOrder::TIPO_ORCAMENTO);
+                $tipoPayload = (string) ($order['tipo'] ?? $tipo);
+
+                if ($tipoPayload !== '' && $tipoPayload !== $tipo) {
+                    throw new \RuntimeException(
+                        'Não é possível alterar o tipo do documento na reabertura. Use o mesmo tipo ('.$tipo.').'
+                    );
+                }
+
+                if ($tipo === VendasInternasOrder::TIPO_PEDIDO
+                    && ! EmpresaParametros::vendasInternasPermitePedido($empresaId)) {
+                    throw new \RuntimeException(
+                        'Esta empresa permite somente orçamentos. Não é possível atualizar pedido.'
+                    );
+                }
+
+                if ($tipo === VendasInternasOrder::TIPO_ORCAMENTO
+                    && ! EmpresaParametros::vendasInternasPermiteOrcamento($empresaId)) {
+                    throw new \RuntimeException(
+                        'Esta empresa permite somente pedidos. Não é possível atualizar orçamento.'
+                    );
+                }
+
+                if ($tipo === VendasInternasOrder::TIPO_PEDIDO) {
+                    $result = $this->updatePedidoExistente($vi, $order, $user);
+                } else {
+                    $result = $this->updateOrcamentoExistente($vi, $order, $user);
+                }
+
+                // Sync concluída: libera bloqueio EM EDIÇÃO NO VI (sem mudar status comercial).
+                $fresh = VendasInternasOrder::query()->find($vi->id);
+                if ($fresh instanceof VendasInternasOrder) {
+                    app(VendasInternasEdicaoLockService::class)->liberarAposSync($fresh);
+                }
+
+                return $result;
+            });
+        } catch (\Throwable $e) {
+            return [
+                'uuid' => $existing->uuid,
+                'tipo' => $existing->tipo ?? VendasInternasOrder::TIPO_ORCAMENTO,
+                'status' => VendasInternasOrder::STATUS_ERRO,
+                'erro' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Empresa, usuário/vendedor do vínculo e situações em que a reabertura é permitida.
+     */
+    private function assertPodeReabrirPedido(VendasInternasOrder $order, User $user): void
+    {
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : 0;
+        $orderEmpresaId = (int) ($order->empresa_id ?? 0);
+
+        if ($empresaId <= 0 || $orderEmpresaId <= 0 || $orderEmpresaId !== $empresaId) {
+            throw new \RuntimeException('Documento pertence a outra empresa. Não é possível reabrir.');
+        }
+
+        $mesmoUsuario = (int) ($order->user_id ?? 0) === (int) $user->id;
+        $mesmoVendedor = $user->vendedor_id
+            && (int) ($order->vendedor_id ?? 0) === (int) $user->vendedor_id;
+
+        if (! $mesmoUsuario && ! $mesmoVendedor) {
+            throw new \RuntimeException('Documento de outro usuário. Não é possível reabrir.');
+        }
+
+        if ((string) $order->status === VendasInternasOrder::STATUS_ERRO) {
+            throw new \RuntimeException('Documento com erro de importação. Não é possível reabrir.');
+        }
+
+        $situacao = $this->situacaoParaApp($order);
+
+        if (in_array($situacao, [
+            VendasInternasOrder::SITUACAO_FATURADO,
+            VendasInternasOrder::SITUACAO_PAGO,
+            VendasInternasOrder::SITUACAO_CANCELADO,
+        ], true)) {
+            throw new \RuntimeException(
+                'Pedido faturado ou cancelado não pode ser reaberto (situação: '.$situacao.').'
+            );
+        }
+
+        if ($situacao === VendasInternasOrder::SITUACAO_NO_CAIXA) {
+            throw new \RuntimeException('Documento já está no caixa. Não é possível reabrir.');
+        }
+
+        if ($order->tipo === VendasInternasOrder::TIPO_PEDIDO) {
+            $fv = $order->forcaVendasOrder;
+
+            if (! $fv instanceof ForcaVendasOrder) {
+                throw new \RuntimeException('Pedido vinculado ao Monitor não encontrado.');
+            }
+
+            if (in_array((string) $fv->situacao, [
+                ForcaVendasOrder::SITUACAO_FATURADO,
+                ForcaVendasOrder::SITUACAO_CANCELADO,
+            ], true)) {
+                throw new \RuntimeException('Pedido faturado ou cancelado não pode ser reaberto.');
+            }
+
+            if ($fv->venda_id) {
+                $venda = $fv->venda_id ? \App\Models\Venda::query()->find((int) $fv->venda_id) : null;
+                if ($venda instanceof \App\Models\Venda
+                    && $venda->status !== \App\Models\Venda::STATUS_ABERTO) {
+                    throw new \RuntimeException('Pedido já faturado. Não é possível reabrir.');
+                }
+            }
+        }
+
+        if ($order->tipo === VendasInternasOrder::TIPO_ORCAMENTO) {
+            $orcamento = $order->orcamento;
+
+            if (! $orcamento instanceof Orcamento) {
+                throw new \RuntimeException('Orçamento não encontrado.');
+            }
+
+            if (in_array((string) $orcamento->status, [
+                Orcamento::STATUS_CANCELADO,
+                Orcamento::STATUS_IMPORTADO,
+            ], true)) {
+                throw new \RuntimeException('Orçamento cancelado ou já importado. Não é possível reabrir.');
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function updatePedidoExistente(VendasInternasOrder $vi, array $order, User $user): array
+    {
+        $fv = ForcaVendasOrder::query()->lockForUpdate()->find($vi->forca_vendas_order_id);
+
+        if (! $fv instanceof ForcaVendasOrder) {
+            throw new \RuntimeException('Pedido vinculado ao Monitor não encontrado.');
+        }
+
+        $pedido = Pedido::query()->lockForUpdate()->find($fv->pedido_id);
+
+        if (! $pedido instanceof Pedido) {
+            throw new \RuntimeException('Pedido (DAV) não encontrado.');
+        }
+
+        [$clienteId, $itens, $descontoValor, $percentualDesconto] = $this->validarItensPush($order);
+
+        $reserva = new EstoqueReservaService();
+        $reserva->liberarPedido($fv);
+
+        PedidoItem::query()->where('pedido_id', $pedido->id)->delete();
+
+        $subtotal = 0.0;
+        $linha = 1;
+        $payloadItens = [];
+
+        foreach ($itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            $quantidade = (float) ($item['quantidade'] ?? 0);
+            $preco = (float) ($item['preco_unitario'] ?? 0);
+            $descItem = (float) ($item['desconto'] ?? 0);
+            $totalItem = round(($quantidade * $preco) - $descItem, 2);
+            $subtotal += $totalItem;
+
+            $attrs = [
+                'pedido_id' => $pedido->id,
+                'item' => $linha,
+                'product_id' => $productId,
+                'product_grade_id' => $item['product_grade_id'] ?? null,
+                'quantidade' => $quantidade,
+                'preco_unitario' => $preco,
+                'total' => $totalItem,
+                'desconto' => $descItem,
+                'descricao' => $item['descricao'] ?? null,
+            ];
+            $this->aplicarTabPrecoNoItemAttrs($attrs, $item, 'pedido_itens');
+            PedidoItem::query()->create($attrs);
+            $payloadItens[] = $attrs;
+            $linha++;
+        }
+
+        $total = round($subtotal - $descontoValor, 2);
+
+        $pedido->update([
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $pedido->vendedor_id,
+            'percentual_desconto' => $percentualDesconto,
+            'desconto_valor' => $descontoValor,
+            'forma_pagamento' => $order['forma_pagamento'] ?? $pedido->forma_pagamento,
+            'observacoes' => $order['observacoes'] ?? null,
+            'subtotal' => round($subtotal, 2),
+            'total' => $total,
+            'status' => Pedido::STATUS_ABERTO,
+        ]);
+
+        $payloadAnterior = is_array($fv->payload) ? $fv->payload : [];
+        $payload = array_merge($order, [
+            'origem' => 'vendas_internas',
+            'reaberto_em' => now()->toIso8601String(),
+            'device_uuid' => $order['device_uuid'] ?? ($payloadAnterior['device_uuid'] ?? null),
+            'itens' => $payloadItens,
+        ]);
+
+        $fv->update([
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $fv->vendedor_id,
+            'total' => $total,
+            'payload' => $payload,
+            'status' => ForcaVendasOrder::STATUS_IMPORTADO,
+            'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
+        ]);
+
+        $fv = $fv->fresh(['pedido']) ?? $fv;
+        $reserva->reservarPedido($fv, $pedido->fresh('itens') ?? $pedido, $user);
+
+        $vi->update([
+            'device_uuid' => $order['device_uuid'] ?? $vi->device_uuid,
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $vi->vendedor_id,
+            'total' => $total,
+            'status' => VendasInternasOrder::STATUS_IMPORTADO,
+            'situacao' => VendasInternasOrder::SITUACAO_PENDENTE,
+            'erro' => null,
+            'payload' => $order,
+        ]);
+
+        return $this->orderPushResult($vi->fresh() ?? $vi);
+    }
+
+    /**
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function updateOrcamentoExistente(VendasInternasOrder $vi, array $order, User $user): array
+    {
+        $orcamento = Orcamento::query()->lockForUpdate()->find($vi->orcamento_id);
+
+        if (! $orcamento instanceof Orcamento) {
+            throw new \RuntimeException('Orçamento não encontrado.');
+        }
+
+        [$clienteId, $itens, $descontoValor, $percentualDesconto] = $this->validarItensPush($order);
+
+        OrcamentoItem::query()->where('orcamento_id', $orcamento->id)->delete();
+
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+        $equipamento = $this->atributosEquipamentoOrcamento($order, $empresaId);
+
+        $subtotal = 0.0;
+        $linha = 1;
+
+        foreach ($itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            $quantidade = (float) ($item['quantidade'] ?? 0);
+            $preco = (float) ($item['preco_unitario'] ?? 0);
+            $descItem = (float) ($item['desconto'] ?? 0);
+            $totalItem = round(($quantidade * $preco) - $descItem, 2);
+            $subtotal += $totalItem;
+
+            $attrs = [
+                'orcamento_id' => $orcamento->id,
+                'item' => $linha,
+                'product_id' => $productId,
+                'product_grade_id' => $item['product_grade_id'] ?? null,
+                'quantidade' => $quantidade,
+                'preco_unitario' => $preco,
+                'total' => $totalItem,
+                'desconto' => $descItem,
+                'descricao' => $item['descricao'] ?? null,
+            ];
+            $this->aplicarTabPrecoNoItemAttrs($attrs, $item, 'orcamento_itens');
+            OrcamentoItem::query()->create($attrs);
+            $linha++;
+        }
+
+        $total = round($subtotal - $descontoValor, 2);
+
+        $orcamento->update([
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $orcamento->vendedor_id,
+            'percentual_desconto' => $percentualDesconto,
+            'desconto_valor' => $descontoValor,
+            'forma_pagamento' => $order['forma_pagamento'] ?? $orcamento->forma_pagamento,
+            'observacoes' => $order['observacoes'] ?? null,
+            ...$equipamento,
+            'subtotal' => round($subtotal, 2),
+            'total' => $total,
+        ]);
+
+        $vi->update([
+            'device_uuid' => $order['device_uuid'] ?? $vi->device_uuid,
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $vi->vendedor_id,
+            'total' => $total,
+            'status' => VendasInternasOrder::STATUS_IMPORTADO,
+            'situacao' => VendasInternasOrder::SITUACAO_AGUARDANDO,
+            'erro' => null,
+            'payload' => $order,
+        ]);
+
+        return $this->orderPushResult($vi->fresh() ?? $vi);
+    }
+
+    /**
+     * @param  array<string, mixed>  $order
+     * @return array{0: int, 1: list<array<string, mixed>>, 2: float, 3: float}
+     */
+    private function validarItensPush(array $order): array
+    {
+        $clienteId = (int) ($order['cliente_id'] ?? 0);
+
+        if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
+            throw new \RuntimeException('Cliente inválido ou não encontrado.');
+        }
+
+        $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
+
+        if ($itens === []) {
+            throw new \RuntimeException('Documento sem itens.');
+        }
+
+        $linha = 1;
+        foreach ($itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
+                throw new \RuntimeException('Produto inválido no item '.$linha.'.');
+            }
+            $linha++;
+        }
+
+        return [
+            $clienteId,
+            $itens,
+            (float) ($order['desconto_valor'] ?? 0),
+            (float) ($order['percentual_desconto'] ?? 0),
+        ];
     }
 
     /**

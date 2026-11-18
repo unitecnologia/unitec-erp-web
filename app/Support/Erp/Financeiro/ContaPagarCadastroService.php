@@ -4,14 +4,20 @@ namespace App\Support\Erp\Financeiro;
 
 use App\Models\Compra;
 use App\Models\ContaPagar;
+use App\Models\PlanoConta;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 class ContaPagarCadastroService
 {
+    public const INTERVALO_MESES = 'meses';
+
+    public const INTERVALO_DIAS = 'dias';
+
     /**
      * @param  array{
      *     emissao: string,
@@ -20,7 +26,10 @@ class ContaPagarCadastroService
      *     vencimento: string,
      *     historico?: string|null,
      *     valor: float|string,
-     *     parcelas?: int
+     *     parcelas?: int,
+     *     intervalo?: int,
+     *     intervalo_unidade?: string,
+     *     compra_id?: int
      * }  $dados
      * @return list<ContaPagar>
      */
@@ -29,6 +38,8 @@ class ContaPagarCadastroService
         $fornecedorId = (int) ($dados['fornecedor_id'] ?? 0);
         $parcelas = max(1, min(120, (int) ($dados['parcelas'] ?? 1)));
         $valorTotal = ErpMoney::parseBr($dados['valor'] ?? 0);
+        $intervalo = max(1, min(3650, (int) ($dados['intervalo'] ?? 1)));
+        $unidade = $this->normalizarIntervaloUnidade($dados['intervalo_unidade'] ?? self::INTERVALO_MESES);
 
         if ($fornecedorId <= 0) {
             throw new InvalidArgumentException('Selecione o fornecedor.');
@@ -44,23 +55,32 @@ class ContaPagarCadastroService
         $documentoBase = mb_strtoupper(trim((string) ($dados['documento'] ?? '')), 'UTF-8');
         $compraId = (int) ($dados['compra_id'] ?? 0);
         $empresaId = $this->resolveEmpresaId($compraId);
+        $competencia = $this->normalizarCompetencia($dados['competencia'] ?? null);
+        $planoContaId = $this->normalizarPlanoContaId($dados['plano_conta_id'] ?? null);
 
-        $valores = $this->distribuirValor($valorTotal, $parcelas);
+        $preview = $this->montarParcelas(
+            valorTotal: $valorTotal,
+            parcelas: $parcelas,
+            vencimentoBase: $vencimentoBase->toDateString(),
+            intervalo: $intervalo,
+            unidade: $unidade,
+        );
 
         return DB::transaction(function () use (
-            $parcelas,
-            $valores,
+            $preview,
             $emissao,
-            $vencimentoBase,
             $historico,
             $documentoBase,
             $fornecedorId,
             $compraId,
             $empresaId,
+            $parcelas,
+            $competencia,
+            $planoContaId,
         ): array {
             $criadas = [];
 
-            for ($i = 0; $i < $parcelas; $i++) {
+            foreach ($preview as $i => $parcela) {
                 $documento = $documentoBase;
                 if ($parcelas > 1 && $documento !== '') {
                     $documento .= '-'.str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT);
@@ -74,15 +94,16 @@ class ContaPagarCadastroService
                     'emissao' => $emissao->toDateString(),
                     'documento' => $documento !== '' ? $documento : null,
                     'fornecedor_id' => $fornecedorId,
-                    'vencimento' => $vencimentoBase->copy()->addMonthsNoOverflow($i)->toDateString(),
+                    'vencimento' => $parcela['vencimento'],
                     'produto' => $historico !== '' ? $historico : null,
-                    'valor' => $valores[$i],
+                    'valor' => $parcela['valor'],
                     'desconto' => 0,
                     'juros' => 0,
                     'multa' => 0,
                     'valor_pago' => 0,
                     'pago_em' => null,
                 ];
+                $payload = $this->aplicarCamposDre($payload, $competencia, $planoContaId);
 
                 if ($compraId > 0) {
                     $payload['compra_id'] = $compraId;
@@ -102,7 +123,8 @@ class ContaPagarCadastroService
      *     emissao: string,
      *     documento?: string|null,
      *     fornecedor_id: int,
-     *     historico?: string|null
+     *     historico?: string|null,
+     *     compra_id?: int
      * }  $dados
      * @param  list<array{documento?: string, vencimento: string, valor: float|string}>  $parcelas
      * @return list<ContaPagar>
@@ -124,6 +146,8 @@ class ContaPagarCadastroService
         $documentoBase = mb_strtoupper(trim((string) ($dados['documento'] ?? '')), 'UTF-8');
         $compraId = (int) ($dados['compra_id'] ?? 0);
         $empresaId = $this->resolveEmpresaId($compraId);
+        $competencia = $this->normalizarCompetencia($dados['competencia'] ?? null);
+        $planoContaId = $this->normalizarPlanoContaId($dados['plano_conta_id'] ?? null);
         $totalParcelas = count($parcelas);
 
         return DB::transaction(function () use (
@@ -135,6 +159,8 @@ class ContaPagarCadastroService
             $compraId,
             $empresaId,
             $totalParcelas,
+            $competencia,
+            $planoContaId,
         ): array {
             $criadas = [];
 
@@ -178,6 +204,7 @@ class ContaPagarCadastroService
                     'valor_pago' => 0,
                     'pago_em' => null,
                 ];
+                $payload = $this->aplicarCamposDre($payload, $competencia, $planoContaId);
 
                 if ($compraId > 0) {
                     $payload['compra_id'] = $compraId;
@@ -225,25 +252,131 @@ class ContaPagarCadastroService
 
         $historico = mb_strtoupper(trim((string) ($dados['historico'] ?? '')), 'UTF-8');
         $documento = mb_strtoupper(trim((string) ($dados['documento'] ?? '')), 'UTF-8');
+        $competencia = $this->normalizarCompetencia($dados['competencia'] ?? null);
+        $planoContaId = $this->normalizarPlanoContaId($dados['plano_conta_id'] ?? null);
 
-        $conta->fill([
+        $fill = [
             'emissao' => Carbon::parse((string) $dados['emissao'])->toDateString(),
             'documento' => $documento !== '' ? $documento : null,
             'fornecedor_id' => $fornecedorId,
             'vencimento' => Carbon::parse((string) $dados['vencimento'])->toDateString(),
             'produto' => $historico !== '' ? $historico : null,
             'valor' => $valor,
-        ]);
+        ];
+        $fill = $this->aplicarCamposDre($fill, $competencia, $planoContaId);
+        $conta->fill($fill);
         $conta->save();
 
         return $conta->fresh();
     }
 
     /**
+     * Atualiza só competência/plano DRE — permitido mesmo com baixa (não mexe em valores).
+     */
+    public function atualizarCompetenciaDre(int $contaId, mixed $competencia, mixed $planoContaId = null): ContaPagar
+    {
+        $conta = ContaPagar::query()->whereKey($contaId)->first();
+
+        if (! $conta) {
+            throw new InvalidArgumentException('Conta não encontrada.');
+        }
+
+        if (! Schema::hasColumn('contas_pagar', 'competencia')) {
+            throw new InvalidArgumentException('Competência ainda não disponível neste banco.');
+        }
+
+        $fill = $this->aplicarCamposDre(
+            [],
+            $this->normalizarCompetencia($competencia),
+            $this->normalizarPlanoContaId($planoContaId),
+        );
+        $conta->fill($fill);
+        $conta->save();
+
+        return $conta->fresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function aplicarCamposDre(array $payload, ?string $competencia, ?int $planoContaId): array
+    {
+        if (Schema::hasColumn('contas_pagar', 'competencia')) {
+            $payload['competencia'] = $competencia;
+        }
+        if (Schema::hasColumn('contas_pagar', 'plano_conta_id')) {
+            $payload['plano_conta_id'] = $planoContaId;
+        }
+
+        return $payload;
+    }
+
+    /** MM/AAAA (ou legado) → DATE Y-m-01; vazio → null. Não usa vencimento. */
+    private function normalizarCompetencia(mixed $raw): ?string
+    {
+        return ContaPagarCompetencia::toDateString($raw, strict: true);
+    }
+
+    private function normalizarPlanoContaId(mixed $raw): ?int
+    {
+        $id = (int) ($raw ?? 0);
+        if ($id <= 0) {
+            return null;
+        }
+        if (! Schema::hasTable('planos_contas')) {
+            return null;
+        }
+        $ok = PlanoConta::query()->whereKey($id)->where('ativo', true)->exists();
+
+        return $ok ? $id : null;
+    }
+
+    /**
+     * Prévia de parcelas (vencimento + valor) sem gravar.
+     *
+     * @return list<array{n: int, vencimento: string, valor: float, valor_br: string}>
+     */
+    public function montarParcelas(
+        float|string $valorTotal,
+        int $parcelas,
+        string $vencimentoBase,
+        int $intervalo = 1,
+        string $unidade = self::INTERVALO_MESES,
+    ): array {
+        $parcelas = max(1, min(120, $parcelas));
+        $intervalo = max(1, min(3650, $intervalo));
+        $unidade = $this->normalizarIntervaloUnidade($unidade);
+        $total = ErpMoney::parseBr($valorTotal);
+
+        if ($total <= 0) {
+            return [];
+        }
+
+        $valores = $this->distribuirValor($total, $parcelas);
+        $base = Carbon::parse($vencimentoBase)->startOfDay();
+        $out = [];
+
+        for ($i = 0; $i < $parcelas; $i++) {
+            $venc = $this->avancarVencimento($base, $i, $intervalo, $unidade);
+            $valor = $valores[$i];
+            $out[] = [
+                'n' => $i + 1,
+                'vencimento' => $venc->toDateString(),
+                'valor' => $valor,
+                'valor_br' => ErpMoney::formatBr($valor),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<float>
      */
-    private function distribuirValor(float $valorTotal, int $parcelas): array
+    public function distribuirValor(float $valorTotal, int $parcelas): array
     {
+        $parcelas = max(1, $parcelas);
         $centavos = (int) round($valorTotal * 100);
         $base = intdiv($centavos, $parcelas);
         $resto = $centavos % $parcelas;
@@ -255,6 +388,28 @@ class ContaPagarCadastroService
         }
 
         return $valores;
+    }
+
+    public function normalizarIntervaloUnidade(mixed $unidade): string
+    {
+        $u = mb_strtolower(trim((string) $unidade), 'UTF-8');
+
+        return $u === self::INTERVALO_DIAS ? self::INTERVALO_DIAS : self::INTERVALO_MESES;
+    }
+
+    private function avancarVencimento(Carbon $base, int $indice, int $intervalo, string $unidade): Carbon
+    {
+        if ($indice <= 0) {
+            return $base->copy();
+        }
+
+        $passo = $intervalo * $indice;
+
+        if ($unidade === self::INTERVALO_DIAS) {
+            return $base->copy()->addDays($passo);
+        }
+
+        return $base->copy()->addMonthsNoOverflow($passo);
     }
 
     private function resolveEmpresaId(int $compraId): ?int

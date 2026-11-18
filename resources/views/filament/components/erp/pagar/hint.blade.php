@@ -1,1 +1,1 @@
-<p class="erp-pagar__hint">Clique na tecla [DELETE] para excluir Conta</p>
+{{-- Hint removido: exclusão via F9 | Excluir / DELETE no rodapé. --}}

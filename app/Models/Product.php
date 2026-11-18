@@ -256,6 +256,14 @@ class Product extends Model
         return $this->hasMany(ProductComposition::class);
     }
 
+    /**
+     * Receita de fabricação (global; 1 por produto). Independente de is_composicao.
+     */
+    public function receita(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ProductReceita::class);
+    }
+
     public function priceTableItems(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ProductPriceTableItem::class);

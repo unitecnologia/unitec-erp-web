@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'order_id',
     'conta_receber_id',
     'venda_id',
+    'pdv_venda_id',
+    'pdv_venda_pagamento_id',
     'provedor',
     'txid',
     'provider_ref',

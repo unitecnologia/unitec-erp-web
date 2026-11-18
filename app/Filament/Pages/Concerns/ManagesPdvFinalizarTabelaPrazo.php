@@ -183,6 +183,10 @@ trait ManagesPdvFinalizarTabelaPrazo
             return true;
         }
 
+        if ($this->tentarAssumirParcelaUnicaCrediario()) {
+            return true;
+        }
+
         if (! $abrirSeNecessario) {
             return false;
         }
@@ -193,6 +197,71 @@ trait ManagesPdvFinalizarTabelaPrazo
     protected function finalizarTemCrediarioComValor(): bool
     {
         return $this->finalizarCrediarioTotalValor > 0;
+    }
+
+    /**
+     * Financeiro max=1: gera a única parcela e dispensa o overlay.
+     * Tabela do cliente com várias condições / modo Tabela: não entra aqui.
+     */
+    protected function tentarAssumirParcelaUnicaCrediario(): bool
+    {
+        $pagamento = null;
+        foreach ($this->finalizarPagamentos as $pag) {
+            if (! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pag)) {
+                continue;
+            }
+            if (ErpMoney::parseBr($pag['valor'] ?? '0') <= 0) {
+                continue;
+            }
+            $pagamento = $pag;
+            break;
+        }
+
+        if ($pagamento === null || ! PdvFinalizarPagamentosHelper::deveAssumirParcelaUnicaSemSelecao($pagamento)) {
+            return false;
+        }
+
+        // Prioridade: tabela do cliente (não forçar max=1 sobre várias condições).
+        $cliente = $this->finalizarClienteId
+            ? Person::query()->find($this->finalizarClienteId)
+            : null;
+        $tabela = $cliente?->tabela_prazo_id
+            ? TabelaPrazo::query()->find($cliente->tabela_prazo_id)
+            : null;
+        $diasCliente = null;
+        if ($tabela && filled($tabela->dias)) {
+            $parsed = PdvFinalizarPagamentosHelper::diasDeString((string) $tabela->dias);
+            if ($parsed !== []) {
+                $diasCliente = $parsed;
+            }
+        }
+        if (is_array($diasCliente) && count($diasCliente) > 1) {
+            return false;
+        }
+
+        $dias = (is_array($diasCliente) && count($diasCliente) === 1)
+            ? $diasCliente
+            : PdvFinalizarPagamentosHelper::diasParcelaUnicaFinanceiro($pagamento);
+
+        if ($dias === [] || count($dias) !== 1) {
+            return false;
+        }
+
+        $this->finalizarTabelaPrazoId = (is_array($diasCliente) && count($diasCliente) === 1)
+            ? (int) ($tabela?->id ?? 0) ?: null
+            : null;
+        $this->finalizarParcelasQtd = '1';
+        $this->finalizarParcelasIntervalo = (string) ($dias[0] ?? 30);
+        $this->gerarParcelasCrediarioPorDias($dias);
+
+        if ($this->finalizarParcelasRows === [] || count($this->finalizarParcelasRows) !== 1) {
+            return false;
+        }
+
+        $this->finalizarTabelaPrazoDias = (string) max(0, (int) ($dias[0] ?? 0));
+        $this->finalizarTabelaPrazoConsulta = false;
+
+        return filled($this->finalizarTabelaPrazoDias) || $this->finalizarTabelaPrazoDias === '0';
     }
 
     protected function abrirParcelasCrediario(): bool

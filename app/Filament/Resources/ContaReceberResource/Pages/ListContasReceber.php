@@ -14,11 +14,13 @@ use App\Filament\Resources\ContaReceberResource;
 use App\Livewire\Erp\ContaReceberListTable;
 use App\Models\ContaReceber;
 use App\Models\Person;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberExclusaoService;
 use App\Support\Erp\Queries\ContaReceberListQueryBuilder;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -676,7 +678,32 @@ class ListContasReceber extends ListRecords
             return;
         }
 
-        $conta->delete();
+        DB::transaction(function () use ($conta): void {
+            $snapshot = [
+                'id' => (int) $conta->id,
+                'numero' => $conta->numero,
+                'documento' => $conta->documento,
+                'historico' => $conta->historico,
+                'cliente_id' => $conta->cliente_id ? (int) $conta->cliente_id : null,
+                'valor' => (float) $conta->valor,
+                'saldo' => (float) $conta->saldo,
+                'vencimento' => optional($conta->vencimento)?->toDateString(),
+                'forma' => $conta->forma,
+            ];
+
+            $conta->delete();
+
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'EXCLUIR_CONTAS_RECEBER',
+                resumo: 'Excluído título a receber #'.($snapshot['numero'] ?: $snapshot['id']).'.',
+                origem: 'contas_receber',
+                documentoTipo: 'conta_receber',
+                documentoId: (int) $snapshot['id'],
+                documentoNumero: (string) ($snapshot['numero'] ?: $snapshot['id']),
+                detalhes: ['antes' => $snapshot],
+                empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+            );
+        });
 
         $this->clearListSelection();
         $this->pushContaReceberListRefresh();

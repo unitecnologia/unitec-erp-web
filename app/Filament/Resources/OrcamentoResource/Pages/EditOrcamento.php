@@ -5,9 +5,12 @@ namespace App\Filament\Resources\OrcamentoResource\Pages;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\OrcamentoResource\Pages\Concerns\ErpOrcamentoFormPage;
 use App\Models\Orcamento;
+use App\Models\User;
 use App\Support\Erp\ErpScreen;
+use App\Support\VendasInternas\VendasInternasEdicaoLockService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Auth;
 
 class EditOrcamento extends EditRecord
 {
@@ -34,6 +37,25 @@ class EditOrcamento extends EditRecord
             $this->redirect(OrcamentoResource::getUrl('index'));
 
             return;
+        }
+
+        $user = Auth::user();
+        if ($user instanceof User) {
+            try {
+                // Orçamento com vínculo VI: bloqueia o app enquanto o ERP edita.
+                app(VendasInternasEdicaoLockService::class)
+                    ->adquirirErpPorOrcamentoId((int) $orcamento->id, $user);
+            } catch (\RuntimeException $e) {
+                Notification::make()
+                    ->title('Orçamento não pode ser alterado.')
+                    ->body($e->getMessage())
+                    ->warning()
+                    ->send();
+
+                $this->redirect(OrcamentoResource::getUrl('index'));
+
+                return;
+            }
         }
 
         $this->loadOrcamentoFormFromRecord($orcamento);

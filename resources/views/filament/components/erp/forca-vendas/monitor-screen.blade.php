@@ -42,12 +42,17 @@
                 poll() {
                     this.s = 5;
                     if (this.busy) return;
-                    // Não compete com faturar/cancelar/reabrir/lote/clonar.
+                    // Não compete com faturar/cancelar/reabrir/lote/clonar/NFC-e.
+                    // Overlay SEFAZ (DOM/flag JS): cobre o request longo sem depender só do Livewire.
                     if (this.$wire.faturarProgressOpen
                         || this.$wire.cancelarProgressOpen
                         || this.$wire.reabrirProgressOpen
                         || this.$wire.nfeLoteProgressOpen
-                        || this.$wire.clonarProgressOpen) {
+                        || this.$wire.clonarProgressOpen
+                        || this.$wire.nfceTransmitindo
+                        || this.$wire.nfceImprimirConfirmOpen
+                        || window.__erpSefazProgressAtivo
+                        || document.querySelector('[data-erp-sefaz-progress].is-visible')) {
                         return;
                     }
                     this.busy = true;
@@ -185,6 +190,97 @@
                                             x-text="op.nome"></button>
                                 </template>
                                 <div class="erp-fv-mon__combo-empty" x-show="filtrados().length === 0 && q.trim() !== ''">Nenhum cliente encontrado</div>
+                            </div>
+                        </div>
+                    @elseif ($this->filtroCampo === 'meio_pgto')
+                        @php
+                            $meioCombo = $this->filtroMeioPgtoCombo();
+                        @endphp
+                        <div
+                            class="erp-fv-mon__combo erp-fv-mon__combo--select erp-fv-mon__combo--multi"
+                            wire:key="filtro-meio-pgto-multi"
+                            x-data="{
+                                open: false,
+                                itens: @js($meioCombo['itens']),
+                                selecionados: @js($meioCombo['selecionados']),
+                                aplicado: @js($meioCombo['aplicado']),
+                                rotulo() {
+                                    const n = this.selecionados.length;
+                                    if (n === 0) return '<todos>';
+                                    if (n === 1) {
+                                        const op = this.itens.find(i => i.id === this.selecionados[0]);
+                                        return op ? op.nome : this.selecionados[0];
+                                    }
+                                    return n + ' selecionados';
+                                },
+                                marcado(id) {
+                                    return this.selecionados.includes(id);
+                                },
+                                sync(id, on) {
+                                    const i = this.selecionados.indexOf(id);
+                                    if (on && i < 0) this.selecionados.push(id);
+                                    if (! on && i >= 0) this.selecionados.splice(i, 1);
+                                },
+                                limpar() {
+                                    this.selecionados = [];
+                                    this.fechar(true);
+                                },
+                                abrir() { this.open = true; },
+                                fechar(force = false) {
+                                    if (! this.open && ! force) return;
+                                    this.open = false;
+                                    this.aplicar();
+                                },
+                                aplicar() {
+                                    const valor = this.selecionados.length ? this.selecionados.join('|') : '';
+                                    if (valor === this.aplicado) return;
+                                    this.aplicado = valor;
+                                    this.$wire.set('filtroValor', valor);
+                                },
+                            }"
+                            @click.outside="fechar()"
+                            @keydown.escape.stop="fechar()"
+                        >
+                            <button
+                                type="button"
+                                class="erp-fv-mon__select-btn"
+                                @click="open ? fechar() : abrir()"
+                                :aria-expanded="open"
+                                title="Meio de pagamento (múltipla seleção)"
+                            >
+                                <span class="erp-fv-mon__select-btn-label" x-text="rotulo()"></span>
+                                <span
+                                    class="erp-fv-mon__multi-count"
+                                    x-show="selecionados.length > 0"
+                                    x-text="selecionados.length"
+                                    x-cloak
+                                ></span>
+                                <span class="erp-fv-mon__select-btn-caret" aria-hidden="true">▾</span>
+                            </button>
+                            <div
+                                class="erp-fv-mon__combo-panel erp-fv-mon__combo-panel--compact erp-fv-mon__combo-panel--multi"
+                                x-show="open"
+                                x-cloak
+                                x-transition.opacity
+                                @click.stop
+                            >
+                                <button
+                                    type="button"
+                                    class="erp-fv-mon__combo-item erp-fv-mon__combo-item--todos"
+                                    @click="limpar()"
+                                >&lt;todos&gt;</button>
+                                <template x-for="op in itens" :key="op.id">
+                                    <label class="erp-fv-mon__multi-option">
+                                        <input
+                                            type="checkbox"
+                                            class="erp-fv-mon__multi-check"
+                                            :checked="marcado(op.id)"
+                                            @change="sync(op.id, $event.target.checked)"
+                                        >
+                                        <span class="erp-fv-mon__multi-option-label" x-text="op.nome"></span>
+                                    </label>
+                                </template>
+                                <div class="erp-fv-mon__combo-empty" x-show="itens.length === 0">Nenhuma forma cadastrada</div>
                             </div>
                         </div>
                     @elseif ($this->filtroCampoTipo() === 'select')

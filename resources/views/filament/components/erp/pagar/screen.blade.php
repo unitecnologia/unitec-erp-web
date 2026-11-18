@@ -1,4 +1,4 @@
-﻿@php
+@php
     $searchFields = [
         'numero' => 'NÚMERO',
         'emissao' => 'EMISSÃO',

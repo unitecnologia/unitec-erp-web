@@ -6,6 +6,7 @@ use App\Models\RhFuncionario;
 use App\Models\User;
 use App\Models\Vendedor;
 use App\Support\Erp\BrDecimal;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpUppercase;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
@@ -57,31 +58,55 @@ final class OperadorFromFuncionarioSync
             throw new InvalidArgumentException('Selecione o usuário do operador.');
         }
 
-        $outroVendedorId = (int) (User::query()->whereKey($usuarioId)->value('vendedor_id') ?? 0);
+        $empresaId = (int) ($funcionario->empresa_id ?? 0);
+        if ($empresaId <= 0) {
+            $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        }
 
-        // Reaproveita o operador já amarrado ao usuário quando for o mesmo vínculo
-        // (ex.: bootstrap / cadastro antigo), em vez de bloquear o save sem feedback útil.
-        if ($outroVendedorId > 0 && (! $vendedor || $outroVendedorId !== (int) $vendedor->getKey())) {
-            $usadoPorOutroFuncionario = RhFuncionario::query()
-                ->where('vendedor_id', $outroVendedorId)
+        // Um usuário pode ser operador em várias empresas; na empresa atual só um vínculo.
+        if (Schema::hasColumn('rh_funcionarios', 'user_id')) {
+            $outroFuncionarioNaEmpresa = RhFuncionario::query()
+                ->where('user_id', $usuarioId)
+                ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
                 ->when(
                     $funcionario->getKey(),
                     fn ($q) => $q->whereKeyNot($funcionario->getKey())
                 )
                 ->exists();
 
-            if ($usadoPorOutroFuncionario) {
+            if ($outroFuncionarioNaEmpresa) {
                 throw new InvalidArgumentException(
-                    'Este usuário já está vinculado a outro operador. Escolha outro usuário ou desative o vínculo anterior.'
+                    'Este usuário já está vinculado a outro funcionário nesta empresa. Escolha outro usuário ou desative o vínculo anterior.'
+                );
+            }
+        }
+
+        $outroVendedorId = (int) (User::query()->whereKey($usuarioId)->value('vendedor_id') ?? 0);
+
+        // Reaproveita o vendedor do usuário só se não estiver preso a funcionário de outra empresa.
+        if ($outroVendedorId > 0 && (! $vendedor || $outroVendedorId !== (int) $vendedor->getKey())) {
+            $usadoNaMesmaEmpresa = RhFuncionario::query()
+                ->where('vendedor_id', $outroVendedorId)
+                ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+                ->when(
+                    $funcionario->getKey(),
+                    fn ($q) => $q->whereKeyNot($funcionario->getKey())
+                )
+                ->exists();
+
+            if ($usadoNaMesmaEmpresa) {
+                throw new InvalidArgumentException(
+                    'Este usuário já está vinculado a outro operador nesta empresa. Escolha outro usuário ou desative o vínculo anterior.'
                 );
             }
 
-            if (! $vendedor) {
+            $usadoEmOutraEmpresa = $empresaId > 0 && RhFuncionario::query()
+                ->where('vendedor_id', $outroVendedorId)
+                ->where('empresa_id', '!=', $empresaId)
+                ->exists();
+
+            if (! $usadoEmOutraEmpresa && ! $vendedor) {
                 $vendedor = Vendedor::query()->find($outroVendedorId);
-            } else {
-                throw new InvalidArgumentException(
-                    'Este usuário já está vinculado a outro operador. Escolha outro usuário ou desative o vínculo anterior.'
-                );
             }
         }
 
@@ -92,7 +117,7 @@ final class OperadorFromFuncionarioSync
             throw new InvalidArgumentException('Selecione o estoque do operador.');
         }
 
-        $empresasSync = $this->empresaVendedorSyncFromUsuario($usuarioId);
+        $empresasSync = $this->empresasSyncParaFuncionario($usuarioId, $empresaId);
 
         if ($empresasSync === []) {
             throw new InvalidArgumentException(
@@ -108,7 +133,7 @@ final class OperadorFromFuncionarioSync
             'nome' => (string) $funcionario->nome,
             'cargo' => $cargoNome,
             'ativo' => (bool) $funcionario->ativo,
-            'empresa_id' => array_key_first($empresasSync),
+            'empresa_id' => $empresaId > 0 ? $empresaId : array_key_first($empresasSync),
             'estoque_id' => $estoqueId,
             'entregador' => (bool) ($operador['entregador'] ?? true),
             'setor_vendas' => (bool) ($operador['setor_vendas'] ?? true),
@@ -155,14 +180,15 @@ final class OperadorFromFuncionarioSync
             ]);
         }
 
-        $vendedor->empresas()->sync($empresasSync);
+        // Só garante a empresa do funcionário; não remove vínculos de outras empresas no mesmo vendedor.
+        $vendedor->empresas()->syncWithoutDetaching($empresasSync);
 
         $terminalIds = array_values(array_unique(array_filter(
             array_map('intval', (array) ($operador['terminais'] ?? []))
         )));
         $vendedor->terminais()->sync($terminalIds);
 
-        $this->syncVendedorUsuario((int) $vendedor->getKey(), $usuarioId);
+        $this->syncVendedorUsuario((int) $vendedor->getKey(), $usuarioId, $empresaId);
 
         $funcionario->vendedor_id = (int) $vendedor->getKey();
 
@@ -246,16 +272,70 @@ final class OperadorFromFuncionarioSync
         return $payload;
     }
 
-    private function syncVendedorUsuario(int $vendedorId, ?int $usuarioId): void
+    /**
+     * Vínculo do vendedor na empresa do funcionário (não força todas as empresas do usuário).
+     *
+     * @return array<int, array{caixa_conta_id: int|null}>
+     */
+    public function empresasSyncParaFuncionario(int $usuarioId, int $empresaId): array
+    {
+        if ($empresaId <= 0) {
+            return $this->empresaVendedorSyncFromUsuario($usuarioId);
+        }
+
+        $user = User::query()->find($usuarioId);
+
+        if (! $user) {
+            return [];
+        }
+
+        $acessiveis = $user->accessibleEmpresaIds();
+
+        if ($acessiveis !== [] && ! in_array($empresaId, $acessiveis, true)) {
+            throw new InvalidArgumentException(
+                'Este usuário não tem acesso a esta empresa. Configure em Permissões / Usuários → Empresas.'
+            );
+        }
+
+        $caixaId = $user->defaultCaixaContaId($empresaId);
+
+        return [
+            $empresaId => [
+                'caixa_conta_id' => $caixaId && $caixaId > 0 ? $caixaId : null,
+            ],
+        ];
+    }
+
+    private function syncVendedorUsuario(int $vendedorId, ?int $usuarioId, int $empresaId = 0): void
     {
         User::query()
             ->where('vendedor_id', $vendedorId)
             ->when($usuarioId !== null, fn ($query) => $query->where('id', '!=', $usuarioId))
             ->update(['vendedor_id' => null]);
 
-        if ($usuarioId !== null) {
-            User::query()->whereKey($usuarioId)->update(['vendedor_id' => $vendedorId]);
+        if ($usuarioId === null) {
+            return;
         }
+
+        $atual = (int) (User::query()->whereKey($usuarioId)->value('vendedor_id') ?? 0);
+
+        if ($atual === $vendedorId) {
+            return;
+        }
+
+        // Não sobrescreve ponteiro global se ele aponta para operador de outra empresa.
+        if ($atual > 0 && $empresaId > 0) {
+            $apontaOutraEmpresa = RhFuncionario::query()
+                ->where('vendedor_id', $atual)
+                ->where('empresa_id', '!=', $empresaId)
+                ->exists();
+
+            if ($apontaOutraEmpresa) {
+                return;
+            }
+        }
+
+        User::query()->whereKey($usuarioId)->update(['vendedor_id' => $vendedorId]);
     }
 
     public static function parseMoney(mixed $value): float

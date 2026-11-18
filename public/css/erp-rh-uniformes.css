@@ -1,0 +1,101 @@
+/* RH — Uniformes: ajustes finos sobre erp-rh-list + erp-list-ui */
+
+.erp-rh-uniformes-page .erp-rh-uniformes__status-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.75rem;
+}
+
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.5rem !important;
+    max-width: 4.5rem;
+}
+
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 22% !important;
+}
+
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(3),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 22% !important;
+}
+
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(4),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(5),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 5.5rem !important;
+    text-align: center;
+}
+
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(6),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-rh-uniformes-page .fi-ta-header-cell:nth-child(7),
+.erp-rh-uniformes-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 7.5rem !important;
+    text-align: center;
+}
+
+.erp-rh-uniformes-page .fi-ta-empty-state {
+    padding: 1.25rem 0.75rem !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+}
+
+.erp-rh-uniformes-page .fi-ta-empty-state-heading {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-rh-uniformes-page .erp-rh-uniforme-form-modal .erp-contador-form-modal__window,
+.erp-rh-uniformes-page .erp-rh-uniforme-catalog-modal .erp-contador-form-modal__window {
+    width: min(calc(36rem + 1cm), calc(100vw - 2rem));
+}
+
+.erp-rh-uniformes-page .erp-rh-uniforme-form-modal .erp-pcad-form__input--date,
+.erp-rh-uniformes-page .erp-rh-uniforme-catalog-modal .erp-pcad-form__input--date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.erp-rh-uniformes-page .erp-rh-uniforme-form-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-rh-uniformes-page .erp-rh-uniforme-form-modal__item {
+    flex-wrap: wrap;
+}
+
+.erp-rh-uniformes-page .erp-contador-delete-modal__window {
+    width: min(26rem, calc(100vw - 2rem));
+}
+
+.erp-rh-uniformes-actions__file {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.erp-rh-uniformes-actions__file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.erp-rh-uniformes-actions__error {
+    width: 100%;
+    padding: 0.2rem 0.75rem 0.45rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b91c1c;
+    background: var(--erp-action-bg);
+}

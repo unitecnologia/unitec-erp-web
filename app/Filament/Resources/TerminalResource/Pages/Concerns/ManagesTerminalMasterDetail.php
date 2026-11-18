@@ -4,6 +4,8 @@ namespace App\Filament\Resources\TerminalResource\Pages\Concerns;
 
 use App\Models\PdvCaixaSessao;
 use App\Models\Terminal;
+use App\Support\Erp\Audit\ErpOperacaoAuditoria;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\License\DeviceLicenseLimitExceeded;
 use App\Support\Erp\License\DeviceLicenseService;
@@ -277,10 +279,30 @@ trait ManagesTerminalMasterDetail
                 $payload['impressora_nome'] = TerminalFormOptions::windowsPrinterFromPorta($payload['porta'] ?? null);
             }
 
+            unset($payload['tef_extra'], $payload['usa_tef']);
+
             $terminal = Terminal::query()->create($payload);
             $this->isNewTerminal = false;
             $this->editingTerminalId = $terminal->id;
             $this->highlightedRecordId = $terminal->id;
+            $this->applyTerminalTefOnSave($terminal);
+
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'ALTERAR_TERMINAL',
+                resumo: 'Terminal #'.$terminal->id.' criado ('.$terminal->nome.').',
+                origem: 'terminais',
+                documentoTipo: 'terminal',
+                documentoId: (int) $terminal->id,
+                documentoNumero: (string) ($terminal->nome ?: $terminal->id),
+                detalhes: [
+                    'acao' => 'criar',
+                    'campos' => ErpOperacaoAuditoria::somente(
+                        $terminal->getAttributes(),
+                        ErpOperacaoAuditoria::camposTerminal(),
+                    ),
+                ],
+                empresaId: $terminal->empresa_id ? (int) $terminal->empresa_id : null,
+            );
         } else {
             $terminal = Terminal::query()->find($this->editingTerminalId ?? $this->highlightedRecordId);
 
@@ -302,8 +324,36 @@ trait ManagesTerminalMasterDetail
                 $payload['impressora_nome'] = $this->impressoraNomeParaGravar($payload['porta'] ?? null, $terminal);
             }
 
+            // TEF por terminal: gravado à parte (não sobe tef_extra em texto puro no payload).
+            unset($payload['tef_extra'], $payload['usa_tef']);
+
+            $antes = ErpOperacaoAuditoria::somente(
+                $terminal->getAttributes(),
+                ErpOperacaoAuditoria::camposTerminal(),
+            );
+
             $terminal->fill($payload);
             $terminal->save();
+            $this->applyTerminalTefOnSave($terminal);
+
+            $depois = ErpOperacaoAuditoria::somente(
+                $terminal->fresh()?->getAttributes() ?? $terminal->getAttributes(),
+                ErpOperacaoAuditoria::camposTerminal(),
+            );
+            $mudancas = ErpOperacaoAuditoria::diffCampos($antes, $depois);
+
+            if ($mudancas !== []) {
+                app(ErpOperacaoLogService::class)->registrar(
+                    operacao: 'ALTERAR_TERMINAL',
+                    resumo: 'Terminal #'.$terminal->id.' alterado ('.count($mudancas).' campo(s)).',
+                    origem: 'terminais',
+                    documentoTipo: 'terminal',
+                    documentoId: (int) $terminal->id,
+                    documentoNumero: (string) ($terminal->nome ?: $terminal->id),
+                    detalhes: ['acao' => 'alterar', 'campos' => $mudancas],
+                    empresaId: $terminal->empresa_id ? (int) $terminal->empresa_id : null,
+                );
+            }
         }
 
         // Não altera o terminal da sessão: editar outro caixa não pode trocar série NFC-e,
@@ -502,7 +552,11 @@ trait ManagesTerminalMasterDetail
         $this->isNewTerminal = false;
         $this->terminalInfoId = null;
 
-        $terminal = Terminal::query()->find($recordId);
+        $empresaId = TerminalResolver::make()->resolveEmpresaId();
+        $terminal = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->whereKey($recordId)
+            ->first();
 
         if ($terminal) {
             $this->loadTerminalIntoForm($terminal);
@@ -541,6 +595,7 @@ trait ManagesTerminalMasterDetail
             $this->data['nvias'] = (int) ($terminal->nvias ?: 1);
         }
 
+        $this->loadTerminalTefIntoForm($terminal);
         $this->ensurePortasBasicas();
     }
 
@@ -572,6 +627,7 @@ trait ManagesTerminalMasterDetail
         $this->isNewTerminal = true;
         $this->terminalIdentidadeFixa = false;
         $this->data = static::defaultTerminalFormData();
+        $this->resetTerminalTefForm();
         $this->ensurePortasBasicas();
     }
 

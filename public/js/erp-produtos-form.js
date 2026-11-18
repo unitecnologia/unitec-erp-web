@@ -92,6 +92,14 @@ document.addEventListener('livewire:init', () => {
         focusErpComposicaoField('pprod-comp-codigo');
     });
 
+    window.Livewire.on('erp-receita-focus-qtd', () => {
+        focusErpComposicaoField('pprod-receita-qtd');
+    });
+
+    window.Livewire.on('erp-receita-focus-search', () => {
+        focusErpComposicaoField('pprod-receita-codigo');
+    });
+
     window.Livewire.on('erp-lookup-opened', () => {
         window.setTimeout(() => {
             document.getElementById('erp-lookup-search')?.focus();

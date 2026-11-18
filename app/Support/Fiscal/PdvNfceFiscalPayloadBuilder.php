@@ -20,6 +20,7 @@ use Unitec\FiscalEngine\Dto\ItemDto;
 use Unitec\FiscalEngine\Dto\ItemImpostoDto;
 use Unitec\FiscalEngine\Dto\PagamentoDto;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
+use Unitec\FiscalEngine\Util\XmlHelper;
 
 final class PdvNfceFiscalPayloadBuilder
 {
@@ -185,6 +186,7 @@ final class PdvNfceFiscalPayloadBuilder
         );
 
         $pagamentos = [];
+        $superTefPorPagamento = $this->mapearIntencoesSuperTefPorPagamento($venda);
 
         foreach ($venda->pagamentos as $pagamento) {
             $valor = (float) $pagamento->valor;
@@ -196,15 +198,29 @@ final class PdvNfceFiscalPayloadBuilder
             $forma = trim((string) $pagamento->forma);
             $tipo = $this->mapTipoPagamento($forma);
             $isCartao = in_array($tipo, ['03', '04'], true);
+            // SuperTEF continua integrado na cobrança (API/NSU/autorização), mas no XML fiscal
+            // usa tpIntegra=2 como POS não integrado: sem CNPJ de adquirente (emulador não fornece).
+            $isSuperTef = $isCartao && $this->isPagamentoCartaoSuperTef($forma, (string) ($pagamento->cartao_maquininha ?? ''));
+
+            $cAut = $isCartao && filled($pagamento->cartao_autorizacao)
+                ? (string) $pagamento->cartao_autorizacao
+                : null;
+            if ($isSuperTef && $cAut === null) {
+                $intencao = $superTefPorPagamento[(int) $pagamento->id]
+                    ?? $superTefPorPagamento[0]
+                    ?? null;
+                if ($intencao instanceof \App\Models\TefIntencao && filled($intencao->autorizacao)) {
+                    $cAut = (string) $intencao->autorizacao;
+                }
+            }
 
             $pagamentos[] = new PagamentoDto(
                 tipo: $tipo,
                 valor: $valor,
                 tpIntegra: $isCartao ? '2' : null,
                 tBand: $isCartao ? $pagamento->tBandFiscal() : null,
-                cAut: $isCartao && filled($pagamento->cartao_autorizacao)
-                    ? (string) $pagamento->cartao_autorizacao
-                    : null,
+                cAut: $cAut,
+                cnpjCredenciadora: null,
                 descricao: $tipo === '99' ? mb_substr($forma !== '' ? $forma : 'Outros', 0, 60, 'UTF-8') : null,
             );
         }
@@ -358,10 +374,26 @@ final class PdvNfceFiscalPayloadBuilder
 
     private function buildEmitente(Empresa $empresa, string $ufEmitente): EmitenteDto
     {
+        $razao = XmlHelper::sanitizeTString(
+            (string) ($empresa->razao_social ?: $empresa->nome),
+            60,
+        );
+        $fantasia = XmlHelper::sanitizeTString(
+            (string) ($empresa->fantasia ?: $empresa->nome),
+            60,
+        );
+
+        if (mb_strlen($razao, 'UTF-8') < 2) {
+            throw new FiscalEngineException(
+                'Razão social da empresa inválida para o XML fiscal (emit/xNome). '
+                .'Corrija o cadastro da empresa (sem caracteres inválidos) e tente novamente.',
+            );
+        }
+
         return new EmitenteDto(
             cnpj: (string) $empresa->cnpj,
-            razaoSocial: (string) ($empresa->razao_social ?: $empresa->nome),
-            nomeFantasia: (string) ($empresa->fantasia ?: $empresa->nome),
+            razaoSocial: $razao,
+            nomeFantasia: $fantasia !== '' ? $fantasia : $razao,
             ie: (string) $empresa->ie,
             crt: RegimeCrtMapper::toCrt($empresa->regime_tributario ?? 'simples'),
             logradouro: (string) ($empresa->endereco ?? 'NAO INFORMADO'),
@@ -584,6 +616,107 @@ final class PdvNfceFiscalPayloadBuilder
     private function mapTpAmb(int $ambienteParametro): int
     {
         return $ambienteParametro === VendasParametro::AMBIENTE_PRODUCAO ? 1 : 2;
+    }
+
+    /**
+     * Política fiscal atual: SuperTEF no XML usa tpIntegra=2 (sem CNPJ de adquirente).
+     * Integração de cobrança permanece; não há bloqueio de transmissão por acquirer_cnpj.
+     */
+    public function impedimentoTransmissaoCartaoSuperTef(PdvVenda $venda): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Mantido por compatibilidade com testes/chamadas antigas — não bloqueia mais.
+     */
+    public function assertCartaoIntegradoSuperTefCompleto(PdvVenda $venda): void
+    {
+        // no-op: fiscal SuperTEF = tpIntegra=2; cobrança continua integrada.
+    }
+
+    /**
+     * Há pagamento SuperTEF (cartão 03/04) na venda? Usado para forçar remontagem no F5
+     * (XML antigo sem CNPJ não deve ser reenviado quando a API passar a devolver acquirer_cnpj).
+     */
+    public function vendaTemPagamentoCartaoSuperTef(PdvVenda $venda): bool
+    {
+        $venda->loadMissing('pagamentos');
+
+        foreach ($venda->pagamentos as $pagamento) {
+            if ((float) $pagamento->valor <= 0) {
+                continue;
+            }
+            $forma = trim((string) $pagamento->forma);
+            $tipo = $this->mapTipoPagamento($forma);
+            if (! in_array($tipo, ['03', '04'], true)) {
+                continue;
+            }
+            if ($this->isPagamentoCartaoSuperTef($forma, (string) ($pagamento->cartao_maquininha ?? ''))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Cartão SuperTEF integrado (API) × POS manual não integrado.
+     * Critério: forma ou maquininha identificam SUPERTEF — nunca usa CNPJ do emitente.
+     */
+    private function isPagamentoCartaoSuperTef(string $forma, string $maquininha): bool
+    {
+        $formaUp = mb_strtoupper(trim($forma), 'UTF-8');
+        $maqUp = mb_strtoupper(trim($maquininha), 'UTF-8');
+
+        return str_starts_with($maqUp, 'SUPERTEF')
+            || str_contains($formaUp, 'SUPERTEF')
+            || str_contains($formaUp, 'SUPER TEF');
+    }
+
+    /**
+     * Intenções SuperTEF da venda, indexadas por pdv_venda_pagamento_id (0 = fallback da venda).
+     *
+     * @return array<int, \App\Models\TefIntencao>
+     */
+    private function mapearIntencoesSuperTefPorPagamento(PdvVenda $venda): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('tef_intencoes')) {
+            return [];
+        }
+
+        $cols = [
+            'id',
+            'pdv_venda_pagamento_id',
+            'autorizacao',
+            'bandeira',
+            'nsu',
+            'raw_last',
+            'payment_uniqueid',
+            'pos_id',
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tef_intencoes', 'acquirer_cnpj')) {
+            $cols[] = 'acquirer_cnpj';
+        }
+
+        $rows = \App\Models\TefIntencao::query()
+            ->where('pdv_venda_id', (int) $venda->id)
+            ->where('status', \App\Models\TefIntencao::STATUS_PAGA)
+            ->orderByDesc('id')
+            ->get($cols);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $pagId = (int) ($row->pdv_venda_pagamento_id ?? 0);
+            if ($pagId > 0 && ! isset($map[$pagId])) {
+                $map[$pagId] = $row;
+            }
+            if (! isset($map[0])) {
+                $map[0] = $row;
+            }
+        }
+
+        return $map;
     }
 
     private function mapTipoPagamento(string $forma): string

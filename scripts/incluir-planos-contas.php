@@ -98,4 +98,19 @@ if (Schema::hasTable('empresas')) {
     }
 }
 
+// Classificações DRE iniciais seguras (preserva existentes; não altera planos_contas).
+if ($criadas > 0 && Schema::hasTable('empresas') && Schema::hasTable('dre_plano_classificacoes')) {
+    try {
+        $svc = $app->make(\App\Support\Erp\Dre\DrePlanoClassificacaoPadraoService::class);
+        $empresas = DB::table('empresas')->orderBy('id')->pluck('id');
+        $total = 0;
+        foreach ($empresas as $empresaId) {
+            $total += $svc->aplicarIniciaisSeguras((int) $empresaId);
+        }
+        echo "dre classificações iniciais: {$total} aplicação(ões) em ".$empresas->count()." empresa(s)\n";
+    } catch (Throwable $e) {
+        echo "dre classificações: aviso — ".$e->getMessage()."\n";
+    }
+}
+
 echo "pronto: criadas={$criadas} já_existiam={$existentes}\n";

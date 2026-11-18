@@ -376,6 +376,7 @@
     min-width: 5.4rem;
     height: 3rem;
     padding: 0.2rem 0.35rem;
+    text-decoration: none;
 }
 
 .erp-pessoas-page .erp-pessoas-actions__btn:hover {

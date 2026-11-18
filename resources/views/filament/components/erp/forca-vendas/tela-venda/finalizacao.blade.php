@@ -2,6 +2,10 @@
     $totalLiquido = $this->totalLiquido();
     $restante = $this->valorRestante();
     $troco = $this->troco();
+    $ajusteBase = round(array_sum(array_map(
+        static fn (array $i): float => (float) ($i['total'] ?? 0),
+        $this->itens,
+    )), 2);
     $davTitulo = $this->davNumero
         ? 'Forma de Pagamento — DAV '.$this->davNumero
         : 'Forma de Pagamento';
@@ -88,6 +92,16 @@
     "
     x-on:erp-pdv-focus-finalizar-cartao-canhoto.window="
         $nextTick(() => {
+            // skipRender: overlay já no DOM (x-show); força visível e foca NSU.
+            const overlay = document.querySelector('.erp-fv-fin .erp-pdv-canhoto-overlay');
+            if (overlay && $wire.finalizarCartaoCanhotoAberta) {
+                overlay.removeAttribute('x-cloak');
+                if (window.getComputedStyle(overlay).display === 'none') {
+                    overlay.style.display = 'flex';
+                }
+            }
+            const total = document.getElementById('erp-fv-canhoto-total');
+            if (total && $wire.fvCanhotoTotalLabel != null) total.value = String($wire.fvCanhotoTotalLabel);
             const el = document.getElementById('erp-fv-canhoto-nsu');
             el?.focus();
             el?.select?.();
@@ -222,6 +236,7 @@
             </div>
 
             @include('filament.components.erp.forca-vendas.tela-venda.finalizacao-parcelas')
+            @include('filament.components.erp.forca-vendas.tela-venda.finalizacao-canhoto')
 
             <div class="erp-pdv-finalizar__body">
                 <div class="erp-pdv-finalizar__grid-wrap">
@@ -339,7 +354,11 @@
                     </table>
                 </div>
 
-                <aside class="erp-pdv-finalizar__totais-panel" aria-label="Totais da venda">
+                <aside
+                    class="erp-pdv-finalizar__totais-panel"
+                    aria-label="Totais da venda"
+                    data-erp-fv-ajuste-base="{{ number_format($ajusteBase, 2, '.', '') }}"
+                >
                     <div class="erp-pdv-finalizar__totais">
                         <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total">
                             <span class="erp-pdv-finalizar__label">Subtotal:</span>
@@ -348,30 +367,39 @@
                                 <span class="erp-pdv-finalizar__money-value">{{ $this->formatMoney($this->totalBruto()) }}</span>
                             </span>
                         </label>
+                        {{-- Sem wire:model.live: cada tecla recalcula no DOM (sem request nem remorph). --}}
                         <div class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total erp-fv-fin__ajuste" title="Acréscimo rateado nos itens">
                             <span class="erp-pdv-finalizar__label">Acréscimo:</span>
                             <div class="erp-fv-fin__ajuste-inputs">
-                                <label class="erp-fv-fin__ajuste-field">
+                                <label class="erp-fv-fin__ajuste-field" wire:ignore>
                                     <span class="erp-fv-fin__ajuste-suffix">%</span>
                                     <input
                                         type="text"
-                                        wire:model.live="acrescimoPedidoPct"
+                                        id="erp-fv-ajuste-acrescimo-pct"
+                                        data-erp-fv-ajuste="acrescimo-pct"
+                                        value="{{ $this->acrescimoPedidoPct }}"
                                         class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num erp-fv-tv__input--acr"
                                         inputmode="decimal"
                                         autocomplete="off"
                                         aria-label="Acréscimo percentual"
+                                        x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                        x-on:mouseup.stop.prevent="$el.select()"
                                     >
                                 </label>
-                                <label class="erp-fv-fin__ajuste-field">
+                                <label class="erp-fv-fin__ajuste-field" wire:ignore>
                                     <span class="erp-fv-fin__ajuste-suffix">R$</span>
                                     <input
                                         type="text"
-                                        wire:model.live="acrescimoPedidoValor"
+                                        id="erp-fv-ajuste-acrescimo-valor"
+                                        data-erp-fv-ajuste="acrescimo-valor"
+                                        value="{{ $this->acrescimoPedidoValor }}"
                                         class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num erp-fv-tv__input--acr"
                                         data-mask="money-br"
                                         inputmode="decimal"
                                         autocomplete="off"
                                         aria-label="Acréscimo em reais"
+                                        x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                        x-on:mouseup.stop.prevent="$el.select()"
                                     >
                                 </label>
                             </div>
@@ -379,27 +407,35 @@
                         <div class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total erp-fv-fin__ajuste" title="Desconto rateado nos itens">
                             <span class="erp-pdv-finalizar__label">Desconto:</span>
                             <div class="erp-fv-fin__ajuste-inputs">
-                                <label class="erp-fv-fin__ajuste-field">
+                                <label class="erp-fv-fin__ajuste-field" wire:ignore>
                                     <span class="erp-fv-fin__ajuste-suffix">%</span>
                                     <input
                                         type="text"
-                                        wire:model.live="descontoPedidoPct"
+                                        id="erp-fv-ajuste-desconto-pct"
+                                        data-erp-fv-ajuste="desconto-pct"
+                                        value="{{ $this->descontoPedidoPct }}"
                                         class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num erp-fv-tv__input--desc"
                                         inputmode="decimal"
                                         autocomplete="off"
                                         aria-label="Desconto percentual"
+                                        x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                        x-on:mouseup.stop.prevent="$el.select()"
                                     >
                                 </label>
-                                <label class="erp-fv-fin__ajuste-field">
+                                <label class="erp-fv-fin__ajuste-field" wire:ignore>
                                     <span class="erp-fv-fin__ajuste-suffix">R$</span>
                                     <input
                                         type="text"
-                                        wire:model.live="descontoPedidoValor"
+                                        id="erp-fv-ajuste-desconto-valor"
+                                        data-erp-fv-ajuste="desconto-valor"
+                                        value="{{ $this->descontoPedidoValor }}"
                                         class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num erp-fv-tv__input--desc"
                                         data-mask="money-br"
                                         inputmode="decimal"
                                         autocomplete="off"
                                         aria-label="Desconto em reais"
+                                        x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                        x-on:mouseup.stop.prevent="$el.select()"
                                     >
                                 </label>
                             </div>
@@ -458,119 +494,6 @@
             </div>
         </div>
 
-        @if ($this->finalizarCartaoCanhotoAberta)
-            <div class="erp-pdv-canhoto-overlay" role="dialog" aria-labelledby="erp-fv-canhoto-title">
-                <div class="erp-pdv-parcelas erp-pdv-canhoto">
-                    <header class="erp-pdv-parcelas__header">
-                        <h3 id="erp-fv-canhoto-title">Canhoto POS | Contas a Receber</h3>
-                        <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarCartaoCanhoto" title="Fechar">✕</button>
-                    </header>
-
-                    <div class="erp-pdv-parcelas__toolbar">
-                        <div class="erp-pdv-parcelas__avulso">
-                            <span class="erp-pdv-parcelas__avulso-title">Dados do canhoto</span>
-                            <div class="erp-pdv-parcelas__avulso-fields">
-                                <label class="erp-pdv-parcelas__field">
-                                    <span>Total</span>
-                                    <input type="text" value="{{ \App\Support\Erp\ErpMoney::formatBr($this->finalizarCartaoTotalValor) }}" readonly tabindex="-1">
-                                </label>
-                                <label class="erp-pdv-parcelas__field">
-                                    <span>NSU</span>
-                                    <input id="erp-fv-canhoto-nsu" type="text" wire:model="finalizarCartaoNsu" autocomplete="off">
-                                </label>
-                                <label class="erp-pdv-parcelas__field">
-                                    <span>Autorização</span>
-                                    <input id="erp-fv-canhoto-autorizacao" type="text" wire:model="finalizarCartaoAutorizacao" autocomplete="off">
-                                </label>
-                                <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
-                                    <span>Maquininha</span>
-                                    <select id="erp-fv-canhoto-maquininha" wire:model="finalizarCartaoMaquininha">
-                                        <option value="">— Selecione —</option>
-                                        @foreach (\App\Models\CartaoMaquininha::optionsAtivas() as $nome)
-                                            <option value="{{ $nome }}">{{ $nome }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
-                                <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
-                                    <span>Bandeira</span>
-                                    <select id="erp-fv-canhoto-bandeira" wire:model="finalizarCartaoBandeira">
-                                        <option value="">— Selecione —</option>
-                                        @foreach (\App\Models\CartaoBandeira::optionsAtivas() as $nome)
-                                            <option value="{{ $nome }}">{{ $nome }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
-                            </div>
-                            <div class="erp-pdv-parcelas__avulso-fields" style="margin-top:0.5rem;">
-                                <label class="erp-pdv-parcelas__field">
-                                    <span>Qtd. Parcelas</span>
-                                    <input id="erp-fv-canhoto-qtd" type="text" wire:model="finalizarCartaoParcelasQtd" data-mask="integer" inputmode="numeric" autocomplete="off">
-                                </label>
-                                <label class="erp-pdv-parcelas__field">
-                                    <span>Intervalo (dias)</span>
-                                    <input id="erp-fv-canhoto-intervalo" type="text" wire:model="finalizarCartaoIntervalo" data-mask="integer" inputmode="numeric" autocomplete="off">
-                                </label>
-                                <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarParcelasCartaoCanhoto">
-                                    <kbd>F2</kbd> Gerar
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="erp-pdv-parcelas__toolbar-actions">
-                            <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarCartaoCanhoto">
-                                <kbd>Esc</kbd> Cancelar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="erp-pdv-parcelas__grid-wrap" id="erp-fv-finalizar-cartao-canhoto">
-                        <table class="erp-pdv__grid erp-pdv-parcelas__grid">
-                            <thead>
-                                <tr>
-                                    <th>Documento</th>
-                                    <th>Vencimento</th>
-                                    <th class="erp-pdv__grid-col-num">Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($this->finalizarCartaoParcelasRows as $index => $row)
-                                    <tr
-                                        wire:click="selectFinalizarCartaoParcelaRow({{ $index }})"
-                                        wire:key="fv-cartao-parcela-{{ $index }}"
-                                        id="erp-fv-finalizar-canhoto-row-{{ $index }}"
-                                        @class([
-                                            'erp-pdv__grid-row',
-                                            'erp-pdv__grid-row--selected' => $this->selectedFinalizarCartaoParcelaIndex === $index,
-                                        ])
-                                    >
-                                        <td>{{ $row['documento'] ?? '—' }}</td>
-                                        <td>{{ $row['vencimento'] ?? '—' }}</td>
-                                        <td class="erp-pdv__grid-col-num">R$ {{ $row['valor'] ?? '0,00' }}</td>
-                                    </tr>
-                                @empty
-                                    <tr class="erp-pdv__grid-empty">
-                                        <td colspan="3">Informe NSU/Autorização/Bandeira e use F2 | Gerar parcelas.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <footer class="erp-pdv-parcelas__footer">
-                        <div class="erp-pdv-parcelas__total">
-                            <span>Total Parcelas</span>
-                            <strong>{{ $this->finalizarCartaoParcelasTotalLabel !== '' ? 'R$ '.$this->finalizarCartaoParcelasTotalLabel : '' }}</strong>
-                        </div>
-                        <div class="erp-pdv-parcelas__footer-actions">
-                            <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="concluirCartaoCanhoto">
-                                <kbd>F7</kbd> Concluir
-                            </button>
-                        </div>
-                    </footer>
-                </div>
-            </div>
-        @endif
-
         <footer
             class="erp-pdv-modal__footer erp-pdv-finalizar__footer-actions erp-fv-fin__footer"
             data-erp-atalho-concluir="{{ $this->atalhoConcluirVenda() }}"
@@ -627,7 +550,8 @@
                 type="button"
                 class="erp-pdv-modal__btn erp-fv-fin__voltar-btn"
                 title="Voltar à Tela de Venda (não cancela a venda)"
-                x-on:click.prevent="window.erpFvFecharFinalizacaoInstantaneo?.($wire)"
+                data-erp-fv-fin-voltar
+                x-on:click.prevent.stop="window.erpFvFecharFinalizacaoInstantaneo?.($wire)"
             >
                 <kbd>Esc</kbd> Voltar
             </button>

@@ -1,12 +1,10 @@
 @php
-    $operacoes = [
-        'todas' => 'Todas',
-        'ESTORNAR_VENDA' => 'Estornar venda',
-    ];
+    $operacoes = $this->operacaoFiltroOptions();
+    $usuarios = $this->usuarioFiltroOptions();
 
     $resultados = [
         'todos' => 'Todos',
-        'ok' => 'OK',
+        'ok' => 'Concluído',
         'erro' => 'Erro',
     ];
 @endphp
@@ -38,8 +36,17 @@
 
             <label class="erp-operacao-logs__field">
                 Operação
-                <select wire:model.live="operacaoFilter" class="erp-operacao-logs__select">
+                <select wire:model.live="operacaoFilter" class="erp-operacao-logs__select erp-operacao-logs__select--wide">
                     @foreach ($operacoes as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="erp-operacao-logs__field">
+                Usuário
+                <select wire:model.live="usuarioFilter" class="erp-operacao-logs__select">
+                    @foreach ($usuarios as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
                 </select>
@@ -54,6 +61,18 @@
                 </select>
             </label>
 
+            <label class="erp-operacao-logs__field">
+                Documento
+                <input
+                    type="text"
+                    wire:model="documentoFilter"
+                    wire:keydown.enter="search"
+                    class="erp-operacao-logs__input erp-operacao-logs__doc-input"
+                    placeholder="Nº documento"
+                    autocomplete="off"
+                >
+            </label>
+
             <div class="erp-operacao-logs__search">
                 <span class="erp-operacao-logs__label">F8 | Localizar</span>
                 <input
@@ -61,7 +80,7 @@
                     wire:model="localSearch"
                     wire:keydown.enter="search"
                     class="erp-operacao-logs__input erp-operacao-logs__search-input"
-                    placeholder="Resumo, documento, usuário..."
+                    placeholder="Documento, usuário ou operação..."
                     autocomplete="off"
                 >
             </div>

@@ -9,8 +9,10 @@ namespace App\Support\Erp;
  * Os serviços abaixo alteram saldo fora do hub e ficam sem movimentação
  * até uma entrega futura (sem mudar a regra de negócio deles agora):
  *
- * - {@see ZeraEstoqueNegativoService} — UPDATE direto em products.estoque
  * - {@see Import\ProdutosPlanilhaImportService} — create/update de estoque + updateOrCreate em product_estoque_saldos
+ *
+ * {@see ZeraEstoqueNegativoService} / {@see ZeraEstoqueService} passaram a usar
+ * {@see AjusteEstoqueService} (não são mais bypass).
  *
  * Não instanciar; apenas registro da dívida técnica.
  */

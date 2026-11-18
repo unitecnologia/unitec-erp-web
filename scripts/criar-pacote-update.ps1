@@ -253,6 +253,40 @@ if (Test-Path $cacheDir) {
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
+# composer.json do staging deve bloquear auto-discover de pacotes DEV (Pail etc.).
+$stagingComposer = Join-Path $StagingDir 'composer.json'
+if (Test-Path -LiteralPath $stagingComposer) {
+    $phpExeCheck = Join-Path $ProjectRoot 'tools\php\php.exe'
+    if (-not (Test-Path $phpExeCheck)) { $phpExeCheck = 'php' }
+    $tmpDontDiscover = Join-Path $env:TEMP ('unitec-check-dont-discover-' + [guid]::NewGuid().ToString('N') + '.php')
+    $phpDontDiscover = @'
+$j = json_decode(file_get_contents($argv[1]), true);
+if (!is_array($j)) { fwrite(STDERR, "composer.json invalido\n"); exit(2); }
+$ignore = $j['extra']['laravel']['dont-discover'] ?? [];
+if (!is_array($ignore)) { fwrite(STDERR, "dont-discover ausente\n"); exit(3); }
+$need = ['laravel/pail','laravel/pao','laravel/sail','nunomaduro/collision'];
+foreach ($need as $pkg) {
+    if (!in_array($pkg, $ignore, true)) {
+        fwrite(STDERR, "faltando $pkg em dont-discover\n");
+        exit(4);
+    }
+}
+echo "ok\n";
+exit(0);
+'@
+    Set-Content -Path $tmpDontDiscover -Value $phpDontDiscover -Encoding UTF8
+    try {
+        $ddOut = & $phpExeCheck $tmpDontDiscover $stagingComposer 2>&1
+        $ddCode = $LASTEXITCODE
+    } finally {
+        Remove-Item $tmpDontDiscover -Force -ErrorAction SilentlyContinue
+    }
+    if ($ddCode -ne 0) {
+        throw "Pacote contaminado: composer.json dont-discover incompleto (exit=$ddCode): $ddOut"
+    }
+    Write-Host '>> composer.json dont-discover cobre pacotes DEV conhecidos' -ForegroundColor Green
+}
+
 # Pacote --no-dev: laravel/pail (e afins) nao pode ir ao cliente.
 $forbiddenDevDirs = @(
     'vendor\laravel\pail',

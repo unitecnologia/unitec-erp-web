@@ -219,7 +219,9 @@ class ListFormasPagamento extends ListRecords
             ),
             'ativo' => $record->ativo,
             'usa_tef' => $record->usa_tef,
+            'usa_pos' => (bool) ($record->usa_pos ?? false),
             'usa_super_tef' => $record->usa_super_tef,
+            'considerar_a_vista' => (bool) ($record->considerar_a_vista ?? false),
             'aparece_venda' => $record->aparece_venda,
             'aparece_contas_receber' => $record->aparece_contas_receber,
             'nfce' => $record->nfce,
@@ -304,7 +306,9 @@ class ListFormasPagamento extends ListRecords
             ),
             'ativo' => (bool) ($this->form['ativo'] ?? false),
             'usa_tef' => (bool) ($this->form['usa_tef'] ?? false),
+            'usa_pos' => (bool) ($this->form['usa_pos'] ?? false),
             'usa_super_tef' => (bool) ($this->form['usa_super_tef'] ?? false),
+            'considerar_a_vista' => (bool) ($this->form['considerar_a_vista'] ?? false),
             'aparece_venda' => (bool) ($this->form['aparece_venda'] ?? false),
             'aparece_contas_receber' => (bool) ($this->form['aparece_contas_receber'] ?? false),
             'nfce' => (bool) ($this->form['nfce'] ?? false),
@@ -314,8 +318,31 @@ class ListFormasPagamento extends ListRecords
             'parcelas' => $this->normalizeParcelas($this->form['parcelas'] ?? []),
         ];
 
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'considerar_a_vista')) {
+            unset($payload['considerar_a_vista']);
+        }
+
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'usa_pos')) {
+            unset($payload['usa_pos']);
+        }
+
         if (! \Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'nao_pagar_comissao')) {
             unset($payload['nao_pagar_comissao']);
+        }
+
+        // POS / TEF / SuperTEF: no máximo uma modalidade por forma.
+        $flagsIntegracao = [
+            'usa_pos' => (bool) ($payload['usa_pos'] ?? false),
+            'usa_tef' => (bool) ($payload['usa_tef'] ?? false),
+            'usa_super_tef' => (bool) ($payload['usa_super_tef'] ?? false),
+        ];
+        if (count(array_filter($flagsIntegracao)) > 1) {
+            $this->addError(
+                'form.usa_pos',
+                'Escolha apenas uma opção: Usa POS, Usa TEF ou Usa SuperTEF.',
+            );
+
+            return;
         }
 
         if (\Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'modo_prazo')) {
@@ -369,6 +396,33 @@ class ListFormasPagamento extends ListRecords
     public function updatedFormTipoMovimento(mixed $value): void
     {
         $this->tipoMovimentoManual = true;
+    }
+
+    public function updatedFormUsaPos(mixed $value): void
+    {
+        if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+        $this->form['usa_tef'] = false;
+        $this->form['usa_super_tef'] = false;
+    }
+
+    public function updatedFormUsaTef(mixed $value): void
+    {
+        if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+        $this->form['usa_pos'] = false;
+        $this->form['usa_super_tef'] = false;
+    }
+
+    public function updatedFormUsaSuperTef(mixed $value): void
+    {
+        if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+        $this->form['usa_pos'] = false;
+        $this->form['usa_tef'] = false;
     }
 
     /**
@@ -451,7 +505,9 @@ class ListFormasPagamento extends ListRecords
             'tipo_movimento' => 'nenhum',
             'ativo' => true,
             'usa_tef' => false,
+            'usa_pos' => false,
             'usa_super_tef' => false,
+            'considerar_a_vista' => false,
             'aparece_venda' => true,
             'aparece_contas_receber' => false,
             'nfce' => false,

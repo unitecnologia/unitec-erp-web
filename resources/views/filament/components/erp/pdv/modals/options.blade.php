@@ -124,7 +124,7 @@
                 @endif
 
                 <li>
-                    <button type="button" role="menuitem" wire:click="moduleStubNfce" @disabled(! $caixaAberto)>
+                    <button type="button" role="menuitem" wire:click="openReimprimirNfceModal" @disabled(! $caixaAberto)>
                         <span class="erp-pdv-options__ico" aria-hidden="true">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V4h12v5"/><rect x="4" y="9" width="16" height="7" rx="1.5"/><path d="M7 16v4h10v-4"/></svg>
                         </span>

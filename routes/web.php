@@ -23,6 +23,8 @@ use App\Http\Controllers\Erp\MonitorPedidosReportController;
 use App\Http\Controllers\Erp\OrcamentoReportController;
 use App\Http\Controllers\Erp\OrdemServicoReportController;
 use App\Http\Controllers\Erp\FvClienteLookupController;
+use App\Http\Controllers\Erp\VendasGeralCidadeLookupController;
+use App\Http\Controllers\Erp\VendasGeralClienteLookupController;
 use App\Http\Controllers\Erp\FvProdutoLookupController;
 use App\Http\Controllers\Erp\OsClienteLookupController;
 use App\Http\Controllers\Erp\OsProdutoLookupController;
@@ -42,11 +44,27 @@ use App\Http\Controllers\Erp\PdvMesaCupomController;
 use App\Http\Controllers\Erp\PdvMesasPulsoController;
 use App\Http\Controllers\Erp\PersonListagemReportController;
 use App\Http\Controllers\Erp\ProductEstoqueReportController;
+use App\Http\Controllers\Erp\RhAnexoDownloadController;
+use App\Http\Controllers\Erp\RhDocumentosListagemReportController;
+use App\Http\Controllers\Erp\RhEpiComprovanteReportController;
+use App\Http\Controllers\Erp\RhEpisListagemReportController;
+use App\Http\Controllers\Erp\RhUniformeComprovanteReportController;
+use App\Http\Controllers\Erp\RhUniformesListagemReportController;
+use App\Http\Controllers\Erp\RhExamesListagemReportController;
+use App\Http\Controllers\Erp\RhFeriasListagemReportController;
+use App\Http\Controllers\Erp\RhHoleritesListagemReportController;
+use App\Http\Controllers\Erp\RhBeneficiosListagemReportController;
+use App\Http\Controllers\Erp\RhOcorrenciaRegistroReportController;
+use App\Http\Controllers\Erp\RhOcorrenciasListagemReportController;
+use App\Http\Controllers\Erp\RhEscalasListagemReportController;
+use App\Http\Controllers\Erp\RhEscalaMensalReportController;
+use App\Http\Controllers\Erp\RhTreinamentosListagemReportController;
 use App\Http\Controllers\Erp\ContaReceberCartoesReportController;
 use App\Http\Controllers\Erp\ContaReceberRelatorioController;
 use App\Http\Controllers\Erp\ReciboEscPosPrintController;
 use App\Http\Controllers\Erp\ReciboReportController;
 use App\Http\Controllers\Erp\TabularReportController;
+use App\Http\Controllers\Erp\VendasGeralFiltrosController;
 use App\Http\Controllers\Erp\VendaListagemReportController;
 use App\Http\Controllers\Erp\PublicStorageFileController;
 use App\Http\Controllers\OAuth\MeliHubOAuthController;
@@ -97,12 +115,69 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/erp/files/{path}', PublicStorageFileController::class)
         ->where('path', '.*')
         ->name('erp.storage.file');
+    Route::get('/admin/relatorio-vendas-geral', VendasGeralFiltrosController::class)
+        ->middleware('erp.permission:vendas.print')
+        ->name('erp.reports.vendas-geral.filtros');
+    Route::get('/admin/relatorio-vendas-geral/clientes-lookup', VendasGeralClienteLookupController::class)
+        ->middleware('erp.permission:vendas.print')
+        ->name('erp.reports.vendas-geral.clientes-lookup');
+    Route::get('/admin/relatorio-vendas-geral/cidades-lookup', VendasGeralCidadeLookupController::class)
+        ->middleware('erp.permission:vendas.print')
+        ->name('erp.reports.vendas-geral.cidades-lookup');
     Route::get('/admin/reports/produtos-estoque', ProductEstoqueReportController::class)
         ->middleware('erp.permission:produtos.print')
         ->name('erp.reports.produtos-estoque');
     Route::get('/admin/reports/pessoas-listagem', PersonListagemReportController::class)
         ->middleware('erp.permission:pessoas.print')
         ->name('erp.reports.pessoas-listagem');
+    Route::get('/admin/reports/rh-documentos-listagem', RhDocumentosListagemReportController::class)
+        ->middleware('erp.permission:rh.documentos.print')
+        ->name('erp.reports.rh-documentos-listagem');
+    Route::get('/admin/reports/rh-epis-listagem', RhEpisListagemReportController::class)
+        ->middleware('erp.permission:rh.epis.print')
+        ->name('erp.reports.rh-epis-listagem');
+    Route::get('/admin/reports/rh-epi-comprovante/{entrega}', RhEpiComprovanteReportController::class)
+        ->middleware('erp.permission:rh.epis.print')
+        ->whereNumber('entrega')
+        ->name('erp.reports.rh-epi-comprovante');
+    Route::get('/admin/reports/rh-uniformes-listagem', RhUniformesListagemReportController::class)
+        ->middleware('erp.permission:rh.uniformes.print')
+        ->name('erp.reports.rh-uniformes-listagem');
+    Route::get('/admin/reports/rh-uniforme-comprovante/{entrega}', RhUniformeComprovanteReportController::class)
+        ->middleware('erp.permission:rh.uniformes.print')
+        ->whereNumber('entrega')
+        ->name('erp.reports.rh-uniforme-comprovante');
+    Route::get('/admin/reports/rh-exames-listagem', RhExamesListagemReportController::class)
+        ->middleware('erp.permission:rh.exames.print')
+        ->name('erp.reports.rh-exames-listagem');
+    Route::get('/admin/reports/rh-ferias-listagem', RhFeriasListagemReportController::class)
+        ->middleware('erp.permission:rh.ferias.print')
+        ->name('erp.reports.rh-ferias-listagem');
+    Route::get('/admin/reports/rh-holerites-listagem', RhHoleritesListagemReportController::class)
+        ->middleware('erp.permission:rh.holerites.print')
+        ->name('erp.reports.rh-holerites-listagem');
+    Route::get('/admin/reports/rh-beneficios-listagem', RhBeneficiosListagemReportController::class)
+        ->middleware('erp.permission:rh.beneficios.print')
+        ->name('erp.reports.rh-beneficios-listagem');
+    Route::get('/admin/reports/rh-ocorrencias-listagem', RhOcorrenciasListagemReportController::class)
+        ->middleware('erp.permission:rh.ocorrencias.print')
+        ->name('erp.reports.rh-ocorrencias-listagem');
+    Route::get('/admin/reports/rh-ocorrencia-registro/{ocorrencia}', RhOcorrenciaRegistroReportController::class)
+        ->middleware('erp.permission:rh.ocorrencias.print')
+        ->whereNumber('ocorrencia')
+        ->name('erp.reports.rh-ocorrencia-registro');
+    Route::get('/admin/reports/rh-treinamentos-listagem', RhTreinamentosListagemReportController::class)
+        ->middleware('erp.permission:rh.treinamentos.print')
+        ->name('erp.reports.rh-treinamentos-listagem');
+    Route::get('/admin/reports/rh-escalas-listagem', RhEscalasListagemReportController::class)
+        ->middleware('erp.permission:rh.escalas.print')
+        ->name('erp.reports.rh-escalas-listagem');
+    Route::get('/admin/reports/rh-escala-mensal', RhEscalaMensalReportController::class)
+        ->middleware('erp.permission:rh.escalas.print')
+        ->name('erp.reports.rh-escala-mensal');
+    Route::get('/admin/erp/rh/anexos/{anexo}/download', RhAnexoDownloadController::class)
+        ->whereNumber('anexo')
+        ->name('erp.rh.anexo.download');
     Route::get('/admin/reports/vendas-listagem', VendaListagemReportController::class)
         ->middleware('erp.permission:vendas.print')
         ->name('erp.reports.vendas-listagem');

@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Schema;
  *   as sangrias incluídas nessa transferência e o retorno do fundo de troco
  *   (abertura/suprimento não é transferido).
  *
+ * Cada conta PDV lista somente sessões com `caixa_conta_id` explícito (sem herdar
+ * o caixa padrão atual do operador). Sessões antigas com conta null ficam no filtro
+ * virtual {@see FILTRO_SESSOES_SEM_CONTA}, separado das contas PDV.
+ *
  * Nada é gravado: o CAIXA GERAL segue só com os próprios lançamentos.
  * Colunas iguais às de caixa_lancamentos (+ ordem e dados da sessão), para a mesma grade.
  */
@@ -29,6 +33,16 @@ final class CaixaPdvMovimentacaoQuery
 
     private const ID_SANGRIA = 3000000000;
 
+    /** Filtro virtual da grade: sessões PDV sem caixa_conta_id (somente consulta). */
+    public const FILTRO_SESSOES_SEM_CONTA = 0;
+
+    public const LABEL_SESSOES_SEM_CONTA = 'PDV — sessões sem caixa';
+
+    public static function isFiltroSessoesSemConta(int $contaId): bool
+    {
+        return $contaId === self::FILTRO_SESSOES_SEM_CONTA;
+    }
+
     public static function isContaPdv(int $contaId): bool
     {
         if ($contaId <= 0) {
@@ -39,6 +53,12 @@ final class CaixaPdvMovimentacaoQuery
             ->whereKey($contaId)
             ->whereIn('tipo', [CaixaConta::TIPO_PDV, 'CAIXA', 'X'])
             ->exists();
+    }
+
+    /** Grade usa a query virtual (conta PDV real ou filtro de sessões sem caixa). */
+    public static function usaQueryVirtual(int $contaId): bool
+    {
+        return self::isFiltroSessoesSemConta($contaId) || self::isContaPdv($contaId);
     }
 
     public function __construct(private readonly int $contaId) {}
@@ -56,25 +76,32 @@ final class CaixaPdvMovimentacaoQuery
     {
         $hasEmpresa = Schema::hasColumn('caixa_lancamentos', 'empresa_id');
 
-        return DB::table('caixa_lancamentos as l')
-            ->where('l.caixa_conta_id', $this->contaId)
-            ->select([
-                DB::raw($this->signed($this->w('l.id')).' as id'),
-                'l.codigo',
-                'l.emissao',
-                'l.documento',
-                'l.historico',
-                'l.plano_contas',
-                'l.plano_conta_id',
-                'l.caixa_conta_id',
-                'l.entrada',
-                'l.saida',
-                $hasEmpresa ? 'l.empresa_id' : DB::raw('NULL as empresa_id'),
-                DB::raw('COALESCE('.$this->w('l.created_at').', '.$this->w('l.emissao').') as ordem'),
-                DB::raw('NULL as pdv_sessao_id'),
-                DB::raw('NULL as pdv_operador'),
-                DB::raw('NULL as pdv_terminal'),
-            ]);
+        $query = DB::table('caixa_lancamentos as l');
+
+        // Filtro virtual não tem lançamentos reais; evita where id=0.
+        if (self::isFiltroSessoesSemConta($this->contaId)) {
+            $query->whereRaw('0 = 1');
+        } else {
+            $query->where('l.caixa_conta_id', $this->contaId);
+        }
+
+        return $query->select([
+            DB::raw($this->signed($this->w('l.id')).' as id'),
+            'l.codigo',
+            'l.emissao',
+            'l.documento',
+            'l.historico',
+            'l.plano_contas',
+            'l.plano_conta_id',
+            'l.caixa_conta_id',
+            'l.entrada',
+            'l.saida',
+            $hasEmpresa ? 'l.empresa_id' : DB::raw('NULL as empresa_id'),
+            DB::raw('COALESCE('.$this->w('l.created_at').', '.$this->w('l.emissao').') as ordem'),
+            DB::raw('NULL as pdv_sessao_id'),
+            DB::raw('NULL as pdv_operador'),
+            DB::raw('NULL as pdv_terminal'),
+        ]);
     }
 
     private function movimentosSessao(): QueryBuilder
@@ -283,37 +310,25 @@ final class CaixaPdvMovimentacaoQuery
     }
 
     /**
-     * Sessões da conta: caixa_conta_id gravado na abertura. Sessões antigas (sem conta)
-     * caem no caixa PDV padrão do operador ou, havendo um só caixa PDV, nele.
+     * Sessões da visão:
+     * - conta PDV: só `caixa_conta_id` explícito (não herda is_padrao atual);
+     * - filtro virtual: só sessões com `caixa_conta_id` null.
      */
     private function filtrarSessoes(QueryBuilder $query): void
     {
-        $temColuna = Schema::hasColumn('pdv_caixa_sessoes', 'caixa_conta_id');
-        $unicoPdv = CaixaConta::query()->assignable()->count() === 1;
+        if (! Schema::hasColumn('pdv_caixa_sessoes', 'caixa_conta_id')) {
+            $query->whereRaw('0 = 1');
 
-        $query->where(function (QueryBuilder $sessoes) use ($temColuna, $unicoPdv): void {
-            if ($temColuna) {
-                $sessoes->where('s.caixa_conta_id', $this->contaId);
-            }
+            return;
+        }
 
-            $sessoes->orWhere(function (QueryBuilder $legado) use ($temColuna, $unicoPdv): void {
-                if ($temColuna) {
-                    $legado->whereNull('s.caixa_conta_id');
-                }
+        if (self::isFiltroSessoesSemConta($this->contaId)) {
+            $query->whereNull('s.caixa_conta_id');
 
-                if ($unicoPdv) {
-                    return;
-                }
+            return;
+        }
 
-                $legado->whereExists(function (QueryBuilder $padrao): void {
-                    $padrao->from('caixa_conta_user as ccu')
-                        ->whereColumn('ccu.user_id', 's.user_id')
-                        ->whereColumn('ccu.empresa_id', 's.empresa_id')
-                        ->where('ccu.caixa_conta_id', $this->contaId)
-                        ->where('ccu.is_padrao', true);
-                });
-            });
-        });
+        $query->where('s.caixa_conta_id', $this->contaId);
     }
 
     private function joinTerminal(QueryBuilder $query): void

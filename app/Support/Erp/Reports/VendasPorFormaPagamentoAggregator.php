@@ -48,17 +48,32 @@ final class VendasPorFormaPagamentoAggregator
         self::somarPagamentos($aggregated, $deStr, $ateStr, $scope, $groupEmpresa, $cadastro);
         self::somarCabecalhosSemPagamento($aggregated, $deStr, $ateStr, $scope, $groupEmpresa, $cadastro);
 
-        $filtro = mb_strtoupper(trim($formaFiltro), 'UTF-8');
-        $rows = array_values($aggregated);
+        return self::finalizeRows($aggregated, $formaFiltro);
+    }
 
-        if ($filtro !== '') {
-            $rows = array_values(array_filter(
-                $rows,
-                static fn (array $row): bool => mb_strtoupper((string) $row['forma'], 'UTF-8') === $filtro,
-            ));
+    /**
+     * Agrega formas apenas para o universo de vendas já filtrado (sem duplicar venda mista no total comercial).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $vendaIdsQuery  SELECT vendas.id
+     * @return list<array{empresa_id: int, forma: string, qtd: float, total: float, codigo: int}>
+     */
+    public static function aggregateForVendaIdsQuery(mixed $vendaIdsQuery, string $formaFiltro = ''): array
+    {
+        if (! ErpSchema::hasTable((new Venda)->getTable())) {
+            return [];
         }
 
-        return $rows;
+        $idsQuery = $vendaIdsQuery instanceof \Illuminate\Database\Eloquent\Builder
+            ? $vendaIdsQuery->clone()->select('vendas.id')->toBase()
+            : $vendaIdsQuery;
+
+        $cadastro = self::formasCadastro();
+        $aggregated = [];
+
+        self::somarPagamentosNoUniverso($aggregated, $idsQuery, $cadastro);
+        self::somarCabecalhosSemPagamentoNoUniverso($aggregated, $idsQuery, $cadastro);
+
+        return self::finalizeRows($aggregated, $formaFiltro);
     }
 
     public static function formaBase(string $forma): string
@@ -134,6 +149,128 @@ final class VendasPorFormaPagamentoAggregator
             ->where('ativo', true)
             ->orderBy('codigo')
             ->get(['id', 'codigo', 'descricao']);
+    }
+
+    /**
+     * @param  array<string, array{empresa_id: int, forma: string, qtd: float, total: float, codigo: int}>  $aggregated
+     * @return list<array{empresa_id: int, forma: string, qtd: float, total: float, codigo: int}>
+     */
+    private static function finalizeRows(array $aggregated, string $formaFiltro): array
+    {
+        $filtro = mb_strtoupper(trim($formaFiltro), 'UTF-8');
+        $rows = array_values($aggregated);
+
+        if ($filtro !== '' && $filtro !== 'TODOS') {
+            $rows = array_values(array_filter(
+                $rows,
+                static fn (array $row): bool => mb_strtoupper((string) $row['forma'], 'UTF-8') === $filtro,
+            ));
+        }
+
+        usort($rows, static function (array $a, array $b): int {
+            $byCodigo = ((int) $a['codigo']) <=> ((int) $b['codigo']);
+            if ($byCodigo !== 0) {
+                return $byCodigo;
+            }
+
+            return strcmp((string) $a['forma'], (string) $b['forma']);
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<string, array{empresa_id: int, forma: string, qtd: float, total: float, codigo: int}>  $aggregated
+     * @param  Collection<int, FormaPagamento>  $cadastro
+     */
+    private static function somarPagamentosNoUniverso(
+        array &$aggregated,
+        mixed $vendaIdsQuery,
+        Collection $cadastro,
+    ): void {
+        if (! ErpSchema::hasTable((new PdvVendaPagamento)->getTable())
+            || ! ErpSchema::hasTable((new PdvVenda)->getTable())
+        ) {
+            return;
+        }
+
+        $formaCol = self::sqlCol('pdv_venda_pagamentos', 'forma');
+        $valorCol = self::sqlCol('pdv_venda_pagamentos', 'valor');
+
+        $query = PdvVendaPagamento::query()
+            ->join('pdv_vendas', 'pdv_vendas.id', '=', 'pdv_venda_pagamentos.pdv_venda_id')
+            ->whereIn('pdv_vendas.venda_id', $vendaIdsQuery)
+            ->where(function ($o): void {
+                $o->whereNull('pdv_vendas.origem')->orWhere('pdv_vendas.origem', '!=', PdvVenda::ORIGEM_REGULARIZACAO_FISCAL);
+            })
+            ->where('pdv_venda_pagamentos.valor', '>', 0)
+            ->groupBy('pdv_venda_pagamentos.forma')
+            ->select([
+                DB::raw("{$formaCol} as forma"),
+                DB::raw('COUNT(*) as qtd'),
+                DB::raw("SUM({$valorCol}) as total"),
+            ]);
+
+        foreach ($query->get() as $row) {
+            self::somar(
+                $aggregated,
+                (string) ($row->forma ?? ''),
+                (float) $row->qtd,
+                (float) $row->total,
+                0,
+                false,
+                $cadastro,
+            );
+        }
+    }
+
+    /**
+     * @param  array<string, array{empresa_id: int, forma: string, qtd: float, total: float, codigo: int}>  $aggregated
+     * @param  Collection<int, FormaPagamento>  $cadastro
+     */
+    private static function somarCabecalhosSemPagamentoNoUniverso(
+        array &$aggregated,
+        mixed $vendaIdsQuery,
+        Collection $cadastro,
+    ): void {
+        $formaCol = self::sqlCol((new Venda)->getTable(), 'forma_pagamento');
+        $totalCol = self::sqlCol((new Venda)->getTable(), 'total');
+
+        $query = Venda::query()
+            ->whereIn('vendas.id', $vendaIdsQuery);
+
+        if (ErpSchema::hasTable((new PdvVendaPagamento)->getTable())
+            && ErpSchema::hasTable((new PdvVenda)->getTable())
+        ) {
+            $query->whereNotExists(function ($exists): void {
+                $exists->selectRaw('1')
+                    ->from('pdv_vendas')
+                    ->join('pdv_venda_pagamentos', 'pdv_venda_pagamentos.pdv_venda_id', '=', 'pdv_vendas.id')
+                    ->whereColumn('pdv_vendas.venda_id', 'vendas.id')
+                    ->where(function ($o): void {
+                        $o->whereNull('pdv_vendas.origem')->orWhere('pdv_vendas.origem', '!=', PdvVenda::ORIGEM_REGULARIZACAO_FISCAL);
+                    });
+            });
+        }
+
+        $query->groupBy('forma_pagamento')
+            ->select([
+                DB::raw("{$formaCol} as forma"),
+                DB::raw('COUNT(*) as qtd'),
+                DB::raw("SUM({$totalCol}) as total"),
+            ]);
+
+        foreach ($query->get() as $row) {
+            self::somar(
+                $aggregated,
+                (string) ($row->forma ?? ''),
+                (float) $row->qtd,
+                (float) $row->total,
+                0,
+                false,
+                $cadastro,
+            );
+        }
     }
 
     /**

@@ -52,6 +52,9 @@ class PermissoesPage extends Page
 
     public bool $permissionLocked = false;
 
+    /** Perfil seed/sistema: nome imutável; permissões editáveis (exceto ADMINISTRADOR). */
+    public bool $profileIsSystem = false;
+
     /**
      * Lista carregada uma vez. A busca filtra no navegador.
      *
@@ -303,6 +306,7 @@ class PermissoesPage extends Page
         $this->contextTitle = 'Novo perfil';
         $this->permissionFullAccess = false;
         $this->permissionLocked = false;
+        $this->profileIsSystem = false;
         $this->activeTab = 'cadastro';
         $this->dispatch('erp-permissoes-sync', keys: [], fullAccess: false, locked: false);
     }
@@ -1160,12 +1164,16 @@ class PermissoesPage extends Page
             return null;
         }
 
-        $fullAccess = $profile->nome === 'ADMINISTRADOR';
+        // ADMINISTRADOR: acesso total e somente consulta.
+        // Demais perfis do sistema (ex.: CAIXA) podem ter permissões personalizadas;
+        // is_system continua protegendo exclusão e o nome do perfil.
+        $fullAccess = mb_strtoupper(trim((string) $profile->nome), 'UTF-8') === 'ADMINISTRADOR';
 
         return [
             'keys' => $fullAccess ? [] : $this->profilePermissionKeys((int) $profile->id),
             'fullAccess' => $fullAccess,
-            'locked' => (bool) $profile->is_system,
+            'locked' => $fullAccess,
+            'system' => (bool) $profile->is_system,
             'name' => (string) $profile->nome,
             'descricao' => (string) ($profile->descricao ?? ''),
         ];
@@ -1180,6 +1188,7 @@ class PermissoesPage extends Page
             $this->contextTitle = $this->sidebarTab === 'perfis' ? 'Novo perfil' : 'Selecione um usuário';
             $this->permissionFullAccess = false;
             $this->permissionLocked = false;
+            $this->profileIsSystem = false;
 
             return;
         }
@@ -1187,6 +1196,7 @@ class PermissoesPage extends Page
         $this->contextTitle = (string) ($state['name'] ?? $this->contextTitle);
         $this->permissionFullAccess = (bool) ($state['fullAccess'] ?? false);
         $this->permissionLocked = (bool) ($state['locked'] ?? false);
+        $this->profileIsSystem = (bool) ($state['system'] ?? false);
     }
 
     /**
@@ -1233,7 +1243,7 @@ class PermissoesPage extends Page
         if ($this->permissionLocked || $this->permissionFullAccess) {
             Notification::make()
                 ->title($this->sidebarTab === 'perfis'
-                    ? 'Perfil do sistema não pode ser alterado.'
+                    ? 'Perfil ADMINISTRADOR não pode ser alterado.'
                     : 'Usuário administrador possui acesso total.')
                 ->warning()
                 ->send();
@@ -1336,19 +1346,28 @@ class PermissoesPage extends Page
             ? ErpProfile::query()->find($this->selectedProfileId)
             : null;
 
-        if (! $profile) {
-            $profile = ErpProfile::query()->create([
-                'nome' => $nome,
-                'descricao' => $this->profileDescricao ?: null,
-            ]);
-            $this->selectedProfileId = $profile->getKey();
-        } elseif ($profile->is_system) {
+        if ($profile && mb_strtoupper(trim((string) $profile->nome), 'UTF-8') === 'ADMINISTRADOR') {
             Notification::make()
-                ->title('Perfil do sistema não pode ser alterado.')
+                ->title('Perfil ADMINISTRADOR não pode ser alterado.')
                 ->warning()
                 ->send();
 
             return;
+        }
+
+        if (! $profile) {
+            $profile = ErpProfile::query()->create([
+                'nome' => $nome,
+                'descricao' => $this->profileDescricao ?: null,
+                'is_system' => false,
+            ]);
+            $this->selectedProfileId = $profile->getKey();
+        } elseif ($profile->is_system) {
+            // Perfil padrão (CAIXA etc.): permite personalizar permissões/descrição; preserva o nome.
+            $profile->update([
+                'descricao' => $this->profileDescricao ?: null,
+            ]);
+            $nome = (string) $profile->nome;
         } else {
             $profile->update([
                 'nome' => $nome,
@@ -1359,6 +1378,9 @@ class PermissoesPage extends Page
         ErpAccess::syncProfilePermissions($profile, $keys);
         $this->refreshDirectory();
         $this->contextTitle = $nome;
+        $this->permissionLocked = false;
+        $this->permissionFullAccess = false;
+        $this->dispatch('erp-permissoes-sync', keys: $keys, fullAccess: false, locked: false);
 
         Notification::make()
             ->title('Perfil salvo.')

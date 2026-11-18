@@ -519,6 +519,16 @@ trait ManagesPdvImportar
         }
 
         try {
+            app(\App\Support\VendasInternas\VendasInternasEdicaoLockService::class)
+                ->assertOrcamentoLivre($orcamento);
+        } catch (\RuntimeException $e) {
+            $this->desfazerImportacao(PdvImportReserva::ORCAMENTO, (int) $orcamento->id);
+            $this->notifyPdvError('Orçamento em edição no Vendas Internas.', $e->getMessage());
+
+            return;
+        }
+
+        try {
             $descontos = app(OrcamentoDescontoService::class);
             $linhas = [];
 

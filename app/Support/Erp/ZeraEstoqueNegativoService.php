@@ -2,30 +2,28 @@
 
 namespace App\Support\Erp;
 
-use App\Models\Product;
-
+/**
+ * Compatibilidade com o modal da Empresa e a tela legada.
+ * A zeragem real passa por {@see ZeraEstoqueService} → {@see AjusteEstoqueService}.
+ */
 final class ZeraEstoqueNegativoService
 {
+    public function __construct(
+        private readonly ZeraEstoqueService $zera = new ZeraEstoqueService(),
+    ) {}
+
     public function countNegativos(): int
     {
-        return Product::query()->where('estoque', '<', 0)->count();
+        return $this->zera->countNegativos();
     }
 
     /**
-     * Zera o saldo de todos os produtos com estoque negativo.
+     * Zera o saldo dos produtos com estoque negativo no depósito da empresa atual.
      *
      * @return int Quantidade de produtos ajustados
      */
     public function zerarTodos(): int
     {
-        $count = $this->countNegativos();
-
-        if ($count === 0) {
-            return 0;
-        }
-
-        Product::query()->where('estoque', '<', 0)->update(['estoque' => 0]);
-
-        return $count;
+        return $this->zera->zerarNegativosEmpresa();
     }
 }

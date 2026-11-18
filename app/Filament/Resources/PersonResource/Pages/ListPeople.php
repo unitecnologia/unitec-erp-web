@@ -415,19 +415,31 @@ class ListPeople extends ListRecords
             ]);
     }
 
-    public function createPerson(): void
+    /**
+     * URL oficial do cadastro Novo (SPA / PDV), com tipo da aba atual.
+     */
+    public function personCreateUrl(): string
     {
-        if (! $this->erpAuthorizeOrNotify('pessoas.create')) {
-            return;
-        }
-
         $createUrl = PersonResource::getUrl('create');
 
         if ($this->tipoFilter !== 'clientes') {
             $createUrl .= '?tipo=' . urlencode($this->tipoFilter);
         }
 
-        $this->redirectErpAdmin($this->urlWithPdvEmbed($createUrl));
+        return $this->urlWithPdvEmbed($createUrl);
+    }
+
+    /**
+     * Fallback Livewire (PDV embed, F2 sem botão na DOM, testes).
+     * Lista normal usa wire:navigate em personCreateUrl() — sem /livewire/update.
+     */
+    public function createPerson(): void
+    {
+        if (! $this->erpAuthorizeOrNotify('pessoas.create')) {
+            return;
+        }
+
+        $this->redirectErpAdmin($this->personCreateUrl());
     }
 
     public function editPerson(int | string | null $recordId = null): void

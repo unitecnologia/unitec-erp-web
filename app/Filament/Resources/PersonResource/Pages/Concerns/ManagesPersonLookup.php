@@ -6,8 +6,11 @@ use App\Models\Person;
 use App\Support\Erp\CepLookupService;
 use App\Support\Erp\CnpjLookupService;
 use App\Support\Erp\MunicipioLookupService;
+use App\Support\Erp\PersonCnpjFieldDiff;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\EditRecord;
 use RuntimeException;
+use Throwable;
 
 trait ManagesPersonLookup
 {
@@ -18,14 +21,15 @@ trait ManagesPersonLookup
 
     public int $pessoaCidadeSugestaoIndex = -1;
 
+    public bool $pessoaCnpjAlteracoesOpen = false;
+
+    /** @var list<array{campo: string, label: string, atual: string, novo: string, selected: bool}> */
+    public array $pessoaCnpjAlteracoes = [];
+
     public function searchPessoaJuridica(?string $cpfCnpj = null): void
     {
         if (filled($cpfCnpj)) {
             $this->data['cpf_cnpj'] = trim($cpfCnpj);
-        }
-
-        if (blank($this->data['cpf_cnpj'] ?? null)) {
-            $this->data['cpf_cnpj'] = $this->form->getState()['cpf_cnpj'] ?? null;
         }
 
         $cnpj = preg_replace('/\D/', '', (string) ($this->data['cpf_cnpj'] ?? ''));
@@ -50,8 +54,10 @@ trait ManagesPersonLookup
             return;
         }
 
+        $reconsulta = $this->pessoaJuridicaRequerConfirmacaoCnpj();
+
         try {
-            $fields = app(CnpjLookupService::class)->fetch($cnpj);
+            $fields = app(CnpjLookupService::class)->fetch($cnpj, forceRefresh: $reconsulta);
         } catch (RuntimeException $exception) {
             Notification::make()
                 ->title('Consulta de CNPJ')
@@ -60,41 +66,172 @@ trait ManagesPersonLookup
                 ->send();
 
             return;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Consulta de CNPJ')
+                ->body('Não foi possível consultar o CNPJ agora. Verifique a conexão e tente novamente.')
+                ->danger()
+                ->send();
+
+            return;
         }
 
-        $hasIe = filled($fields['rg_ie'] ?? null);
-        $missingAddress = blank($fields['endereco'] ?? null) || blank($fields['cep'] ?? null);
+        if ($reconsulta) {
+            $this->apresentarConsultaCnpjExistente($fields);
 
+            return;
+        }
+
+        $this->aplicarCamposConsultaCnpj($fields, notifyFill: true);
+    }
+
+    public function aplicarAlteracoesCnpjPessoa(): void
+    {
+        $selected = [];
+
+        foreach ($this->pessoaCnpjAlteracoes as $row) {
+            if (! ($row['selected'] ?? false)) {
+                continue;
+            }
+
+            $campo = (string) ($row['campo'] ?? '');
+            $novo = $row['novo'] ?? null;
+
+            if ($campo === '' || ! filled($novo) || $novo === '—') {
+                continue;
+            }
+
+            $selected[$campo] = (string) $novo;
+        }
+
+        $this->fecharAlteracoesCnpjPessoa();
+
+        if ($selected === []) {
+            Notification::make()
+                ->title('Nenhum campo selecionado.')
+                ->body('O cadastro atual foi mantido.')
+                ->info()
+                ->send();
+
+            return;
+        }
+
+        $this->aplicarCamposConsultaCnpj($selected, notifyFill: false);
+
+        Notification::make()
+            ->title('Dados atualizados pela consulta do CNPJ')
+            ->body('Revise o formulário e grave o cadastro para confirmar.')
+            ->success()
+            ->duration(3500)
+            ->send();
+    }
+
+    public function manterCadastroCnpjPessoa(): void
+    {
+        $this->fecharAlteracoesCnpjPessoa();
+
+        Notification::make()
+            ->title('Cadastro mantido')
+            ->body('Nenhuma alteração da consulta foi aplicada.')
+            ->info()
+            ->duration(2500)
+            ->send();
+    }
+
+    public function fecharAlteracoesCnpjPessoa(): void
+    {
+        $this->pessoaCnpjAlteracoesOpen = false;
+        $this->pessoaCnpjAlteracoes = [];
+    }
+
+    /**
+     * @param  array<string, string|null>  $fields
+     */
+    protected function apresentarConsultaCnpjExistente(array $fields): void
+    {
+        $fields = PersonCnpjFieldDiff::enrichConsultaWithTipoContribuinte($fields, $this->data ?? []);
+        $diffs = PersonCnpjFieldDiff::differences($this->data ?? [], $fields);
+
+        if ($diffs === []) {
+            Notification::make()
+                ->title('Consulta realizada com sucesso')
+                ->body('Nenhuma alteração cadastral encontrada.')
+                ->success()
+                ->duration(3500)
+                ->send();
+
+            return;
+        }
+
+        $this->pessoaCnpjAlteracoes = $diffs;
+        $this->pessoaCnpjAlteracoesOpen = true;
+        $this->activeFormTab = 'dados';
+    }
+
+    /**
+     * @param  array<string, string|null>  $fields
+     */
+    protected function aplicarCamposConsultaCnpj(array $fields, bool $notifyFill): void
+    {
+        $filled = array_filter(
+            $fields,
+            fn (?string $value): bool => filled($value),
+        );
+
+        // Nunca apaga valor existente com retorno vazio da API.
         $this->data = [
             ...$this->data,
-            ...array_filter($fields, fn (?string $value): bool => filled($value)),
+            ...$filled,
         ];
 
-        if ($hasIe) {
-            $this->syncTipoContribuinteFromIe();
+        // IE válida/ativa ou ISENTO nos campos aplicados ⇒ alinha Tipo de Contribuinte.
+        // Sem IE aplicada ⇒ não força NÃO CONTRIBUINTE nem apaga classificação existente.
+        // (tipo_contribuinte explícito no payload, ex.: modal, já entrou no merge acima.)
+        if (array_key_exists('rg_ie', $filled) && ! array_key_exists('tipo_contribuinte', $filled)) {
+            $tipo = PersonCnpjFieldDiff::tipoFromIe($filled['rg_ie']);
+
+            if ($tipo !== null) {
+                $this->data['tipo_contribuinte'] = $tipo;
+            }
         }
 
         $this->form->fill($this->data);
 
-        $body = match (true) {
-            $hasIe && ! $missingAddress => 'Dados preenchidos automaticamente.',
-            $hasIe => 'Dados preenchidos com IE. Confira endereço e complementos se necessário.',
-            ! $missingAddress => 'Dados preenchidos. IE não informada nas consultas — preencha manualmente se necessário.',
-            default => 'Dados parciais preenchidos. Complete endereço e IE manualmente se necessário.',
-        };
+        if ($notifyFill) {
+            $hasIe = filled($this->data['rg_ie'] ?? null);
+            $missingAddress = blank($this->data['endereco'] ?? null) || blank($this->data['cep'] ?? null);
 
-        Notification::make()
-            ->title('Pessoa jurídica encontrada')
-            ->body($body)
-            ->success()
-            ->duration(3500)
-            ->send();
+            $body = match (true) {
+                $hasIe && ! $missingAddress => 'Dados preenchidos automaticamente.',
+                $hasIe => 'Dados preenchidos com IE. Confira endereço e complementos se necessário.',
+                ! $missingAddress => 'Dados preenchidos. IE não informada nas consultas — preencha manualmente se necessário.',
+                default => 'Dados parciais preenchidos. Complete endereço e IE manualmente se necessário.',
+            };
+
+            Notification::make()
+                ->title('Pessoa jurídica encontrada')
+                ->body($body)
+                ->success()
+                ->duration(3500)
+                ->send();
+        }
 
         if (filled($this->data['cep'] ?? null) && ! CepLookupService::isValidIbgeCode($this->data['cidade_codigo'] ?? null)) {
             $this->buscarCepPessoa(silentIncompleteCep: true);
         }
 
         $this->dispatch('erp-masks-refresh');
+    }
+
+    protected function pessoaJuridicaRequerConfirmacaoCnpj(): bool
+    {
+        if ($this instanceof EditRecord && $this->record?->exists) {
+            return true;
+        }
+
+        return PersonCnpjFieldDiff::hasComparableData($this->data ?? []);
     }
 
     protected function personHasRelevantAddress(): bool

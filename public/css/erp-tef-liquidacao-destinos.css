@@ -1,0 +1,8 @@
+/* C5B.1 — Destinos SuperTEF (complemento leve ao layout RH) */
+.erp-tef-liq-dest-form-modal__hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.3;
+}

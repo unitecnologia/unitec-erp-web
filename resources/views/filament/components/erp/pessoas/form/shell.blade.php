@@ -85,4 +85,5 @@
 {{-- PDV embed: shell sem window — modal fica aqui. --}}
 @if ($this->embedsInPdv)
     @include('filament.components.erp.pessoas.form.documento-duplicado-modal')
+    @include('filament.components.erp.pessoas.form.cnpj-alteracoes-modal')
 @endif

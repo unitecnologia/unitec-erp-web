@@ -115,6 +115,7 @@ class FormaPagamentoFormClarityTest extends TestCase
         $this->assertFalse($ui['tabelas_prazo']);
         $this->assertFalse($ui['modo_prazo']);
         $this->assertFalse($ui['usa_tef']);
+        $this->assertFalse($ui['usa_pos']);
         $this->assertFalse($ui['usa_super_tef']);
         $this->assertFalse($ui['gerar_qrcode_pdv']);
         $this->assertFalse($ui['bandeiras']);
@@ -142,6 +143,8 @@ class FormaPagamentoFormClarityTest extends TestCase
         $this->assertTrue($cartao['max_parcelas']);
         $this->assertTrue($cartao['intervalo_parcelas']);
         $this->assertTrue($cartao['usa_tef']);
+        $this->assertTrue($cartao['usa_pos']);
+        $this->assertTrue($cartao['usa_super_tef']);
         $this->assertTrue($cartao['modo_prazo']);
         $this->assertFalse($cartao['gerar_qrcode_pdv']);
 
@@ -152,6 +155,7 @@ class FormaPagamentoFormClarityTest extends TestCase
         $this->assertFalse($boleto['taxa_cartao']);
         $this->assertFalse($boleto['gerar_qrcode_pdv']);
         $this->assertFalse($boleto['usa_tef']);
+        $this->assertFalse($boleto['usa_pos']);
     }
 
     public function test_normalize_modo_prazo(): void

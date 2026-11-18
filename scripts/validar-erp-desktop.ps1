@@ -27,9 +27,38 @@ Write-Host "AppUrl=$AppUrl"
 $binLauncher = Join-Path $AppPath 'bin\Unitec ERP.exe'
 $binServer = Join-Path $AppPath 'bin\UnitecErpServer.exe'
 $binUpdater = Join-Path $AppPath 'bin\Unitec Atualizador.exe'
+$binCoreClr = Join-Path $AppPath 'bin\coreclr.dll'
 
 Set-Result 'binaries' ((Test-Path $binLauncher) -and (Test-Path $binServer) -and (Test-Path $binUpdater)) `
     "launcher=$(Test-Path $binLauncher); server=$(Test-Path $binServer); updater=$(Test-Path $binUpdater)"
+
+$selfContainedOk = $true
+$selfContainedDetail = @()
+foreach ($pair in @(
+    @{ Name = 'launcher'; Path = (Join-Path $AppPath 'bin\Unitec ERP.runtimeconfig.json') },
+    @{ Name = 'server'; Path = (Join-Path $AppPath 'bin\UnitecErpServer.runtimeconfig.json') },
+    @{ Name = 'updater'; Path = (Join-Path $AppPath 'bin\Unitec Atualizador.runtimeconfig.json') }
+)) {
+    if (-not (Test-Path -LiteralPath $pair.Path)) {
+        $selfContainedOk = $false
+        $selfContainedDetail += "$($pair.Name)=missing-runtimeconfig"
+        continue
+    }
+    $rt = Get-Content -LiteralPath $pair.Path -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+        $selfContainedOk = $false
+        $selfContainedDetail += "$($pair.Name)=framework-dependent"
+    } else {
+        $selfContainedDetail += "$($pair.Name)=self-contained"
+    }
+}
+if (-not (Test-Path -LiteralPath $binCoreClr)) {
+    $selfContainedOk = $false
+    $selfContainedDetail += 'coreclr=missing'
+} else {
+    $selfContainedDetail += 'coreclr=ok'
+}
+Set-Result 'self_contained' $selfContainedOk ($selfContainedDetail -join '; ')
 
 if (-not $SkipServiceInstall) {
     try {

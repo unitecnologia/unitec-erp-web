@@ -67,15 +67,29 @@ class NfceListTable extends Component
         $this->highlightedRecordId = null;
         $this->resetPage();
 
+        // Abas com rodapé amarelo: o pai remonta o footer (Denegado destaca a 1ª nota sozinho).
+        $needsFooterAviso = in_array($normalized, [
+            PdvVendaNfce::TAB_CONTINGENCIA,
+            PdvVendaNfce::TAB_DUPLICIDADE,
+            PdvVendaNfce::TAB_DENEGADO,
+        ], true);
+
         $this->js(sprintf(
             '(() => {
                 const status = %s;
+                const needsFooterAviso = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
-                    parent.set("statusFilter", status, false);
-                    parent.set("nfceSelecionadosTransmitir", [], false);
-                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                    if (needsFooterAviso) {
+                        parent.call("onNfceListStatusChanged", status);
+                    } else {
+                        parent.set("statusFilter", status, false);
+                        parent.set("nfceSelecionadosTransmitir", [], false);
+                        try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                        const aviso = document.querySelector(".erp-nfce-page .erp-nfce__contingencia-aviso");
+                        if (aviso) aviso.remove();
+                    }
                 }
                 try {
                     const url = new URL(window.location.href);
@@ -87,15 +101,21 @@ class NfceListTable extends Component
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
                 window.dispatchEvent(new CustomEvent("erp-nfce-status", { detail: status }));
-                document.querySelectorAll(".erp-nfce-page .fi-ta-row.erp-row-selected").forEach((row) => {
-                    row.classList.remove("erp-row-selected");
-                });
-                const aviso = document.querySelector(".erp-nfce-page .erp-nfce__contingencia-aviso");
-                if (aviso) aviso.remove();
+                if (!needsFooterAviso) {
+                    document.querySelectorAll(".erp-nfce-page .fi-ta-row.erp-row-selected").forEach((row) => {
+                        row.classList.remove("erp-row-selected");
+                    });
+                }
             })()',
             json_encode($normalized, JSON_UNESCAPED_UNICODE),
+            $needsFooterAviso ? 'true' : 'false',
             json_encode(self::PARENT_NAME, JSON_UNESCAPED_UNICODE),
         ));
+
+        // O pai devolve o destaque via erp-nfce-list-refresh; evita paint intermediário vazio.
+        if ($needsFooterAviso) {
+            $this->skipRender();
+        }
     }
 
     /**
@@ -408,11 +428,7 @@ class NfceListTable extends Component
 
     protected function showsSituacaoColumn(): bool
     {
-        return in_array($this->statusFilter, [
-            PdvVendaNfce::TAB_GRAVADOS,
-            PdvVendaNfce::TAB_DUPLICIDADE,
-            PdvVendaNfce::TAB_INUTILIZADOS,
-            PdvVendaNfce::TAB_DENEGADO,
-        ], true);
+        // Situação SEFAZ saiu da grade; motivo completo fica no rodapé amarelo.
+        return false;
     }
 }

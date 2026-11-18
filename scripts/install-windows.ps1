@@ -57,7 +57,10 @@ if (-not $Recovery -and -not $ApplyBundledSeed -and (Test-UnitecExistingInstall 
 }
 
 $padraoSql = Join-Path $AppPath 'installer\seed\unitec_erp.sql'
-$usePadraoBase = (-not $Recovery) -and (-not $ApplyBundledSeed) -and (Test-Path -LiteralPath $padraoSql) -and ((Get-Item -LiteralPath $padraoSql).Length -gt 1024)
+$padraoSqlPresent = (Test-Path -LiteralPath $padraoSql) -and ((Get-Item -LiteralPath $padraoSql).Length -gt 1024)
+# Decisao final de restaurar a base padrao ocorre apos o MariaDB estar no ar
+# (retomada de instalacao incompleta sem usuarios). Valor inicial: instalacao nova.
+$usePadraoBase = (-not $Recovery) -and (-not $ApplyBundledSeed) -and $padraoSqlPresent
 
 if ($Recovery -and -not $ForceDatabaseReset -and -not $ApplyBundledSeed) {
     Ensure-UnitecEnvFile -AppPath $AppPath -AppUrl $AppUrl | Out-Null
@@ -225,8 +228,24 @@ Invoke-Step 'Preparando banco de dados' {
     if ($Unattended -and -not $Recovery) {
         Sync-UnitecEnvDatabaseCredentials -AppPath $AppPath -DbHost $DbHost -DbPort $DbPort -DbName $DbName -DbUser $DbUser -DbPassword $DbPassword | Out-Null
     }
+}
 
-    if ($ApplyBundledSeed -or $usePadraoBase) {
+# Retomada: .env existe (Recovery), mas ainda nao ha usuarios — base padrao pode
+# ser restaurada sem risco de sobrescrever cliente. Nunca quando ja ha usuarios.
+# (Fora do Invoke-Step para o valor permanecer no escopo do instalador.)
+if (
+    $Recovery -and
+    -not $ApplyBundledSeed -and
+    -not $ForceDatabaseReset -and
+    $padraoSqlPresent -and
+    (Test-UnitecNeedsInitialSeed -AppPath $AppPath)
+) {
+    Write-Ok 'Retomada de instalacao incompleta (sem usuarios) — restaurando base padrao.'
+    $usePadraoBase = $true
+}
+
+if ($ApplyBundledSeed -or $usePadraoBase) {
+    Invoke-Step 'Restaurando base do instalador' {
         Import-UnitecBundledSeedDatabase -AppPath $AppPath -DbHost $DbHost -DbPort $DbPort -DbUser $DbUser -DbPassword $DbPassword -DbName $DbName
     }
 }

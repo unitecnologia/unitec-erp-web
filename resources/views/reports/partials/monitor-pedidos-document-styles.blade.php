@@ -42,6 +42,42 @@
         padding: 0.28rem 0.55rem;
     }
 
+    /* Faixa de via: só na impressão (clonada em beforeprint). */
+    .monitor-pedidos-doc__via-banner {
+        display: none;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0 0 0.35rem;
+        padding: 0.28rem 0.55rem;
+        border: 1px solid #111827;
+        text-align: center;
+        font-weight: 800;
+        font-size: 11pt;
+        letter-spacing: 0.04em;
+        color: #111827;
+        background: #f3f4f6;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Segunda via segue na mesma folha (como o recibo). Sem page-break obrigatório. */
+    .monitor-pedidos-doc--via-cliente {
+        page-break-before: auto;
+        break-before: auto;
+        break-after: auto;
+        page-break-after: auto;
+    }
+
+    .monitor-pedidos-doc__via-sep {
+        margin: 2.2mm 0 2.6mm;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        page-break-before: auto;
+        break-before: auto;
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+
     .monitor-pedidos-doc__block {
         margin: 0;
         /* Pedido pequeno: não fatiar no meio (cabeçalho numa folha, total na outra).
@@ -122,6 +158,59 @@
         margin: 0;
         font-size: 8.5pt;
         table-layout: fixed;
+    }
+
+    .monitor-pedidos-doc__empresa-cab {
+        margin: 0 0 0.22rem;
+        padding: 0.18rem 0.35rem;
+        border: 1px solid #111827;
+        font-size: 8.5pt;
+        line-height: 1.2;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-table td {
+        vertical-align: middle;
+        padding: 0;
+        border: 0;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-logo {
+        width: 22mm;
+        padding-right: 2.5mm;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-logo img {
+        display: block;
+        max-width: 20mm;
+        max-height: 14mm;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-dados {
+        width: auto;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-nome {
+        font-weight: 800;
+        font-size: 9.5pt;
+        margin: 0 0 0.04rem;
+        word-break: break-word;
+    }
+
+    .monitor-pedidos-doc__empresa-cab-line {
+        display: block;
+        margin: 0;
+        word-break: break-word;
     }
 
     .monitor-pedidos-doc__meta-wrap {
@@ -239,6 +328,12 @@
         word-break: break-word;
     }
 
+    /* Linhas em branco da meia folha: mesma grade, sem conteúdo. */
+    .monitor-pedidos-doc__blank-row td {
+        color: transparent;
+        user-select: none;
+    }
+
     .monitor-pedidos-doc__totals-row td {
         background: #e5e7eb;
         font-weight: 700;
@@ -294,7 +389,7 @@
         font-size: 7pt;
         font-weight: 400;
         color: #4b5563;
-        text-align: right;
+        text-align: center;
         white-space: nowrap;
     }
 
@@ -323,9 +418,10 @@
         .monitor-pedidos-doc__page-layer {
             display: block;
             position: absolute;
+            left: 0;
             right: 0;
-            left: auto;
-            width: auto;
+            width: 100%;
+            text-align: center;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 7pt;
             font-weight: 400;
@@ -353,6 +449,84 @@
 
         .monitor-pedidos-doc__status {
             right: 0.4rem;
+        }
+
+        .monitor-pedidos-doc__via-banner {
+            display: block;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        body.erp-print-duas-vias .viewer,
+        body.erp-print-meia-folha .viewer {
+            min-height: 0;
+            height: auto;
+            display: block;
+        }
+
+        body.erp-print-duas-vias .viewer__canvas,
+        body.erp-print-meia-folha .viewer__canvas {
+            flex: none;
+            display: block;
+            overflow: visible;
+        }
+
+        /* Só no fluxo de 2 vias: o pedido pode continuar na folha seguinte
+           entre linhas. Cabeçalho, linha, totais e corte continuam inteiros. */
+        .viewer__paper--duas-vias:not(.viewer__paper--meia-folha-duas) .monitor-pedidos-doc__pages > tbody > tr,
+        .viewer__paper--duas-vias:not(.viewer__paper--meia-folha-duas) .monitor-pedidos-doc__block {
+            page-break-inside: auto;
+            break-inside: auto;
+        }
+
+        .viewer__paper--duas-vias .monitor-pedidos-doc--via-cliente {
+            page-break-before: auto;
+            break-before: auto;
+            page-break-after: auto;
+            break-after: auto;
+        }
+
+        .viewer__paper--duas-vias .monitor-pedidos-doc__via-banner + .monitor-pedidos-doc__pages {
+            page-break-before: avoid;
+            break-before: avoid;
+        }
+
+        /* Meia folha A4: slot padronizado (sem cortar conteúdo — só aplica se couber). */
+        .viewer__paper--meia-folha .monitor-pedidos-doc--meia-folha-slot {
+            box-sizing: border-box;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        /* 2 vias + meia folha: uma via em cada metade, com faixa de corte no meio. */
+        .viewer__paper--meia-folha-duas .monitor-pedidos-doc--meia-folha-slot {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        .viewer__paper--meia-folha-duas .monitor-pedidos-doc--via-cliente {
+            page-break-before: avoid;
+            break-before: avoid;
+        }
+
+        .viewer__paper--meia-folha-duas .monitor-pedidos-doc__via-sep--meia-folha {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin: 2.4mm 0 2.6mm;
+            padding: 0.6mm 0;
+            height: auto;
+            overflow: visible;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-before: avoid;
+            break-before: avoid;
+            page-break-after: avoid;
+            break-after: avoid;
         }
     }
 </style>

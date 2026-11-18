@@ -6,6 +6,7 @@ use App\Support\Erp\Database\PendingMigrationsGuard;
 use App\Support\Erp\ErpUpdateProcessLauncher;
 use App\Support\Erp\ErpUpdateService;
 use App\Support\Erp\Printing\DeviceServiceLauncher;
+use App\Support\Erp\WindowsSafeFilesystem;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RecursiveDirectoryIterator;
@@ -177,6 +178,8 @@ final class AtualizacaoApplyService
                 'total' => 0,
                 'message' => 'Atualizando pacotes do Laravel…',
             ]);
+            $this->purgeForbiddenDevVendorResidues($appPath);
+            $this->clearCompiledViewsSafely($appPath);
             $this->rediscoverPackagesViaCli($appPath);
             AtualizacaoLog::line('Pacotes', 'ok', $appPath);
 
@@ -232,7 +235,11 @@ final class AtualizacaoApplyService
 
                 try {
                     if (str_starts_with(trim($step['command']), 'package:discover')) {
+                        $this->purgeForbiddenDevVendorResidues($appPath);
                         $this->rediscoverPackagesViaCli($appPath);
+                    } elseif (str_starts_with(trim($step['command']), 'view:cache')) {
+                        $this->clearCompiledViewsSafely($appPath);
+                        $this->runCliArtisan($appPath, $step['command']);
                     } else {
                         // Sempre CLI novo — nunca Artisan::call no processo do apply.
                         $this->runCliArtisan($appPath, $step['command']);
@@ -558,10 +565,13 @@ final class AtualizacaoApplyService
      */
     private function rediscoverPackagesViaCli(string $appPath): void
     {
+        $this->purgeForbiddenDevVendorResidues($appPath);
         $this->deletePackageDiscoveryCaches($appPath);
         $this->runCliArtisan($appPath, 'package:discover --ansi');
         $hits = $this->findForbiddenDevMarkersInManifest($appPath);
         if ($hits === []) {
+            // services.php antigo pode ainda listar Pail mesmo com packages.php limpo.
+            $this->sanitizeBootstrapCacheManifests($appPath);
             return;
         }
 
@@ -572,8 +582,10 @@ final class AtualizacaoApplyService
         );
         Log::warning('packages.php continha providers DEV apos discover', ['hits' => $hits]);
 
+        $this->purgeForbiddenDevVendorResidues($appPath);
         $this->deletePackageDiscoveryCaches($appPath);
         $this->runCliArtisan($appPath, 'package:discover --ansi');
+        $this->sanitizeBootstrapCacheManifests($appPath);
         $hitsAgain = $this->findForbiddenDevMarkersInManifest($appPath);
         if ($hitsAgain !== []) {
             throw new RuntimeException(
@@ -584,36 +596,161 @@ final class AtualizacaoApplyService
     }
 
     /**
-     * @return list<string>
+     * Remove leftovers de require-dev (ex.: vendor/laravel/pail) que o copyTree não apaga.
+     * Sem isso, package:discover reintroduz PailServiceProvider e o HTTP 500 volta.
      */
-    private function findForbiddenDevMarkersInManifest(string $appPath): array
+    private function purgeForbiddenDevVendorResidues(string $appPath): void
     {
-        $path = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'bootstrap'
-            .DIRECTORY_SEPARATOR.'cache'.DIRECTORY_SEPARATOR.'packages.php';
-        if (! is_file($path)) {
-            return [];
-        }
+        $root = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'vendor';
+        $dirs = [
+            'laravel'.DIRECTORY_SEPARATOR.'pail',
+            'laravel'.DIRECTORY_SEPARATOR.'pao',
+            'laravel'.DIRECTORY_SEPARATOR.'sail',
+            'nunomaduro'.DIRECTORY_SEPARATOR.'collision',
+            'filp'.DIRECTORY_SEPARATOR.'whoops',
+            'phpunit'.DIRECTORY_SEPARATOR.'phpunit',
+        ];
 
-        $raw = (string) file_get_contents($path);
-        $hits = [];
-
-        foreach (self::FORBIDDEN_DEV_PROVIDER_NEEDLES as $needle) {
-            if (str_contains($raw, $needle)) {
-                $hits[] = $needle;
+        foreach ($dirs as $rel) {
+            $path = $root.DIRECTORY_SEPARATOR.$rel;
+            if (! is_dir($path)) {
+                continue;
             }
+            try {
+                File::deleteDirectory($path);
+                AtualizacaoLog::line('Pacotes', 'removido residuo DEV vendor/'.$rel, $appPath);
+            } catch (\Throwable $e) {
+                AtualizacaoLog::line(
+                    'Pacotes',
+                    'falha ao remover vendor/'.$rel.': '.$e->getMessage(),
+                    $appPath,
+                );
+            }
+        }
+    }
+
+    /**
+     * Esvazia storage/framework/views sem unlink arquivo-a-arquivo (Windows code:5).
+     */
+    private function clearCompiledViewsSafely(string $appPath): void
+    {
+        $views = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'
+            .DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'views';
+
+        try {
+            (new WindowsSafeFilesystem)->clearCompiledViewsDirectory($views);
+            AtualizacaoLog::line('Caches', 'views compiladas limpas (safe)', $appPath);
+        } catch (\Throwable $e) {
+            AtualizacaoLog::line('Caches', 'limpeza safe de views: '.$e->getMessage(), $appPath);
+        }
+    }
+
+    /**
+     * Remove providers/pacotes DEV de packages.php e services.php se ainda restarem.
+     */
+    private function sanitizeBootstrapCacheManifests(string $appPath): void
+    {
+        $cache = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'bootstrap'.DIRECTORY_SEPARATOR.'cache';
+        foreach (['packages.php', 'services.php'] as $file) {
+            $path = $cache.DIRECTORY_SEPARATOR.$file;
+            if (! is_file($path)) {
+                continue;
+            }
+
+            $manifest = $this->loadPhpManifestArray($path);
+            if ($manifest === null) {
+                if ($this->rawManifestLooksForbidden((string) file_get_contents($path))) {
+                    @unlink($path);
+                    AtualizacaoLog::line('Pacotes', 'apagado '.$file.' invalido com marcadores DEV', $appPath);
+                }
+                continue;
+            }
+
+            if (! $this->manifestArrayHasForbiddenDev($manifest) && ! $this->rawManifestLooksForbidden((string) file_get_contents($path))) {
+                continue;
+            }
+
+            $clean = $this->stripForbiddenDevFromManifestArray($manifest);
+            $export = '<?php return '.var_export($clean, true).';'."\n";
+            try {
+                (new WindowsSafeFilesystem)->replace($path, $export);
+                $this->invalidatePhpManifestCache($path);
+                AtualizacaoLog::line('Pacotes', 'sanitizado '.$file.' (providers DEV removidos)', $appPath);
+            } catch (\Throwable $e) {
+                @unlink($path);
+                $this->invalidatePhpManifestCache($path);
+                AtualizacaoLog::line(
+                    'Pacotes',
+                    'falha ao sanitizar '.$file.' — removido: '.$e->getMessage(),
+                    $appPath,
+                );
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function loadPhpManifestArray(string $path): ?array
+    {
+        $this->invalidatePhpManifestCache($path);
+        if (! is_file($path)) {
+            return null;
         }
 
         /** @var mixed $manifest */
-        $manifest = @include $path;
-        if (! is_array($manifest)) {
-            return array_values(array_unique($hits));
+        $manifest = (static function (string $file) {
+            return include $file;
+        })($path);
+
+        return is_array($manifest) ? $manifest : null;
+    }
+
+    private function invalidatePhpManifestCache(string $path): void
+    {
+        clearstatcache(true, $path);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($path, true);
+        }
+    }
+
+    private function rawManifestLooksForbidden(string $raw): bool
+    {
+        if ($raw === '') {
+            return false;
         }
 
+        foreach (self::FORBIDDEN_DEV_PACKAGE_NAMES as $name) {
+            if (str_contains($raw, $name)) {
+                return true;
+            }
+        }
+
+        // Arquivo PHP escapa barra: Laravel\\Pail\\ — procurar tokens estáveis.
+        foreach (['PailServiceProvider', 'PaoServiceProvider', 'SailServiceProvider', 'Collision\\\\Adapters', 'Collision\\Adapters'] as $token) {
+            if (str_contains($raw, $token)) {
+                return true;
+            }
+        }
+
+        foreach (self::FORBIDDEN_DEV_PROVIDER_NEEDLES as $needle) {
+            if (str_contains($raw, $needle) || str_contains($raw, str_replace('\\', '\\\\', $needle))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     */
+    private function manifestArrayHasForbiddenDev(array $manifest): bool
+    {
         $packages = is_array($manifest['packages'] ?? null) ? $manifest['packages'] : [];
         foreach (array_keys($packages) as $name) {
-            $lower = strtolower((string) $name);
-            if (in_array($lower, self::FORBIDDEN_DEV_PACKAGE_NAMES, true)) {
-                $hits[] = $lower;
+            if (in_array(strtolower((string) $name), self::FORBIDDEN_DEV_PACKAGE_NAMES, true)) {
+                return true;
             }
         }
 
@@ -623,13 +760,132 @@ final class AtualizacaoApplyService
             }
             foreach ($manifest[$key] as $k => $v) {
                 $class = is_string($k) && ! is_int($k) ? (string) $k : (is_string($v) ? $v : '');
-                if ($class === '') {
+                if ($class !== '' && $this->isForbiddenDevProviderClass($class)) {
+                    return true;
+                }
+            }
+        }
+
+        if (isset($manifest['when']) && is_array($manifest['when'])) {
+            foreach (array_keys($manifest['when']) as $provider) {
+                if ($this->isForbiddenDevProviderClass((string) $provider)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return array<string, mixed>
+     */
+    private function stripForbiddenDevFromManifestArray(array $manifest): array
+    {
+        if (isset($manifest['packages']) && is_array($manifest['packages'])) {
+            foreach (array_keys($manifest['packages']) as $name) {
+                if (in_array(strtolower((string) $name), self::FORBIDDEN_DEV_PACKAGE_NAMES, true)) {
+                    unset($manifest['packages'][$name]);
+                }
+            }
+        }
+
+        foreach (['providers', 'eager'] as $key) {
+            if (! isset($manifest[$key]) || ! is_array($manifest[$key])) {
+                continue;
+            }
+            $manifest[$key] = array_values(array_filter(
+                $manifest[$key],
+                fn ($item) => is_string($item) && ! $this->isForbiddenDevProviderClass($item)
+            ));
+        }
+
+        if (isset($manifest['deferred']) && is_array($manifest['deferred'])) {
+            foreach ($manifest['deferred'] as $service => $provider) {
+                if (is_string($provider) && $this->isForbiddenDevProviderClass($provider)) {
+                    unset($manifest['deferred'][$service]);
+                }
+            }
+        }
+
+        if (isset($manifest['when']) && is_array($manifest['when'])) {
+            foreach (array_keys($manifest['when']) as $provider) {
+                if ($this->isForbiddenDevProviderClass((string) $provider)) {
+                    unset($manifest['when'][$provider]);
+                }
+            }
+        }
+
+        return $manifest;
+    }
+
+    private function isForbiddenDevProviderClass(string $class): bool
+    {
+        $class = ltrim($class, '\\');
+        foreach (self::FORBIDDEN_DEV_PROVIDER_NEEDLES as $needle) {
+            if (str_starts_with($class, $needle) || str_contains($class, rtrim($needle, '\\'))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function findForbiddenDevMarkersInManifest(string $appPath): array
+    {
+        $cache = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'bootstrap'
+            .DIRECTORY_SEPARATOR.'cache';
+        $hits = [];
+
+        foreach (['packages.php', 'services.php'] as $file) {
+            $path = $cache.DIRECTORY_SEPARATOR.$file;
+            if (! is_file($path)) {
+                continue;
+            }
+
+            $raw = (string) file_get_contents($path);
+            if ($this->rawManifestLooksForbidden($raw)) {
+                foreach (self::FORBIDDEN_DEV_PACKAGE_NAMES as $name) {
+                    if (str_contains($raw, $name)) {
+                        $hits[] = $file.':'.$name;
+                    }
+                }
+                foreach (['PailServiceProvider', 'PaoServiceProvider', 'SailServiceProvider'] as $token) {
+                    if (str_contains($raw, $token)) {
+                        $hits[] = $file.':'.$token;
+                    }
+                }
+            }
+
+            $manifest = $this->loadPhpManifestArray($path);
+            if ($manifest === null) {
+                continue;
+            }
+
+            $packages = is_array($manifest['packages'] ?? null) ? $manifest['packages'] : [];
+            foreach (array_keys($packages) as $name) {
+                $lower = strtolower((string) $name);
+                if (in_array($lower, self::FORBIDDEN_DEV_PACKAGE_NAMES, true)) {
+                    $hits[] = $file.':'.$lower;
+                }
+            }
+
+            foreach (['providers', 'eager', 'deferred'] as $key) {
+                if (! isset($manifest[$key]) || ! is_array($manifest[$key])) {
                     continue;
                 }
-                $class = ltrim($class, '\\');
-                foreach (self::FORBIDDEN_DEV_PROVIDER_NEEDLES as $needle) {
-                    if (str_starts_with($class, $needle) || str_contains($class, rtrim($needle, '\\'))) {
-                        $hits[] = $class;
+                foreach ($manifest[$key] as $k => $v) {
+                    $class = is_string($k) && ! is_int($k) ? (string) $k : (is_string($v) ? $v : '');
+                    if ($class === '') {
+                        continue;
+                    }
+                    $class = ltrim($class, '\\');
+                    if ($this->isForbiddenDevProviderClass($class)) {
+                        $hits[] = $file.':'.$class;
                     }
                 }
             }
@@ -705,15 +961,21 @@ final class AtualizacaoApplyService
                 $appPath,
             );
 
+            $this->purgeForbiddenDevVendorResidues($appPath);
+            $this->clearCompiledViewsSafely($appPath);
             $this->rediscoverPackagesViaCli($appPath);
             try {
                 $this->runCliArtisan($appPath, 'optimize:clear');
             } catch (\Throwable $e) {
                 AtualizacaoLog::line('Health', 'optimize:clear na recuperacao: '.$e->getMessage(), $appPath);
             }
+            $this->purgeForbiddenDevVendorResidues($appPath);
             $this->rediscoverPackagesViaCli($appPath);
             foreach (['config:cache', 'route:cache', 'view:cache', 'unitec:filament-cache --force'] as $cmd) {
                 try {
+                    if ($cmd === 'view:cache') {
+                        $this->clearCompiledViewsSafely($appPath);
+                    }
                     $this->runCliArtisan($appPath, $cmd);
                 } catch (\Throwable $e) {
                     AtualizacaoLog::line('Health', $cmd.' na recuperacao: '.$e->getMessage(), $appPath);

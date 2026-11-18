@@ -117,7 +117,10 @@
     }
 
     function chartPeriodSuffix(meta) {
-        if (meta && meta.granularity === 'day') {
+        if (meta && meta.clamped) {
+            return ' (período longo: últimos 93 dias)';
+        }
+        if (meta && meta.clamped_to_31_days) {
             return ' (máx. 31 dias)';
         }
         if (meta && meta.clamped_to_12_months) {
@@ -134,6 +137,9 @@
 
         var type = chartType === 'bar' ? 'bar' : 'line';
         var isDaily = !!(payload.meta && payload.meta.granularity === 'day');
+        var labelCount = (payload.labels || []).length;
+        var xMaxTicks = isDaily ? (labelCount > 40 ? 16 : (labelCount > 20 ? 12 : undefined)) : undefined;
+        var xRotation = isDaily && labelCount > 14 ? 45 : 0;
 
         chartInstance = new window.Chart(canvas, {
             type: type,
@@ -146,7 +152,7 @@
                 maintainAspectRatio: false,
                 animation: false,
                 layout: {
-                    padding: { top: 4, right: 8, bottom: 0, left: 0 },
+                    padding: { top: 8, right: 8, bottom: 0, left: 0 },
                 },
                 interaction: {
                     mode: 'index',
@@ -154,7 +160,7 @@
                 },
                 plugins: {
                     legend: {
-                        display: true,
+                        display: type !== 'bar',
                         position: 'top',
                         align: 'start',
                         labels: {
@@ -165,6 +171,14 @@
                             usePointStyle: true,
                             pointStyle: 'circle',
                         },
+                    },
+                    title: {
+                        display: !!(payload.meta && payload.meta.title),
+                        text: (payload.meta && payload.meta.title) || '',
+                        align: 'start',
+                        color: '#0f2847',
+                        font: { size: 13, weight: '700' },
+                        padding: { bottom: 8 },
                     },
                     tooltip: {
                         callbacks: {
@@ -191,9 +205,11 @@
                         border: { display: false },
                         ticks: {
                             font: { size: 10 },
-                            maxRotation: 0,
+                            maxRotation: xRotation,
+                            minRotation: xRotation,
+                            autoSkip: true,
                             padding: 2,
-                            maxTicksLimit: isDaily ? 12 : undefined,
+                            maxTicksLimit: xMaxTicks,
                         },
                         grid: { display: false },
                     },

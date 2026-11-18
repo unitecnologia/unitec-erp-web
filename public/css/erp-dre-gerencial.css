@@ -1,0 +1,375 @@
+/* D2.2 — DRE Gerencial: largura total no chrome RH Treinamentos / Conciliação.
+   Escopo: somente .erp-dre-gerencial-page (não altera outras telas). */
+
+/* Causa do “meio da tela”: max-width no container — removido. Página em coluna flex. */
+.erp-dre-gerencial-page.fi-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0 !important;
+}
+
+.erp-dre-gerencial-page .fi-page-header,
+.erp-dre-gerencial-page .fi-header {
+  display: none !important;
+}
+
+/* Aproxima filtros da barra de ícones (mesmo efeito de erp-list-page, só nesta tela). */
+.erp-dre-gerencial-page .fi-page-header-main-ctn,
+.erp-dre-gerencial-page .fi-page-main,
+.erp-dre-gerencial-page .fi-page-content,
+.erp-dre-gerencial-page .fi-main,
+.erp-dre-gerencial-page .fi-main-ctn,
+.erp-dre-gerencial-page .fi-section-content-ctn,
+.erp-dre-gerencial-page .fi-sc {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: none !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.erp-dre-gerencial-page .fi-sc > div:not(.fi-hidden) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  /* Alinha ao recuo vertical das listagens RH (erp-rh-list). */
+  margin-top: -1mm;
+  padding-top: 0.15rem;
+}
+
+/* Filtros: mesma barra horizontal da Conciliação (classes erp-rh-treinamentos + erp-conciliacao). */
+.erp-dre-gerencial-page .erp-dre-gerencial__badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  padding: 0.15rem 0.45rem;
+  white-space: nowrap;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__erro {
+  color: #b91c1c !important;
+  font-weight: 600;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__meta {
+  margin: 0 0.65rem 0.25rem;
+  font-size: 0.75rem;
+  color: #334155;
+}
+
+/* Área da grade: ocupa o restante da janela (como fi-ta nas listagens RH). */
+.erp-dre-gerencial-page .erp-dre-gerencial__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 0.65rem;
+  width: calc(100% - 1.3rem);
+  box-sizing: border-box;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table-wrap {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  width: 100%;
+  border: 1px solid var(--erp-border-light, #c7d5e8);
+  overflow: auto;
+  background: #fff;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--erp-font-size-grid, 0.8125rem);
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table th,
+.erp-dre-gerencial-page .erp-dre-gerencial__table td {
+  padding: 0.28rem 0.45rem;
+  border-right: 1px solid #b8c8d8;
+  border-bottom: 1px solid var(--erp-border-light, #d4e0ef);
+  text-align: left;
+  vertical-align: middle;
+  line-height: 1.25;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--erp-text-on-brand, #fff);
+  background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+  font-weight: 700;
+  border-right-color: rgb(255 255 255 / 40%);
+  border-bottom-color: rgb(255 255 255 / 25%);
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table .col-desc {
+  width: 55%;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table .col-valor {
+  width: 18%;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table .col-obs {
+  width: 27%;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table .is-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table tr.is-subtotal td {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table tr.is-total td {
+  background: #e8f1fb;
+  font-weight: 700;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table tr.is-info td {
+  color: #64748b;
+  font-style: italic;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table tr.is-pending td {
+  color: #9a3412;
+  background: #fffbeb;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__aviso {
+  margin: 0.3rem 0.65rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__sec {
+  margin-top: 0.45rem;
+  border: 1px solid var(--erp-border-light, #c7d5e8);
+  background: #fff;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__sec--pend {
+  background: #fffbeb;
+  border-color: #fed7aa;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__sec-title {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1e3a5f;
+  background: #f1f5f9;
+  border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__sec--pend .erp-dre-gerencial__sec-title {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__table--compact {
+  font-size: 0.78rem;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__sec-note {
+  margin: 0;
+  padding: 0.25rem 0.45rem 0.35rem;
+  font-size: 0.7rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__sec-note--block {
+  padding: 0.45rem;
+  color: #9a3412;
+  font-weight: 600;
+}
+
+.erp-dre-gerencial-page .erp-dre-gerencial__pend-list {
+  margin: 0;
+  padding: 0.3rem 0.45rem 0.4rem 1.25rem;
+  font-size: 0.75rem;
+  color: #9a3412;
+  line-height: 1.35;
+}
+
+/* Rodapé Fechar: action bar RH Treinamentos em largura total. */
+.erp-dre-gerencial-page .erp-dre-gerencial__actions {
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .erp-dre-gerencial-page .erp-dre-gerencial__badge {
+    margin-left: 0;
+  }
+
+  .erp-dre-gerencial-page .erp-dre-gerencial__table .col-desc,
+  .erp-dre-gerencial-page .erp-dre-gerencial__table .col-valor,
+  .erp-dre-gerencial-page .erp-dre-gerencial__table .col-obs {
+    width: auto;
+  }
+
+  .erp-dre-gerencial-page .erp-dre-gerencial__table {
+    table-layout: auto;
+  }
+}
+
+/* D2.3 — Modal compacto de classificação (não altera layout da grade). */
+.erp-dre-gerencial-page .erp-dre-classificar {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+/* Prévia do padrão fica ACIMA do modal de classificação (antes z-index 60 ficava invisível). */
+.erp-dre-gerencial-page .erp-dre-classificar--previa {
+  z-index: 95;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(15 23 42 / 35%);
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+  max-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #94a3b8;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 18%);
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%);
+  color: #fff;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__titlebar strong {
+  font-size: 0.85rem;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__close {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__hint {
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__table th,
+.erp-dre-gerencial-page .erp-dre-classificar__table td {
+  padding: 0.28rem 0.4rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__table th {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__select {
+  width: 100%;
+  max-width: 16rem;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.25rem;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__footer button {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid #94a3b8;
+  background: #fff;
+  cursor: pointer;
+}
+
+.erp-dre-gerencial-page .erp-dre-classificar__empty {
+  margin: 0;
+  padding: 0.75rem 0.65rem;
+  font-size: 0.78rem;
+  color: #334155;
+  line-height: 1.35;
+}
+
+/* Notificações Filament acima dos modais DRE. */
+.fi-no-notification {
+  z-index: 120 !important;
+}

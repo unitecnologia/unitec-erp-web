@@ -156,7 +156,7 @@ class NfeListTable extends Component
 
     public function sortBy(string $column): void
     {
-        if (! in_array($column, ['numero', 'data_emissao'], true)) {
+        if (! in_array($column, ['numero', 'serie', 'data_emissao'], true)) {
             return;
         }
 
@@ -164,7 +164,7 @@ class NfeListTable extends Component
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
             $this->sortColumn = $column;
-            $this->sortDirection = $column === 'numero' ? 'desc' : 'asc';
+            $this->sortDirection = $column === 'data_emissao' ? 'asc' : 'desc';
         }
 
         $this->resetPage();
@@ -302,6 +302,7 @@ class NfeListTable extends Component
                 "{$table}.venda_id",
                 "{$table}.ordem_servico_id",
                 "{$table}.numero",
+                "{$table}.serie",
                 "{$table}.npedido",
                 "{$table}.data_emissao",
                 "{$table}.data_saida",
@@ -328,6 +329,12 @@ class NfeListTable extends Component
 
         if ($this->sortColumn === 'data_emissao') {
             $query->orderBy("{$table}.data_emissao", $dir)->orderByDesc("{$table}.id");
+
+            return;
+        }
+
+        if ($this->sortColumn === 'serie') {
+            ErpTableSort::orderByCodigoNumerico($query, $dir, 'serie', desempateIdDesc: true);
 
             return;
         }

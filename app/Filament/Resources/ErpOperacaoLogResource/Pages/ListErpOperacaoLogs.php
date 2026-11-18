@@ -5,7 +5,13 @@ namespace App\Filament\Resources\ErpOperacaoLogResource\Pages;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\ErpOperacaoLogResource;
+use App\Models\ErpOperacaoLog;
+use App\Support\Erp\Audit\ErpOperacaoLogLabels;
+use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use Carbon\Carbon;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -41,8 +47,22 @@ class ListErpOperacaoLogs extends ListRecords
     #[Url(as: 'resultado')]
     public string $resultadoFilter = 'todos';
 
+    #[Url(as: 'usuario')]
+    public string $usuarioFilter = 'todos';
+
+    public string $documentoFilter = '';
+
+    public string $documentoFilterApplied = '';
+
+    public bool $detalheModalOpen = false;
+
+    /** @var array<string, mixed>|null */
+    public ?array $detalheRegistro = null;
+
     public function mount(): void
     {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
+
         parent::mount();
 
         ErpScreen::set('Log de Operações');
@@ -90,39 +110,63 @@ class ListErpOperacaoLogs extends ListRecords
     {
         return ErpOperacaoLogResource::table($table)
             ->recordUrl(null)
-            ->recordAction(null);
+            ->recordAction(null)
+            ->recordActions([
+                Action::make('detalhes')
+                    ->label('Ver detalhes')
+                    ->link()
+                    ->action(fn (ErpOperacaoLog $record) => $this->abrirDetalhe((int) $record->id)),
+            ]);
     }
 
     protected function getTableQuery(): Builder
     {
         $query = parent::getTableQuery();
 
-        if (filled($this->localSearchDeApplied)) {
-            $query->whereDate('ocorrido_em', '>=', $this->localSearchDeApplied);
+        $de = $this->parseDateStart($this->localSearchDeApplied);
+        $ate = $this->parseDateEndExclusive($this->localSearchAteApplied);
+
+        if ($de !== null) {
+            $query->where('ocorrido_em', '>=', $de);
         }
 
-        if (filled($this->localSearchAteApplied)) {
-            $query->whereDate('ocorrido_em', '<=', $this->localSearchAteApplied);
+        if ($ate !== null) {
+            $query->where('ocorrido_em', '<', $ate);
         }
 
-        if ($this->operacaoFilter !== 'todas') {
+        if ($this->operacaoFilter !== 'todas' && $this->operacaoFilter !== '') {
             $query->where('operacao', mb_strtoupper($this->operacaoFilter, 'UTF-8'));
         }
 
-        if ($this->resultadoFilter !== 'todos') {
+        if ($this->resultadoFilter !== 'todos' && $this->resultadoFilter !== '') {
             $query->where('resultado', $this->resultadoFilter);
         }
 
-        $term = trim($this->localSearch);
+        if ($this->usuarioFilter !== 'todos' && $this->usuarioFilter !== '') {
+            $userId = (int) $this->usuarioFilter;
+            if ($userId > 0) {
+                $query->where('user_id', $userId);
+            }
+        }
 
+        $documento = trim($this->documentoFilterApplied);
+        if ($documento !== '') {
+            // Prefixo (usa intervalo de data + igualdade parcial leve; evita %termo% em TEXT).
+            $query->where('documento_numero', 'like', $documento.'%');
+        }
+
+        $term = trim($this->localSearch);
         if ($term !== '') {
-            $like = '%'.$term.'%';
-            $query->where(function (Builder $inner) use ($like): void {
-                $inner->where('resumo', 'like', $like)
-                    ->orWhere('documento_numero', 'like', $like)
-                    ->orWhere('user_nome', 'like', $like)
-                    ->orWhere('origem', 'like', $like)
-                    ->orWhere('operacao', 'like', $like);
+            // Busca simples e limitada: documento ou usuário (prefixo), sem LIKE em resumo.
+            $like = $term.'%';
+            $query->where(function (Builder $inner) use ($like, $term): void {
+                $inner->where('documento_numero', 'like', $like)
+                    ->orWhere('user_nome', 'like', $like);
+
+                $operacao = $this->resolverOperacaoPorTermo($term);
+                if ($operacao !== null) {
+                    $inner->orWhere('operacao', $operacao);
+                }
             });
         }
 
@@ -136,13 +180,59 @@ class ListErpOperacaoLogs extends ListRecords
             ->components([
                 View::make('filament.components.erp.operacao-logs.screen'),
                 EmbeddedTable::make()->columnSpanFull(),
+                View::make('filament.components.erp.operacao-logs.action-bar'),
+                View::make('filament.components.erp.operacao-logs.detail-modal'),
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function operacaoFiltroOptions(): array
+    {
+        return ErpOperacaoLogLabels::opcoesFiltroOperacao();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function usuarioFiltroOptions(): array
+    {
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        $opcoes = ['todos' => 'Todos'];
+
+        if ($empresaId <= 0) {
+            return $opcoes;
+        }
+
+        $rows = ErpOperacaoLog::query()
+            ->daEmpresaAtiva($empresaId)
+            ->whereNotNull('user_id')
+            ->select(['user_id', 'user_nome'])
+            ->distinct()
+            ->orderBy('user_nome')
+            ->limit(200)
+            ->get();
+
+        foreach ($rows as $row) {
+            $id = (int) $row->user_id;
+            if ($id <= 0) {
+                continue;
+            }
+            $nome = trim((string) ($row->user_nome ?: 'Usuário #'.$id));
+            $opcoes[(string) $id] = $nome;
+        }
+
+        return $opcoes;
     }
 
     public function search(): void
     {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
+
         $this->localSearchDeApplied = $this->localSearchDe;
         $this->localSearchAteApplied = $this->localSearchAte;
+        $this->documentoFilterApplied = trim($this->documentoFilter);
         $this->resetTable();
 
         Notification::make()
@@ -153,6 +243,8 @@ class ListErpOperacaoLogs extends ListRecords
 
     public function clearSearch(): void
     {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
+
         $this->localSearch = '';
         $this->localSearchDe = now()->startOfMonth()->format('Y-m-d');
         $this->localSearchAte = now()->format('Y-m-d');
@@ -160,16 +252,131 @@ class ListErpOperacaoLogs extends ListRecords
         $this->localSearchAteApplied = $this->localSearchAte;
         $this->operacaoFilter = 'todas';
         $this->resultadoFilter = 'todos';
+        $this->usuarioFilter = 'todos';
+        $this->documentoFilter = '';
+        $this->documentoFilterApplied = '';
         $this->resetTable();
     }
 
     public function updatedOperacaoFilter(): void
     {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
         $this->resetTable();
     }
 
     public function updatedResultadoFilter(): void
     {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
         $this->resetTable();
+    }
+
+    public function updatedUsuarioFilter(): void
+    {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
+        $this->resetTable();
+    }
+
+    public function abrirDetalhe(int $id): void
+    {
+        abort_unless(ErpAccess::currentCan('auditoria.access'), 403);
+
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
+        if ($id <= 0 || $empresaId <= 0) {
+            return;
+        }
+
+        // Carga sob demanda do registro completo (inclui detalhes JSON).
+        $registro = ErpOperacaoLog::query()
+            ->daEmpresaAtiva($empresaId)
+            ->whereKey($id)
+            ->first(['id', 'ocorrido_em', 'user_id', 'user_nome', 'empresa_id', 'operacao', 'origem', 'documento_tipo', 'documento_id', 'documento_numero', 'resultado', 'resumo', 'detalhes', 'created_at', 'updated_at']);
+
+        if (! $registro) {
+            Notification::make()
+                ->title('Registro não encontrado nesta empresa.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $detalhes = $registro->detalhes;
+        $detalhesJson = is_array($detalhes)
+            ? json_encode($detalhes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : null;
+
+        $this->detalheRegistro = [
+            'id' => (int) $registro->id,
+            'ocorrido_em' => $registro->ocorrido_em?->format('d/m/Y H:i:s') ?? '—',
+            'usuario' => $registro->user_nome ?: '—',
+            'operacao' => ErpOperacaoLogLabels::operacao($registro->operacao),
+            'operacao_codigo' => (string) $registro->operacao,
+            'origem' => $registro->origem ?: '—',
+            'documento' => ErpOperacaoLogLabels::documento(
+                $registro->documento_tipo,
+                $registro->documento_numero,
+                $registro->documento_id ? (int) $registro->documento_id : null,
+            ),
+            'resultado' => ErpOperacaoLogLabels::resultado($registro->resultado),
+            'resumo' => $registro->resumo ?: '—',
+            'detalhes_json' => $detalhesJson,
+        ];
+        $this->detalheModalOpen = true;
+    }
+
+    public function fecharDetalhe(): void
+    {
+        $this->detalheModalOpen = false;
+        $this->detalheRegistro = null;
+    }
+
+    private function parseDateStart(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $value)->startOfDay()->format('Y-m-d H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function parseDateEndExclusive(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $value)->addDay()->startOfDay()->format('Y-m-d H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function resolverOperacaoPorTermo(string $term): ?string
+    {
+        $needle = mb_strtolower(trim($term), 'UTF-8');
+        if ($needle === '') {
+            return null;
+        }
+
+        $upper = mb_strtoupper($term, 'UTF-8');
+        if (isset(ErpOperacaoLogLabels::operacoes()[$upper])) {
+            return $upper;
+        }
+
+        foreach (ErpOperacaoLogLabels::operacoes() as $codigo => $label) {
+            if (mb_strtolower($label, 'UTF-8') === $needle
+                || str_starts_with(mb_strtolower($label, 'UTF-8'), $needle)) {
+                return $codigo;
+            }
+        }
+
+        return null;
     }
 }

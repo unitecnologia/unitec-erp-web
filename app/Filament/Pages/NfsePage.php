@@ -2097,11 +2097,12 @@ class NfsePage extends Page
             return;
         }
 
-        $this->nfseServicoAjusteTipo = 'desconto';
+        $seed = $this->seedNfseServicoAjusteModal();
+        $this->nfseServicoAjusteTipo = $seed['tipo'];
         $this->nfseServicoAjusteModo = 'percentual';
-        $this->nfseServicoAjusteValor = '0,00';
+        $this->nfseServicoAjusteValor = $seed['pct'];
         $this->nfseDescontoModalOpen = true;
-        $this->nfseFocarCampo('erp-nfse-desconto-preco');
+        $this->nfseFocarCampo('erp-nfse-desconto-pct');
     }
 
     public function fecharNfseModalDescontoItem(): void
@@ -2111,56 +2112,88 @@ class NfsePage extends Page
         $this->nfseServicoAjusteRowIndex = null;
     }
 
-    public function updatedNfseServicoAjusteValor(): void
-    {
-        $raw = preg_replace('/[^\d,.\-]/', '', (string) $this->nfseServicoAjusteValor) ?? '';
-        $this->nfseServicoAjusteValor = $raw === '' ? '0,00' : $raw;
-    }
-
-    public function setNfseServicoAjusteTipo(string $tipo): void
-    {
-        $this->nfseServicoAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
-    }
-
-    public function setNfseServicoAjusteModo(string $modo): void
-    {
-        $this->nfseServicoAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
-    }
-
     /**
-     * @return array{descricao: string, base: string, novoPreco: string, total: string, ajuste: string, tipo: string, temAjuste: bool}
+     * @return array{descricao: string, baseRaw: float, qtdRaw: float, tipo: string, pct: string, reais: string, modoReais: string}
      */
-    public function getNfseServicoAjustePreviewProperty(): array
+    public function getNfseServicoAjusteModalProperty(): array
     {
         $ctx = $this->contextoNfseServicoAjuste();
-
-        if ($ctx === null) {
-            return [
-                'descricao' => '',
-                'base' => '0,00',
-                'novoPreco' => '0,00',
-                'total' => '0,00',
-                'ajuste' => '0,00',
-                'tipo' => $this->nfseServicoAjusteTipo,
-                'temAjuste' => false,
-            ];
-        }
-
-        $calc = $this->calcularNfseServicoAjuste($ctx['preco'], $ctx['quantidade']);
+        $seed = $this->seedNfseServicoAjusteModal();
 
         return [
-            'descricao' => $ctx['descricao'],
-            'base' => $this->nfseFormatarDecimal($calc['base'], 2),
-            'novoPreco' => $this->nfseFormatarDecimal($calc['novoPreco'], 2),
-            'total' => $this->nfseFormatarDecimal($calc['total'], 2),
-            'ajuste' => $this->nfseFormatarDecimal($calc['ajusteLinha'], 2),
-            'tipo' => $this->nfseServicoAjusteTipo,
-            'temAjuste' => $this->nfseCompararDecimal($calc['ajusteLinha'], '0', 2) > 0,
+            'descricao' => $ctx['descricao'] ?? '',
+            'baseRaw' => (float) ($ctx['preco'] ?? 0),
+            'qtdRaw' => (float) ($ctx['quantidade'] ?? 0),
+            'tipo' => $seed['tipo'],
+            'pct' => $seed['pct'],
+            'reais' => $seed['reais'],
+            'modoReais' => 'linha',
         ];
     }
 
-    public function confirmarNfseServicoAjuste(): void
+    /**
+     * @return array{tipo: string, pct: string, reais: string}
+     */
+    protected function seedNfseServicoAjusteModal(): array
     {
+        $ctx = $this->contextoNfseServicoAjuste();
+        $preco = (float) ($ctx['preco'] ?? 0);
+        $qtd = (float) ($ctx['quantidade'] ?? 0);
+        $bruto = max(0.0, round($preco * $qtd, 2));
+        $ajuste = 0.0;
+        $tipo = 'desconto';
+
+        if ($this->nfseServicoAjusteAlvo === 'form') {
+            $desc = (float) ($this->nfseNormalizarDecimal($this->nfseServicoDesconto !== '' ? $this->nfseServicoDesconto : '0', 2) ?? 0);
+            $acr = (float) ($this->nfseNormalizarDecimal($this->nfseServicoAcrescimo !== '' ? $this->nfseServicoAcrescimo : '0', 2) ?? 0);
+            if ($acr > 0.0001) {
+                $tipo = 'acrescimo';
+                $ajuste = $acr;
+            } elseif ($desc > 0.0001) {
+                $ajuste = $desc;
+            }
+        } elseif ($this->nfseServicoAjusteAlvo === 'grid') {
+            $index = $this->nfseServicoAjusteRowIndex !== null
+                ? (int) $this->nfseServicoAjusteRowIndex
+                : (int) $this->nfseServicoLinhaIndex;
+            if (isset($this->nfseServicos[$index])) {
+                $item = $this->nfseServicos[$index];
+                $desc = (float) ($this->nfseNormalizarDecimal($item['desconto'] ?? '0', 2) ?? 0);
+                $acr = (float) ($this->nfseNormalizarDecimal($item['acrescimo'] ?? '0', 2) ?? 0);
+                if ($acr > 0.0001) {
+                    $tipo = 'acrescimo';
+                    $ajuste = $acr;
+                } elseif ($desc > 0.0001) {
+                    $ajuste = $desc;
+                }
+            }
+        }
+
+        $pct = $bruto > 0 && $ajuste > 0 ? round(($ajuste / $bruto) * 100, 2) : 0.0;
+
+        return [
+            'tipo' => $tipo,
+            'pct' => $this->nfseFormatarDecimal((string) $pct, 2),
+            'reais' => $this->nfseFormatarDecimal((string) $ajuste, 2),
+        ];
+    }
+
+    public function confirmarNfseServicoAjuste(
+        ?string $valorInformado = null,
+        ?string $modoEntrada = null,
+        ?string $tipoInformado = null,
+    ): void {
+        if ($tipoInformado !== null && $tipoInformado !== '') {
+            $this->nfseServicoAjusteTipo = $tipoInformado === 'acrescimo' ? 'acrescimo' : 'desconto';
+        }
+        if ($modoEntrada !== null && $modoEntrada !== '') {
+            $this->nfseServicoAjusteModo = $modoEntrada === 'valor' ? 'valor' : 'percentual';
+        }
+        if ($valorInformado !== null && trim($valorInformado) !== '') {
+            $raw = preg_replace('/[^\d,.\-]/', '', $valorInformado) ?? '';
+            $this->nfseServicoAjusteValor = $raw === '' ? '0,00' : $raw;
+        }
+
         $ctx = $this->contextoNfseServicoAjuste();
 
         if ($ctx === null) {
@@ -2187,6 +2220,7 @@ class NfsePage extends Page
         $alvo = $this->nfseServicoAjusteAlvo;
         $tipo = $this->nfseServicoAjusteTipo;
         $ajusteFormatado = $this->nfseFormatarDecimal($ajusteLinha, 2);
+        $this->nfseDescontoModalOpen = false;
 
         if ($alvo === 'form') {
             if ($tipo === 'desconto') {

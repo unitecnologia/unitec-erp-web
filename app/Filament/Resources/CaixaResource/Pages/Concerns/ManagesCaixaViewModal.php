@@ -3,15 +3,19 @@
 namespace App\Filament\Resources\CaixaResource\Pages\Concerns;
 
 use App\Models\CaixaLancamento;
-use App\Models\ForcaVendasOrder;
 use App\Models\OrdemServico;
+use App\Models\PdvVenda;
 use App\Models\Venda;
 use App\Support\Erp\CaixaHistoricoExibicao;
 use App\Support\Erp\CaixaListRowFormatter;
 use App\Support\Erp\ContaReceberPedidoExibicao;
-use App\Support\Erp\Financeiro\CaixaLancamentoOrigemResolver;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\Financeiro\CaixaLancamentoConsultaService;
+use App\Support\Erp\Financeiro\CaixaLivroAberturaDisplay;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
+use App\Support\Erp\Queries\CaixaPdvMovimentacaoQuery;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Schema;
 
 trait ManagesCaixaViewModal
 {
@@ -33,20 +37,32 @@ trait ManagesCaixaViewModal
 
     public function openCaixaView(int $lancamentoId, array $grupoIds = []): void
     {
-        $display = \App\Support\Erp\Financeiro\CaixaLivroAberturaDisplay::class;
+        $display = CaixaLivroAberturaDisplay::class;
+        $contaPdv = is_numeric($this->contaFilter)
+            && CaixaPdvMovimentacaoQuery::usaQueryVirtual((int) $this->contaFilter);
 
-        if ($display::isLinhaFechamento($lancamentoId)) {
+        // Em conta PDV, IDs no espaço -1e9/-2e9/-3e9 são espelhos de fechamento — não o livro.
+        if ($display::isLinhaFechamento($lancamentoId) && ! $contaPdv) {
             $this->selecionarHistoricoFechamento($display::movimentoIdFromVirtual($lancamentoId));
 
             return;
         }
 
-        if ($display::isLinhaVirtual($lancamentoId)) {
-            Notification::make()
-                ->title('Abertura de caixa')
-                ->body('Linha de conferência do troco inicial — sem lançamento financeiro vinculado.')
-                ->info()
-                ->send();
+        if ($display::isLinhaAbertura($lancamentoId) && ! $contaPdv) {
+            $payload = app(CaixaLancamentoConsultaService::class)
+                ->montarAberturaLivro($lancamentoId, is_numeric($this->contaFilter) ? (int) $this->contaFilter : null);
+
+            if (! $payload) {
+                Notification::make()
+                    ->title('Abertura de caixa não encontrada.')
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $this->viewModalData = $payload;
+            $this->viewModalOpen = true;
 
             return;
         }
@@ -73,35 +89,16 @@ trait ManagesCaixaViewModal
             return;
         }
 
-        $origem = app(CaixaLancamentoOrigemResolver::class)->resolver($lancamento);
-        $vinculo = $this->resolverVinculoItensVenda($lancamento);
+        try {
+            $this->viewModalData = app(CaixaLancamentoConsultaService::class)->montar($lancamento);
+        } catch (\RuntimeException) {
+            Notification::make()
+                ->title('Lançamento não encontrado.')
+                ->danger()
+                ->send();
 
-        $this->viewModalData = [
-            'eh_grupo' => false,
-            'codigo' => (string) $lancamento->codigo,
-            'emissao' => $lancamento->emissao?->format('d/m/Y') ?? '—',
-            'documento' => ContaReceberPedidoExibicao::texto(
-                $lancamento->documento,
-                ContaReceberPedidoExibicao::mapa([$lancamento]),
-            ),
-            'historico' => CaixaListRowFormatter::comSessaoPdv(
-                CaixaHistoricoExibicao::paraExibicao(
-                    (string) $lancamento->historico,
-                    ContaReceberPedidoExibicao::mapa([$lancamento]),
-                ),
-                $lancamento,
-            ),
-            'plano_contas' => mb_strtoupper((string) ($lancamento->plano_contas ?? ''), 'UTF-8') ?: '—',
-            'conta' => mb_strtoupper($lancamento->conta?->nome ?? '—', 'UTF-8'),
-            'entrada' => number_format((float) $lancamento->entrada, 2, ',', '.'),
-            'saida' => number_format((float) $lancamento->saida, 2, ',', '.'),
-            'tem_detalhe' => (bool) ($origem['tem_detalhe'] ?? false),
-            'detalhes' => $origem['linhas'] ?? [],
-            'membros' => [],
-            'pode_ver_itens' => $vinculo['pode'],
-            'venda_id' => $vinculo['venda_id'],
-            'os_id' => $vinculo['os_id'],
-        ];
+            return;
+        }
 
         $this->viewModalOpen = true;
     }
@@ -132,6 +129,7 @@ trait ManagesCaixaViewModal
         $sumEntrada = 0.0;
         $sumSaida = 0.0;
         $primeiro = null;
+        $ordenados = [];
 
         foreach ($grupoIds as $id) {
             $lancamento = $porId[$id] ?? null;
@@ -140,6 +138,7 @@ trait ManagesCaixaViewModal
             }
 
             $primeiro ??= $lancamento;
+            $ordenados[] = $lancamento;
             $entrada = round((float) ($lancamento->entrada ?? 0), 2);
             $saida = round((float) ($lancamento->saida ?? 0), 2);
             $sumEntrada += $entrada;
@@ -171,45 +170,43 @@ trait ManagesCaixaViewModal
             return;
         }
 
-        $ordenados = [];
-        foreach ($grupoIds as $id) {
-            if (isset($porId[$id])) {
-                $ordenados[] = $porId[$id];
-            }
+        try {
+            $this->viewModalData = app(CaixaLancamentoConsultaService::class)
+                ->montarGrupo($primeiro, $ordenados, $membros, $sumEntrada, $sumSaida);
+        } catch (\RuntimeException) {
+            Notification::make()
+                ->title('Lançamentos do grupo não encontrados.')
+                ->danger()
+                ->send();
+
+            return;
         }
-
-        $pedidosMonitor = ContaReceberPedidoExibicao::mapa($ordenados);
-        $grupo = \App\Support\Erp\CaixaListAgrupamentoVisual::montarLinhaGrupo($ordenados, $pedidosMonitor);
-        $vinculo = $this->resolverVinculoItensVenda($primeiro);
-
-        $this->viewModalData = [
-            'eh_grupo' => true,
-            'codigo' => count($membros).' lançamentos',
-            'emissao' => $primeiro->emissao?->format('d/m/Y') ?? '—',
-            'documento' => ContaReceberPedidoExibicao::texto(
-                $primeiro->documento,
-                ContaReceberPedidoExibicao::mapa([$primeiro]),
-            ),
-            'historico' => (string) ($grupo->getAttribute('caixa_grupo_resumo') ?? ''),
-            'plano_contas' => $this->resumoPlanoContasGrupo($membros),
-            'conta' => mb_strtoupper($primeiro->conta?->nome ?? '—', 'UTF-8'),
-            'entrada' => number_format($sumEntrada, 2, ',', '.'),
-            'saida' => number_format($sumSaida, 2, ',', '.'),
-            'tem_detalhe' => false,
-            'detalhes' => [],
-            'membros' => $membros,
-            'pode_ver_itens' => $vinculo['pode'],
-            'venda_id' => $vinculo['venda_id'],
-            'os_id' => $vinculo['os_id'],
-        ];
 
         $this->viewModalOpen = true;
     }
 
     public function abrirCaixaItensVenda(): void
     {
+        $pdvVendaId = (int) ($this->viewModalData['pdv_venda_id'] ?? 0);
         $vendaId = (int) ($this->viewModalData['venda_id'] ?? 0);
         $osId = (int) ($this->viewModalData['os_id'] ?? 0);
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if ($pdvVendaId > 0) {
+            $query = PdvVenda::query()
+                ->with(['itens', 'person:id,nome_razao,apelido_fantasia']);
+
+            if ($empresaId && Schema::hasColumn((new PdvVenda)->getTable(), 'empresa_id')) {
+                $query->where('empresa_id', $empresaId);
+            }
+
+            $venda = $query->find($pdvVendaId);
+            if ($venda) {
+                $this->preencherCaixaItensDePdvVenda($venda);
+
+                return;
+            }
+        }
 
         // OS primeiro: título/itens pelo nº da OS (pedido operacional),
         // não pelo id/número da venda espelho gerada no faturamento.
@@ -254,77 +251,77 @@ trait ManagesCaixaViewModal
 
     private function carregarLancamentoCaixaView(int $lancamentoId): ?CaixaLancamento
     {
+        $empresaId = ErpContext::currentEmpresaId();
+
         if ($lancamentoId < 0) {
-            return (new CaixaListQueryBuilder(contaFilter: $this->contaFilter, applyDefaultOrder: false))
+            $lancamento = (new CaixaListQueryBuilder(contaFilter: $this->contaFilter, applyDefaultOrder: false))
                 ->buildForList()
                 ->where('id', $lancamentoId)
                 ->first();
+
+            if ($lancamento && $empresaId && (int) ($lancamento->empresa_id ?? 0) > 0
+                && (int) $lancamento->empresa_id !== (int) $empresaId) {
+                return null;
+            }
+
+            return $lancamento;
         }
 
-        return CaixaLancamento::query()
-            ->with(['conta'])
-            ->find($lancamentoId);
+        $query = CaixaLancamento::query()->with(['conta'])->whereKey($lancamentoId);
+
+        if ($empresaId && Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
+            $query->where('empresa_id', $empresaId);
+        }
+
+        if (is_numeric($this->contaFilter)) {
+            $query->where('caixa_conta_id', (int) $this->contaFilter);
+        }
+
+        return $query->first();
     }
 
-    /**
-     * @return array{pode: bool, venda_id: int|null, os_id: int|null}
-     */
-    private function resolverVinculoItensVenda(CaixaLancamento $lancamento): array
+    private function preencherCaixaItensDePdvVenda(PdvVenda $venda): void
     {
-        $documento = trim((string) ($lancamento->documento ?? ''));
-        $historico = (string) ($lancamento->historico ?? '');
+        $numero = filled($venda->numero)
+            ? (ltrim((string) $venda->numero, '0') ?: (string) $venda->numero)
+            : '0';
+        $cliente = $venda->person?->apelido_fantasia
+            ?: $venda->person?->nome_razao
+            ?: '—';
+        $rows = [];
+        $index = 1;
+        $total = 0.0;
 
-        if (preg_match('/^OS-(\d+)$/', $documento, $m) === 1
-            || preg_match('/^OS\s+(\d+)/iu', $historico, $m) === 1) {
-            $numero = (int) $m[1];
-            $padded = str_pad((string) $numero, 6, '0', STR_PAD_LEFT);
-            $ordem = OrdemServico::query()
-                ->where(function ($q) use ($numero, $padded): void {
-                    $q->where('numero', (string) $numero)
-                        ->orWhere('numero', $padded);
-                })
-                ->first(['id', 'venda_id']);
-
-            if ($ordem) {
-                return [
-                    'pode' => true,
-                    'venda_id' => $ordem->venda_id ? (int) $ordem->venda_id : null,
-                    'os_id' => (int) $ordem->id,
-                ];
+        foreach ($venda->itens as $item) {
+            $total += (float) $item->total;
+            $codigo = $item->codigo;
+            $codigoFmt = '—';
+            if ($codigo !== null && $codigo !== '') {
+                $trimmed = ltrim((string) $codigo, '0');
+                $codigoFmt = $trimmed !== '' ? $trimmed : '0';
             }
+
+            $rows[] = [
+                'item' => (string) $index++,
+                'codigo' => $codigoFmt,
+                'produto' => (string) ($item->descricao ?: '—'),
+                'qtd' => number_format((float) $item->quantidade, 3, ',', '.'),
+                'preco' => number_format((float) $item->preco_unitario, 2, ',', '.'),
+                'total' => number_format((float) $item->total, 2, ',', '.'),
+                'desconto' => number_format((float) $item->desconto, 2, ',', '.'),
+            ];
         }
 
-        if (preg_match('/^FV-(\d+)/', $documento, $m) === 1
-            || preg_match('/\[FV-(\d+)\]/i', $historico, $m) === 1) {
-            $order = ForcaVendasOrder::query()->find((int) $m[1], ['id', 'venda_id']);
-            if ($order?->venda_id) {
-                return [
-                    'pode' => true,
-                    'venda_id' => (int) $order->venda_id,
-                    'os_id' => null,
-                ];
-            }
-        }
-
-        if (preg_match('/^VENDA PDV #(\S+)/i', mb_strtoupper($historico, 'UTF-8'), $m) === 1) {
-            $num = $m[1];
-            $padded = str_pad(preg_replace('/\D/', '', $num) ?: '0', 6, '0', STR_PAD_LEFT);
-            $venda = Venda::query()
-                ->where(function ($q) use ($num, $padded): void {
-                    $q->where('numero', $num)->orWhere('numero', $padded);
-                })
-                ->first(['id']);
-
-            if ($venda) {
-                return [
-                    'pode' => true,
-                    'venda_id' => (int) $venda->id,
-                    'os_id' => null,
-                ];
-            }
-        }
-
-        return ['pode' => false, 'venda_id' => null, 'os_id' => null];
+        $this->caixaItensModalTitulo = 'Itens do pedido nº '.$numero;
+        $this->caixaItensModalCliente = (string) $cliente;
+        $this->caixaItensModalRows = $rows;
+        $this->caixaItensModalTotal = 'R$ '.number_format(
+            $total > 0 ? $total : (float) $venda->total,
+            2,
+            ',',
+            '.',
+        );
+        $this->caixaItensModalOpen = true;
     }
 
     private function preencherCaixaItensDeVenda(Venda $venda): void
@@ -412,28 +409,5 @@ trait ManagesCaixaViewModal
         $this->viewModalOpen = false;
         $this->viewModalData = [];
         $this->closeCaixaItensVenda();
-    }
-
-    /**
-     * @param  list<array{plano_contas?: string}>  $membros
-     */
-    private function resumoPlanoContasGrupo(array $membros): string
-    {
-        $planos = [];
-
-        foreach ($membros as $membro) {
-            $plano = trim((string) ($membro['plano_contas'] ?? ''));
-            if ($plano === '' || $plano === '—') {
-                continue;
-            }
-
-            $planos[$plano] = true;
-        }
-
-        if ($planos === []) {
-            return '—';
-        }
-
-        return implode(' · ', array_keys($planos));
     }
 }

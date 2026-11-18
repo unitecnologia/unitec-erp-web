@@ -284,6 +284,17 @@ class PixCobrancaService
             $this->tentarBaixaBoletosApi((int) $locked->conta_receber_id);
         }
 
+        if ((int) ($locked->pdv_venda_pagamento_id ?? 0) > 0) {
+            try {
+                app(PixPdvLivroCaixaService::class)->lancarSeConfirmado($locked);
+            } catch (Throwable $e) {
+                Log::warning('PIX PDV: não foi possível lançar no Livro Caixa após confirmação.', [
+                    'pix_cobranca_id' => $locked->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return $locked;
     }
 

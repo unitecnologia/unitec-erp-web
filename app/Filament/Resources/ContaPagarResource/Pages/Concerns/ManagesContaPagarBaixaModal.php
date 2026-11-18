@@ -7,7 +7,9 @@ use App\Models\ContaPagar;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Financeiro\ContaPagarBaixaJurosPadrao;
 use App\Support\Erp\Financeiro\ContaPagarBaixaService;
+use App\Support\Erp\Financeiro\ContaPagarBaixaValorPagoJuros;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -42,7 +44,12 @@ trait ManagesContaPagarBaixaModal
 
     public bool $baixaJurosEditado = false;
 
+    public bool $baixaJurosValorEditado = false;
+
     public bool $baixaMultaEditada = false;
+
+    /** @var list<array{saldo: float, vencimento: string|null}> */
+    public array $baixaItensSaldo = [];
 
     public bool $baixaDescontoEditado = false;
 
@@ -85,6 +92,8 @@ trait ManagesContaPagarBaixaModal
     public string $baixaValorPago = '0,00';
 
     public string $baixaPagoEm = '';
+
+    public string $baixaPagoEmConfirmado = '';
 
     /** @var list<array{id: int, label: string, tipo: string|null, caixa_conta_id?: int|null, caixa_label?: string, movimenta_caixa?: bool, exige_cheque?: bool}> */
     public array $baixaFormasOptions = [];
@@ -139,6 +148,7 @@ trait ManagesContaPagarBaixaModal
         $this->baixaPlanoContaId = $this->resolvePlanoContaPadraoFornecedores();
         $this->baixaValorPagoEditado = false;
         $this->baixaJurosEditado = false;
+        $this->baixaJurosValorEditado = false;
         $this->baixaMultaEditada = false;
         $this->baixaDescontoEditado = false;
         $this->baixaCheque = '';
@@ -146,13 +156,11 @@ trait ManagesContaPagarBaixaModal
         $this->syncFormaBaixa();
 
         $this->baixaSaldo = ErpMoney::formatBr($saldo);
-        $this->baixaPercJuros = '0,00';
-        $this->baixaJuros = '0,00';
-        $this->baixaPercMulta = '0,00';
-        $this->baixaMulta = '0,00';
         $this->baixaPercDesconto = '0,00';
         $this->baixaDesconto = '0,00';
         $this->baixaPagoEm = ErpTimezone::toLocal()->toDateString();
+        $this->baixaPagoEmConfirmado = $this->baixaPagoEm;
+        $this->aplicarPadraoJurosMulta();
         $this->recalcularBaixaTotais();
         $this->baixaModalOpen = true;
     }
@@ -171,10 +179,10 @@ trait ManagesContaPagarBaixaModal
 
     public function updatedBaixaPercJuros(mixed $value): void
     {
-        $saldo = ErpMoney::parseBr($this->baixaSaldo);
         $perc = ErpMoney::parseBr($value);
         $this->baixaPercJuros = ErpMoney::formatBr($perc);
-        $this->baixaJuros = ErpMoney::formatBr(round($saldo * ($perc / 100), 2));
+        $this->baixaJurosValorEditado = false;
+        $this->baixaJuros = ErpMoney::formatBr($this->totalJurosPeloPercAoDia($perc));
         $this->recalcularBaixaTotais();
     }
 
@@ -182,17 +190,46 @@ trait ManagesContaPagarBaixaModal
     {
         if ($this->dinheiroBaixaMudou($value, $this->baixaJuros)) {
             $this->baixaJurosEditado = true;
+            $this->baixaJurosValorEditado = true;
         }
     }
 
     public function updatedBaixaJuros(mixed $value): void
     {
-        $saldo = ErpMoney::parseBr($this->baixaSaldo);
         $juros = ErpMoney::parseBr($value);
         $this->baixaJuros = ErpMoney::formatBr($juros);
-        $this->baixaPercJuros = $saldo > 0
-            ? ErpMoney::formatBr(round(($juros / $saldo) * 100, 2))
-            : '0,00';
+        $this->baixaPercJuros = $this->percAoDiaPeloJuros($juros);
+        $this->recalcularBaixaTotais();
+    }
+
+    public function updatedBaixaPagoEm(mixed $value): void
+    {
+        $pagoEm = trim((string) $value);
+        if (! ContaPagarBaixaJurosPadrao::dataIsoValida($pagoEm)) {
+            if (ContaPagarBaixaJurosPadrao::dataIsoValida($this->baixaPagoEmConfirmado)) {
+                $this->baixaPagoEm = $this->baixaPagoEmConfirmado;
+            }
+
+            return;
+        }
+
+        $this->baixaPagoEm = $pagoEm;
+        $this->baixaPagoEmConfirmado = $pagoEm;
+
+        if (! $this->baixaJurosValorEditado) {
+            $this->baixaJuros = ErpMoney::formatBr(
+                $this->totalJurosPeloPercAoDia(ErpMoney::parseBr($this->baixaPercJuros))
+            );
+        } else {
+            $this->baixaPercJuros = $this->percAoDiaPeloJuros(ErpMoney::parseBr($this->baixaJuros));
+        }
+
+        if (! $this->baixaMultaEditada) {
+            $this->baixaMulta = ErpMoney::formatBr(
+                $this->totalMultaPeloPerc(ErpMoney::parseBr($this->baixaPercMulta))
+            );
+        }
+
         $this->recalcularBaixaTotais();
     }
 
@@ -205,10 +242,9 @@ trait ManagesContaPagarBaixaModal
 
     public function updatedBaixaPercMulta(mixed $value): void
     {
-        $saldo = ErpMoney::parseBr($this->baixaSaldo);
         $perc = ErpMoney::parseBr($value);
         $this->baixaPercMulta = ErpMoney::formatBr($perc);
-        $this->baixaMulta = ErpMoney::formatBr(round($saldo * ($perc / 100), 2));
+        $this->baixaMulta = ErpMoney::formatBr($this->totalMultaPeloPerc($perc));
         $this->recalcularBaixaTotais();
     }
 
@@ -277,7 +313,26 @@ trait ManagesContaPagarBaixaModal
 
     public function updatedBaixaValorPago(mixed $value): void
     {
-        $this->baixaValorPago = ErpMoney::formatBr(ErpMoney::parseBr($value));
+        $valorPago = round(ErpMoney::parseBr($value), 2);
+        $this->baixaValorPago = ErpMoney::formatBr($valorPago);
+
+        $calc = ContaPagarBaixaValorPagoJuros::absorverExcesso(
+            ErpMoney::parseBr($this->baixaSaldo),
+            ErpMoney::parseBr($this->baixaJuros),
+            ErpMoney::parseBr($this->baixaMulta),
+            ErpMoney::parseBr($this->baixaDesconto),
+            $valorPago,
+        );
+
+        if (! $calc['aplicar']) {
+            return;
+        }
+
+        $this->baixaJuros = ErpMoney::formatBr($calc['juros']);
+        $this->baixaPercJuros = $this->percAoDiaPeloJuros($calc['juros']);
+        $this->baixaJurosEditado = true;
+        $this->baixaJurosValorEditado = true;
+        $this->recalcularBaixaTotais();
     }
 
     protected function recalcularBaixaTotais(): void
@@ -317,6 +372,8 @@ trait ManagesContaPagarBaixaModal
         $this->baixaUnica = true;
         $this->baixaValorPagoEditado = false;
         $this->baixaJurosEditado = false;
+        $this->baixaJurosValorEditado = false;
+        $this->baixaItensSaldo = [];
         $this->baixaMultaEditada = false;
         $this->baixaDescontoEditado = false;
         $this->baixaResumoQtd = '0';
@@ -346,6 +403,7 @@ trait ManagesContaPagarBaixaModal
         $this->baixaValorAPagar = '0,00';
         $this->baixaValorPago = '0,00';
         $this->baixaPagoEm = '';
+        $this->baixaPagoEmConfirmado = '';
     }
 
     protected function resolvePlanoContaPadraoFornecedores(): ?int
@@ -386,6 +444,15 @@ trait ManagesContaPagarBaixaModal
             return;
         }
 
+        if (! ContaPagarBaixaJurosPadrao::dataIsoValida($this->baixaPagoEm)) {
+            Notification::make()
+                ->title('Informe a data de pagamento.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $opcoes = [
             'plano_conta_id' => (int) $this->baixaPlanoContaId,
             'perc_juros' => ErpMoney::parseBr($this->baixaPercJuros),
@@ -404,8 +471,8 @@ trait ManagesContaPagarBaixaModal
 
         if (! $this->baixaUnica) {
             $opcoes['grupo'] = [
-                'juros_editado' => $this->baixaJurosEditado,
-                'multa_editada' => $this->baixaMultaEditada,
+                'juros_editado' => $this->baixaJurosEditado || ErpMoney::parseBr($this->baixaJuros) > 0,
+                'multa_editada' => $this->baixaMultaEditada || ErpMoney::parseBr($this->baixaMulta) > 0,
                 'desconto_editado' => $this->baixaDescontoEditado,
                 'valor_editado' => $this->baixaValorPagoEditado,
             ];
@@ -568,6 +635,14 @@ trait ManagesContaPagarBaixaModal
             $vencimento = $vencimentos->count() === 1 && (string) $vencimentos->first() !== '' ? (string) $vencimentos->first() : '—';
         }
 
+        $this->baixaItensSaldo = $contas
+            ->map(fn (ContaPagar $conta): array => [
+                'saldo' => round((float) $conta->saldo, 2),
+                'vencimento' => optional($conta->vencimento)?->toDateString(),
+            ])
+            ->values()
+            ->all();
+
         $this->baixaDados = [
             'fornecedor' => $fornecedorNome !== '' ? $fornecedorNome : '—',
             'documento' => $documento,
@@ -644,6 +719,72 @@ trait ManagesContaPagarBaixaModal
             })
             ->values()
             ->all();
+    }
+
+    protected function aplicarPadraoJurosMulta(): void
+    {
+        $dias = $this->maiorDiasAtrasoBaixa();
+        if ($dias <= 0) {
+            $this->baixaPercJuros = '0,00';
+            $this->baixaJuros = '0,00';
+            $this->baixaPercMulta = '0,00';
+            $this->baixaMulta = '0,00';
+
+            return;
+        }
+
+        $this->baixaPercJuros = ErpMoney::formatBr(ContaPagarBaixaJurosPadrao::PERC_JUROS_MES);
+        $this->baixaPercMulta = ErpMoney::formatBr(ContaPagarBaixaJurosPadrao::PERC_MULTA);
+        $this->baixaJuros = ErpMoney::formatBr($this->totalJurosPeloPercAoDia(ContaPagarBaixaJurosPadrao::PERC_JUROS_MES));
+        $this->baixaMulta = ErpMoney::formatBr($this->totalMultaPeloPerc(ContaPagarBaixaJurosPadrao::PERC_MULTA));
+    }
+
+    protected function totalJurosPeloPercAoDia(float $percAoDia): float
+    {
+        $total = 0.0;
+        foreach ($this->baixaItensSaldo as $item) {
+            $dias = ContaPagarBaixaJurosPadrao::diasAtraso($item['vencimento'] ?? null, $this->baixaPagoEm);
+            $total = round($total + ContaPagarBaixaJurosPadrao::juros((float) ($item['saldo'] ?? 0), $dias, $percAoDia), 2);
+        }
+
+        return $total;
+    }
+
+    protected function totalMultaPeloPerc(float $perc): float
+    {
+        $total = 0.0;
+        foreach ($this->baixaItensSaldo as $item) {
+            $dias = ContaPagarBaixaJurosPadrao::diasAtraso($item['vencimento'] ?? null, $this->baixaPagoEm);
+            $total = round($total + ContaPagarBaixaJurosPadrao::multa((float) ($item['saldo'] ?? 0), $dias, $perc), 2);
+        }
+
+        return $total;
+    }
+
+    protected function percAoDiaPeloJuros(float $juros): string
+    {
+        $baseDias = 0.0;
+        foreach ($this->baixaItensSaldo as $item) {
+            $dias = ContaPagarBaixaJurosPadrao::diasAtraso($item['vencimento'] ?? null, $this->baixaPagoEm);
+            $baseDias = round($baseDias + round((float) ($item['saldo'] ?? 0) * $dias, 2), 2);
+        }
+
+        if ($baseDias <= 0) {
+            return '0,00';
+        }
+
+        return ErpMoney::formatBr(round(($juros / $baseDias) * 100 * ContaPagarBaixaJurosPadrao::DIAS_MES, 2));
+    }
+
+    protected function maiorDiasAtrasoBaixa(): int
+    {
+        $maior = 0;
+        foreach ($this->baixaItensSaldo as $item) {
+            $dias = ContaPagarBaixaJurosPadrao::diasAtraso($item['vencimento'] ?? null, $this->baixaPagoEm);
+            $maior = max($maior, $dias);
+        }
+
+        return $maior;
     }
 
     protected function dinheiroBaixaMudou(mixed $novo, string $atual): bool

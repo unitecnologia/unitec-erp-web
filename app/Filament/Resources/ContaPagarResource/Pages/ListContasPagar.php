@@ -11,11 +11,14 @@ use App\Filament\Resources\ContaPagarResource\Pages\Concerns\ManagesContaPagarDe
 use App\Filament\Resources\ContaPagarResource\Pages\Concerns\ManagesContaPagarFormModal;
 use App\Livewire\Erp\ContaPagarListTable;
 use App\Models\ContaPagar;
-use App\Models\Person;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Financeiro\ContaPagarExclusaoService;
 use App\Support\Erp\Queries\ContaPagarListQueryBuilder;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -116,7 +119,9 @@ class ListContasPagar extends ListRecords
             'searchInput' => '.erp-pagar__search-text, .erp-pagar__search-date-from, .erp-field-dd__btn',
             'create' => 'createConta',
             'edit' => 'editConta',
+            'delete' => 'pedirExcluirConta',
             'extraKeys' => $extra,
+            'blockingSelector' => '.erp-pagar-forn-rapido, .erp-lookup-modal',
         ];
     }
 
@@ -144,7 +149,7 @@ class ListContasPagar extends ListRecords
             return ['erp-pagar-row--paga'];
         }
 
-        if ($record->vencimento && $record->vencimento->isBefore(now()->startOfDay())) {
+        if ($record->vencimento && $record->vencimento->toDateString() < ErpTimezone::today()) {
             return ['erp-pagar-row--vencida'];
         }
 
@@ -183,17 +188,6 @@ class ListContasPagar extends ListRecords
             'numero', 'emissao', 'documento', 'fornecedor', 'vencimento',
             'valor', 'desconto', 'juros', 'valor_pago', 'pago_em', 'saldo',
         ];
-    }
-
-    #[Computed]
-    public function fornecedoresOptions(): array
-    {
-        return Person::query()
-            ->where('is_fornecedor', true)
-            ->where('ativo', true)
-            ->orderBy('nome_razao')
-            ->pluck('nome_razao', 'id')
-            ->all();
     }
 
     #[Computed]
@@ -256,7 +250,6 @@ class ListContasPagar extends ListRecords
         if ($this->viewTab === 'desdobramentos') {
             $components[] = View::make('filament.components.erp.pagar.desdobramentos');
         } else {
-            $components[] = View::make('filament.components.erp.pagar.hint');
             $components[] = View::make('filament.components.erp.pagar.table-host')
                 ->columnSpanFull();
             $components[] = View::make('filament.components.erp.pagar.footer-summary');
@@ -267,6 +260,7 @@ class ListContasPagar extends ListRecords
         $components[] = View::make('filament.components.erp.pagar.baixa-modal');
         $components[] = View::make('filament.components.erp.pagar.form-modal');
         $components[] = View::make('filament.components.erp.pagar.estorno-confirm-modal');
+        $components[] = View::make('filament.components.erp.pagar.exclusao-confirm-modal');
 
         return $schema
             ->gap(false)
@@ -542,23 +536,216 @@ class ListContasPagar extends ListRecords
         $this->pushContaPagarListRefresh();
     }
 
-    public function deleteConta(): void
+    public bool $exclusaoConfirmOpen = false;
+
+    public ?int $exclusaoContaId = null;
+
+    /** @var array{numero: string, fornecedor: string, documento: string, valor: string, vencimento: string}|null */
+    public ?array $exclusaoContaResumo = null;
+
+    public function pedirExcluirConta(): void
     {
+        if ($this->viewTab === 'desdobramentos') {
+            return;
+        }
+
+        if ($this->contaFormModalOpen
+            || $this->baixaModalOpen
+            || $this->exclusaoConfirmOpen
+            || $this->historicoPagamentosOpen
+            || $this->estornoConfirmOpen) {
+            return;
+        }
+
+        if (! $this->erpAuthorizeOrNotify('contas_pagar.update')) {
+            return;
+        }
+
         $recordId = $this->highlightedRecordIdOrNotify('delete');
 
         if (! $recordId) {
             return;
         }
 
-        ContaPagar::query()->whereKey($recordId)->delete();
+        $conta = ContaPagar::query()
+            ->with(['fornecedor:id,nome_razao', 'pagamentos:id,conta_pagar_id'])
+            ->find($recordId);
+
+        if (! $conta) {
+            Notification::make()
+                ->title('Conta não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $service = app(ContaPagarExclusaoService::class);
+
+        if (! $service->podeExcluir($conta)) {
+            Notification::make()
+                ->title('Não é possível excluir')
+                ->body($service->motivoBloqueio($conta))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->exclusaoContaId = (int) $conta->getKey();
+        $this->exclusaoContaResumo = [
+            'numero' => (string) ($conta->numero ?? $conta->getKey()),
+            'fornecedor' => mb_strtoupper(trim((string) ($conta->fornecedor?->nome_razao ?? '—')), 'UTF-8'),
+            'documento' => trim((string) ($conta->documento ?? '')) !== ''
+                ? (string) $conta->documento
+                : '—',
+            'valor' => 'R$ '.ErpMoney::formatBr((float) $conta->valor),
+            'vencimento' => optional($conta->vencimento)?->format('d/m/Y') ?? '—',
+        ];
+        $this->exclusaoConfirmOpen = true;
+    }
+
+    /** Compatível com chamadas antigas / testes: abre a confirmação. */
+    public function deleteConta(): void
+    {
+        $this->pedirExcluirConta();
+    }
+
+    public function cancelarExcluirConta(): void
+    {
+        $this->exclusaoConfirmOpen = false;
+        $this->exclusaoContaId = null;
+        $this->exclusaoContaResumo = null;
+    }
+
+    public function confirmarExcluirConta(): void
+    {
+        if (! $this->exclusaoConfirmOpen || $this->exclusaoContaId === null) {
+            return;
+        }
+
+        if (! $this->erpAuthorizeOrNotify('contas_pagar.update')) {
+            $this->cancelarExcluirConta();
+
+            return;
+        }
+
+        $contaId = (int) $this->exclusaoContaId;
+        $this->cancelarExcluirConta();
+
+        $conta = ContaPagar::query()
+            ->with(['pagamentos:id,conta_pagar_id'])
+            ->find($contaId);
+
+        if (! $conta) {
+            Notification::make()
+                ->title('Conta não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $service = app(ContaPagarExclusaoService::class);
+
+        if (! $service->podeExcluir($conta)) {
+            Notification::make()
+                ->title('Não é possível excluir')
+                ->body($service->motivoBloqueio($conta))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($conta): void {
+                $snapshot = [
+                    'id' => (int) $conta->id,
+                    'numero' => $conta->numero,
+                    'documento' => $conta->documento,
+                    'historico' => $conta->produto,
+                    'fornecedor_id' => $conta->fornecedor_id ? (int) $conta->fornecedor_id : null,
+                    'compra_id' => $conta->compra_id ? (int) $conta->compra_id : null,
+                    'valor' => (float) $conta->valor,
+                    'saldo' => (float) $conta->saldo,
+                    'vencimento' => optional($conta->vencimento)?->toDateString(),
+                ];
+
+                $conta->delete();
+
+                app(ErpOperacaoLogService::class)->registrar(
+                    operacao: 'EXCLUIR_CONTAS_PAGAR',
+                    resumo: 'Excluído título a pagar #'.($snapshot['numero'] ?: $snapshot['id']).'.',
+                    origem: 'contas_pagar',
+                    documentoTipo: 'conta_pagar',
+                    documentoId: (int) $snapshot['id'],
+                    documentoNumero: (string) ($snapshot['numero'] ?: $snapshot['id']),
+                    detalhes: ['antes' => $snapshot],
+                    empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+                );
+            });
+        } catch (\Throwable $e) {
+            report($e);
+            Notification::make()
+                ->title('Não foi possível excluir a conta.')
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->selecionadosParaBaixa = [];
+        $this->pushContaPagarListRefresh(renderPage: true);
 
         Notification::make()
             ->title('Conta excluída.')
             ->success()
             ->send();
+    }
+
+    #[Computed]
+    public function podeExcluirContaDestacada(): bool
+    {
+        if ($this->viewTab === 'desdobramentos' || ! $this->highlightedRecordId) {
+            return false;
+        }
+
+        if (! $this->erpCan('contas_pagar.update')) {
+            return false;
+        }
+
+        $conta = ContaPagar::query()
+            ->with(['pagamentos:id,conta_pagar_id'])
+            ->find((int) $this->highlightedRecordId);
+
+        return $conta instanceof ContaPagar
+            && app(ContaPagarExclusaoService::class)->podeExcluir($conta);
+    }
+
+    #[Computed]
+    public function exclusaoContaTooltip(): string
+    {
+        if (! $this->highlightedRecordId) {
+            return 'Selecione uma conta na lista';
+        }
+
+        $conta = ContaPagar::query()
+            ->with(['pagamentos:id,conta_pagar_id'])
+            ->find((int) $this->highlightedRecordId);
+
+        if (! $conta) {
+            return 'Selecione uma conta na lista';
+        }
+
+        $service = app(ContaPagarExclusaoService::class);
+
+        if ($service->podeExcluir($conta)) {
+            return 'Excluir conta selecionada';
+        }
+
+        return $service->motivoBloqueio($conta) ?? 'Não é possível excluir esta conta';
     }
 
     public bool $historicoPagamentosOpen = false;
@@ -722,6 +909,15 @@ class ListContasPagar extends ListRecords
         if ($this->viewTab !== 'titulos') {
             return;
         }
+
+        unset(
+            $this->contagensSituacao,
+            $this->totalAPagar,
+            $this->totalPago,
+            $this->totalAtrasado,
+            $this->totalSelecionado,
+            $this->quantidadeSelecionada,
+        );
 
         $builder = $this->listQueryBuilder();
         $totalAPagar = $builder->sumSaldoFiltered();

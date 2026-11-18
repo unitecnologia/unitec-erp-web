@@ -5,6 +5,7 @@ namespace App\Support\Erp\Financeiro;
 use App\Models\ContaReceber;
 use App\Models\ContaReceberPagamento;
 use App\Models\PlanoConta;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -48,6 +49,18 @@ final class ContaReceberEstornoService
                 throw new InvalidArgumentException('Baixa sem valor recebido para estornar.');
             }
 
+            $snapshotPagamento = [
+                'pagamento_id' => (int) $pagamento->id,
+                'data' => optional($pagamento->data)?->toDateString(),
+                'valor_recebido' => $valorRecebido,
+                'juros' => $juros,
+                'multa' => $multa,
+                'desconto' => $desconto,
+                'forma_pagamento_id' => $pagamento->forma_pagamento_id ? (int) $pagamento->forma_pagamento_id : null,
+                'caixa_conta_id' => $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null,
+                'plano_conta_id' => $pagamento->plano_conta_id ? (int) $pagamento->plano_conta_id : null,
+            ];
+
             $conta->valor_recebido = round(max(0, (float) $conta->valor_recebido - $valorRecebido), 2);
             $conta->juros = round(max(0, (float) $conta->juros - $juros), 2);
             $conta->multa = round(max(0, (float) $conta->multa - $multa), 2);
@@ -82,6 +95,27 @@ final class ContaReceberEstornoService
             }
 
             $pagamento->delete();
+
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'ESTORNAR_BAIXA_CONTAS_RECEBER',
+                resumo: 'Estornada baixa de CR #'.($conta->numero ?: $conta->id).' (R$ '.number_format($valorRecebido, 2, ',', '.').').',
+                origem: 'contas_receber',
+                documentoTipo: 'conta_receber',
+                documentoId: (int) $conta->id,
+                documentoNumero: (string) ($conta->numero ?: $conta->id),
+                detalhes: [
+                    'conta' => [
+                        'id' => (int) $conta->id,
+                        'numero' => $conta->numero,
+                        'documento' => $conta->documento,
+                        'cliente_id' => $conta->cliente_id ? (int) $conta->cliente_id : null,
+                        'valor' => (float) $conta->valor,
+                    ],
+                    'pagamento' => $snapshotPagamento,
+                    'movimentou_caixa' => (bool) $caixaContaId,
+                ],
+                empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+            );
 
             return [
                 'ok' => true,

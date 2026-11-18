@@ -1,0 +1,272 @@
+/* Faturamento Mensal — compacto, sem animação, adequado a PC fraco.
+   Escopo: .erp-faturamento-mensal-page */
+
+.erp-faturamento-mensal-page.fi-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0 !important;
+}
+
+.erp-faturamento-mensal-page .fi-page-header,
+.erp-faturamento-mensal-page .fi-header {
+  display: none !important;
+}
+
+.erp-faturamento-mensal-page .fi-page-header-main-ctn,
+.erp-faturamento-mensal-page .fi-page-main,
+.erp-faturamento-mensal-page .fi-page-content,
+.erp-faturamento-mensal-page .fi-main,
+.erp-faturamento-mensal-page .fi-main-ctn,
+.erp-faturamento-mensal-page .fi-section-content-ctn,
+.erp-faturamento-mensal-page .fi-sc {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: none !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.erp-faturamento-mensal-page .fi-sc > div:not(.fi-hidden) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  margin-top: -1mm;
+  padding-top: 0.15rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__empresa {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.85rem;
+  padding: 0 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0f2847;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__select {
+  min-width: 5.5rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__select--mes {
+  min-width: 9.5rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__btn-sair {
+  margin-left: auto;
+  border-color: #b91c1c;
+  background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  box-shadow: none;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__btn-sair kbd {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__btn-sair:hover {
+  filter: brightness(1.05);
+  color: #fff;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__erro {
+  color: #b91c1c !important;
+  font-weight: 600;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0 0.65rem 0.35rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.45rem 0.55rem;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+  border-radius: 6px;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__card-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__card-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f2847;
+  line-height: 1.2;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__card-hint {
+  font-size: 0.72rem;
+  font-style: normal;
+  color: #475569;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__meta {
+  margin: 0 0.65rem 0.35rem;
+  font-size: 0.75rem;
+  color: #334155;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  height: 14rem;
+  margin: 0 0.65rem 0.5rem;
+  padding: 0.55rem 0.45rem 0.35rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__chart.is-loading {
+  opacity: 0.55;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__chart--single {
+  max-width: 12rem;
+  justify-content: center;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__bar-value {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__chart--single .erp-faturamento-mensal__bar-value {
+  font-size: 0.75rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__bar-fill {
+  width: 72%;
+  max-width: 2.4rem;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: #1e5a9e;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__bar-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+  line-height: 1;
+  padding-bottom: 0.1rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__empty {
+  margin: auto;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table-wrap {
+  margin: 0 0.65rem 0.75rem;
+  overflow: auto;
+  max-width: 22rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table th,
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table td {
+  padding: 0.28rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table th {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-faturamento-mensal-page .erp-faturamento-mensal__table tfoot td {
+  font-weight: 700;
+  color: #0f2847;
+  border-bottom: 0;
+  background: #f1f5f9;
+}
+
+@media (max-width: 720px) {
+  .erp-faturamento-mensal-page .erp-faturamento-mensal__cards {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-faturamento-mensal-page .erp-faturamento-mensal__chart {
+    height: 12rem;
+  }
+
+  .erp-faturamento-mensal-page .erp-faturamento-mensal__bar-value {
+    font-size: 0.5rem;
+  }
+}

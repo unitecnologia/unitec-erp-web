@@ -476,8 +476,41 @@ window.ErpMasks = {
         return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
     },
 
+    /** Competência DRE: 112026 → 11/2026 (máx. 6 dígitos). */
+    formatMonthYear(value) {
+        const digits = this.digits(value).slice(0, 6);
+
+        if (! digits) {
+            return '';
+        }
+
+        if (digits.length <= 2) {
+            return digits;
+        }
+
+        return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    },
+
     formatDigits(value, max = 14) {
         return this.digits(value).slice(0, max);
+    },
+
+    caretAfterDigits(formatted, digitCount) {
+        if (digitCount <= 0) {
+            return 0;
+        }
+
+        let seen = 0;
+        for (let i = 0; i < formatted.length; i += 1) {
+            if (/\d/.test(formatted[i])) {
+                seen += 1;
+                if (seen >= digitCount) {
+                    return i + 1;
+                }
+            }
+        }
+
+        return formatted.length;
     },
 
     formatByType(type, value, input = null, options = {}) {
@@ -508,6 +541,8 @@ window.ErpMasks = {
                 return this.formatQuantity3(value);
             case 'date-br':
                 return this.formatDateBr(value);
+            case 'month-year':
+                return this.formatMonthYear(value);
             case 'digits':
                 return this.formatDigits(value, parseInt(input?.dataset.maxDigits ?? '14', 10));
             default:
@@ -594,10 +629,22 @@ window.ErpMasks = {
         const formatOptions = this.isBrDecimalMask(type)
             ? { thousands: options.thousands === true }
             : {};
+        const keepCaret = type === 'month-year' && document.activeElement === input;
+        const digitsBefore = keepCaret
+            ? this.digits(String(input.value ?? '').slice(0, input.selectionStart ?? 0)).length
+            : 0;
         const formatted = this.formatByType(type, input.value, input, formatOptions);
 
         if (input.value !== formatted) {
             input.value = formatted;
+            if (keepCaret) {
+                const pos = this.caretAfterDigits(formatted, digitsBefore);
+                try {
+                    input.setSelectionRange(pos, pos);
+                } catch (_e) {
+                    // ignore
+                }
+            }
         }
 
         const shouldSync = options.sync !== false;
@@ -621,6 +668,13 @@ window.ErpMasks = {
         input.setAttribute('inputmode', 'numeric');
         input.setAttribute('autocomplete', 'off');
 
+        if (input.dataset.mask === 'month-year') {
+            input.setAttribute('maxlength', '7');
+            if (! input.getAttribute('placeholder')) {
+                input.setAttribute('placeholder', 'MM/AAAA');
+            }
+        }
+
         input.addEventListener('input', () => {
             if (input.dataset.mask === 'cpf-cnpj') {
                 this.setDocumentoValidationState(input, null);
@@ -631,6 +685,29 @@ window.ErpMasks = {
             }
 
             this.apply(input);
+        });
+        input.addEventListener('keydown', (event) => {
+            if (input.dataset.mask !== 'month-year' || event.key !== 'Backspace') {
+                return;
+            }
+
+            const start = input.selectionStart ?? 0;
+            const end = input.selectionEnd ?? 0;
+            if (start !== end || start === 0) {
+                return;
+            }
+
+            // Backspace na barra: só move o cursor para antes dela (próximo Backspace apaga o dígito).
+            if (input.value[start - 1] !== '/') {
+                return;
+            }
+
+            event.preventDefault();
+            try {
+                input.setSelectionRange(start - 1, start - 1);
+            } catch (_e) {
+                // ignore
+            }
         });
         input.addEventListener(
             'blur',

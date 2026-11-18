@@ -19,6 +19,27 @@ final class EmpresaParametros
     /** Permanece na TV após faturar e inicia nova venda (não volta ao Monitor). Sem migration: JSON por empresa. */
     public const COLUMN_PERMANECER_TELA_VENDA_APOS_CONCLUIR = 'param_pdv_permanecer_tela_venda_apos_concluir';
 
+    /** PDV: pede vendedor ativo ao abrir o fechamento de cada venda. Sem migration: JSON por empresa. */
+    public const COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA = 'param_pdv_solicitar_vendedor_cada_venda';
+
+    /** Relatório de Pedidos (Monitor/TV): imprimir 2 vias. Sem migration: JSON por empresa. */
+    public const COLUMN_MONITOR_PEDIDOS_DUAS_VIAS = 'param_monitor_vendas_imp_duas_vias';
+
+    /** Relatório de Pedidos (Monitor/TV): padronizar em meia folha A4 (A5). Sem migration: JSON por empresa. */
+    public const COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4 = 'param_monitor_vendas_imp_meia_folha_a4';
+
+    /** Relatório de Pedidos: exibir dados da empresa no cabeçalho. Sem migration: JSON por empresa. */
+    public const COLUMN_PEDIDO_CABECALHO_EMPRESA = 'param_geral_exibir_dados_empresa_cabecalho_pedido';
+
+    /** App Força de Vendas: permitir alterar preço unitário na venda. Sem migration: JSON por empresa. */
+    public const COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO = 'param_forca_vendas_alterar_preco_unitario';
+
+    /** Financeiro: "Ignorar financeiro" — permitir faturar com débitos/pendências. */
+    public const COLUMN_FINANCEIRO_AGUARDE = 'param_financeiro_aguarde';
+
+    /** Conta BANCO da empresa usada pela API PIX. */
+    public const COLUMN_PIX_CAIXA_CONTA_ID = 'param_pix_caixa_conta_id';
+
     /**
      * Teclas F compatíveis com Concluir no PDV ERP e na Tela de Venda,
      * sem desativar atalhos fixos nem reservar teclas de meios de pagamento (F3/F4).
@@ -113,6 +134,12 @@ final class EmpresaParametros
             'param_pdv_habilitar_desconto' => ['label' => 'Habilitar Desconto no PDV', 'default' => false],
             'param_pdv_ativar_som' => ['label' => 'Ativar Som no PDV (bip ao incluir item)', 'default' => false],
             'param_pdv_nfce_descricao_completa' => ['label' => 'NFC-e: Descrição Completa dos Itens (sem abreviar)', 'default' => false],
+            self::COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA => [
+                'label' => 'Solicitar vendedor a cada venda',
+                'hint' => 'PDV: pede o vendedor ao abrir o fechamento. Tela de Venda e OS: o campo Vendedor/Técnico inicia em Selecione e bloqueia a inclusão de item até escolher. Desmarcado: comportamento atual.',
+                'default' => false,
+                'json_fallback' => true,
+            ],
             'param_pdv_carga_auto' => ['label' => 'Carga Automática do PDV Offline', 'default' => true],
             // Sem coluna no banco: UI no grupo PDV + JSON em storage (igual atalho concluir).
             self::COLUMN_PERGUNTAR_IMPRIMIR_POS_VENDA_TV => [
@@ -158,6 +185,13 @@ final class EmpresaParametros
                 'hint' => 'Marcado: exibe indicadores e gráficos na tela inicial. Desmarcado: exibe a logomarca da empresa, sem carregar o Dashboard.',
                 'default' => true,
             ],
+            // Sem coluna no banco: UI em Ajustes Gerais + JSON em storage.
+            self::COLUMN_PEDIDO_CABECALHO_EMPRESA => [
+                'label' => 'Exibir dados da empresa no cabeçalho do pedido de venda',
+                'hint' => 'Marcado: no Relatório de Pedidos (Visualizar/Imprimir/PDF) exibe razão social, fantasia, CNPJ, IE, endereço e telefone da empresa logada acima dos dados do cliente. Desmarcado: relatório permanece igual ao atual.',
+                'default' => false,
+                'json_fallback' => true,
+            ],
 
             'param_fiscal_puxar_cfop_produto' => ['label' => 'Puxar CFOP do Produto', 'default' => false],
             'param_fiscal_bloquear_cancelamento_doc' => ['label' => 'Bloquear Cancelamento Venda com Documento Fiscal Emitido', 'default' => true],
@@ -167,11 +201,23 @@ final class EmpresaParametros
                 'hint' => 'Marcado: ao transmitir NF-e de saída, baixa o estoque dos produtos. Desmarcado: não movimenta estoque.',
                 'default' => true,
             ],
+            'param_fiscal_permitir_iniciar_nfe_consumidor_final' => [
+                'label' => 'Permitir iniciar NF-e com Consumidor Final',
+                'hint' => 'Marcado: no Monitor de Recebimento de Vendas é possível abrir a NF-e de pedido com Consumidor Final para trocar o destinatário antes de transmitir. Não altera o cliente do pedido. Desmarcado: mantém o bloqueio atual de cadastro incompleto.',
+                'default' => false,
+            ],
 
             'param_forca_vendas_ver_todos_clientes' => [
                 'label' => 'Permitir visualizar todos os clientes',
                 'hint' => 'Marcado: no Força de Vendas cada vendedor sincroniza todos os clientes e pode vender para qualquer um. Desmarcado: só a carteira (Vendedor Força de Vendas na Pessoa).',
                 'default' => false,
+            ],
+            // Sem coluna no banco: UI Força de Vendas + JSON em storage.
+            self::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO => [
+                'label' => 'Permitir alterar preço unitário na venda',
+                'hint' => 'Marcado: no App Força de Vendas o vendedor pode digitar o preço unitário do item (somente naquela venda). Desmarcado: o preço permanece só para visualização e a API rejeita valores diferentes do cadastro/tabela.',
+                'default' => false,
+                'json_fallback' => true,
             ],
 
             'param_vendas_internas_fechar_orcamento_auto' => [
@@ -190,6 +236,12 @@ final class EmpresaParametros
                 'label' => 'Habilitar equipamento no aplicativo',
                 'hint' => 'Marcado: o App Vendas Internas exibe o botão Equipamento na Nova Venda (pesquisa, cadastro e consulta de placa). Desmarcado: oculta o botão e bloqueia novos vínculos de equipamento pelo aplicativo.',
                 'default' => true,
+            ],
+
+            'param_vendas_internas_permitir_reabrir_pedido' => [
+                'label' => 'Permitir reabrir pedido ainda não faturado',
+                'hint' => 'Marcado: o App Vendas Internas pode reabrir e editar pedidos/orçamentos ainda não faturados (mesmo UUID, sem duplicar). Desmarcado: mantém o bloqueio atual. Pedidos faturados ou cancelados nunca podem ser reabertos.',
+                'default' => false,
             ],
 
             'param_monitor_vendas_escolher_empresa_emitente_nfe' => [
@@ -214,6 +266,25 @@ final class EmpresaParametros
                 'label' => 'Ocultar coluna de desconto na impressão',
                 'default' => true,
             ],
+            // Sem coluna no banco: UI no Monitor + JSON em storage (igual params TV).
+            self::COLUMN_MONITOR_PEDIDOS_DUAS_VIAS => [
+                'label' => 'Imprimir 2 vias do pedido',
+                'hint' => 'Na impressão do Relatório de Pedidos (Monitor e Tela de Venda), gera VIA DO ESTABELECIMENTO e VIA DO CLIENTE com os mesmos dados. O Salvar PDF continua em uma via.',
+                'default' => false,
+                'json_fallback' => true,
+            ],
+            self::COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4 => [
+                'label' => 'Padronizar impressão do pedido em meia folha A4',
+                'hint' => 'Quando o pedido cabe em meia folha (A5), reserva essa região na impressão. Com 2 vias, coloca uma via em cada metade da A4. Pedidos maiores seguem a impressão normal. O Salvar PDF não muda.',
+                'default' => false,
+                'json_fallback' => true,
+            ],
+
+            self::COLUMN_FINANCEIRO_AGUARDE => [
+                'label' => 'Ignorar financeiro',
+                'hint' => 'Marcado: permite faturar mesmo com débitos ou pendências financeiras do cliente (não quita títulos existentes). Desmarcado: mantém o bloqueio/retenção financeira atual.',
+                'default' => false,
+            ],
         ];
     }
 
@@ -228,8 +299,8 @@ final class EmpresaParametros
     public const VI_TIPOS_VENDA_SOMENTE_PEDIDO = 'somente_pedido';
 
     /**
-     * Como o app Força de Vendas interpreta o desconto em R$ do item.
-     * Não altera o modo %.
+     * Como PDV / Telas de Vendas / apps interpretam o desconto em R$ do item.
+     * Não altera o modo %. Persistência: empresas.param_monitor_vendas_desconto_reais_item_modo.
      *
      * @return array{label: string, hint: string, default: string, options: array<string, string>}
      */
@@ -237,7 +308,7 @@ final class EmpresaParametros
     {
         return [
             'label' => 'Desconto em R$ nos itens',
-            'hint' => 'Define se o desconto informado em R$ no item será aplicado em cada unidade ou uma única vez sobre o total da linha.',
+            'hint' => 'Define se o desconto informado em R$ no item será aplicado em cada unidade ou uma única vez sobre o total da linha. Vale para PDV, Tela de Venda, Orçamentos e apps de venda. Não recalcula vendas já concluídas.',
             'default' => self::DESCONTO_REAIS_ITEM_UNITARIO,
             'options' => [
                 self::DESCONTO_REAIS_ITEM_UNITARIO => 'Por unidade',
@@ -251,6 +322,32 @@ final class EmpresaParametros
         return $valor === self::DESCONTO_REAIS_ITEM_LINHA
             ? self::DESCONTO_REAIS_ITEM_LINHA
             : self::DESCONTO_REAIS_ITEM_UNITARIO;
+    }
+
+    /**
+     * Modo vigente do desconto em R$ por item (escopo empresa).
+     */
+    public static function descontoReaisItemModo(?int $empresaId = null): string
+    {
+        $default = self::monitorVendasDescontoReaisItemModoField()['default'];
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_monitor_vendas_desconto_reais_item_modo')) {
+            return $default;
+        }
+
+        return self::normalizarDescontoReaisItemModo(
+            Empresa::query()->whereKey($empresaId)->value('param_monitor_vendas_desconto_reais_item_modo'),
+        );
+    }
+
+    public static function descontoReaisItemEhPorUnidade(?int $empresaId = null): bool
+    {
+        return self::descontoReaisItemModo($empresaId) === self::DESCONTO_REAIS_ITEM_UNITARIO;
     }
 
     /**
@@ -321,7 +418,7 @@ final class EmpresaParametros
     /**
      * Payload de configuração do App Vendas Internas (login/me/pull).
      *
-     * @return array{tipos_venda: string, permite_orcamento: bool, permite_pedido: bool, fechar_orcamento_auto: bool, permitir_compartilhar: bool, habilitar_equipamento: bool}
+     * @return array{tipos_venda: string, permite_orcamento: bool, permite_pedido: bool, fechar_orcamento_auto: bool, permitir_compartilhar: bool, habilitar_equipamento: bool, permitir_reabrir_pedido: bool, desconto_reais_item_modo: string}
      */
     public static function vendasInternasAppConfig(?int $empresaId): array
     {
@@ -336,6 +433,8 @@ final class EmpresaParametros
             'fechar_orcamento_auto' => self::vendasInternasFecharOrcamentoAuto($empresaId),
             'permitir_compartilhar' => self::vendasInternasPermitirCompartilhar($empresaId),
             'habilitar_equipamento' => self::vendasInternasHabilitarEquipamento($empresaId),
+            'permitir_reabrir_pedido' => self::vendasInternasPermitirReabrirPedido($empresaId),
+            'desconto_reais_item_modo' => self::descontoReaisItemModo($empresaId),
         ];
     }
 
@@ -379,6 +478,28 @@ final class EmpresaParametros
         $valor = Empresa::query()
             ->whereKey($empresaId)
             ->value('param_vendas_internas_habilitar_equipamento');
+
+        return $valor === null ? $default : (bool) $valor;
+    }
+
+    /**
+     * App Vendas Internas pode reabrir/editar pedido ainda não faturado (mesmo UUID).
+     */
+    public static function vendasInternasPermitirReabrirPedido(?int $empresaId): bool
+    {
+        $default = (bool) (self::permissionFields()['param_vendas_internas_permitir_reabrir_pedido']['default'] ?? false);
+
+        if (! $empresaId || $empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_vendas_internas_permitir_reabrir_pedido')) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_vendas_internas_permitir_reabrir_pedido');
 
         return $valor === null ? $default : (bool) $valor;
     }
@@ -519,6 +640,7 @@ final class EmpresaParametros
     {
         return [
             'param_pix_provedor' => ['label' => 'Provedor Pix', 'default' => 'mercadopago', 'type' => 'string'],
+            self::COLUMN_PIX_CAIXA_CONTA_ID => ['label' => 'Conta Bancária Vinculada', 'default' => null, 'type' => 'integer'],
             'param_pix_mp_access_token' => ['label' => 'Mercado Pago — Access Token', 'default' => '', 'type' => 'string'],
             'param_pix_chave' => ['label' => 'Chave PIX', 'default' => '', 'type' => 'string'],
             'param_pix_client_id' => ['label' => 'Client ID', 'default' => '', 'type' => 'string'],
@@ -1211,6 +1333,22 @@ final class EmpresaParametros
     }
 
     /**
+     * Token Bearer da software house SuperTEF (único por instalação; cifrado).
+     *
+     * @return array<string, array{label: string, default: string, type: string}>
+     */
+    public static function tefSuperTefFields(): array
+    {
+        return [
+            'param_tef_supertef_softhouse_token' => [
+                'label' => 'SuperTEF — Token software house',
+                'default' => '',
+                'type' => 'string',
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, array{label: string, default: bool}>
      */
     public static function consultaPlacaBooleanFields(): array
@@ -1597,6 +1735,7 @@ final class EmpresaParametros
             'pdv' => 'Ajustes do PDV e Telas de Vendas',
             'geral' => 'Ajustes Gerais',
             'fiscal' => 'Ajustes Fiscais',
+            'financeiro' => 'Financeiro',
             'forca_vendas' => 'Força de Vendas',
             'vendas_internas' => 'Vendas Internas',
             'monitor_vendas' => 'Monitor de vendas',
@@ -1738,6 +1877,106 @@ final class EmpresaParametros
         );
     }
 
+    /**
+     * PDV: solicitar vendedor ativo ao abrir o fechamento de cada venda.
+     */
+    public static function solicitarVendedorCadaVenda(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA,
+            $empresaId,
+        );
+    }
+
+    public static function gravarSolicitarVendedorCadaVenda(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_SOLICITAR_VENDEDOR_CADA_VENDA,
+            $empresaId,
+            $valor,
+        );
+    }
+
+    /**
+     * Relatório de Pedidos (Monitor/TV): imprimir duas vias (estabelecimento + cliente).
+     */
+    public static function monitorPedidosImprimirDuasVias(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_MONITOR_PEDIDOS_DUAS_VIAS,
+            $empresaId,
+        );
+    }
+
+    public static function gravarMonitorPedidosImprimirDuasVias(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_MONITOR_PEDIDOS_DUAS_VIAS,
+            $empresaId,
+            $valor,
+        );
+    }
+
+    /**
+     * Relatório de Pedidos (Monitor/TV): padronizar impressão em meia folha A4 (A5).
+     */
+    public static function monitorPedidosImprimirMeiaFolhaA4(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4,
+            $empresaId,
+        );
+    }
+
+    public static function gravarMonitorPedidosImprimirMeiaFolhaA4(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_MONITOR_PEDIDOS_MEIA_FOLHA_A4,
+            $empresaId,
+            $valor,
+        );
+    }
+
+    /**
+     * Relatório de Pedidos: exibir dados cadastrais da empresa no cabeçalho.
+     */
+    public static function pedidoExibirCabecalhoEmpresa(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_PEDIDO_CABECALHO_EMPRESA,
+            $empresaId,
+        );
+    }
+
+    public static function gravarPedidoExibirCabecalhoEmpresa(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_PEDIDO_CABECALHO_EMPRESA,
+            $empresaId,
+            $valor,
+        );
+    }
+
+    /**
+     * App Força de Vendas: permitir alterar preço unitário na venda.
+     */
+    public static function forcaVendasAlterarPrecoUnitario(?int $empresaId = null): bool
+    {
+        return self::lerPermissionBoolJson(
+            self::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO,
+            $empresaId,
+        );
+    }
+
+    public static function gravarForcaVendasAlterarPrecoUnitario(int $empresaId, mixed $valor): bool
+    {
+        return self::gravarPermissionBoolJson(
+            self::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO,
+            $empresaId,
+            $valor,
+        );
+    }
+
     private static function lerPermissionBoolJson(string $coluna, ?int $empresaId = null): bool
     {
         $default = (bool) (self::permissionFields()[$coluna]['default'] ?? false);
@@ -1864,6 +2103,10 @@ final class EmpresaParametros
             return 'geral';
         }
 
+        if (str_starts_with($field, 'param_financeiro_')) {
+            return 'financeiro';
+        }
+
         if (str_starts_with($field, 'param_forca_vendas_')) {
             return 'forca_vendas';
         }
@@ -1877,6 +2120,55 @@ final class EmpresaParametros
         }
 
         return 'fiscal';
+    }
+
+    /**
+     * Financeiro → "Ignorar financeiro": permite faturar com débitos/pendências do cliente.
+     * Default false = comportamento atual (retenção/bloqueio).
+     */
+    public static function aguardeFinanceiro(?int $empresaId = null): bool
+    {
+        $default = (bool) (self::permissionFields()[self::COLUMN_FINANCEIRO_AGUARDE]['default'] ?? false);
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), self::COLUMN_FINANCEIRO_AGUARDE)) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value(self::COLUMN_FINANCEIRO_AGUARDE);
+
+        return $valor === null ? $default : (bool) $valor;
+    }
+
+    /**
+     * Fiscal → permite abrir rascunho de NF-e no Monitor com Consumidor Final
+     * (troca de destinatário antes de transmitir). Default false = bloqueio atual.
+     */
+    public static function permitirIniciarNfeConsumidorFinal(?int $empresaId = null): bool
+    {
+        $coluna = 'param_fiscal_permitir_iniciar_nfe_consumidor_final';
+        $default = (bool) (self::permissionFields()[$coluna]['default'] ?? false);
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), $coluna)) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value($coluna);
+
+        return $valor === null ? $default : (bool) $valor;
     }
 
     /**
@@ -2023,6 +2315,10 @@ final class EmpresaParametros
         }
 
         foreach (self::consultaPlacaBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::tefSuperTefFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
 

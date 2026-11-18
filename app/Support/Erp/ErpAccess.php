@@ -3,6 +3,8 @@
 namespace App\Support\Erp;
 
 use App\Models\User;
+use App\Support\Erp\Audit\ErpOperacaoAuditoria;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
@@ -126,6 +128,14 @@ class ErpAccess
     $valid = array_values(array_unique(array_intersect($permissions, ErpPermissionCatalog::allKeys())));
     $now = now();
     $userId = $user->getKey();
+    $antes = DB::table('user_permissions')
+      ->where('user_id', $userId)
+      ->orderBy('permission_key')
+      ->pluck('permission_key')
+      ->map(static fn ($key): string => (string) $key)
+      ->all();
+    $diff = ErpOperacaoAuditoria::diffListas($antes, $valid);
+
     $rows = array_map(static fn (string $key): array => [
       'user_id' => $userId,
       'permission_key' => $key,
@@ -133,11 +143,31 @@ class ErpAccess
       'updated_at' => $now,
     ], $valid);
 
-    DB::transaction(static function () use ($userId, $rows): void {
+    DB::transaction(static function () use ($userId, $rows, $user, $diff, $antes, $valid): void {
       DB::table('user_permissions')->where('user_id', $userId)->delete();
 
       if ($rows !== []) {
         DB::table('user_permissions')->insert($rows);
+      }
+
+      if ($diff['added'] !== [] || $diff['removed'] !== []) {
+        app(ErpOperacaoLogService::class)->registrar(
+          operacao: 'ALTERAR_PERMISSOES_USUARIO',
+          resumo: 'Permissões do usuário '.$user->name.' atualizadas (+'.count($diff['added']).' / -'.count($diff['removed']).').',
+          origem: 'permissoes',
+          documentoTipo: 'usuario',
+          documentoId: (int) $userId,
+          documentoNumero: (string) $userId,
+          detalhes: [
+            'alvo_user_id' => (int) $userId,
+            'alvo_nome' => $user->name,
+            'added' => $diff['added'],
+            'removed' => $diff['removed'],
+            'total_antes' => count($antes),
+            'total_depois' => count($valid),
+          ],
+          empresaId: $user->empresa_id ? (int) $user->empresa_id : ErpContext::currentEmpresaId(),
+        );
       }
     });
 
@@ -155,6 +185,14 @@ class ErpAccess
     $valid = array_values(array_unique(array_intersect($permissions, ErpPermissionCatalog::allKeys())));
     $now = now();
     $profileId = $profile->getKey();
+    $antes = DB::table('erp_profile_permissions')
+      ->where('erp_profile_id', $profileId)
+      ->orderBy('permission_key')
+      ->pluck('permission_key')
+      ->map(static fn ($key): string => (string) $key)
+      ->all();
+    $diff = ErpOperacaoAuditoria::diffListas($antes, $valid);
+
     $rows = array_map(static fn (string $key): array => [
       'erp_profile_id' => $profileId,
       'permission_key' => $key,
@@ -162,11 +200,31 @@ class ErpAccess
       'updated_at' => $now,
     ], $valid);
 
-    DB::transaction(static function () use ($profileId, $rows): void {
+    DB::transaction(static function () use ($profileId, $rows, $profile, $diff, $antes, $valid): void {
       DB::table('erp_profile_permissions')->where('erp_profile_id', $profileId)->delete();
 
       if ($rows !== []) {
         DB::table('erp_profile_permissions')->insert($rows);
+      }
+
+      if ($diff['added'] !== [] || $diff['removed'] !== []) {
+        app(ErpOperacaoLogService::class)->registrar(
+          operacao: 'ALTERAR_PERMISSOES_PERFIL',
+          resumo: 'Permissões do perfil '.($profile->nome ?: '#'.$profileId).' atualizadas (+'.count($diff['added']).' / -'.count($diff['removed']).').',
+          origem: 'permissoes',
+          documentoTipo: 'perfil',
+          documentoId: (int) $profileId,
+          documentoNumero: (string) ($profile->nome ?: $profileId),
+          detalhes: [
+            'perfil_id' => (int) $profileId,
+            'perfil_nome' => $profile->nome,
+            'added' => $diff['added'],
+            'removed' => $diff['removed'],
+            'total_antes' => count($antes),
+            'total_depois' => count($valid),
+          ],
+          empresaId: ErpContext::currentEmpresaId(),
+        );
       }
     });
   }

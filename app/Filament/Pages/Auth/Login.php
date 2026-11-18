@@ -595,8 +595,9 @@ class Login extends BaseLogin
             $result = $guard->check();
 
             // Lock transitório: não tratar como schema incompatível (evita redirect falso).
-            for ($i = 0; $i < 4 && (($result['transient'] ?? false) === true); $i++) {
-                usleep(150_000);
+            // No máximo 1 retry curto — 4×150ms atrasava a tela "Abrindo o sistema".
+            if (($result['transient'] ?? false) === true) {
+                usleep(50_000);
                 $result = $guard->check(forceRefresh: true);
             }
 
