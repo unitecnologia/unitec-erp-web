@@ -69,6 +69,10 @@ class ForcaVendasOrder extends Model
             'confirmed_at' => 'datetime',
             'faturado_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'em_edicao_fv' => 'boolean',
+            'em_edicao_fv_at' => 'datetime',
+            'em_edicao_erp' => 'boolean',
+            'em_edicao_erp_at' => 'datetime',
         ];
     }
 

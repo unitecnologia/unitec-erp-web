@@ -23,7 +23,11 @@
                 @click="
                     statusAtivo = @js($value);
                     window.dispatchEvent(new CustomEvent('erp-nfce-status', { detail: @js($value) }));
-                    const t = (window.Livewire?.getByName?.('erp.nfce-list-table') || [])[0];
+                    let t = (window.Livewire?.getByName?.('erp.nfce-list-table') || [])[0] || null;
+                    if (!t) {
+                        const id = document.querySelector('.erp-nfce-page .erp-list-grid-area [wire\\:id]')?.getAttribute('wire:id');
+                        t = id && window.Livewire?.find ? window.Livewire.find(id) : null;
+                    }
                     if (t) t.call('setStatusFilter', @js($value));
                 "
             >

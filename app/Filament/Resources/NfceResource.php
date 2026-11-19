@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfce\NfceConsumidorIdentificado;
+use App\Support\Erp\Nfce\NfceListCaixaLabel;
 use App\Support\Erp\Nfce\NfceListDavNumero;
 use App\Filament\Resources\NfceResource\Pages;
+use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -117,6 +119,18 @@ class NfceResource extends Resource
                 TextColumn::make('pdvVenda.sessao.terminal.nome')
                     ->label('Caixa')
                     ->placeholder('—')
+                    ->getStateUsing(function (PdvVendaNfce $record): string {
+                        // UI principal é NfceListTable (lote). Aqui só fallback pontual.
+                        $venda = $record->pdvVenda;
+                        if ($venda !== null
+                            && (string) ($venda->origem ?? '') === PdvVenda::ORIGEM_REGULARIZACAO_FISCAL
+                            && filled($venda->venda_id)
+                        ) {
+                            NfceListCaixaLabel::aquecer([$record]);
+                        }
+
+                        return NfceListCaixaLabel::texto($record);
+                    })
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.vendedor.nome')
                     ->label('Vendedor')

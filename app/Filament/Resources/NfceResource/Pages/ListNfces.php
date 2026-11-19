@@ -17,6 +17,7 @@ use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use App\Support\Erp\Nfce\NfceImpressaoFiscal;
 use App\Support\Erp\Nfce\NfceListAvisoRodape;
+use App\Support\Erp\Nfce\NfceListCaixaLabel;
 use App\Support\Erp\Nfce\NfceListPeriodo;
 use App\Support\Erp\Nfce\NfceListStatusCounts;
 use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
@@ -227,6 +228,7 @@ class ListNfces extends ListRecords
                             'numero',
                             'vendedor_nome',
                             'total',
+                            'origem',
                         ]);
                     },
                     'pdvVenda.sessao' => static fn ($q) => $q->select(['id', 'terminal_id', 'empresa_id']),
@@ -388,7 +390,7 @@ class ListNfces extends ListRecords
                 $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
                     ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));
             }),
-            'caixa' => $query->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like)),
+            'caixa' => NfceListCaixaLabel::aplicarBusca($query, $like),
             'usuario' => $query->whereHas('pdvVenda.user', fn (Builder $user): Builder => $user->where('name', 'like', $like)),
             'vendedor' => $query->where(function (Builder $outer) use ($like): void {
                 $outer->whereHas('pdvVenda.vendedor', fn (Builder $vendedor): Builder => $vendedor->where('nome', 'like', $like))
@@ -428,23 +430,26 @@ class ListNfces extends ListRecords
         $id = (int) $recordId;
         $this->highlightedRecordId = NfceEmpresaEscopo::filtrarIds([$id], $this->empresaIdAtiva()) !== [] ? $id : null;
 
-        // Contingência / Duplicidade / Denegado: remonta o rodapé (aviso amarelo). Demais abas: só destaque.
+        // Contingência / Duplicidade / Denegado: aviso amarelo via JS (sem remount — evita orphanar a grade).
         if (in_array($this->statusFilter, [
             PdvVendaNfce::TAB_CONTINGENCIA,
             PdvVendaNfce::TAB_DUPLICIDADE,
             PdvVendaNfce::TAB_DENEGADO,
         ], true)) {
             unset($this->highlightedNfceAvisoRodape);
-
-            return;
+            $this->js(sprintf(
+                'window.ErpNfceAvisoRodape && window.ErpNfceAvisoRodape.apply(%s);',
+                json_encode($this->highlightedNfceAvisoRodape, JSON_UNESCAPED_UNICODE),
+            ));
         }
 
         $this->skipRender();
     }
 
     /**
-     * Troca de aba iniciada pela grade leve (sem remount do pai no caminho antigo).
-     * Em Denegado, destaca a 1ª nota e remonta o rodapé amarelo automaticamente.
+     * Compat / atalho: troca de aba pelo pai.
+     * A UI das abas usa só {@see NfceListTable::setStatusFilter} (1 request, sem remount).
+     * Aqui também evita remount do Filament — o aviso amarelo vai via JS no filho.
      */
     public function onNfceListStatusChanged(string $status): void
     {
@@ -454,13 +459,14 @@ class ListNfces extends ListRecords
         $this->garantirDestaqueAvisoRodapeDenegado();
         unset($this->highlightedNfceAvisoRodape, $this->nfceInutilizacoesFaixas);
 
-        $remountFooter = in_array($normalized, [
-            PdvVendaNfce::TAB_CONTINGENCIA,
-            PdvVendaNfce::TAB_DUPLICIDADE,
-            PdvVendaNfce::TAB_DENEGADO,
-        ], true);
+        $this->pushNfceListRefresh(skipParentRender: true);
 
-        $this->pushNfceListRefresh(skipParentRender: ! $remountFooter);
+        $aviso = $this->highlightedNfceAvisoRodape;
+        $this->js(sprintf(
+            'window.ErpNfceAvisoRodape && window.ErpNfceAvisoRodape.apply(%s); window.dispatchEvent(new CustomEvent("erp-nfce-status", { detail: %s }));',
+            json_encode($aviso, JSON_UNESCAPED_UNICODE),
+            json_encode($normalized, JSON_UNESCAPED_UNICODE),
+        ));
     }
 
     /**

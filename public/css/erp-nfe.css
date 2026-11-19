@@ -2421,6 +2421,39 @@
     min-width: 0;
 }
 
+.erp-nfe-page .erp-nfe-transportadora__nova-btn {
+    flex: 0 0 auto;
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0 0.55rem;
+    border: 1px solid #93c5fd;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #0f3460;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.1;
+    white-space: nowrap;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__nova-btn:hover {
+    border-color: #1e5a9e;
+    background: #e0f2fe;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__hint {
+    margin-top: 0.12rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.2;
+}
+
 .erp-nfe-page .erp-nfe-transportadora__nome,
 .erp-nfe-page .erp-nfe-transportadora__select {
     flex: 1 1 auto;
@@ -2516,6 +2549,52 @@
 .erp-nfe-page .erp-nfe-transportadora__suggest button.is-selected .erp-nfe-transportadora__suggest-doc.is-cnpj {
     color: #fff;
     font-weight: 800;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__suggest--empty {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.55rem 0.6rem;
+    min-width: min(22rem, 90vw);
+}
+
+.erp-nfe-page .erp-nfe-transportadora__suggest-empty-text {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__suggest-create {
+    align-self: flex-start;
+    border: 1px solid #93c5fd;
+    border-radius: 5px;
+    background: #eff6ff;
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 0.28rem 0.55rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__suggest-create:hover {
+    border-color: #1e5a9e;
+    background: #dbeafe;
+}
+
+.erp-nfe-page .erp-transportadora-form-modal.erp-lookup-modal {
+    z-index: 320;
+}
+
+/* Evita que o chrome genérico da NF-e “achate” o titlebar do cadastro de transportadora. */
+.erp-nfe-page .erp-transportadora-form-modal .erp-lookup-modal__titlebar {
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.95rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
 }
 
 .erp-nfe-page .erp-nfe-transportadora__placa {
@@ -5879,6 +5958,42 @@
     line-height: 1;
     cursor: pointer;
     font-size: 0.7rem;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: linear-gradient(180deg, #fff 0%, #eef4fb 100%);
+    flex-shrink: 0;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.6rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal__btn:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    background: #f8fbff;
+}
+
+.erp-nfe-page .erp-nfe-historico-modal__btn--close {
+    margin-left: auto;
+    background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+    border-color: #f87171;
 }
 
 .erp-nfe-page .erp-nfe-historico-modal__body {

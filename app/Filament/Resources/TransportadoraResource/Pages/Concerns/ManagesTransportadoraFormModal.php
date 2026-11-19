@@ -22,7 +22,7 @@ trait ManagesTransportadoraFormModal
     /** @var array<string, mixed> */
     public array $transportadoraForm = [];
 
-    public function createTransportadora(): void
+    public function createTransportadora(?string $prefillBusca = null): void
     {
         if ($this->transportadoraModalOpen) {
             return;
@@ -30,6 +30,7 @@ trait ManagesTransportadoraFormModal
 
         $this->transportadoraModalRecordId = null;
         $this->transportadoraForm = $this->defaultTransportadoraFormData();
+        $this->aplicarPrefillTransportadoraForm($prefillBusca);
         $this->transportadoraModalOpen = true;
     }
 
@@ -165,6 +166,10 @@ trait ManagesTransportadoraFormModal
 
     public function saveTransportadora(): void
     {
+        if (! $this->transportadoraModalOpen) {
+            return;
+        }
+
         $tipoPessoa = strtoupper(trim((string) ($this->transportadoraForm['tipo_pessoa'] ?? 'J')));
         $tipoPessoa = in_array($tipoPessoa, ['F', 'J'], true) ? $tipoPessoa : 'J';
 
@@ -214,7 +219,7 @@ trait ManagesTransportadoraFormModal
                 'transportadoraForm.cnpj_cpf' => 'CNPJ/CPF',
                 'transportadoraForm.rg_ie' => 'RG/IE',
                 'transportadoraForm.cep' => 'CEP',
-                'transportadoraForm.proprietario' => 'proprietário',
+                'transportadoraForm.proprietario' => 'nome/razão',
                 'transportadoraForm.apelido' => 'apelido',
                 'transportadoraForm.whatsapp' => 'WhatsApp',
                 'transportadoraForm.endereco' => 'endereço',
@@ -230,6 +235,8 @@ trait ManagesTransportadoraFormModal
 
         $motoristas = $data['motoristas'] ?? [];
         unset($data['motoristas']);
+
+        $created = false;
 
         if ($this->transportadoraModalRecordId) {
             $record = Transportadora::query()->find($this->transportadoraModalRecordId);
@@ -254,6 +261,7 @@ trait ManagesTransportadoraFormModal
             $data['ativo'] = true;
             $record = Transportadora::query()->create($data);
             $this->syncTransportadoraMotoristas($record, $motoristas);
+            $created = true;
 
             Notification::make()
                 ->title('Transportadora incluída.')
@@ -262,9 +270,41 @@ trait ManagesTransportadoraFormModal
         }
 
         $this->closeTransportadoraModal();
+        $this->afterTransportadoraSaved($record, $created);
+    }
+
+    /**
+     * Hook pós-gravação: na listagem destaca o registro; em outros contextos (ex.: NF-e) pode selecionar no formulário.
+     */
+    protected function afterTransportadoraSaved(Transportadora $record, bool $created): void
+    {
         $this->clearListSelection();
         $this->resetTable();
         $this->highlightRecord((int) $record->getKey());
+    }
+
+    protected function aplicarPrefillTransportadoraForm(?string $prefillBusca): void
+    {
+        $term = trim((string) $prefillBusca);
+
+        if ($term === '') {
+            return;
+        }
+
+        if (preg_match('/^(\d+)\s*[—\-]\s*(.+)$/u', $term, $m)) {
+            $term = trim($m[2]);
+        }
+
+        $digits = preg_replace('/\D/', '', $term) ?: '';
+
+        if (strlen($digits) >= 11) {
+            $this->transportadoraForm['tipo_pessoa'] = strlen($digits) > 11 ? 'J' : 'F';
+            $this->transportadoraForm['cnpj_cpf'] = Contador::formatCnpjCpf($digits);
+
+            return;
+        }
+
+        $this->transportadoraForm['proprietario'] = mb_strtoupper($term, 'UTF-8');
     }
 
     /**

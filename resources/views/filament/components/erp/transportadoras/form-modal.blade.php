@@ -1,7 +1,11 @@
 @if ($this->transportadoraModalOpen)
+@php
+    // Na NF-e o Esc é tratado por handleNfeModalEscape (evita fechar os dois modais).
+    $transportadoraEscapeNoHost = ! ($this->nfeModalOpen ?? false);
+@endphp
     <div
         class="erp-lookup-modal erp-transportadora-form-modal"
-        wire:keydown.escape.window="closeTransportadoraModal"
+        @if ($transportadoraEscapeNoHost) wire:keydown.escape.window="closeTransportadoraModal" @endif
         wire:keydown.f5.window.prevent="saveTransportadora"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeTransportadoraModal"></div>
@@ -55,7 +59,7 @@
                             </label>
 
                             <label class="erp-transportadora-form__field erp-transportadora-form__field--doc">
-                                <span>CNPJ/CPF</span>
+                                <span>CPF/CNPJ</span>
                                 <div class="erp-transportadora-form__doc">
                                     <input
                                         id="transportadora-cnpj-cpf"
@@ -86,7 +90,7 @@
                             </label>
 
                             <label class="erp-transportadora-form__field erp-transportadora-form__field--full">
-                                <span>Proprietário</span>
+                                <span>Nome/Razão</span>
                                 <input
                                     id="transportadora-proprietario"
                                     type="text"
@@ -99,7 +103,7 @@
                             </label>
 
                             <label class="erp-transportadora-form__field erp-transportadora-form__field--apelido">
-                                <span>Apelido / Fantasia</span>
+                                <span>Apelido/Fantasia</span>
                                 <input id="transportadora-apelido" type="text" wire:model="transportadoraForm.apelido">
                             </label>
 

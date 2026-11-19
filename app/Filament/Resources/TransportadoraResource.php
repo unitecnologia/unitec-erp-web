@@ -57,17 +57,21 @@ class TransportadoraResource extends Resource
                 TextColumn::make('cnpj_cpf')
                     ->label('CPF/CNPJ')
                     ->formatStateUsing(fn (?string $state): string => filled($state) ? Contador::formatCnpjCpf($state) : '—')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->wrap(false),
                 TextColumn::make('rg_ie')
                     ->label('RG/IE')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->wrap(false),
                 TextColumn::make('cidade')
                     ->label('Cidade')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->wrap(false),
                 TextColumn::make('uf')
                     ->label('UF')
                     ->placeholder('—')
-                    ->alignCenter(),
+                    ->alignCenter()
+                    ->wrap(false),
             ])
             ->defaultSort(fn (Builder $query, string $direction, $livewire): Builder => ErpTableSort::applyDefaultCodigoNumerico($query, $direction, $livewire))
             ->striped()

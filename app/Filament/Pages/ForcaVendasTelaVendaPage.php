@@ -650,6 +650,11 @@ class ForcaVendasTelaVendaPage extends Page
         try {
             app(VendasInternasEdicaoLockService::class)
                 ->liberarErpPorForcaVendasOrderId((int) $this->pedidoId, $user);
+            $order = ForcaVendasOrder::query()->find((int) $this->pedidoId);
+            if ($order instanceof ForcaVendasOrder) {
+                app(\App\Support\ForcaVendas\ForcaVendasEdicaoLockService::class)
+                    ->liberarErp($order, $user);
+            }
         } catch (\Throwable) {
             // Saída do formulário não deve falhar por lock.
         }
@@ -3841,6 +3846,9 @@ class ForcaVendasTelaVendaPage extends Page
                 // Pedido com vínculo VI: bloqueia o app enquanto o ERP edita.
                 app(VendasInternasEdicaoLockService::class)
                     ->adquirirErpPorForcaVendasOrderId((int) $order->id, $user);
+                // Pedido nativo FV: mesmo bloqueio na tabela forca_vendas_orders.
+                app(\App\Support\ForcaVendas\ForcaVendasEdicaoLockService::class)
+                    ->adquirirErp($order, $user);
             }
 
             $this->vendaEmpresaId = (int) $order->empresa_id;

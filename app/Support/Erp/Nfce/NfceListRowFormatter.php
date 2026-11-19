@@ -12,10 +12,15 @@ final class NfceListRowFormatter
 {
     /**
      * @param  array<int, string>|null  $davComercialPorPdvVendaId  mapa SCV (pdv_venda_id → pedidos.numero)
+     * @param  array<int, string>|null  $caixaFinanceiroPorVendaId  mapa regularização (venda_id → nome conta)
      * @return array<string, string>
      */
-    public function format(PdvVendaNfce $record, bool $showSituacao = false, ?array $davComercialPorPdvVendaId = null): array
-    {
+    public function format(
+        PdvVendaNfce $record,
+        bool $showSituacao = false,
+        ?array $davComercialPorPdvVendaId = null,
+        ?array $caixaFinanceiroPorVendaId = null,
+    ): array {
         $venda = $record->pdvVenda;
 
         $cpfRaw = filled($venda?->cpf_nota)
@@ -77,10 +82,8 @@ final class NfceListRowFormatter
             'protocolo' => '<span title="'.e($protocolo === '—' ? '' : $protocolo).'">'.e($protocolo).'</span>',
             'cpf' => e($cpf),
             'cliente' => '<span title="'.e($cliente === '—' ? '' : $cliente).'">'.e($cliente).'</span>',
-            // Histórico SCV: rótulo do CAIXA GERAL do UNI (conta sistema; vínculo na sessão de migração).
-            'caixa' => e((string) $record->operacao === NfceListDavNumero::OPERACAO_SCV_HIST
-                ? 'CAIXA GERAL'
-                : (string) ($venda?->sessao?->terminal?->nome ?: '—')),
+            // PDV = terminal; SCV = CAIXA GERAL; regularização Monitor = conta financeira da venda.
+            'caixa' => e(NfceListCaixaLabel::texto($record, $caixaFinanceiroPorVendaId)),
             'vendedor' => e($vendedor !== '' ? $vendedor : '—'),
             'bruto' => $brutoHtml,
             'desc_acres' => $descAcresHtml,

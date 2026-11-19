@@ -41,7 +41,7 @@
                 },
                 poll() {
                     this.s = 5;
-                    if (this.busy) return;
+                    if (this.busy || window.__erpFvMonFiltroBusy) return;
                     // Não compete com faturar/cancelar/reabrir/lote/clonar/NFC-e.
                     // Overlay SEFAZ (DOM/flag JS): cobre o request longo sem depender só do Livewire.
                     if (this.$wire.faturarProgressOpen
@@ -56,7 +56,19 @@
                         return;
                     }
                     this.busy = true;
-                    this.$wire.pollRefresh().finally(() => { this.busy = false; });
+                    // Epoch: se o usuário trocar vendedor/filtro durante o poll, a resposta
+                    // antiga pode reaplicar o filtro anterior — reaplica o desejado.
+                    const epoch = window.__erpFvMonFiltroEpoch || 0;
+                    this.$wire.pollRefresh().finally(() => {
+                        this.busy = false;
+                        const epochAgora = window.__erpFvMonFiltroEpoch || 0;
+                        const desejado = window.__erpFvMonFiltroDesejado;
+                        if (epochAgora === epoch || desejado == null) return;
+                        if (String(this.$wire.filtroValor ?? '') === String(desejado)) return;
+                        if (typeof window.__erpFvMonAplicarFiltroValor === 'function') {
+                            window.__erpFvMonAplicarFiltroValor(this.$wire, desejado);
+                        }
+                    });
                 },
             }"
         >
@@ -164,9 +176,9 @@
                                     if (op) this.escolher(op.id, op.id === 'todos' ? '' : op.nome);
                                 },
                                 escolher(id, nome) {
-                                    this.$wire.set('filtroValor', String(id));
                                     this.q = id === 'todos' ? '' : nome;
                                     this.open = false;
+                                    window.__erpFvMonAplicarFiltroValor(this.$wire, id);
                                 },
                             }"
                             @click.outside="open = false"
@@ -235,7 +247,7 @@
                                     const valor = this.selecionados.length ? this.selecionados.join('|') : '';
                                     if (valor === this.aplicado) return;
                                     this.aplicado = valor;
-                                    this.$wire.set('filtroValor', valor);
+                                    window.__erpFvMonAplicarFiltroValor(this.$wire, valor);
                                 },
                             }"
                             @click.outside="fechar()"
@@ -286,7 +298,7 @@
                     @elseif ($this->filtroCampoTipo() === 'select')
                         <div
                             class="erp-fv-mon__combo erp-fv-mon__combo--select"
-                            wire:key="filtro-select-{{ $this->filtroCampo }}"
+                            wire:key="filtro-select-{{ $this->filtroCampo }}-{{ $this->filtroValor }}"
                             x-data="{
                                 open: false,
                                 ativo: 0,
@@ -319,8 +331,8 @@
                                 escolher(id, nome) {
                                     this.valor = id;
                                     this.rotulo = id === 'todos' ? this.todos : nome;
-                                    this.$wire.set('filtroValor', String(id));
                                     this.open = false;
+                                    window.__erpFvMonAplicarFiltroValor(this.$wire, id);
                                 },
                             }"
                             @click.outside="open = false"
@@ -398,5 +410,39 @@
     ])
 
     @include('filament.components.erp.form-scripts')
+
+    @once
+        @script
+        <script>
+            window.__erpFvMonFiltroEpoch = window.__erpFvMonFiltroEpoch || 0;
+            window.__erpFvMonFiltroBusy = false;
+            window.__erpFvMonFiltroDesejado = window.__erpFvMonFiltroDesejado ?? null;
+
+            /**
+             * Aplica filtroValor com proteção contra o poll 5s sobrescrever a seleção.
+             * Não remonta a tela: só $wire.set + updatedFiltroValor (resetTable no PHP).
+             */
+            window.__erpFvMonAplicarFiltroValor = function (wire, valor) {
+                const next = String(valor ?? '');
+                window.__erpFvMonFiltroEpoch = (window.__erpFvMonFiltroEpoch || 0) + 1;
+                window.__erpFvMonFiltroDesejado = next;
+                window.__erpFvMonFiltroBusy = true;
+
+                const done = () => { window.__erpFvMonFiltroBusy = false; };
+                try {
+                    const req = wire.set('filtroValor', next);
+                    if (req && typeof req.finally === 'function') {
+                        req.finally(done);
+                    } else {
+                        done();
+                    }
+                } catch (e) {
+                    done();
+                    throw e;
+                }
+            };
+        </script>
+        @endscript
+    @endonce
 </div>
 </div>

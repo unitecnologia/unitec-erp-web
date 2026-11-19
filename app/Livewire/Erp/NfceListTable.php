@@ -5,6 +5,8 @@ namespace App\Livewire\Erp;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\Nfce\NfceEmpresaEscopo;
+use App\Support\Erp\Nfce\NfceListAvisoRodape;
+use App\Support\Erp\Nfce\NfceListCaixaLabel;
 use App\Support\Erp\Nfce\NfceListDavNumero;
 use App\Support\Erp\Nfce\NfceListPeriodo;
 use App\Support\Erp\Nfce\NfceListRowFormatter;
@@ -51,6 +53,10 @@ class NfceListTable extends Component
     /**
      * Troca de aba: 1 request só na grade. Sem re-render do Filament pai.
      * Rodapé (totais do período) é responsabilidade exclusiva do ListNfces — não sobrescrever via JS.
+     *
+     * Importante: nunca chamar o pai com remount (onNfceListStatusChanged) aqui.
+     * Esse 2º request remorphava a página e podia orphanar este componente — abas
+     * “travavam” até F5 porque Livewire.getByName('erp.nfce-list-table') ficava vazio.
      */
     public function setStatusFilter(string $filter): void
     {
@@ -67,29 +73,24 @@ class NfceListTable extends Component
         $this->highlightedRecordId = null;
         $this->resetPage();
 
-        // Abas com rodapé amarelo: o pai remonta o footer (Denegado destaca a 1ª nota sozinho).
-        $needsFooterAviso = in_array($normalized, [
-            PdvVendaNfce::TAB_CONTINGENCIA,
-            PdvVendaNfce::TAB_DUPLICIDADE,
-            PdvVendaNfce::TAB_DENEGADO,
-        ], true);
+        // Denegado: destaca a 1ª nota na própria grade (aviso amarelo via JS, sem remount do pai).
+        if ($normalized === PdvVendaNfce::TAB_DENEGADO) {
+            $this->highlightedRecordId = $this->primeiroIdListaAtual();
+        }
+
+        $aviso = $this->avisoRodapeParaDestaque($normalized, $this->highlightedRecordId);
 
         $this->js(sprintf(
             '(() => {
                 const status = %s;
-                const needsFooterAviso = %s;
+                const highlightedId = %s;
+                const aviso = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
-                    if (needsFooterAviso) {
-                        parent.call("onNfceListStatusChanged", status);
-                    } else {
-                        parent.set("statusFilter", status, false);
-                        parent.set("nfceSelecionadosTransmitir", [], false);
-                        try { parent.set("highlightedRecordId", null, false); } catch (e) {}
-                        const aviso = document.querySelector(".erp-nfce-page .erp-nfce__contingencia-aviso");
-                        if (aviso) aviso.remove();
-                    }
+                    parent.set("statusFilter", status, false);
+                    parent.set("nfceSelecionadosTransmitir", [], false);
+                    try { parent.set("highlightedRecordId", highlightedId, false); } catch (e) {}
                 }
                 try {
                     const url = new URL(window.location.href);
@@ -101,21 +102,56 @@ class NfceListTable extends Component
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
                 window.dispatchEvent(new CustomEvent("erp-nfce-status", { detail: status }));
-                if (!needsFooterAviso) {
+                if (window.ErpNfceAvisoRodape && typeof window.ErpNfceAvisoRodape.apply === "function") {
+                    window.ErpNfceAvisoRodape.apply(aviso);
+                } else {
+                    const el = document.querySelector(".erp-nfce-page .erp-nfce__contingencia-aviso");
+                    if (el) el.remove();
+                }
+                if (!highlightedId) {
                     document.querySelectorAll(".erp-nfce-page .fi-ta-row.erp-row-selected").forEach((row) => {
                         row.classList.remove("erp-row-selected");
                     });
                 }
             })()',
             json_encode($normalized, JSON_UNESCAPED_UNICODE),
-            $needsFooterAviso ? 'true' : 'false',
+            json_encode($this->highlightedRecordId, JSON_UNESCAPED_UNICODE),
+            json_encode($aviso, JSON_UNESCAPED_UNICODE),
             json_encode(self::PARENT_NAME, JSON_UNESCAPED_UNICODE),
         ));
+    }
 
-        // O pai devolve o destaque via erp-nfce-list-refresh; evita paint intermediário vazio.
-        if ($needsFooterAviso) {
-            $this->skipRender();
+    /**
+     * @return array{titulo: string, motivo: string, ajuda: string}|null
+     */
+    protected function avisoRodapeParaDestaque(string $statusFilter, ?int $highlightedRecordId): ?array
+    {
+        if (! $highlightedRecordId || ! in_array($statusFilter, [
+            PdvVendaNfce::TAB_CONTINGENCIA,
+            PdvVendaNfce::TAB_DUPLICIDADE,
+            PdvVendaNfce::TAB_DENEGADO,
+        ], true)) {
+            return null;
         }
+
+        $record = NfceEmpresaEscopo::find(
+            $highlightedRecordId,
+            NfceEmpresaEscopo::empresaIdAtiva(),
+        );
+
+        return $record ? NfceListAvisoRodape::fromRecord($record, $statusFilter) : null;
+    }
+
+    protected function primeiroIdListaAtual(): ?int
+    {
+        $table = (new PdvVendaNfce)->getTable();
+        $id = $this->buildFilterQuery()
+            ->reorder()
+            ->orderByDesc("{$table}.numero")
+            ->orderByDesc("{$table}.id")
+            ->value("{$table}.id");
+
+        return $id ? (int) $id : null;
     }
 
     /**
@@ -198,10 +234,13 @@ class NfceListTable extends Component
     {
         $records = $this->records();
 
+        $items = $records->items();
+
         return view('livewire.erp.nfce-list-table', [
             'records' => $records,
             'formatter' => app(NfceListRowFormatter::class),
-            'davComercialPorPdvVendaId' => NfceListDavNumero::aquecer($records->items()),
+            'davComercialPorPdvVendaId' => NfceListDavNumero::aquecer($items),
+            'caixaFinanceiroPorVendaId' => NfceListCaixaLabel::aquecer($items),
             'showSituacao' => $this->showsSituacaoColumn(),
             'isContingenciaTab' => $this->statusFilter === PdvVendaNfce::TAB_CONTINGENCIA,
             'inutilizacoesFaixas' => $this->inutilizacoesFaixas(),
@@ -347,6 +386,7 @@ class NfceListTable extends Component
                         'numero',
                         'vendedor_nome',
                         'total',
+                        'origem',
                     ]);
                 },
                 'pdvVenda.sessao' => static fn ($q) => $q->select(['id', 'terminal_id', 'empresa_id']),
@@ -382,13 +422,7 @@ class NfceListTable extends Component
                 $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
                     ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));
             }),
-            'caixa' => $query->where(function (Builder $outer) use ($like, $table): void {
-                $termCaixa = mb_strtoupper(trim($like, '%'), 'UTF-8');
-                $outer->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like));
-                if ($termCaixa !== '' && str_contains('CAIXA GERAL', $termCaixa)) {
-                    $outer->orWhere("{$table}.operacao", NfceListDavNumero::OPERACAO_SCV_HIST);
-                }
-            }),
+            'caixa' => NfceListCaixaLabel::aplicarBusca($query, $like),
             'usuario' => $query->whereHas('pdvVenda.user', fn (Builder $user): Builder => $user->where('name', 'like', $like)),
             'vendedor' => $query->where(function (Builder $outer) use ($like): void {
                 $outer->whereHas('pdvVenda.vendedor', fn (Builder $vendedor): Builder => $vendedor->where('nome', 'like', $like))

@@ -4,6 +4,7 @@ namespace App\Support\Erp\Queries;
 
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\Nfce\NfceEmpresaEscopo;
+use App\Support\Erp\Nfce\NfceListCaixaLabel;
 use App\Support\Erp\Nfce\NfceListPeriodo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -95,7 +96,7 @@ class NfceListQueryBuilder
                 $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
                     ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));
             }),
-            'caixa' => $query->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like)),
+            'caixa' => NfceListCaixaLabel::aplicarBusca($query, $like),
             'usuario' => $query->whereHas('pdvVenda.user', fn (Builder $user): Builder => $user->where('name', 'like', $like)),
             'vendedor' => $query->where(function (Builder $outer) use ($like): void {
                 $outer->whereHas('pdvVenda.vendedor', fn (Builder $vendedor): Builder => $vendedor->where('nome', 'like', $like))

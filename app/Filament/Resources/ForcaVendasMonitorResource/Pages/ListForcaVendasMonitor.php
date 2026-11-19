@@ -1245,9 +1245,11 @@ class ListForcaVendasMonitor extends ListRecords
         }
 
         $valor = $valorAtual === '' ? 'todos' : $valorAtual;
-        $rotulo = $valor === 'todos'
-            ? $todosLabel
-            : (string) ($options[$valor] ?? $valor);
+        $rotulo = $todosLabel;
+        if ($valor !== 'todos') {
+            $rotulo = (string) ($options[$valor]
+                ?? (is_numeric($valor) ? ($options[(int) $valor] ?? $valor) : $valor));
+        }
 
         return [
             'itens' => $itens,
@@ -1334,6 +1336,7 @@ class ListForcaVendasMonitor extends ListRecords
 
         $this->totaisCacheKey = '';
         $this->totaisCachePayload = [];
+        unset($this->totaisFiltrados, $this->totalFiltrado);
         $this->guardarAssinaturaPedidos($this->lerAssinaturaPedidos());
     }
 
@@ -1455,12 +1458,20 @@ class ListForcaVendasMonitor extends ListRecords
 
         $total = (int) ($row->total ?? 0);
 
+        // Inclui a assinatura do filtro: evita colisão entre vendedores/filtros
+        // com o mesmo COUNT/MAX e impede o poll de reutilizar totais/estado alheios.
         return [
             'hash' => md5(implode('|', [
                 $total,
                 (string) ($row->max_updated ?? ''),
                 (string) ($row->max_id ?? ''),
                 ErpDataSyncVersion::current(ErpDataSyncVersion::CHANNEL_SALES),
+                $this->situacaoFilter,
+                $this->filtroCampo,
+                (string) $this->filtroValor,
+                $this->plataformaFilter,
+                (string) $this->periodoDeApplied,
+                (string) $this->periodoAteApplied,
             ])),
             'total' => $total,
         ];

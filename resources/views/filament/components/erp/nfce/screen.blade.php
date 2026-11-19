@@ -144,5 +144,5 @@
 
     @include('filament.components.erp.form-scripts')
 
-    <script src="{{ asset('js/erp-nfe-tab-counts.js') }}?v=2"></script>
+    <script src="{{ asset('js/erp-nfe-tab-counts.js') }}?v=3"></script>
 </div>

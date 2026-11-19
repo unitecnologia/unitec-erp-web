@@ -783,6 +783,8 @@ class ForcaVendasSyncService
                     ->values()
                     ->all() ?? [];
 
+                $locks = app(ForcaVendasEdicaoLockService::class)->flagsParaApp($order);
+
                 return [
                     'uuid' => $order->uuid,
                     'numero' => $doc?->numero,
@@ -800,6 +802,8 @@ class ForcaVendasSyncService
                     'data' => optional($order->dataAberturaAt())->toDateString(),
                     'created_at' => optional($order->client_created_at ?? $order->received_at)->toIso8601String(),
                     'updated_at' => optional($order->updated_at)->toIso8601String(),
+                    'em_edicao_fv' => $locks['em_edicao_fv'],
+                    'em_edicao_erp' => $locks['em_edicao_erp'],
                 ];
             })
             ->all();
@@ -886,6 +890,22 @@ class ForcaVendasSyncService
                     continue;
                 }
 
+                $empresaId = $user->empresa_id ? (int) $user->empresa_id : null;
+                $reabertura = ! empty($order['reabertura']);
+
+                // Apps antigos / param off: mantém idempotência (duplicado).
+                // Só atualiza in-place com flag reabertura + parâmetro ligado.
+                if ($reabertura && EmpresaParametros::forcaVendasPermitirReabrirPedido($empresaId)) {
+                    $results[] = $this->updateOrderExistente(
+                        $existing,
+                        $order,
+                        $user,
+                        (string) ($order['device_uuid'] ?? ''),
+                    );
+
+                    continue;
+                }
+
                 $results[] = $this->orderPushResult($existing, duplicado: true);
 
                 continue;
@@ -895,6 +915,274 @@ class ForcaVendasSyncService
         }
 
         return $results;
+    }
+
+    /**
+     * Expõe regras de reabertura para o bloqueio de edição (API lock).
+     */
+    public function assertPodeReabrirPedidoPublico(ForcaVendasOrder $order, User $user): void
+    {
+        $order->loadMissing(['venda', 'pedido']);
+        $this->assertPodeReabrirPedido($order, $user);
+    }
+
+    /**
+     * Reabre/edita pedido FV existente (mesmo UUID), sem duplicar DAV/itens/estoque.
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function updateOrderExistente(
+        ForcaVendasOrder $existing,
+        array $order,
+        User $user,
+        string $deviceUuid = '',
+    ): array {
+        try {
+            return DB::transaction(function () use ($existing, $order, $user, $deviceUuid): array {
+                $fv = ForcaVendasOrder::query()->lockForUpdate()->findOrFail($existing->id);
+                $fv->loadMissing(['pedido', 'venda']);
+
+                $this->assertPodeReabrirPedido($fv, $user);
+                app(ForcaVendasEdicaoLockService::class)->assertPodeAplicarReabertura($fv, $deviceUuid);
+
+                if ((string) ($fv->tipo ?? '') !== ForcaVendasOrder::TIPO_PEDIDO) {
+                    throw new \RuntimeException('Somente pedidos podem ser reabertos para edição.');
+                }
+
+                $tipoPayload = (string) ($order['tipo'] ?? ForcaVendasOrder::TIPO_PEDIDO);
+                if ($tipoPayload !== '' && $tipoPayload !== ForcaVendasOrder::TIPO_PEDIDO) {
+                    throw new \RuntimeException(
+                        'Não é possível alterar o tipo do documento na reabertura. Use pedido.'
+                    );
+                }
+
+                $result = $this->updatePedidoExistente($fv, $order, $user);
+
+                $fresh = ForcaVendasOrder::query()->find($fv->id);
+                if ($fresh instanceof ForcaVendasOrder) {
+                    app(ForcaVendasEdicaoLockService::class)->liberarAposSync($fresh);
+                }
+
+                return $result;
+            });
+        } catch (\Throwable $e) {
+            return [
+                'uuid' => $existing->uuid,
+                'tipo' => $existing->tipo ?? ForcaVendasOrder::TIPO_PEDIDO,
+                'status' => ForcaVendasOrder::STATUS_ERRO,
+                'erro' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    private function assertPodeReabrirPedido(ForcaVendasOrder $order, User $user): void
+    {
+        $empresaId = $user->empresa_id ? (int) $user->empresa_id : 0;
+        $orderEmpresaId = (int) ($order->empresa_id ?? 0);
+
+        if ($empresaId <= 0 || $orderEmpresaId <= 0 || $orderEmpresaId !== $empresaId) {
+            throw new \RuntimeException('Documento pertence a outra empresa. Não é possível reabrir.');
+        }
+
+        $mesmoUsuario = (int) ($order->user_id ?? 0) === (int) $user->id;
+        $mesmoVendedor = $user->vendedor_id
+            && (int) ($order->vendedor_id ?? 0) === (int) $user->vendedor_id;
+
+        if (! $mesmoUsuario && ! $mesmoVendedor) {
+            throw new \RuntimeException('Documento de outro usuário. Não é possível reabrir.');
+        }
+
+        if ((string) $order->status === ForcaVendasOrder::STATUS_ERRO) {
+            throw new \RuntimeException('Documento com erro de importação. Não é possível reabrir.');
+        }
+
+        if ((string) ($order->tipo ?? '') !== ForcaVendasOrder::TIPO_PEDIDO) {
+            throw new \RuntimeException('Somente pedidos podem ser reabertos para edição.');
+        }
+
+        if (in_array((string) $order->situacao, [
+            ForcaVendasOrder::SITUACAO_FATURADO,
+            ForcaVendasOrder::SITUACAO_CANCELADO,
+        ], true)) {
+            throw new \RuntimeException(
+                'Pedido faturado ou cancelado não pode ser reaberto (situação: '.$order->situacao.').'
+            );
+        }
+
+        if (! in_array((string) $order->situacao, ForcaVendasTelaVendaService::situacoesEditaveis(), true)) {
+            throw new \RuntimeException(
+                'Este pedido não pode mais ser editado (situação: '.$order->situacaoLabel().').'
+            );
+        }
+
+        if ($order->venda_id) {
+            $venda = $order->venda_id ? Venda::query()->find((int) $order->venda_id) : null;
+            if ($venda instanceof Venda && $venda->status !== Venda::STATUS_ABERTO) {
+                throw new \RuntimeException('Pedido já faturado. Não é possível reabrir.');
+            }
+        }
+    }
+
+    /**
+     * Atualiza Pedido + ForcaVendasOrder in-place (mesmo DAV / número).
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function updatePedidoExistente(ForcaVendasOrder $fv, array $order, User $user): array
+    {
+        $pedido = Pedido::query()->lockForUpdate()->find($fv->pedido_id);
+
+        if (! $pedido instanceof Pedido) {
+            throw new \RuntimeException('Pedido (DAV) não encontrado.');
+        }
+
+        $clienteId = (int) ($order['cliente_id'] ?? 0);
+        if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
+            throw new \RuntimeException('Cliente inválido ou não encontrado.');
+        }
+
+        $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
+        if ($itens === []) {
+            throw new \RuntimeException('Pedido sem itens.');
+        }
+
+        $descontoValor = (float) ($order['desconto_valor'] ?? 0);
+        $percentualDesconto = (float) ($order['percentual_desconto'] ?? 0);
+        $empresaIdPedido = $user->empresa_id ? (int) $user->empresa_id : null;
+        $podeAlterarPreco = $this->alterarPrecoUnitarioPermitido($empresaIdPedido);
+        $tabSvc = app(ProductTabelaPrecoService::class);
+
+        $reserva = new EstoqueReservaService();
+        $reserva->liberarPedido($fv);
+
+        PedidoItem::query()->where('pedido_id', $pedido->id)->delete();
+
+        $subtotal = 0.0;
+        $linha = 1;
+        $payloadItens = [];
+
+        foreach ($itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+            $product = $productId > 0 ? Product::query()->find($productId) : null;
+
+            if (! $product) {
+                throw new \RuntimeException('Produto inválido no item '.$linha.'.');
+            }
+
+            $quantidade = (float) ($item['quantidade'] ?? 0);
+            $preco = round((float) ($item['preco_unitario'] ?? 0), 2);
+            $descItem = round((float) ($item['desconto'] ?? 0), 2);
+
+            if ($quantidade <= 0) {
+                throw new \RuntimeException('Quantidade inválida no item '.$linha.'.');
+            }
+
+            if ($preco <= 0) {
+                throw new \RuntimeException('Preço unitário inválido no item '.$linha.'.');
+            }
+
+            if ($descItem < 0) {
+                throw new \RuntimeException('Desconto inválido no item '.$linha.'.');
+            }
+
+            $nivelItem = strtolower(trim((string) ($item['tabela_nivel'] ?? $item['nivel'] ?? '')));
+            $priceTableItem = (int) ($item['price_table_id'] ?? 0);
+            $precoEsperado = $this->precoEsperadoItemApp(
+                $product,
+                $quantidade,
+                $nivelItem !== '' ? $nivelItem : null,
+                $priceTableItem > 0 ? $priceTableItem : null,
+                $empresaIdPedido,
+                $tabSvc,
+            );
+
+            if (! $podeAlterarPreco && abs($preco - $precoEsperado) > 0.009) {
+                throw new \RuntimeException(
+                    'Preço unitário diferente do cadastro/tabela no item '.$linha
+                    .'. A empresa não permite alterar preço no App Força de Vendas.'
+                );
+            }
+
+            $totalItem = round(($quantidade * $preco) - $descItem, 2);
+            if ($totalItem < 0) {
+                throw new \RuntimeException('Total do item '.$linha.' ficou negativo.');
+            }
+
+            $subtotal += $totalItem;
+
+            $attrs = [
+                'pedido_id' => $pedido->id,
+                'item' => $linha,
+                'product_id' => $productId,
+                'product_grade_id' => $item['product_grade_id'] ?? null,
+                'quantidade' => $quantidade,
+                'preco_unitario' => $preco,
+                'total' => $totalItem,
+                'desconto' => $descItem,
+                'descricao' => $item['descricao'] ?? null,
+            ];
+
+            if (Schema::hasColumn('pedido_itens', 'price_table_id') && $priceTableItem > 0) {
+                $attrs['price_table_id'] = $priceTableItem;
+            }
+            if (Schema::hasColumn('pedido_itens', 'tabela_nivel') && $nivelItem !== '') {
+                $attrs['tabela_nivel'] = $nivelItem;
+            }
+
+            PedidoItem::query()->create($attrs);
+            $payloadItens[] = $attrs;
+            $linha++;
+        }
+
+        $total = round($subtotal - $descontoValor, 2);
+
+        $pedido->update([
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $pedido->vendedor_id,
+            'percentual_desconto' => $percentualDesconto,
+            'desconto_valor' => $descontoValor,
+            'forma_pagamento' => $order['forma_pagamento'] ?? $pedido->forma_pagamento,
+            'observacoes' => $order['observacoes'] ?? null,
+            'subtotal' => round($subtotal, 2),
+            'total' => $total,
+            'status' => Pedido::STATUS_ABERTO,
+        ]);
+
+        $payloadAnterior = is_array($fv->payload) ? $fv->payload : [];
+        $payload = array_merge($order, [
+            'origem' => 'forca_vendas_reabertura',
+            'reaberto_em' => now()->toIso8601String(),
+            'device_uuid' => $order['device_uuid'] ?? ($payloadAnterior['device_uuid'] ?? null),
+            'itens' => $payloadItens,
+        ]);
+
+        $empresaSyncId = (int) ($user->empresa_id ?? 0);
+        $restricaoFinanceira = ! empty($order['restricao_financeira'])
+            && FaturamentoPendenciaFinanceiraGuard::deveReterPorPendenciaCliente(
+                $empresaSyncId > 0 ? $empresaSyncId : null,
+            );
+
+        $fv->update([
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id ?? $fv->vendedor_id,
+            'total' => $total,
+            'payload' => $payload,
+            'status' => ForcaVendasOrder::STATUS_IMPORTADO,
+            'situacao' => $restricaoFinanceira
+                ? ForcaVendasOrder::SITUACAO_FINANCEIRO
+                : ForcaVendasOrder::SITUACAO_PENDENTE,
+            'erro' => null,
+        ]);
+
+        $fv = $fv->fresh(['pedido', 'venda']) ?? $fv;
+        $reserva->reservarPedido($fv, $pedido->fresh('itens') ?? $pedido, $user);
+
+        return $this->orderPushResult($fv);
     }
 
     /**

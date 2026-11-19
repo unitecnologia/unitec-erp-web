@@ -52,6 +52,55 @@
         }
     }
 
+    /**
+     * Aviso amarelo (Contingência / Duplicidade / Denegado) sem remount do Filament pai.
+     * Evita orphanar a grade Livewire na troca rápida de abas.
+     */
+    function applyNfceAvisoRodape(aviso) {
+        var page = document.querySelector('.erp-nfce-page');
+        if (!page) {
+            return;
+        }
+
+        var host = page.querySelector('.erp-nfe__total--nfce');
+        if (!host) {
+            return;
+        }
+
+        var existing = host.querySelector('.erp-nfce__contingencia-aviso');
+
+        if (!aviso || !aviso.titulo) {
+            if (existing) {
+                existing.remove();
+            }
+            return;
+        }
+
+        if (!existing) {
+            existing = document.createElement('div');
+            existing.className = 'erp-nfce__contingencia-aviso';
+            existing.setAttribute('role', 'status');
+            host.appendChild(existing);
+        }
+
+        existing.textContent = '';
+
+        var titulo = document.createElement('strong');
+        titulo.className = 'erp-nfce__contingencia-aviso__titulo';
+        titulo.textContent = String(aviso.titulo || '');
+        existing.appendChild(titulo);
+
+        var motivo = document.createElement('span');
+        motivo.className = 'erp-nfce__contingencia-aviso__motivo';
+        motivo.textContent = 'Motivo: ' + String(aviso.motivo || '');
+        existing.appendChild(motivo);
+
+        var ajuda = document.createElement('span');
+        ajuda.className = 'erp-nfce__contingencia-aviso__ajuda';
+        ajuda.textContent = String(aviso.ajuda || '');
+        existing.appendChild(ajuda);
+    }
+
     window.ErpNfeTabCounts = {
         applyNfe: function (counts) {
             applyCounts('erp-nfe', counts);
@@ -63,5 +112,9 @@
 
     window.ErpNfceFooterTotals = {
         apply: applyNfceFooterTotals,
+    };
+
+    window.ErpNfceAvisoRodape = {
+        apply: applyNfceAvisoRodape,
     };
 })();

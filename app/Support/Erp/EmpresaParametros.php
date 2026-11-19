@@ -220,6 +220,12 @@ final class EmpresaParametros
                 'json_fallback' => true,
             ],
 
+            'param_forca_vendas_permitir_reabrir_pedido' => [
+                'label' => 'Permitir Reabrir Pedido',
+                'hint' => 'Marcado: o App Força de Vendas pode reabrir e editar pedidos ainda não faturados (mesmo UUID/DAV, sem duplicar). Desmarcado: mantém o bloqueio atual (push idempotente). Pedidos faturados ou cancelados nunca podem ser reabertos.',
+                'default' => false,
+            ],
+
             'param_vendas_internas_fechar_orcamento_auto' => [
                 'label' => 'Fechar automaticamente os orçamentos enviados pelo aplicativo',
                 'hint' => 'Marcado: orçamentos do App Vendas Internas chegam com status Fechado (prontos para importar no PDV). Desmarcado: chegam Abertos (comportamento atual). Não fatura nem movimenta estoque/financeiro.',
@@ -1966,6 +1972,28 @@ final class EmpresaParametros
             self::COLUMN_FORCA_VENDAS_ALTERAR_PRECO_UNITARIO,
             $empresaId,
         );
+    }
+
+    /**
+     * App Força de Vendas pode reabrir/editar pedido ainda não faturado (mesmo UUID).
+     */
+    public static function forcaVendasPermitirReabrirPedido(?int $empresaId): bool
+    {
+        $default = (bool) (self::permissionFields()['param_forca_vendas_permitir_reabrir_pedido']['default'] ?? false);
+
+        if (! $empresaId || $empresaId <= 0) {
+            return $default;
+        }
+
+        if (! ErpSchema::hasColumn((new Empresa)->getTable(), 'param_forca_vendas_permitir_reabrir_pedido')) {
+            return $default;
+        }
+
+        $valor = Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_forca_vendas_permitir_reabrir_pedido');
+
+        return $valor === null ? $default : (bool) $valor;
     }
 
     public static function gravarForcaVendasAlterarPrecoUnitario(int $empresaId, mixed $valor): bool

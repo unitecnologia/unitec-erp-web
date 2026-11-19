@@ -181,6 +181,9 @@ trait ManagesNfeEmissaoModal
 
     public string $nfeTransportadoraBusca = '';
 
+    /** Label formatado da transportadora efetivamente selecionada (não o texto digitado). */
+    public string $nfeTransportadoraSelecionadaLabel = '';
+
     /** @var list<array{id: int, codigo: string, nome: string, cpf_cnpj: string, doc_tipo: string}> */
     public array $nfeTransportadoraSugestoes = [];
 
@@ -271,6 +274,9 @@ trait ManagesNfeEmissaoModal
         $this->fecharNfeModalDescontoItem();
         $this->fecharNfeInfoAdicionaisModal();
         $this->fecharNfeClienteFiscalIncompleto();
+        if ($this->transportadoraModalOpen ?? false) {
+            $this->closeTransportadoraModal();
+        }
         $this->nfeModalOpen = false;
         $this->nfeModalRecordId = null;
         $this->nfeModalStatus = 'ABERTA';
@@ -1378,6 +1384,7 @@ trait ManagesNfeEmissaoModal
         $term = trim($value);
 
         if ($term === '') {
+            $this->desvincularNfeTransportadoraSelecionada(keepBusca: true);
             $this->fecharNfeSugestoesTransportadora();
 
             return;
@@ -1388,6 +1395,9 @@ trait ManagesNfeEmissaoModal
 
             return;
         }
+
+        // Texto digitado nunca conta como transportadora selecionada.
+        $this->desvincularNfeTransportadoraSelecionada(keepBusca: true);
 
         $digits = preg_replace('/\D/', '', $term) ?: '';
         $termUpper = mb_strtoupper($term, 'UTF-8');
@@ -1443,8 +1453,15 @@ trait ManagesNfeEmissaoModal
             })
             ->values()
             ->all();
-        $this->nfeTransportadoraSugestoesOpen = $this->nfeTransportadoraSugestoes !== [];
+        $this->nfeTransportadoraSugestoesOpen = true;
         $this->nfeSelectedTransportadoraSugestaoIndex = 0;
+    }
+
+    public function abrirNovaTransportadoraNfe(bool $usarBusca = false): void
+    {
+        $prefill = $usarBusca ? trim($this->nfeTransportadoraBusca) : '';
+        $this->fecharNfeSugestoesTransportadora();
+        $this->createTransportadora($prefill !== '' ? $prefill : null);
     }
 
     public function confirmarNfeTransportadoraBusca(): void
@@ -1505,7 +1522,15 @@ trait ManagesNfeEmissaoModal
             ->first();
 
         if (! $row) {
-            Notification::make()->title('Transportador não encontrado.')->warning()->send();
+            $this->desvincularNfeTransportadoraSelecionada(keepBusca: true);
+            $this->nfeTransportadoraSugestoes = [];
+            $this->nfeTransportadoraSugestoesOpen = true;
+            $this->nfeSelectedTransportadoraSugestaoIndex = 0;
+            Notification::make()
+                ->title('Transportadora não encontrada no cadastro.')
+                ->body('Use + Nova Transportadora para cadastrar.')
+                ->warning()
+                ->send();
 
             return;
         }
@@ -1532,8 +1557,10 @@ trait ManagesNfeEmissaoModal
             ->first();
 
         if (! $row) {
-            Notification::make()->title('Transportador não encontrado.')->warning()->send();
+            Notification::make()->title('Transportadora não encontrada no cadastro.')->warning()->send();
             $this->nfeForm['transportadora_id'] = '';
+            $this->nfeForm['transportadora_codigo'] = '0';
+            $this->nfeTransportadoraSelecionadaLabel = '';
             $this->nfeTransportadoraBusca = '';
             $this->fecharNfeSugestoesTransportadora();
 
@@ -1582,16 +1609,29 @@ trait ManagesNfeEmissaoModal
         $this->nfeForm['transportadora_id'] = '';
         $this->nfeForm['transportadora_codigo'] = '0';
         $this->nfeTransportadoraBusca = '';
+        $this->nfeTransportadoraSelecionadaLabel = '';
         $this->fecharNfeSugestoesTransportadora();
+    }
+
+    protected function desvincularNfeTransportadoraSelecionada(bool $keepBusca = false): void
+    {
+        $this->nfeForm['transportadora_id'] = '';
+        $this->nfeForm['transportadora_codigo'] = '0';
+        $this->nfeTransportadoraSelecionadaLabel = '';
+
+        if (! $keepBusca) {
+            $this->nfeTransportadoraBusca = '';
+        }
     }
 
     protected function aplicarNfeTransportadora(Transportadora $transportadora, bool $syncBusca = true): void
     {
         $this->nfeForm['transportadora_id'] = (string) $transportadora->id;
         $this->nfeForm['transportadora_codigo'] = (string) ($transportadora->codigo ?: '0');
+        $this->nfeTransportadoraSelecionadaLabel = $this->formatarNfeTransportadoraBusca($transportadora);
 
         if ($syncBusca) {
-            $this->nfeTransportadoraBusca = $this->formatarNfeTransportadoraBusca($transportadora);
+            $this->nfeTransportadoraBusca = $this->nfeTransportadoraSelecionadaLabel;
         }
     }
 
@@ -1615,18 +1655,15 @@ trait ManagesNfeEmissaoModal
         }
 
         $termNorm = mb_strtoupper(trim($term), 'UTF-8');
-        $buscaNorm = mb_strtoupper(trim($this->nfeTransportadoraBusca), 'UTF-8');
-
-        if ($termNorm !== '' && $termNorm === $buscaNorm) {
-            return true;
+        if ($termNorm === '') {
+            return false;
         }
 
-        $codigo = trim((string) ($this->nfeForm['transportadora_codigo'] ?? ''));
+        // Não comparar com nfeTransportadoraBusca: o Livewire já atualiza esse campo
+        // para o texto digitado, senão a pesquisa nunca reabre após uma seleção.
+        $labelNorm = mb_strtoupper(trim($this->nfeTransportadoraSelecionadaLabel), 'UTF-8');
 
-        return $codigo !== '' && $codigo !== '0' && (
-            $termNorm === mb_strtoupper($codigo, 'UTF-8')
-            || $termNorm === mb_strtoupper(ltrim($codigo, '0'), 'UTF-8')
-        );
+        return $labelNorm !== '' && $termNorm === $labelNorm;
     }
 
     public function updatedNfeFormClienteId(): void

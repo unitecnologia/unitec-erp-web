@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ForcaVendas\DashboardController;
 use App\Http\Controllers\Api\ForcaVendas\DeviceController as FvDeviceController;
 use App\Http\Controllers\Api\ForcaVendas\InfoController as FvInfoController;
 use App\Http\Controllers\Api\ForcaVendas\OrcamentoController;
+use App\Http\Controllers\Api\ForcaVendas\OrderEdicaoController as FvOrderEdicaoController;
 use App\Http\Controllers\Api\ForcaVendas\PixController;
 use App\Http\Controllers\Api\ForcaVendas\ProductEstoqueFiliaisController;
 use App\Http\Controllers\Api\ForcaVendas\ProductPhotoController;
@@ -126,6 +127,8 @@ Route::prefix('v1/forca-vendas')->group(function (): void {
             Route::get('orcamentos/{orcamento}', [OrcamentoController::class, 'show']);
             Route::get('sync/pull', [FvSyncController::class, 'pull']);
             Route::post('sync/push', [FvSyncController::class, 'push']);
+            Route::post('orders/{uuid}/edicao/lock', [FvOrderEdicaoController::class, 'lock']);
+            Route::post('orders/{uuid}/edicao/unlock', [FvOrderEdicaoController::class, 'unlock']);
             Route::get('cnpj/{cnpj}', [CnpjController::class, 'show'])
                 ->where('cnpj', '\d{14}');
             Route::get('produtos/{product}/estoque-filiais', ProductEstoqueFiliaisController::class);

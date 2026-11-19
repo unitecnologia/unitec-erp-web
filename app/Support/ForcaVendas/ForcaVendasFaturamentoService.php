@@ -109,6 +109,10 @@ class ForcaVendasFaturamentoService
             throw new \RuntimeException($e->getMessage(), 0, $e);
         }
 
+        app(ForcaVendasEdicaoLockService::class)->assertNaoEmEdicaoFv($order);
+        app(\App\Support\VendasInternas\VendasInternasEdicaoLockService::class)
+            ->assertForcaVendasOrderLivre($order);
+
         if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
             throw new \RuntimeException('Pedido já foi faturado.');
         }

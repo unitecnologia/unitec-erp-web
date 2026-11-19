@@ -19,6 +19,7 @@ use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeHistoricoModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeImportacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeInutilizacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeRelatorio;
+use App\Filament\Resources\TransportadoraResource\Pages\Concerns\ManagesTransportadoraFormModal;
 use App\Livewire\Erp\NfeListTable;
 use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
@@ -27,6 +28,7 @@ use App\Models\OperacaoFiscal;
 use App\Models\OrdemServico;
 use App\Models\OutrasSaidaMovimento;
 use App\Models\Person;
+use App\Models\Transportadora;
 use App\Models\Venda;
 use App\Models\VendasParametro;
 use App\Support\Erp\EmpresaParametros;
@@ -68,6 +70,7 @@ class ListNfes extends ListRecords
     use ManagesNfeHistoricoModal;
     use ManagesNfeRelatorio;
     use ManagesNfeContadorEmail;
+    use ManagesTransportadoraFormModal;
 
     protected static string $resource = NfeResource::class;
 
@@ -814,6 +817,17 @@ class ListNfes extends ListRecords
         $this->syncStatusTabCountsDom();
     }
 
+    /**
+     * Após gravar transportadora pelo modal reutilizado na NF-e, vincula ao lançamento aberto.
+     * Não destaca linha da grade de NF-e (IDs diferentes).
+     */
+    protected function afterTransportadoraSaved(Transportadora $record, bool $created): void
+    {
+        if ($this->nfeModalOpen) {
+            $this->selecionarNfeTransportadora((int) $record->getKey());
+        }
+    }
+
     public function refreshTable(): void
     {
         unset($this->filteredTotal, $this->filteredTotalCanceladas);
@@ -1040,6 +1054,7 @@ class ListNfes extends ListRecords
                 View::make('filament.components.erp.nfe.footer-total'),
                 View::make('filament.components.erp.nfe.action-bar'),
                 View::make('filament.components.erp.nfe.lancamento-modal'),
+                View::make('filament.components.erp.transportadoras.form-modal'),
                 View::make('filament.components.erp.nfe.cliente-fiscal-incompleto-modal'),
                 View::make('filament.components.erp.nfe.fiscal-whatsapp-modal'),
                 View::make('filament.components.erp.nfe.fiscal-danfe-email-modal'),

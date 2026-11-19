@@ -567,6 +567,18 @@ trait ManagesNfeItemGrid
             return;
         }
 
+        if ($this->transportadoraModalOpen ?? false) {
+            $this->closeTransportadoraModal();
+
+            return;
+        }
+
+        if ($this->nfeTransportadoraSugestoesOpen) {
+            $this->fecharNfeSugestoesTransportadora();
+
+            return;
+        }
+
         $this->closeNfeModal();
     }
 

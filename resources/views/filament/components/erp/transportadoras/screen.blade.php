@@ -2,7 +2,7 @@
     $searchFields = [
         'codigo' => 'CÓDIGO',
         'proprietario' => 'NOME/RAZÃO',
-        'apelido' => 'APELIDO',
+        'apelido' => 'APELIDO/FANTASIA',
         'cnpj_cpf' => 'CPF/CNPJ',
         'cidade' => 'CIDADE',
     ];

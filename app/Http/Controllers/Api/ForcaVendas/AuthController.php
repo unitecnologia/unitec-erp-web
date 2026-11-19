@@ -180,6 +180,9 @@ class AuthController
             'alterar_preco_unitario' => \App\Support\Erp\EmpresaParametros::forcaVendasAlterarPrecoUnitario(
                 $user->empresa_id ? (int) $user->empresa_id : null,
             ),
+            'permitir_reabrir_pedido' => \App\Support\Erp\EmpresaParametros::forcaVendasPermitirReabrirPedido(
+                $user->empresa_id ? (int) $user->empresa_id : null,
+            ),
             'desconto_reais_item_modo' => \App\Support\Erp\EmpresaParametros::descontoReaisItemModo(
                 $empresa?->id,
             ),

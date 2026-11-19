@@ -30,6 +30,25 @@
                 >✕</button>
             </div>
 
+            <div class="erp-nfe-historico-modal__toolbar">
+                <button
+                    type="button"
+                    wire:click="baixarXmlNfceHistorico"
+                    class="erp-nfe-historico-modal__btn"
+                    title="Baixar XML original da NFC-e"
+                >
+                    <span aria-hidden="true">⬇</span> Baixar XML
+                </button>
+                <button
+                    type="button"
+                    wire:click="closeNfceHistorico"
+                    class="erp-nfe-historico-modal__btn erp-nfe-historico-modal__btn--close"
+                    title="Fechar"
+                >
+                    <span aria-hidden="true">✕</span> Fechar
+                </button>
+            </div>
+
             <div class="erp-lookup-modal__body erp-nfe-historico-modal__body">
                 <section class="erp-nfe-historico-modal__card erp-nfe-historico-modal__card--resumo">
                     <div class="erp-nfe-historico-modal__card-head">

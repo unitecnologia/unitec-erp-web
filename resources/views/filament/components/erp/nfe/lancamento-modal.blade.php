@@ -453,8 +453,8 @@
                 @elseif ($this->nfeModalDetailTab === 'transportadora')
                     <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-transportadora">
                         <div class="erp-nfe-transportadora__row">
-                            <div class="erp-nfe-transportadora__field erp-nfe-transportadora__field--transportador" @if ($this->nfeTransportadoraSugestoesOpen && $this->nfeTransportadoraSugestoes !== []) data-lookup-open="1" @endif>
-                                <span class="erp-nfe-lancamento-modal__form-label">Código</span>
+                            <div class="erp-nfe-transportadora__field erp-nfe-transportadora__field--transportador" @if ($this->nfeTransportadoraSugestoesOpen) data-lookup-open="1" @endif>
+                                <span class="erp-nfe-lancamento-modal__form-label">Transportadora cadastrada</span>
                                 <div class="erp-nfe-transportadora__transportador">
                                     <input
                                         type="text"
@@ -463,7 +463,8 @@
                                         class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__codigo"
                                         inputmode="numeric"
                                         autocomplete="off"
-                                        title="Código do transportador"
+                                        title="Código da transportadora cadastrada"
+                                        aria-label="Código da transportadora"
                                     >
                                     <div class="erp-nfe-transportadora__nome-wrap">
                                         <input
@@ -475,39 +476,62 @@
                                             wire:keydown.arrow-down.prevent="moverNfeSugestaoTransportadora(1)"
                                             class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__nome"
                                             autocomplete="off"
-                                            placeholder="Nome ou CNPJ — Enter"
+                                            placeholder="Pesquisar por nome ou CNPJ"
+                                            title="Pesquisa somente transportadoras já cadastradas. Selecione um resultado da lista."
                                             role="combobox"
                                             aria-autocomplete="list"
-                                            aria-expanded="{{ $this->nfeTransportadoraSugestoesOpen && $this->nfeTransportadoraSugestoes !== [] ? 'true' : 'false' }}"
+                                            aria-expanded="{{ $this->nfeTransportadoraSugestoesOpen ? 'true' : 'false' }}"
                                             aria-controls="nfe-transportadora-sugestoes"
                                         >
-                                        @if ($this->nfeTransportadoraSugestoesOpen && $this->nfeTransportadoraSugestoes !== [])
-                                            <ul id="nfe-transportadora-sugestoes" class="erp-nfe-transportadora__suggest" role="listbox" aria-label="Transportadoras encontradas">
-                                                @foreach ($this->nfeTransportadoraSugestoes as $index => $sug)
-                                                    <li wire:key="nfe-transp-sug-{{ $sug['id'] }}" role="presentation">
-                                                        <button
-                                                            type="button"
-                                                            role="option"
-                                                            aria-selected="{{ (int) $this->nfeSelectedTransportadoraSugestaoIndex === (int) $index ? 'true' : 'false' }}"
-                                                            wire:click="selecionarNfeTransportadora({{ $sug['id'] }})"
-                                                            @class(['is-selected' => (int) $this->nfeSelectedTransportadoraSugestaoIndex === (int) $index])
-                                                        >
-                                                            <span class="erp-nfe-transportadora__suggest-code">{{ $sug['codigo'] ?: '—' }}</span>
-                                                            <span class="erp-nfe-transportadora__suggest-nome">{{ $sug['nome'] }}</span>
-                                                            @if (filled($sug['cpf_cnpj'] ?? null))
-                                                                <span @class([
-                                                                    'erp-nfe-transportadora__suggest-doc',
-                                                                    'is-cnpj' => ($sug['doc_tipo'] ?? '') === 'cnpj',
-                                                                    'is-cpf' => ($sug['doc_tipo'] ?? '') === 'cpf',
-                                                                ])>{{ $sug['cpf_cnpj'] }}</span>
-                                                            @endif
-                                                        </button>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
+                                        @if ($this->nfeTransportadoraSugestoesOpen)
+                                            @if ($this->nfeTransportadoraSugestoes !== [])
+                                                <ul id="nfe-transportadora-sugestoes" class="erp-nfe-transportadora__suggest" role="listbox" aria-label="Transportadoras encontradas">
+                                                    @foreach ($this->nfeTransportadoraSugestoes as $index => $sug)
+                                                        <li wire:key="nfe-transp-sug-{{ $sug['id'] }}" role="presentation">
+                                                            <button
+                                                                type="button"
+                                                                role="option"
+                                                                aria-selected="{{ (int) $this->nfeSelectedTransportadoraSugestaoIndex === (int) $index ? 'true' : 'false' }}"
+                                                                wire:click="selecionarNfeTransportadora({{ $sug['id'] }})"
+                                                                @class(['is-selected' => (int) $this->nfeSelectedTransportadoraSugestaoIndex === (int) $index])
+                                                            >
+                                                                <span class="erp-nfe-transportadora__suggest-code">{{ $sug['codigo'] ?: '—' }}</span>
+                                                                <span class="erp-nfe-transportadora__suggest-nome">{{ $sug['nome'] }}</span>
+                                                                @if (filled($sug['cpf_cnpj'] ?? null))
+                                                                    <span @class([
+                                                                        'erp-nfe-transportadora__suggest-doc',
+                                                                        'is-cnpj' => ($sug['doc_tipo'] ?? '') === 'cnpj',
+                                                                        'is-cpf' => ($sug['doc_tipo'] ?? '') === 'cpf',
+                                                                    ])>{{ $sug['cpf_cnpj'] }}</span>
+                                                                @endif
+                                                            </button>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @else
+                                                <div id="nfe-transportadora-sugestoes" class="erp-nfe-transportadora__suggest erp-nfe-transportadora__suggest--empty" role="status">
+                                                    <p class="erp-nfe-transportadora__suggest-empty-text">Nenhuma transportadora cadastrada encontrada.</p>
+                                                    <button
+                                                        type="button"
+                                                        class="erp-nfe-transportadora__suggest-create"
+                                                        wire:click="abrirNovaTransportadoraNfe(true)"
+                                                    >
+                                                        + Cadastrar transportadora
+                                                    </button>
+                                                </div>
+                                            @endif
                                         @endif
                                     </div>
+                                    <button
+                                        type="button"
+                                        class="erp-nfe-transportadora__nova-btn"
+                                        wire:click="abrirNovaTransportadoraNfe(false)"
+                                        title="Cadastrar nova transportadora"
+                                    >
+                                        + Nova Transportadora
+                                    </button>
                                 </div>
+                                <span class="erp-nfe-transportadora__hint">Pesquisa o cadastro por nome ou CNPJ — o texto digitado não é gravado na NF-e.</span>
                             </div>
 
                             <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--frete">

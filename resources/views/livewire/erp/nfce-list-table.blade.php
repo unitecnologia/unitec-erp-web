@@ -70,7 +70,12 @@
                         .($index % 2 === 1 ? ' fi-striped' : '')
                         .($checked ? ' erp-nfce-row--checked' : '')
                         .($selected ? ' erp-row-selected' : '');
-                    $cells = $formatter->format($record, $showSituacao, $davComercialPorPdvVendaId ?? null);
+                    $cells = $formatter->format(
+                        $record,
+                        $showSituacao,
+                        $davComercialPorPdvVendaId ?? null,
+                        $caixaFinanceiroPorVendaId ?? null,
+                    );
                     $podeMarcar = $isContingenciaTab
                         && $record->status === \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA
                         && ! $record->simulada;

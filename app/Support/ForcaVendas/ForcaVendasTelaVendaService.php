@@ -49,10 +49,15 @@ class ForcaVendasTelaVendaService
         $viLocks = app(\App\Support\VendasInternas\VendasInternasEdicaoLockService::class);
         $viLocks->assertForcaVendasOrderLivre($order);
 
+        // Pedidos do App Força de Vendas em reabertura: bloqueio EM EDIÇÃO NO FV.
+        $fvLocks = app(ForcaVendasEdicaoLockService::class);
+        $fvLocks->assertNaoEmEdicaoFv($order);
+
         // Mantém TTL do bloqueio ERP vivo enquanto grava/edita.
         $user = \Illuminate\Support\Facades\Auth::user();
         if ($user instanceof \App\Models\User) {
             $viLocks->tocarErpPorForcaVendasOrderId((int) $order->id, $user);
+            $fvLocks->tocarErp($order, $user);
         }
 
         if (! in_array((string) $order->situacao, self::situacoesEditaveis(), true)) {

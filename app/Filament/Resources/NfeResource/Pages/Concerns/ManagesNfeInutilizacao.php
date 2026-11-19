@@ -28,6 +28,11 @@ trait ManagesNfeInutilizacao
 
     public function inutilizarNfe(): void
     {
+        // F5 do cadastro de transportadora (modal reutilizado na NF-e) tem prioridade.
+        if ($this->transportadoraModalOpen ?? false) {
+            return;
+        }
+
         if ($this->nfeModalOpen && filled($this->nfeFiscalSucessoDetalhe)) {
             $this->showNfeFiscalOverlayInfo('Inutilizar', 'Feche a tela de sucesso antes de inutilizar numeração.');
 
