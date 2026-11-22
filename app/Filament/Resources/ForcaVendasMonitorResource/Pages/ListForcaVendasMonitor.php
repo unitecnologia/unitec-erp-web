@@ -37,6 +37,7 @@ use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasMonitorCancelamentoService;
 use App\Support\ForcaVendas\ForcaVendasMonitorTotaisAggregator;
 use App\Support\ForcaVendas\ForcaVendasTelaVendaService;
+use App\Support\ForcaVendas\MonitorMeioPgtoQuery;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -85,6 +86,9 @@ class ListForcaVendasMonitor extends ListRecords
     public string $periodoDeApplied = '';
 
     public string $periodoAteApplied = '';
+
+    /** Sequência do auto-apply de período (descarta response Livewire mais antiga). */
+    public int $periodoApplySeq = 0;
 
     /**
      * IDs dos pedidos marcados (check-boxes) para faturar/cancelar em lote.
@@ -820,11 +824,40 @@ class ListForcaVendasMonitor extends ListRecords
     /**
      * Aplica o período após o Flatpickr gravar periodoDe/periodoAte
      * (um único resetTable — sem remount dos inputs, que ficam em wire:ignore).
+     *
+     * @param  string|null  $de  ISO Y-m-d vindo do JS (evita corrida set/call)
+     * @param  string|null  $ate  ISO Y-m-d vindo do JS
+     * @param  int|null  $seq  sequência do cliente; response antiga é ignorada
      */
-    public function applyPeriodFilterAuto(): void
+    public function applyPeriodFilterAuto(?string $de = null, ?string $ate = null, ?int $seq = null): void
     {
-        $this->periodoDeApplied = $this->periodoDe;
-        $this->periodoAteApplied = $this->periodoAte;
+        if ($seq !== null) {
+            if ($seq < $this->periodoApplySeq) {
+                $this->skipRender();
+
+                return;
+            }
+            $this->periodoApplySeq = $seq;
+        }
+
+        if ($de !== null) {
+            $this->periodoDe = trim($de);
+        }
+        if ($ate !== null) {
+            $this->periodoAte = trim($ate);
+        }
+
+        $de = trim((string) $this->periodoDe);
+        $ate = trim((string) $this->periodoAte);
+
+        if ($this->periodoDeApplied === $de && $this->periodoAteApplied === $ate) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->periodoDeApplied = $de;
+        $this->periodoAteApplied = $ate;
         $this->clearListSelection();
         $this->resetTable();
     }
@@ -1141,36 +1174,12 @@ class ListForcaVendasMonitor extends ListRecords
     }
 
     /**
-     * Vendas com pelo menos uma das formas marcadas (cabeçalho misto incluso via LIKE).
+     * Vendas com pelo menos uma das formas marcadas.
+     * Prioriza pagamentos reais (payload.pagamentos / PDV); cabeçalho só sem detalhe.
      */
     protected function aplicarFiltroMeioPgto(Builder $query, string $valorRaw): void
     {
-        $valores = self::parseFiltroMeioPgtoValor($valorRaw);
-        if ($valores === []) {
-            return;
-        }
-
-        $query->where(function (Builder $outer) use ($valores): void {
-            foreach ($valores as $valor) {
-                $needles = self::variantesBuscaMeioPagamento($valor);
-                if ($needles === []) {
-                    continue;
-                }
-
-                $outer->orWhere(function (Builder $grupo) use ($needles): void {
-                    foreach ($needles as $needle) {
-                        $like = '%'.addcslashes($needle, '%_\\').'%';
-                        $grupo->orWhereRaw(
-                            "LOWER(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento'))) LIKE ?",
-                            [$like]
-                        )->orWhereHas(
-                            'pedido',
-                            fn (Builder $s) => $s->whereRaw('LOWER(forma_pagamento) LIKE ?', [$like])
-                        );
-                    }
-                });
-            }
-        });
+        MonitorMeioPgtoQuery::apply($query, self::parseFiltroMeioPgtoValor($valorRaw));
     }
 
     /**
@@ -1178,26 +1187,12 @@ class ListForcaVendasMonitor extends ListRecords
      */
     public static function variantesBuscaMeioPagamento(string $valor): array
     {
-        $valor = trim($valor);
-        if ($valor === '') {
-            return [];
-        }
-
-        $lower = mb_strtolower($valor, 'UTF-8');
-        $ascii = mb_strtolower(self::normalizarChaveMeioPagamento($valor), 'UTF-8');
-
-        return array_values(array_unique(array_filter([$lower, $ascii], fn (string $v): bool => $v !== '')));
+        return MonitorMeioPgtoQuery::variantesBusca($valor);
     }
 
     public static function normalizarChaveMeioPagamento(string $descricao): string
     {
-        $chave = mb_strtoupper(trim($descricao), 'UTF-8');
-
-        return str_replace(
-            ['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'],
-            ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'],
-            $chave,
-        );
+        return MonitorMeioPgtoQuery::normalizarChave($descricao);
     }
 
     public static function rotuloMeioPagamento(string $descricao): string
@@ -1210,7 +1205,9 @@ class ListForcaVendasMonitor extends ListRecords
             'POS DEBITO' => 'POS Débito',
             'POS CREDITO' => 'POS Crédito',
             'CREDIARIO' => 'Crediário',
-            'CARTAO', 'CARTAO DE CREDITO' => 'Cartão',
+            'CARTAO CREDITO', 'CARTAO DE CREDITO' => 'Cartão Crédito',
+            'CARTAO DEBITO', 'CARTAO DE DEBITO' => 'Cartão Débito',
+            'CARTAO' => 'Cartão',
             'BOLETO' => 'Boleto',
             'CHEQUE' => 'Cheque',
             default => mb_convert_case(mb_strtolower(trim($descricao), 'UTF-8'), MB_CASE_TITLE, 'UTF-8'),

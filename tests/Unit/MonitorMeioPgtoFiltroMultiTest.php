@@ -65,11 +65,19 @@ class MonitorMeioPgtoFiltroMultiTest extends TestCase
         $this->assertStringContainsString('function filtroMeioPgtoCombo(): array', $page);
         $this->assertStringContainsString('function aplicarFiltroMeioPgto(', $page);
         $this->assertStringContainsString('parseFiltroMeioPgtoValor', $page);
+        $this->assertStringContainsString('MonitorMeioPgtoQuery::apply', $page);
         // Sem DISTINCT pesado no payload da grade.
         $this->assertStringNotContainsString(
             "DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento'))",
             $page
         );
+
+        $query = file_get_contents(app_path('Support/ForcaVendas/MonitorMeioPgtoQuery.php'));
+        $this->assertIsString($query);
+        $this->assertStringContainsString('JSON_TABLE', $query);
+        $this->assertStringContainsString('PdvVendaPagamento', $query);
+        $this->assertStringContainsString('json_each', $query);
+        $this->assertStringContainsString('orWherePdvPagamentosMatchAny', $query);
 
         $this->assertIsString($blade);
         $this->assertStringContainsString("filtroCampo === 'meio_pgto'", $blade);

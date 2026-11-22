@@ -420,8 +420,15 @@ class ListDevolucoesCompra extends ListRecords
         $this->notifyPeriodFilterResult();
     }
 
-    public function applyPeriodFilterAuto(): void
+    public function applyPeriodFilterAuto(?string $de = null, ?string $ate = null, ?int $seq = null): void
     {
+        if ($de !== null) {
+            $this->periodoDe = trim($de);
+        }
+        if ($ate !== null) {
+            $this->periodoAte = trim($ate);
+        }
+
         $this->syncAppliedPeriodFilter();
     }
 

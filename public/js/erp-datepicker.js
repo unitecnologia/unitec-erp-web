@@ -115,6 +115,12 @@ window.ErpDatepicker = {
         cal.classList.add('erp-flatpickr');
         cal.dataset.erpDecorated = '1';
 
+        // allowInput: sem isso o 1º clique no dia só tira o foco do input (precisa 2x).
+        // Igual ao calendário De / padrão Flatpickr pós-4.6.6.
+        cal.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+        }, true);
+
         const footer = document.createElement('div');
         footer.className = 'flatpickr-erp-footer';
 
@@ -226,9 +232,25 @@ window.ErpDatepicker = {
     },
 
     resolveInitialValue(input, wireFormat) {
+        // Preferir o valor já exibido (ex.: usuário acabou de clicar no dia).
+        // data-erp-date-initial fica stale com wire:ignore e revertia o 1º clique.
+        const typed = String(input?.value ?? '').trim();
+
+        if (typed !== '' && (this.isCompleteDisplayDate(typed) || this.isIsoDateString(typed))) {
+            const typedParsed = this.parseValue(typed, wireFormat);
+
+            if (typedParsed) {
+                return {
+                    raw: typed,
+                    parsed: typedParsed,
+                    fromWire: false,
+                };
+            }
+        }
+
         const wireValue = String(this.readWireValue(input) ?? '').trim();
         const attributeValue = this.readInitialAttribute(input);
-        const raw = wireValue || attributeValue || String(input?.value ?? '').trim();
+        const raw = wireValue || attributeValue || typed;
 
         if (raw === '') {
             return {
@@ -245,6 +267,27 @@ window.ErpDatepicker = {
             parsed,
             fromWire: wireValue !== '',
         };
+    },
+
+    hasOpenCalendar(root = document) {
+        if ((window.__erpDatepickerOpenCount || 0) > 0) {
+            return true;
+        }
+
+        if (document.querySelector('.flatpickr-calendar.open')) {
+            return true;
+        }
+
+        const scope = root?.querySelectorAll ? root : document;
+        let open = false;
+
+        scope.querySelectorAll(this.selectors).forEach((input) => {
+            if (input?._flatpickr?.isOpen) {
+                open = true;
+            }
+        });
+
+        return open;
     },
 
     ensureFieldWrap(input) {
@@ -458,6 +501,23 @@ window.ErpDatepicker = {
         }
     },
 
+    periodGroupFingerprint(group) {
+        if (! group) {
+            return '';
+        }
+
+        const parts = [];
+
+        group.querySelectorAll('input[data-wire-field]').forEach((el) => {
+            const field = String(el.dataset.wireField || '').trim();
+            const format = this.getWireFormat(el);
+            const wire = this.readCommittedWireValue(el, el._flatpickr, format);
+            parts.push(`${field}=${wire}`);
+        });
+
+        return parts.join('|');
+    },
+
     commitPeriodGroup(input) {
         const group = input.closest('[data-erp-date-group]');
 
@@ -465,18 +525,67 @@ window.ErpDatepicker = {
             return false;
         }
 
-        // set(live=false) + call no mesmo turno: evita corrida em que apply roda com período antigo.
+        // set(live=false) + call com De/Até explícitos: apply não depende de props ainda não commitadas.
+        const values = {};
         group.querySelectorAll('input[data-wire-field]').forEach((el) => {
             this.commitPeriodGroupInput(el, false);
+            const field = String(el.dataset.wireField || '').trim();
+            if (field !== '') {
+                values[field] = this.readCommittedWireValue(el, el._flatpickr, this.getWireFormat(el));
+            }
         });
 
         const applyMethod = group.dataset.erpDateApplyMethod;
+        const fingerprint = this.periodGroupFingerprint(group);
+
+        // onChange + onClose + blur: um apply por período (já aplicado OU em voo).
+        if (
+            applyMethod
+            && (
+                group.dataset.erpDateAppliedFp === fingerprint
+                || group.dataset.erpDatePendingFp === fingerprint
+            )
+        ) {
+            return true;
+        }
 
         if (applyMethod && window.ErpMasks) {
             const component = window.ErpMasks.getLivewireComponent(input);
 
             if (component && typeof component.call === 'function') {
-                component.call(applyMethod);
+                const seq = String((Number(group.dataset.erpDateApplySeq || 0) + 1));
+                group.dataset.erpDateApplySeq = seq;
+                group.dataset.erpDatePendingFp = fingerprint;
+
+                const de = Object.prototype.hasOwnProperty.call(values, 'periodoDe')
+                    ? String(values.periodoDe ?? '')
+                    : null;
+                const ate = Object.prototype.hasOwnProperty.call(values, 'periodoAte')
+                    ? String(values.periodoAte ?? '')
+                    : null;
+
+                let req;
+                if (de !== null || ate !== null) {
+                    req = component.call(applyMethod, de ?? '', ate ?? '', Number(seq));
+                } else {
+                    req = component.call(applyMethod);
+                }
+
+                const finish = (ok) => {
+                    if (group.dataset.erpDateApplySeq !== seq) {
+                        return; // resposta antiga: não sobrescreve fingerprint mais novo
+                    }
+                    delete group.dataset.erpDatePendingFp;
+                    if (ok) {
+                        group.dataset.erpDateAppliedFp = fingerprint;
+                    }
+                };
+
+                if (req && typeof req.then === 'function') {
+                    req.then(() => finish(true)).catch(() => finish(false));
+                } else {
+                    finish(true);
+                }
             }
         }
 
@@ -592,8 +701,14 @@ window.ErpDatepicker = {
                     return;
                 }
 
+                // Auto-apply: onChange/onClose já aplicaram; fingerprint evita 2º/3º resetTable.
+                if (self.shouldAutoApplyPeriodGroup(input)) {
+                    self.maybeAutoApplyPeriodGroup(input);
+
+                    return;
+                }
+
                 self.commitValue(input, picker, wireFormat);
-                self.maybeAutoApplyPeriodGroup(input);
             }, 0);
         };
 
@@ -821,6 +936,11 @@ window.ErpDatepicker = {
         const wireFormat = this.getWireFormat(input);
 
         if (input.dataset.erpDateBound === '1' && input._flatpickr) {
+            // Não mexer enquanto o usuário escolhe o dia (morph Livewire no meio do clique).
+            if (input._flatpickr.isOpen) {
+                return;
+            }
+
             const pickerAlive = Boolean(
                 input._flatpickr.calendarContainer
                 && input._flatpickr.calendarContainer.isConnected
@@ -873,6 +993,8 @@ window.ErpDatepicker = {
                     self.decorateCalendar(instance);
                 },
                 onOpen(_selectedDates, _dateStr, instance) {
+                    window.__erpDatepickerOpenCount = (window.__erpDatepickerOpenCount || 0) + 1;
+
                     // Reposiciona após abrir (grades / modais perto da borda).
                     window.requestAnimationFrame(() => {
                         if (typeof instance._positionCalendar === 'function') {
@@ -885,22 +1007,37 @@ window.ErpDatepicker = {
                         return;
                     }
 
+                    const autoApply = self.shouldAutoApplyPeriodGroup(input);
+
+                    // Auto-apply no onClose: apply no onChange faz o 1º clique no dia falhar
+                    // (morph Livewire no meio da seleção / calendário volta à data antiga).
                     self.applySelectedDate(
                         input,
                         picker,
                         selectedDates[0] ?? null,
                         wireFormat,
-                        true,
+                        ! autoApply,
+                        ! autoApply,
                     );
-                    self.maybeAutoApplyPeriodGroup(input);
                 },
                 onClose(_selectedDates, _dateStr, instance) {
+                    const n = (window.__erpDatepickerOpenCount || 1) - 1;
+                    window.__erpDatepickerOpenCount = n > 0 ? n : 0;
+
                     if (self.isEmptyInput(instance.input)) {
                         return;
                     }
 
+                    // Monitor/auto-apply: um apply ao fechar (after paint do Flatpickr).
+                    if (self.shouldAutoApplyPeriodGroup(instance.input)) {
+                        window.setTimeout(() => {
+                            self.maybeAutoApplyPeriodGroup(instance.input);
+                        }, 0);
+
+                        return;
+                    }
+
                     self.commitValue(instance.input, instance, wireFormat);
-                    self.maybeAutoApplyPeriodGroup(instance.input);
                 },
             });
         } catch (error) {
@@ -1166,6 +1303,11 @@ document.addEventListener('livewire:init', () => {
     window.Livewire.on('erp-masks-refresh', () => bootErpDatepickers(document));
 
     window.Livewire.hook('morph.updated', ({ el }) => {
+        // Polling / resetTable no meio do calendário aberto: não rebindar (mata o 1º clique).
+        if (window.ErpDatepicker.hasOpenCalendar()) {
+            return;
+        }
+
         if (! (el instanceof HTMLElement)) {
             bootErpDatepickers(document);
 

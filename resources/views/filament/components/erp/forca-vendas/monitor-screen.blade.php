@@ -42,6 +42,11 @@
                 poll() {
                     this.s = 5;
                     if (this.busy || window.__erpFvMonFiltroBusy) return;
+                    // Calendário aberto: não remonta a grade (mata o 1º clique no dia).
+                    if ((window.__erpDatepickerOpenCount || 0) > 0
+                        || document.querySelector('.flatpickr-calendar.open')) {
+                        return;
+                    }
                     // Não compete com faturar/cancelar/reabrir/lote/clonar/NFC-e.
                     // Overlay SEFAZ (DOM/flag JS): cobre o request longo sem depender só do Livewire.
                     if (this.$wire.faturarProgressOpen
