@@ -10,16 +10,20 @@ use App\Livewire\Erp\OrcamentoListTable;
 use App\Models\Orcamento;
 use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use App\Support\Erp\Queries\OrcamentoListQueryBuilder;
+use App\Support\VendasInternas\VendasInternasEdicaoLockService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use RuntimeException;
 
 class ListOrcamentos extends ListRecords
 {
@@ -48,11 +52,11 @@ class ListOrcamentos extends ListRecords
 
     public string $periodoAteApplied = '';
 
-    public bool $printModalOpen = false;
-
     public bool $previewOverlayOpen = false;
 
     public ?string $previewOverlayUrl = null;
+
+    public ?int $reabrirConfirmOrcamentoId = null;
 
     public function mount(): void
     {
@@ -100,11 +104,11 @@ class ListOrcamentos extends ListRecords
 
     protected function resetOrcamentoListUiState(): void
     {
-        $this->printModalOpen = false;
         $this->previewOverlayOpen = false;
         $this->previewOverlayUrl = null;
         $this->viewModalOpen = false;
         $this->emailModalOpen = false;
+        $this->reabrirConfirmOrcamentoId = null;
     }
 
     protected static function erpListPageClass(): string
@@ -130,7 +134,7 @@ class ListOrcamentos extends ListRecords
             'edit' => 'editOrcamento',
             'extraKeys' => [
                 'F4' => ['method' => 'cancelOrcamento'],
-                'F6' => ['method' => 'openPrintModal'],
+                'F6' => ['method' => 'visualizarOrcamentoImpressao'],
                 'F9' => ['method' => 'openEmailModal'],
             ],
         ];
@@ -179,10 +183,10 @@ class ListOrcamentos extends ListRecords
                     ->columnSpanFull(),
                 View::make('filament.components.erp.orcamentos.footer-total'),
                 View::make('filament.components.erp.orcamentos.action-bar'),
-                View::make('filament.components.erp.orcamentos.print-modal'),
                 View::make('filament.components.erp.orcamentos.email-modal'),
                 View::make('filament.components.erp.orcamentos.preview-overlay'),
                 View::make('filament.components.erp.orcamentos.view-modal'),
+                View::make('filament.components.erp.orcamentos.reabrir-confirm'),
             ]);
     }
 
@@ -322,6 +326,10 @@ class ListOrcamentos extends ListRecords
 
     public function editOrcamento(int | string | null $recordId = null): void
     {
+        if ($this->reabrirConfirmOrcamentoId !== null) {
+            return;
+        }
+
         $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
 
         if (! $resolvedId) {
@@ -330,7 +338,167 @@ class ListOrcamentos extends ListRecords
             return;
         }
 
-        $this->redirectErpAdmin(OrcamentoResource::getUrl('edit', ['record' => $resolvedId]));
+        $orcamento = Orcamento::query()
+            ->select(['id', 'status', 'numero'])
+            ->find($resolvedId);
+
+        if (! $orcamento) {
+            Notification::make()
+                ->title('Orçamento não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($orcamento->status === Orcamento::STATUS_ABERTO) {
+            $this->redirectErpAdmin(OrcamentoResource::getUrl('edit', ['record' => $orcamento->id]));
+
+            return;
+        }
+
+        if ($orcamento->status === Orcamento::STATUS_CANCELADO) {
+            Notification::make()
+                ->title('Orçamento cancelado não pode ser reaberto.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($orcamento->status !== Orcamento::STATUS_FECHADO) {
+            $motivo = OrcamentoFaturamentoGuard::motivoFaturado((int) $orcamento->id)
+                ?? 'Orçamento indisponível para edição.';
+
+            Notification::make()
+                ->title('Não é possível alterar este orçamento.')
+                ->body($motivo)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $motivo = OrcamentoFaturamentoGuard::motivoFaturado((int) $orcamento->id);
+
+        if ($motivo !== null) {
+            Notification::make()
+                ->title('Não é possível reabrir este orçamento.')
+                ->body($motivo)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            app(VendasInternasEdicaoLockService::class)->assertOrcamentoLivre($orcamento);
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title('Não é possível reabrir este orçamento.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->reabrirConfirmOrcamentoId = (int) $orcamento->id;
+        $this->dispatch('erp-orcamento-reabrir-confirm-opened');
+    }
+
+    public function confirmarReabrirOrcamento(): void
+    {
+        $orcamentoId = $this->reabrirConfirmOrcamentoId;
+        $this->reabrirConfirmOrcamentoId = null;
+
+        if (! $orcamentoId) {
+            return;
+        }
+
+        $podeEditar = false;
+
+        try {
+            DB::transaction(function () use ($orcamentoId, &$podeEditar): void {
+                $orcamento = Orcamento::query()
+                    ->whereKey($orcamentoId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $orcamento) {
+                    Notification::make()
+                        ->title('Orçamento não encontrado.')
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                if ($orcamento->status === Orcamento::STATUS_CANCELADO) {
+                    Notification::make()
+                        ->title('Orçamento cancelado não pode ser reaberto.')
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                if ($orcamento->status === Orcamento::STATUS_ABERTO) {
+                    $podeEditar = true;
+
+                    return;
+                }
+
+                if ($orcamento->status !== Orcamento::STATUS_FECHADO) {
+                    $motivo = OrcamentoFaturamentoGuard::motivoFaturado((int) $orcamento->id)
+                        ?? 'Orçamento indisponível para edição.';
+
+                    Notification::make()
+                        ->title('Não é possível reabrir este orçamento.')
+                        ->body($motivo)
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                $motivo = OrcamentoFaturamentoGuard::motivoFaturado((int) $orcamento->id);
+
+                if ($motivo !== null) {
+                    Notification::make()
+                        ->title('Não é possível reabrir este orçamento.')
+                        ->body($motivo)
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                app(VendasInternasEdicaoLockService::class)->assertOrcamentoLivre($orcamento);
+
+                $orcamento->update(['status' => Orcamento::STATUS_ABERTO]);
+                $podeEditar = true;
+            });
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title('Não é possível reabrir este orçamento.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! $podeEditar) {
+            return;
+        }
+
+        $this->redirectErpAdmin(OrcamentoResource::getUrl('edit', ['record' => $orcamentoId]));
+    }
+
+    public function cancelarReabrirOrcamento(): void
+    {
+        $this->reabrirConfirmOrcamentoId = null;
     }
 
     public function cancelOrcamento(): void
@@ -367,44 +535,16 @@ class ListOrcamentos extends ListRecords
             ->send();
     }
 
-    public function openPrintModal(): void
-    {
-        if (! $this->highlightedRecordIdOrNotify('print')) {
-            return;
-        }
-
-        $this->printModalOpen = true;
-    }
-
-    public function closePrintModal(): void
-    {
-        $this->printModalOpen = false;
-    }
-
     public function visualizarOrcamentoImpressao(): void
     {
-        if (! $this->highlightedRecordId) {
+        $recordId = $this->highlightedRecordIdOrNotify('print');
+
+        if (! $recordId) {
             return;
         }
 
-        $this->closePrintModal();
         $this->previewOverlayUrl = route('erp.reports.orcamento', [
-            'orcamento' => $this->highlightedRecordId,
-            'embed' => 1,
-        ]);
-        $this->previewOverlayOpen = true;
-    }
-
-    public function imprimirBobinaOrcamento(): void
-    {
-        if (! $this->highlightedRecordId) {
-            return;
-        }
-
-        $this->closePrintModal();
-        $this->previewOverlayUrl = route('erp.reports.orcamento', [
-            'orcamento' => $this->highlightedRecordId,
-            'bobina' => 1,
+            'orcamento' => $recordId,
             'embed' => 1,
         ]);
         $this->previewOverlayOpen = true;

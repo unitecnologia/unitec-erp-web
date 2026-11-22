@@ -21,6 +21,11 @@ class PdvVenda extends Model
      */
     public const ORIGEM_OS_NFCE_PECAS = 'os_nfce_pecas';
 
+    /**
+     * Casca só para conservar NFC-e arquivada (XML inconsistente SCV); sem venda/financeiro.
+     */
+    public const ORIGEM_NFCE_ARQUIVADA_SCV = 'nfce_arquivada_scv';
+
     protected $table = 'pdv_vendas';
 
     protected $fillable = [
@@ -136,6 +141,7 @@ class PdvVenda extends Model
                 ->orWhereNotIn($q->qualifyColumn('origem'), [
                     self::ORIGEM_REGULARIZACAO_FISCAL,
                     self::ORIGEM_OS_NFCE_PECAS,
+                    self::ORIGEM_NFCE_ARQUIVADA_SCV,
                 ]);
         });
     }

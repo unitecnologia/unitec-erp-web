@@ -23,6 +23,7 @@ use App\Http\Controllers\Erp\MonitorPedidosReportController;
 use App\Http\Controllers\Erp\OrcamentoReportController;
 use App\Http\Controllers\Erp\OrdemServicoReportController;
 use App\Http\Controllers\Erp\FvClienteLookupController;
+use App\Http\Controllers\Erp\LucratividadePorVendaFiltrosController;
 use App\Http\Controllers\Erp\VendasGeralCidadeLookupController;
 use App\Http\Controllers\Erp\VendasGeralClienteLookupController;
 use App\Http\Controllers\Erp\FvProdutoLookupController;
@@ -118,6 +119,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/relatorio-vendas-geral', VendasGeralFiltrosController::class)
         ->middleware('erp.permission:vendas.print')
         ->name('erp.reports.vendas-geral.filtros');
+    Route::get('/admin/relatorio-lucratividade-por-venda', LucratividadePorVendaFiltrosController::class)
+        ->middleware('erp.permission:vendas.print')
+        ->name('erp.reports.lucratividade-por-venda.filtros');
     Route::get('/admin/relatorio-vendas-geral/clientes-lookup', VendasGeralClienteLookupController::class)
         ->middleware('erp.permission:vendas.print')
         ->name('erp.reports.vendas-geral.clientes-lookup');

@@ -25,6 +25,7 @@ use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasClienteReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasVendedorReport;
 use App\Support\Erp\Reports\Tabular\Definitions\LucratividadeOsReport;
+use App\Support\Erp\Reports\Tabular\Definitions\LucratividadePorVendaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\MovimentoCaixaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\MovimentoMesasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\OsPendentesAtrasadasReport;
@@ -84,6 +85,7 @@ class ReportRegistry
             'historico-orcamentos' => HistoricoOrcamentosReport::class,
             'historico-vendas-cliente' => HistoricoVendasClienteReport::class,
             'historico-vendas-vendedor' => HistoricoVendasVendedorReport::class,
+            'lucratividade-por-venda' => LucratividadePorVendaReport::class,
             'vendas-pdv' => VendasPdvReport::class,
             'movimento-mesas' => MovimentoMesasReport::class,
             'historico-fechamentos-mesas' => HistoricoFechamentosMesasReport::class,

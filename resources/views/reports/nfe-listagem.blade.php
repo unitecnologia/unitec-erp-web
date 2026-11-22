@@ -278,7 +278,7 @@
 
                     <div class="viewer__actions">
 
-                        <button type="submit" class="viewer__btn">Atualizar preview</button>
+                        @include('reports.partials.viewer-mostrar-resultados-btn')
 
                     </div>
 

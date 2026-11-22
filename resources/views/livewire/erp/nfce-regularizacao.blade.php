@@ -170,7 +170,7 @@
                         @endif
                             <td class="erp-nfce-reg__ellipsis">{{ $row['caixa'] }}</td>
                             <td class="erp-nfce-reg__ellipsis" title="{{ $row['vendedor'] }}">{{ $row['vendedor'] }}</td>
-                            <td class="erp-nfce-reg__ellipsis" title="{{ $row['forma'] }}">{{ $row['forma'] }}</td>
+                            <td class="erp-nfce-reg__ellipsis" title="{{ $row['forma_title'] ?? $row['forma'] }}">{{ $row['forma'] }}</td>
                             <td class="erp-nfce-reg__num erp-nfce-reg__mono">
                                 <span class="erp-nfce-reg__money"><span class="erp-nfce-reg__money-cur">R$</span><span>{{ number_format($row['total'], 2, ',', '.') }}</span></span>
                             </td>

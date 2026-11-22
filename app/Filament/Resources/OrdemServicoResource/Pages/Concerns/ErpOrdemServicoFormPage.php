@@ -20,10 +20,12 @@ use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\VendedorEstoque;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\FormaPagamentoAtalho;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
+use App\Support\Erp\Os\OsDescontoFechamentoRateio;
 use App\Support\Erp\Os\OsFaturamentoService;
 use App\Support\Erp\Os\OsProdutoLookupService;
 use App\Support\Erp\ErpTimezone;
@@ -55,6 +57,7 @@ trait ErpOrdemServicoFormPage
     use ManagesOrdemServicoFaturamentoParcelas;
     use ManagesEquipamentoVeiculo;
     use ManagesOrdemServicoImportarOrcamento;
+    use ManagesOrdemServicoOperacional;
     use ManagesOrdemServicoTransportadora;
     public string $activeFormTab = 'dados';
 
@@ -455,13 +458,15 @@ trait ErpOrdemServicoFormPage
         return OrdemServico::nextNumero();
     }
 
-    /**
-     * @return array<int, array{id: int, nome: string}>
-     */
-    public function updatedAtendenteId(): void
+    public function updatedAtendenteId(mixed $value = null): void
     {
+        if ($value !== null) {
+            $this->atendenteId = $value !== '' ? (int) $value : null;
+        }
+
         unset($this->atendenteOptions);
         $this->syncTecnicoEmTodosItens();
+        $this->onOsAtendenteIdUpdated();
     }
 
     protected function syncTecnicoEmTodosItens(): void
@@ -487,7 +492,7 @@ trait ErpOrdemServicoFormPage
      *
      * Memoizado por request (#[Computed]): evita 2× a mesma query pesada no painel Dados + grade.
      *
-     * @return list<array{id: int, nome: string}>
+     * @return list<array{id: int, nome: string, estoque_id: int|null, estoque_label: string}>
      */
     #[Computed]
     public function atendenteOptions(): array
@@ -499,7 +504,7 @@ trait ErpOrdemServicoFormPage
             ->where('ativo', true)
             ->where('setor_servicos', true)
             ->whereHas('rhFuncionario')
-            ->with('rhFuncionario');
+            ->with(['rhFuncionario', 'estoqueCadastro']);
 
         if ($empresaId) {
             $query->whereHas(
@@ -509,14 +514,16 @@ trait ErpOrdemServicoFormPage
         }
 
         $opcoes = $query
-            ->get(['id', 'codigo', 'nome'])
+            ->get(['id', 'codigo', 'nome', 'estoque_id'])
             ->sortBy(fn (Vendedor $v): int => (int) preg_replace('/\D/', '', (string) ($v->rhFuncionario?->codigo ?? '0')))
             ->values()
             ->map(fn (Vendedor $v): array => $this->mapAtendenteOption($v))
             ->all();
 
         if ($atualId > 0 && ! collect($opcoes)->contains(fn (array $op): bool => (int) $op['id'] === $atualId)) {
-            $atual = Vendedor::query()->with('rhFuncionario')->find($atualId);
+            $atual = Vendedor::query()
+                ->with(['rhFuncionario', 'estoqueCadastro'])
+                ->find($atualId);
 
             if ($atual) {
                 array_unshift($opcoes, $this->mapAtendenteOption($atual));
@@ -527,7 +534,7 @@ trait ErpOrdemServicoFormPage
     }
 
     /**
-     * @return array{id: int, nome: string}
+     * @return array{id: int, nome: string, estoque_id: int|null, estoque_label: string}
      */
     private function mapAtendenteOption(Vendedor $vendedor): array
     {
@@ -535,10 +542,13 @@ trait ErpOrdemServicoFormPage
         $codigo = trim((string) ($rh?->codigo ?? $vendedor->codigo ?? ''));
         $nome = trim((string) ($rh?->nome ?? $vendedor->nome ?? ''));
         $label = trim(($codigo !== '' ? $codigo.' - ' : '').$nome);
+        $estoque = VendedorEstoque::fromVendedor($vendedor);
 
         return [
             'id' => (int) $vendedor->id,
             'nome' => mb_strtoupper($label !== '' ? $label : (string) ($vendedor->nome ?? ''), 'UTF-8'),
+            'estoque_id' => $estoque['id'],
+            'estoque_label' => $estoque['label'],
         ];
     }
 
@@ -662,9 +672,9 @@ trait ErpOrdemServicoFormPage
     {
         $momento = ErpTimezone::toLocal();
 
-        $this->atendenteId = EmpresaParametros::solicitarVendedorCadaVenda(ErpContext::currentEmpresaId())
-            ? null
-            : Auth::user()?->vendedor_id;
+        // Técnico padrão: mesma regra da Tela de Venda (Pedir Vendedor / OperadorDoUsuario / sessão PDV).
+        // Definido em bootOsOperacional → carregarTecnicoPadraoOs (não usar só users.vendedor_id).
+        $this->atendenteId = null;
         $this->dataInicio = $momento->format('Y-m-d');
         $this->horaInicio = $momento->format('H:i');
         $this->previsaoEntrega = '';
@@ -682,6 +692,7 @@ trait ErpOrdemServicoFormPage
             'situacao' => OrdemServico::SITUACAO_ABERTA,
         ];
         $this->form->fill($this->data);
+        $this->bootOsOperacional();
     }
 
     protected function loadOsFormFromRecord(OrdemServico $ordem): void
@@ -707,6 +718,15 @@ trait ErpOrdemServicoFormPage
         $this->cidade = mb_strtoupper((string) ($ordem->cidade ?? ''), 'UTF-8');
         $this->uf = mb_strtoupper((string) ($ordem->uf ?: 'SC'), 'UTF-8');
         $this->atendenteId = $ordem->atendente_id;
+
+        $this->carregarTabelaPrecoOpcoesOs();
+        $this->syncOsCaixaEstoqueLabels();
+        $priceTableId = (int) ($ordem->price_table_id ?? 0);
+        if ($priceTableId > 0) {
+            $this->aplicarTabelaPrecoOs($priceTableId, recalcGrade: false);
+        } else {
+            $this->carregarTabelaPrecoPadraoOs();
+        }
 
         $this->dataInicio = $ordem->data_inicio?->format('Y-m-d') ?? '';
         $this->horaInicio = $ordem->horaInicioExibicao() ?? '';
@@ -772,6 +792,7 @@ trait ErpOrdemServicoFormPage
             'servico_prestado' => (string) ($item->servico_prestado ?? ''),
             'qtd' => ErpMoney::formatBr((float) $item->qtd, 3),
             'preco' => ErpMoney::formatBr((float) $item->preco),
+            'preco_manual' => (bool) ($item->preco_manual ?? false),
             'desconto' => ErpMoney::formatBr((float) ($item->desconto ?? 0)),
             'acrescimo' => ErpMoney::formatBr((float) ($item->acrescimo ?? 0)),
             'total' => ErpMoney::formatBr((float) $item->total),
@@ -964,6 +985,12 @@ trait ErpOrdemServicoFormPage
 
         if ($person->vendedor_loja_id) {
             $this->atendenteId = $person->vendedor_loja_id;
+            $this->syncOsEstoqueLabelDoAtendente();
+        }
+
+        // Nova OS / troca de cliente: prioridade de tabela cliente → técnico.
+        if (! $this->isEditingOs() || $this->itens === []) {
+            $this->carregarTabelaPrecoPadraoOs();
         }
     }
 
@@ -1125,6 +1152,9 @@ trait ErpOrdemServicoFormPage
             $itens[$index][$field] = trim($value);
         } else {
             $itens[$index][$field] = $value;
+            if ($field === 'preco') {
+                $itens[$index]['preco_manual'] = true;
+            }
             $itens[$index] = $this->recalcItemRowData($itens[$index]);
         }
 
@@ -1828,9 +1858,21 @@ trait ErpOrdemServicoFormPage
         }
 
         $precoInformado = max(0.0, ErpMoney::parseBr($this->itemPrecoInput));
-        $preco = $this->editingItemIndex !== null
-            ? $precoInformado
-            : $this->resolverPrecoConfirmacaoInclusao($precoInformado, $qtd);
+        $precoManual = false;
+
+        if ($this->editingItemIndex !== null) {
+            $preco = $precoInformado;
+            $sugeridoEdit = $this->osPrecoSugeridoInclusao;
+            $precoManual = (bool) ($this->itens[$this->editingItemIndex]['preco_manual'] ?? false)
+                || $sugeridoEdit === null
+                || abs($precoInformado - (float) $sugeridoEdit) >= 0.005;
+        } else {
+            $sugerido = $this->osPrecoSugeridoInclusao;
+            $precoManual = $sugerido !== null && abs($precoInformado - (float) $sugerido) >= 0.005;
+            $preco = $precoManual
+                ? $precoInformado
+                : $this->resolverPrecoConfirmacaoInclusao($precoInformado, $qtd);
+        }
 
         if ($preco <= 0) {
             Notification::make()->title('Informe o valor unitário do item.')->warning()->send();
@@ -1846,7 +1888,7 @@ trait ErpOrdemServicoFormPage
 
         try {
             if ($this->editingItemIndex !== null) {
-                $this->applyEditedItemFromBar($qtd, $preco, $acrescimo, $desconto);
+                $this->applyEditedItemFromBar($qtd, $preco, $acrescimo, $desconto, $precoManual);
                 $this->clearItemEntryRow();
                 $this->dispatch('erp-os-focus-item-descricao');
 
@@ -1854,7 +1896,7 @@ trait ErpOrdemServicoFormPage
             }
 
             $hadRows = $this->itens !== [];
-            $this->appendStagedOsItem($qtd, $preco, $acrescimo, $desconto);
+            $this->appendStagedOsItem($qtd, $preco, $acrescimo, $desconto, $precoManual);
             $included = $this->osItemIncludedPayload();
             $this->clearItemEntryRow();
 
@@ -1880,8 +1922,13 @@ trait ErpOrdemServicoFormPage
         }
     }
 
-    protected function applyEditedItemFromBar(float $qtd, float $preco, float $acrescimo, float $desconto): void
-    {
+    protected function applyEditedItemFromBar(
+        float $qtd,
+        float $preco,
+        float $acrescimo,
+        float $desconto,
+        bool $precoManual = false,
+    ): void {
         $index = $this->editingItemIndex;
 
         if ($index === null || ! isset($this->itens[$index])) {
@@ -1901,6 +1948,7 @@ trait ErpOrdemServicoFormPage
             : mb_strtoupper(trim($this->itemProdutoSearch), 'UTF-8');
         $row['qtd'] = ErpMoney::formatBr($qtd, 3);
         $row['preco'] = ErpMoney::formatBr($preco);
+        $row['preco_manual'] = $precoManual || (bool) ($row['preco_manual'] ?? false);
         $row['acrescimo'] = ErpMoney::formatBr($acrescimo);
         $row['desconto'] = ErpMoney::formatBr($desconto);
         $itens[$index] = $this->recalcItemRowData($row);
@@ -1953,18 +2001,11 @@ trait ErpOrdemServicoFormPage
     }
 
     /**
-     * Preço efetivo de inclusão na OS (varejo + campanha/legado da empresa ativa).
+     * Preço efetivo de inclusão na OS (tabela selecionada na faixa operacional).
      */
     protected function resolveOsPrecoInclusao(Product $product, float $quantidade = 1.0): float
     {
-        $empresaId = (int) (ErpContext::currentEmpresaId() ?? 0);
-
-        return app(ProductTabelaPrecoService::class)->resolvePrecoNivel(
-            $product,
-            ProductTabelaPrecoService::NIVEL_VAREJO,
-            max(0.001, $quantidade),
-            $empresaId > 0 ? $empresaId : null,
-        );
+        return $this->precoProdutoNaTabelaOs($product, max(0.001, $quantidade));
     }
 
     /**
@@ -2008,6 +2049,17 @@ trait ErpOrdemServicoFormPage
 
         $tipo = $product->is_servico ? 'S' : 'P';
         $exigeTabPreco = ($product->usa_tab_preco ?? false) && $this->editingItemIndex === null;
+        $tabConfirmadaPelaFaixa = false;
+
+        // Com tabela da faixa: se o nível selecionado está habilitado, não abre o modal.
+        if ($exigeTabPreco) {
+            $tabSvc = app(ProductTabelaPrecoService::class);
+            $tabSvc->carregarItens($product);
+            if ($tabSvc->habilitaNivel($product, $this->nivelTabelaPrecoSelecionadaOs())) {
+                $exigeTabPreco = false;
+                $tabConfirmadaPelaFaixa = true;
+            }
+        }
 
         $this->itemPendingProductId = $product->id;
         $this->osPendingUsaTabPreco = (bool) ($product->usa_tab_preco ?? false);
@@ -2016,7 +2068,7 @@ trait ErpOrdemServicoFormPage
         $this->itemQtdInput = ErpMoney::formatBr(1, 3);
         $this->itemPendingDesconto = '0,00';
         $this->itemPendingAcrescimo = '0,00';
-        $this->tabPrecoItemConfirmada = false;
+        $this->tabPrecoItemConfirmada = $tabConfirmadaPelaFaixa;
         $this->osPrecoSugeridoInclusao = null;
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
@@ -2513,8 +2565,13 @@ trait ErpOrdemServicoFormPage
         );
     }
 
-    protected function appendStagedOsItem(float $qtd, float $preco, float $acrescimo, float $desconto): void
-    {
+    protected function appendStagedOsItem(
+        float $qtd,
+        float $preco,
+        float $acrescimo,
+        float $desconto,
+        bool $precoManual = false,
+    ): void {
         $tipo = $this->activeItemTab === 'servicos' ? 'S' : 'P';
 
         $this->pushOsGridItem(
@@ -2529,6 +2586,7 @@ trait ErpOrdemServicoFormPage
             $acrescimo,
             $desconto,
             $tipo === 'P' ? $this->produtoAtualFoto : null,
+            $precoManual,
         );
     }
 
@@ -2542,6 +2600,7 @@ trait ErpOrdemServicoFormPage
         float $acrescimo,
         float $desconto,
         ?string $foto,
+        bool $precoManual = false,
     ): void {
         $itens = $this->itens;
         $row = $this->recalcItemRowData([
@@ -2554,6 +2613,7 @@ trait ErpOrdemServicoFormPage
             'servico_prestado' => '',
             'qtd' => ErpMoney::formatBr($qtd, 3),
             'preco' => ErpMoney::formatBr($preco),
+            'preco_manual' => $precoManual,
             'acrescimo' => ErpMoney::formatBr(max(0, $acrescimo)),
             'desconto' => ErpMoney::formatBr(max(0, $desconto)),
             'total' => ErpMoney::formatBr(0),
@@ -2767,7 +2827,7 @@ trait ErpOrdemServicoFormPage
 
     protected function garantirTecnicoSelecionadoParaItem(): bool
     {
-        if (! EmpresaParametros::solicitarVendedorCadaVenda(ErpContext::currentEmpresaId())) {
+        if (! $this->deveExigirTecnicoAntesDoItemOs()) {
             return true;
         }
 
@@ -2805,7 +2865,6 @@ trait ErpOrdemServicoFormPage
         $this->osAcrescimoPct = $this->formatOsMoney($this->moneyOs($this->osAcrescimoPct));
         $valor = bcdiv(bcmul($this->moneyOs($this->totalGeral), $this->moneyOs($this->osAcrescimoPct), 4), '100', 2);
         $this->osAcrescimoValor = $this->formatOsMoney($valor);
-        $this->aplicarTotalNaPrimeiraFormaOs();
     }
 
     public function updatedOsAcrescimoValor(): void
@@ -2815,7 +2874,6 @@ trait ErpOrdemServicoFormPage
         $this->osAcrescimoPct = bccomp($base, '0.00', 2) === 1
             ? $this->formatOsMoney(bcdiv(bcmul($this->moneyOs($this->osAcrescimoValor), '100', 4), $base, 2))
             : '0,00';
-        $this->aplicarTotalNaPrimeiraFormaOs();
     }
 
     public function updatedOsDescontoPct(): void
@@ -2823,7 +2881,6 @@ trait ErpOrdemServicoFormPage
         $this->osDescontoPct = $this->formatOsMoney($this->moneyOs($this->osDescontoPct));
         $valor = bcdiv(bcmul($this->moneyOs($this->totalGeral), $this->moneyOs($this->osDescontoPct), 4), '100', 4);
         $this->osDescontoValor = $this->formatOsMoney(bcadd($valor, '0', 2));
-        $this->aplicarTotalNaPrimeiraFormaOs();
     }
 
     public function updatedOsDescontoValor(): void
@@ -2833,7 +2890,6 @@ trait ErpOrdemServicoFormPage
         $this->osDescontoPct = bccomp($base, '0.00', 2) === 1
             ? $this->formatOsMoney(bcdiv(bcmul($this->moneyOs($this->osDescontoValor), '100', 4), $base, 2))
             : '0,00';
-        $this->aplicarTotalNaPrimeiraFormaOs();
     }
 
     public function selectOsPagamentoByAtalho(string $atalho): void
@@ -3221,9 +3277,36 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $liquido = $this->osTotalLiquido();
+        // Snapshot: se o faturamento falhar, devolve grade/desconto F4 (DB já dá rollback).
+        $itensAntesRateio = $this->itens;
+        $descontoF4Antes = $this->osDescontoValor;
+        $descontoPctF4Antes = $this->osDescontoPct;
+        $totaisAntesRateio = [
+            'descPecas' => $this->descPecas,
+            'descServicos' => $this->descServicos,
+            'subtotalPecas' => $this->subtotalPecas,
+            'subtotalServicos' => $this->subtotalServicos,
+            'subtotalGeral' => $this->subtotalGeral,
+            'totalPecas' => $this->totalPecas,
+            'totalServicos' => $this->totalServicos,
+            'totalGeral' => $this->totalGeral,
+        ];
+
+        // Desconto F4 → rateio nos itens (padrão TV). Acréscimo F4 permanece no total.
+        $rateioAplicado = $this->aplicarRateioDescontoFechamentoOs();
+        $liquido = bcadd(
+            $this->moneyOs($this->totalGeral),
+            $this->moneyOs($this->osAcrescimoValor),
+            2,
+        );
 
         if (bccomp($liquido, '0.00', 2) !== 1) {
+            $this->restaurarEstadoAposFalhaRateioF4(
+                $itensAntesRateio,
+                $descontoF4Antes,
+                $descontoPctF4Antes,
+                $totaisAntesRateio,
+            );
             Notification::make()
                 ->title('A OS não tem valor para faturar.')
                 ->warning()
@@ -3232,7 +3315,6 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $ordem->total_geral = $liquido;
         // Informações Adicionais do F4 = mesma $observacoes da OS.
         $ordem->observacoes = trim($this->observacoes) !== '' ? trim($this->observacoes) : null;
         $this->persistirOsTransporteNaOrdem();
@@ -3242,6 +3324,12 @@ trait ErpOrdemServicoFormPage
 
         if (! $lock->get()) {
             $this->osPersistindo = false;
+            $this->restaurarEstadoAposFalhaRateioF4(
+                $itensAntesRateio,
+                $descontoF4Antes,
+                $descontoPctF4Antes,
+                $totaisAntesRateio,
+            );
             Notification::make()
                 ->title('O faturamento desta OS já está em andamento.')
                 ->warning()
@@ -3252,14 +3340,29 @@ trait ErpOrdemServicoFormPage
         \App\Support\Erp\Os\OsFinPerf::mark('php.lock_ok');
 
         try {
-            $contas = app(OsFaturamentoService::class)->faturar(
-                $ordem,
-                $this->osMeiosPagamento,
-                $this->osTabelaPrazoDiasList(),
-                $this->osParcelasChequeNumerosList(),
-            );
+            $contas = DB::transaction(function () use ($ordem, $liquido, $rateioAplicado) {
+                if ($rateioAplicado) {
+                    $this->persistirItensETotaisOsAposRateioF4($ordem, $liquido);
+                    $ordem->unsetRelation('itens');
+                } else {
+                    $ordem->total_geral = (float) $liquido;
+                }
+
+                return app(OsFaturamentoService::class)->faturar(
+                    $ordem,
+                    $this->osMeiosPagamento,
+                    $this->osTabelaPrazoDiasList(),
+                    $this->osParcelasChequeNumerosList(),
+                );
+            });
             \App\Support\Erp\Os\OsFinPerf::mark('php.svc_faturar_ok');
         } catch (\Throwable $exception) {
+            $this->restaurarEstadoAposFalhaRateioF4(
+                $itensAntesRateio,
+                $descontoF4Antes,
+                $descontoPctF4Antes,
+                $totaisAntesRateio,
+            );
             Notification::make()
                 ->title('Não foi possível faturar a OS.')
                 ->body($exception->getMessage())
@@ -3310,6 +3413,84 @@ trait ErpOrdemServicoFormPage
         );
 
         return bccomp($liquido, '0.00', 2) === 1 ? $liquido : '0.00';
+    }
+
+    /**
+     * Espelho do rateio F4 da Tela de Venda: desconto de fechamento vai para item.desconto.
+     * Consome osDesconto* para não reduzir total_geral de novo.
+     */
+    protected function aplicarRateioDescontoFechamentoOs(): bool
+    {
+        $desconto = round((float) $this->moneyOs($this->osDescontoValor), 2);
+
+        if ($desconto <= 0 || $this->itens === []) {
+            return false;
+        }
+
+        $resultado = OsDescontoFechamentoRateio::aplicar($this->itens, $desconto);
+
+        if ($resultado['desconto_aplicado'] <= 0) {
+            return false;
+        }
+
+        $this->itens = $resultado['itens'];
+        $this->osDescontoValor = '0,00';
+        $this->osDescontoPct = '0,00';
+        $this->recalcTotais();
+
+        return true;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $itens
+     * @param  array<string, string>  $totais
+     */
+    protected function restaurarEstadoAposFalhaRateioF4(
+        array $itens,
+        string $descontoValor,
+        string $descontoPct,
+        array $totais,
+    ): void {
+        $this->itens = $itens;
+        $this->osDescontoValor = $descontoValor;
+        $this->osDescontoPct = $descontoPct;
+        $this->descPecas = $totais['descPecas'] ?? $this->descPecas;
+        $this->descServicos = $totais['descServicos'] ?? $this->descServicos;
+        $this->subtotalPecas = $totais['subtotalPecas'] ?? $this->subtotalPecas;
+        $this->subtotalServicos = $totais['subtotalServicos'] ?? $this->subtotalServicos;
+        $this->subtotalGeral = $totais['subtotalGeral'] ?? $this->subtotalGeral;
+        $this->totalPecas = $totais['totalPecas'] ?? $this->totalPecas;
+        $this->totalServicos = $totais['totalServicos'] ?? $this->totalServicos;
+        $this->totalGeral = $totais['totalGeral'] ?? $this->totalGeral;
+    }
+
+    /**
+     * Grava itens/totais já rateados antes do OsFaturamentoService (espelho/fiscal leem o banco).
+     * vl_desc_* permanece o global do formulário (sem o F4 — F4 está nas linhas).
+     */
+    protected function persistirItensETotaisOsAposRateioF4(OrdemServico $ordem, string $totalGeralLiquido): void
+    {
+        $empresaId = filled($ordem->empresa_id)
+            ? (int) $ordem->empresa_id
+            : (int) (ErpContext::currentEmpresaId() ?? Auth::user()?->empresa_id ?? 0);
+        $usuarioId = Auth::id();
+
+        $ordem->forceFill([
+            'subtotal' => round(
+                ErpMoney::parseBr($this->subtotalPecas) + ErpMoney::parseBr($this->subtotalServicos),
+                2,
+            ),
+            'subtotal_pecas' => ErpMoney::parseBr($this->subtotalPecas),
+            'subtotal_servicos' => ErpMoney::parseBr($this->subtotalServicos),
+            'vl_desc_pecas' => ErpMoney::parseBr($this->descPecasGlobal),
+            'vl_desc_servicos' => ErpMoney::parseBr($this->descServicosGlobal),
+            'total_produtos' => ErpMoney::parseBr($this->totalPecas),
+            'total_servicos' => ErpMoney::parseBr($this->totalServicos),
+            'total_geral' => (float) $totalGeralLiquido,
+            'observacoes' => $ordem->observacoes,
+        ])->save();
+
+        $this->sincronizarItensPersistidos($ordem, $empresaId > 0 ? $empresaId : null, $usuarioId);
     }
 
     /**
@@ -3504,6 +3685,7 @@ trait ErpOrdemServicoFormPage
                     'cliente_id' => $this->clienteId,
                     'orcamento_id' => $this->orcamentoOrigemId,
                     'atendente_id' => $this->atendenteId,
+                    'price_table_id' => $this->tabelaPrecoId ?: null,
                     'usuario_id' => $usuarioId,
                     'documento' => trim($this->documento) ?: null,
                     'nome' => mb_strtoupper(trim($this->nome ?: $this->clienteSearch), 'UTF-8') ?: null,
@@ -3667,6 +3849,7 @@ trait ErpOrdemServicoFormPage
                     : null,
                 'qtd' => ErpMoney::parseBr($row['qtd'] ?? 0, 3),
                 'preco' => ErpMoney::parseBr($row['preco'] ?? 0),
+                'preco_manual' => (bool) ($row['preco_manual'] ?? false),
                 'desconto' => ErpMoney::parseBr($row['desconto'] ?? 0),
                 'acrescimo' => ErpMoney::parseBr($row['acrescimo'] ?? 0),
                 'total' => ErpMoney::parseBr($row['total'] ?? 0),
@@ -4027,26 +4210,6 @@ trait ErpOrdemServicoFormPage
         $this->osAcrescimoValor = '0,00';
         $this->osDescontoPct = '0,00';
         $this->osDescontoValor = '0,00';
-    }
-
-    protected function aplicarTotalNaPrimeiraFormaOs(): void
-    {
-        if ($this->osMeiosPagamento === []) {
-            return;
-        }
-
-        // Recalcula o restante na forma selecionada (não força Dinheiro).
-        $index = $this->osPagamentoIndex;
-
-        if (! isset($this->osMeiosPagamento[$index])) {
-            $index = 0;
-        }
-
-        foreach ($this->osMeiosPagamento as $i => $meio) {
-            $this->osMeiosPagamento[$i]['valor'] = '0,00';
-        }
-
-        $this->aplicarRestanteOsPagamento($index);
     }
 
     protected function carregarMeiosPagamentoOs(): void

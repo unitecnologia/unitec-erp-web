@@ -39,6 +39,20 @@
         margin: 0 0 0.22rem;
     }
 
+    .orc-doc__separador td {
+        background: #eef2f7;
+        border-top: 1px solid #c5ced9;
+        border-bottom: 1px solid #c5ced9;
+        color: #1f2937;
+        font-size: 9.5pt;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        padding: 0.28rem 0.35rem;
+        text-align: left;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
     .orc-doc__fechamento {
         width: 100%;
         border-collapse: collapse;

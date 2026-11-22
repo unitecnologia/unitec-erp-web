@@ -2,14 +2,14 @@
     $columns = [
         ['key' => 'numero', 'label' => 'Número', 'sortable' => true, 'align' => 'center'],
         ['key' => 'data', 'label' => 'Data', 'sortable' => true, 'align' => 'center'],
-        ['key' => 'hora', 'label' => 'Hora', 'sortable' => false, 'align' => 'center'],
         ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'telefone', 'label' => 'Telefone', 'sortable' => false, 'align' => 'start'],
         ['key' => 'vendedor', 'label' => 'Vendedor', 'sortable' => false, 'align' => 'start'],
         ['key' => 'cidade', 'label' => 'Cidade', 'sortable' => false, 'align' => 'start'],
         ['key' => 'uf', 'label' => 'UF', 'sortable' => false, 'align' => 'center'],
         ['key' => 'plataforma', 'label' => 'Plataforma', 'sortable' => false, 'align' => 'center'],
         ['key' => 'status', 'label' => 'Situação', 'sortable' => false, 'align' => 'center', 'html' => true],
-        ['key' => 'total', 'label' => 'Total', 'sortable' => false, 'align' => 'end', 'html' => true],
+        ['key' => 'total', 'label' => 'Total', 'sortable' => false, 'align' => 'start', 'html' => true],
         ['key' => 'ver_itens', 'label' => '', 'sortable' => false, 'align' => 'center', 'html' => true],
     ];
 @endphp
@@ -53,7 +53,15 @@
                 <tr class="{{ $rowClass }}" data-record-key="{{ $record->getKey() }}">
                     @foreach ($columns as $column)
                         @php
-                            $value = $cells[$column['key']] ?? '';
+                            if ($column['key'] === 'data') {
+                                $data = (string) ($cells['data'] ?? '—');
+                                $hora = (string) ($cells['hora'] ?? '');
+                                $value = ($data !== '—' && $hora !== '' && $hora !== '—')
+                                    ? $data . ' ' . $hora
+                                    : $data;
+                            } else {
+                                $value = $cells[$column['key']] ?? '';
+                            }
                         @endphp
                         <td @class(['fi-ta-cell', 'text-' . $column['align'] => filled($column['align'] ?? null)])>
                             @if ($column['html'] ?? false)

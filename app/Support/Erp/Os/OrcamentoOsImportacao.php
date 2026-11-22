@@ -43,6 +43,10 @@ final class OrcamentoOsImportacao
         $baseServicos = 0.0;
 
         foreach ($orcamento->itens as $item) {
+            if ($item->isSeparador()) {
+                continue;
+            }
+
             $linha = $this->linha($item);
             $linhas[] = $linha;
 

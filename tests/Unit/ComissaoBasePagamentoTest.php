@@ -84,4 +84,55 @@ class ComissaoBasePagamentoTest extends TestCase
             [],
         ));
     }
+
+    public function test_troca_identificada_nao_pagar_nao_desconta_duas_vezes(): void
+    {
+        // Venda já líquida (100 − 30 TROCA rateada). Base = 70.
+        $base = ComissaoBasePagamento::baseComissionavel(70.0, 'DINHEIRO', null, ['TROCA' => true]);
+        $this->assertSame(70.0, $base);
+
+        $ajustada = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+            $base,
+            70.0,
+            ['valor' => 30.0, 'nao_pagar_comissao' => true, 'descricao' => 'TROCA'],
+        );
+
+        $this->assertSame(70.0, $ajustada);
+    }
+
+    public function test_troca_identificada_que_paga_comissao_volta_a_base(): void
+    {
+        $base = ComissaoBasePagamento::baseComissionavel(70.0, 'DINHEIRO', null, []);
+        $ajustada = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+            $base,
+            70.0,
+            ['valor' => 30.0, 'nao_pagar_comissao' => false, 'descricao' => 'TROCA'],
+        );
+
+        $this->assertSame(100.0, $ajustada);
+    }
+
+    public function test_troca_cem_por_cento_com_flag_nao_pagar_zera_base(): void
+    {
+        $base = ComissaoBasePagamento::baseComissionavel(0.0, 'TROCA', null, ['TROCA' => true]);
+        $ajustada = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+            $base,
+            0.0,
+            ['valor' => 100.0, 'nao_pagar_comissao' => true, 'descricao' => 'TROCA'],
+        );
+
+        $this->assertSame(0.0, $ajustada);
+    }
+
+    public function test_troca_cem_por_cento_que_paga_recoloca_valor(): void
+    {
+        $base = ComissaoBasePagamento::baseComissionavel(0.0, 'TROCA', null, []);
+        $ajustada = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+            $base,
+            0.0,
+            ['valor' => 100.0, 'nao_pagar_comissao' => false, 'descricao' => 'TROCA'],
+        );
+
+        $this->assertSame(100.0, $ajustada);
+    }
 }

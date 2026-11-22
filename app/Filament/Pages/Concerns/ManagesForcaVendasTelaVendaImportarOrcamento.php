@@ -250,6 +250,10 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
         foreach ($orcamento->itens as $item) {
             /** @var OrcamentoItem $item */
+            if ($item->isSeparador()) {
+                continue;
+            }
+
             $product = $item->product;
 
             if (! $product || ! $product->ativo) {

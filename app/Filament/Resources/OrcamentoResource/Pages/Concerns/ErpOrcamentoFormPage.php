@@ -28,6 +28,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\MunicipioLookupService;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
+use App\Support\Erp\Orcamento\OrcamentoItemDisplayNumbers;
 use App\Support\Erp\Orcamento\OrcamentoPrecoService;
 use App\Support\Erp\Orcamento\OrcamentoTotaisService;
 use App\Support\Erp\ProductEstoqueSaldoService;
@@ -53,7 +54,9 @@ trait ErpOrcamentoFormPage
 {
     use InteractsWithErpFormReturnUrl;
     use ManagesEquipamentoVeiculo;
+    use ManagesOrcamentoMargem;
     use ManagesOrcamentoPrecoDivergencia;
+    use ManagesOrcamentoSeparadores;
 
     public ?int $osVeiculoId = null;
 
@@ -511,23 +514,26 @@ trait ErpOrcamentoFormPage
         $acrescimo = $partes['acrescimo'];
         $total = $partes['total'];
 
+        $isSeparador = $item->isSeparador();
+
         return [
             'id' => $item->id,
-            'key' => 'item-' . $item->id,
+            'key' => ($isSeparador ? 'sep-' : 'item-') . $item->id,
             'item' => (int) $item->item,
-            'product_id' => $item->product_id,
-            'product_codigo' => $item->product?->codigo ?? '',
+            'is_separador' => $isSeparador,
+            'product_id' => $isSeparador ? null : $item->product_id,
+            'product_codigo' => $isSeparador ? '' : ($item->product?->codigo ?? ''),
             'descricao' => mb_strtoupper((string) ($item->descricao ?? $item->product?->descricao ?? ''), 'UTF-8'),
-            'quantidade' => ErpMoney::formatBr($qtd, 3),
-            'unidade' => mb_strtoupper((string) ($item->product?->unidade ?? 'UN'), 'UTF-8'),
-            'preco_unitario' => ErpMoney::formatBr($preco),
-            'acrescimo' => ErpMoney::formatBr($acrescimo),
-            'desconto' => ErpMoney::formatBr($desconto),
-            'total' => ErpMoney::formatBr($total),
-            'preco_variavel' => (bool) ($item->product?->preco_variavel ?? false),
-            'product_grade_id' => $item->product_grade_id,
-            'grade_descricao' => mb_strtoupper((string) ($item->grade?->descricao ?? ''), 'UTF-8'),
-            'foto' => $item->product?->fotoUrl(),
+            'quantidade' => ErpMoney::formatBr($isSeparador ? 0 : $qtd, 3),
+            'unidade' => $isSeparador ? '' : mb_strtoupper((string) ($item->product?->unidade ?? 'UN'), 'UTF-8'),
+            'preco_unitario' => ErpMoney::formatBr($isSeparador ? 0 : $preco),
+            'acrescimo' => ErpMoney::formatBr($isSeparador ? 0 : $acrescimo),
+            'desconto' => ErpMoney::formatBr($isSeparador ? 0 : $desconto),
+            'total' => ErpMoney::formatBr($isSeparador ? 0 : $total),
+            'preco_variavel' => $isSeparador ? false : (bool) ($item->product?->preco_variavel ?? false),
+            'product_grade_id' => $isSeparador ? null : $item->product_grade_id,
+            'grade_descricao' => $isSeparador ? '' : mb_strtoupper((string) ($item->grade?->descricao ?? ''), 'UTF-8'),
+            'foto' => $isSeparador ? null : $item->product?->fotoUrl(),
         ];
     }
 
@@ -1346,6 +1352,10 @@ trait ErpOrcamentoFormPage
         $subtotal = 0.0;
 
         foreach ($this->itens as $row) {
+            if ($this->linhaEhSeparador($row)) {
+                continue;
+            }
+
             $subtotal += ErpMoney::parseBr($row['total'] ?? 0);
         }
 
@@ -1404,6 +1414,13 @@ trait ErpOrcamentoFormPage
         }
 
         $row = $this->itens[$index];
+
+        if ($this->linhaEhSeparador($row)) {
+            $this->carregarSeparadorParaEdicao($index);
+
+            return;
+        }
+
         $productId = (int) ($row['product_id'] ?? 0);
 
         if ($productId <= 0) {
@@ -1448,6 +1465,12 @@ trait ErpOrcamentoFormPage
     {
         if ($this->orcamentoReadOnly() || ! isset($this->itens[$index])) {
             return;
+        }
+
+        if ($this->linhaEhSeparador($this->itens[$index])) {
+            if ($field !== 'descricao') {
+                return;
+            }
         }
 
         if (! in_array($field, ['quantidade', 'preco_unitario', 'descricao'], true)) {
@@ -1499,6 +1522,19 @@ trait ErpOrcamentoFormPage
      */
     protected function recalcItemRowData(array $row): array
     {
+        if ($this->linhaEhSeparador($row)) {
+            $row['quantidade'] = ErpMoney::formatBr(0, 3);
+            $row['preco_unitario'] = ErpMoney::formatBr(0);
+            $row['acrescimo'] = ErpMoney::formatBr(0);
+            $row['desconto'] = ErpMoney::formatBr(0);
+            $row['total'] = ErpMoney::formatBr(0);
+            $row['product_id'] = null;
+            $row['product_codigo'] = '';
+            $row['unidade'] = '';
+
+            return $row;
+        }
+
         $qtd = ErpMoney::parseBr($row['quantidade'] ?? 0, 3);
         $preco = ErpMoney::parseBr($row['preco_unitario'] ?? 0);
         $acrescimo = ErpMoney::parseBr($row['acrescimo'] ?? 0);
@@ -1543,14 +1579,25 @@ trait ErpOrcamentoFormPage
         $this->itens = $itens;
     }
 
-    public function resolveItemDisplayNumber(int $index, ?int $total = null): int
+    /**
+     * Numeração da coluna # na grade: só produtos (1..N). Separadores = null.
+     *
+     * @return array<int, int|null>
+     */
+    public function resolveItemDisplayNumbers(): array
     {
-        $total ??= count($this->itens);
+        return OrcamentoItemDisplayNumbers::fromRows($this->itens);
+    }
 
-        return max(1, $total - $index);
+    public function resolveItemDisplayNumber(int $index, ?int $total = null): ?int
+    {
+        return $this->resolveItemDisplayNumbers()[$index] ?? null;
     }
 
     /**
+     * Sequência interna de persistência/ordem (inclui separadores).
+     * Não é a numeração visual da coluna #.
+     *
      * @param  array<int, array<string, mixed>>  $itens
      * @return array<int, array<string, mixed>>
      */
@@ -1559,7 +1606,7 @@ trait ErpOrcamentoFormPage
         $total = count($itens);
 
         foreach (array_keys($itens) as $index) {
-            $itens[$index]['item'] = $this->resolveItemDisplayNumber($index, $total);
+            $itens[$index]['item'] = max(1, $total - $index);
         }
 
         return $itens;
@@ -2513,11 +2560,30 @@ trait ErpOrcamentoFormPage
         );
     }
 
+    public function itensResumoQuantidadeDisplay(): string
+    {
+        $count = 0;
+
+        foreach ($this->itens as $row) {
+            if ($this->linhaEhSeparador($row)) {
+                continue;
+            }
+
+            $count++;
+        }
+
+        return $count.' '.($count === 1 ? 'item' : 'itens');
+    }
+
     public function itensResumoBrutoDisplay(): string
     {
         $total = 0.0;
 
         foreach ($this->itens as $row) {
+            if ($this->linhaEhSeparador($row)) {
+                continue;
+            }
+
             $qtd = ErpMoney::parseBr($row['quantidade'] ?? 0, 3);
             $preco = ErpMoney::parseBr($row['preco_unitario'] ?? 0);
             $total += round($qtd * $preco, 2);
@@ -2531,6 +2597,10 @@ trait ErpOrcamentoFormPage
         $total = 0.0;
 
         foreach ($this->itens as $row) {
+            if ($this->linhaEhSeparador($row)) {
+                continue;
+            }
+
             $total += ErpMoney::parseBr($row['acrescimo'] ?? 0);
         }
 
@@ -2542,6 +2612,10 @@ trait ErpOrcamentoFormPage
         $total = ErpMoney::parseBr($this->descontoValorDisplay);
 
         foreach ($this->itens as $row) {
+            if ($this->linhaEhSeparador($row)) {
+                continue;
+            }
+
             $qtd = ErpMoney::parseBr($row['quantidade'] ?? 0, 3);
             $preco = ErpMoney::parseBr($row['preco_unitario'] ?? 0);
             $bruto = round($qtd * $preco, 2);
@@ -2558,6 +2632,10 @@ trait ErpOrcamentoFormPage
         $total = 0.0;
 
         foreach ($this->itens as $row) {
+            if ($this->linhaEhSeparador($row)) {
+                continue;
+            }
+
             $total += ErpMoney::parseBr($row['total'] ?? 0);
         }
 
@@ -2583,6 +2661,7 @@ trait ErpOrcamentoFormPage
             'id' => null,
             'key' => 'new-' . Str::uuid()->toString(),
             'item' => count($itens) + 1,
+            'is_separador' => false,
             'product_id' => $product->id,
             'product_codigo' => $product->codigo,
             'descricao' => mb_strtoupper($product->descricao, 'UTF-8'),
@@ -2689,11 +2768,32 @@ trait ErpOrcamentoFormPage
             return false;
         }
 
+        if ($finalizar) {
+            $temProduto = false;
+
+            foreach ($this->itens as $row) {
+                if (! $this->linhaEhSeparador($row)) {
+                    $temProduto = true;
+                    break;
+                }
+            }
+
+            if (! $temProduto) {
+                Notification::make()->title('Informe os Itens do Orçamento!')->warning()->send();
+
+                return false;
+            }
+        }
+
         foreach ($this->itens as $index => $row) {
             if (blank($row['descricao'] ?? null)) {
+                $numero = $this->resolveItemDisplayNumber($index);
+
                 Notification::make()
-                    ->title('Informe a Descrição do Produto')
-                    ->body('Item ' . $this->resolveItemDisplayNumber($index))
+                    ->title($this->linhaEhSeparador($row)
+                        ? 'Informe o título do separador'
+                        : 'Informe a Descrição do Produto')
+                    ->body($numero !== null ? 'Item '.$numero : 'Separador de grupo')
                     ->warning()
                     ->send();
 
@@ -2839,18 +2939,34 @@ trait ErpOrcamentoFormPage
                 $keptIds = [];
 
                 foreach ($this->itens as $index => $row) {
-                    $itemData = [
-                        'item' => (int) ($row['item'] ?? $this->resolveItemDisplayNumber($index)),
-                        'product_id' => (int) $row['product_id'],
-                        'product_grade_id' => filled($row['product_grade_id'] ?? null)
-                            ? (int) $row['product_grade_id']
-                            : null,
-                        'quantidade' => ErpMoney::parseBr($row['quantidade'] ?? 0, 3),
-                        'preco_unitario' => ErpMoney::parseBr($row['preco_unitario'] ?? 0),
-                        'total' => ErpMoney::parseBr($row['total'] ?? 0),
-                        'descricao' => mb_strtoupper((string) ($row['descricao'] ?? ''), 'UTF-8'),
-                        'desconto' => ErpMoney::parseBr($row['desconto'] ?? 0),
-                    ];
+                    $isSeparador = $this->linhaEhSeparador($row);
+                    $itemSeq = (int) ($row['item'] ?? max(1, count($this->itens) - $index));
+
+                    $itemData = $isSeparador
+                        ? [
+                            'item' => $itemSeq,
+                            'is_separador' => true,
+                            'product_id' => null,
+                            'product_grade_id' => null,
+                            'quantidade' => 0,
+                            'preco_unitario' => 0,
+                            'total' => 0,
+                            'descricao' => mb_strtoupper((string) ($row['descricao'] ?? ''), 'UTF-8'),
+                            'desconto' => 0,
+                        ]
+                        : [
+                            'item' => $itemSeq,
+                            'is_separador' => false,
+                            'product_id' => (int) $row['product_id'],
+                            'product_grade_id' => filled($row['product_grade_id'] ?? null)
+                                ? (int) $row['product_grade_id']
+                                : null,
+                            'quantidade' => ErpMoney::parseBr($row['quantidade'] ?? 0, 3),
+                            'preco_unitario' => ErpMoney::parseBr($row['preco_unitario'] ?? 0),
+                            'total' => ErpMoney::parseBr($row['total'] ?? 0),
+                            'descricao' => mb_strtoupper((string) ($row['descricao'] ?? ''), 'UTF-8'),
+                            'desconto' => ErpMoney::parseBr($row['desconto'] ?? 0),
+                        ];
 
                     if (filled($row['id'] ?? null)) {
                         $item = OrcamentoItem::query()->find($row['id']);
@@ -2867,7 +2983,7 @@ trait ErpOrcamentoFormPage
                     $item = $orcamento->itens()->create($itemData);
                     $keptIds[] = $item->id;
                     $this->itens[$index]['id'] = $item->id;
-                    $this->itens[$index]['key'] = 'item-' . $item->id;
+                    $this->itens[$index]['key'] = ($isSeparador ? 'sep-' : 'item-') . $item->id;
                 }
 
                 $orcamento->itens()->whereNotIn('id', $keptIds)->delete();
@@ -3013,6 +3129,12 @@ trait ErpOrcamentoFormPage
 
     public function handleOrcamentoFormEscape(): void
     {
+        if ($this->margemModalOpen) {
+            $this->fecharMargemVenda();
+
+            return;
+        }
+
         if ($this->equipamentoModalOpen) {
             $this->fecharEquipamentoOrcamento();
 

@@ -7,12 +7,15 @@ use App\Support\ForcaVendas\ForcaVendasMargemVendaCalculator;
 use Filament\Notifications\Notification;
 
 /**
- * Modal “Margem da venda” na Tela de Venda.
- * Calcula sob demanda (só ao abrir); não altera $itens.
+ * Modal “Margem da venda” + toggle de custo na grade (Mais opções) na Tela de Venda.
+ * Custo/margem sob demanda; não altera $itens.
  */
 trait ManagesForcaVendasTelaVendaMargem
 {
     public bool $margemModalOpen = false;
+
+    /** Toggle de sessão: coluna Custo na grade (via Mais opções). Oculto por padrão. */
+    public bool $tvExibirCustoProdutos = false;
 
     /**
      * @var list<array{
@@ -44,6 +47,25 @@ trait ManagesForcaVendasTelaVendaMargem
         'margem' => 0.0,
     ];
 
+    public function empresaExibirMaisOpcoesNaTelaVenda(): bool
+    {
+        return (bool) (ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_mais_opcoes ?? false);
+    }
+
+    public function toggleExibirCustoProdutos(): void
+    {
+        if (! $this->empresaExibirMaisOpcoesNaTelaVenda()) {
+            $this->tvExibirCustoProdutos = false;
+            unset($this->exibirCustoProdutoGrade, $this->custosUnitariosGrade);
+
+            return;
+        }
+
+        $this->tvExibirCustoProdutos = ! $this->tvExibirCustoProdutos;
+        // Invalida Computed da página para a grade refletir o toggle no mesmo request.
+        unset($this->exibirCustoProdutoGrade, $this->custosUnitariosGrade);
+    }
+
     public function abrirMargemVenda(): void
     {
         if ($this->itens === []) {
@@ -67,7 +89,7 @@ trait ManagesForcaVendasTelaVendaMargem
 
         $resultado = ForcaVendasMargemVendaCalculator::calcular(
             $this->itens,
-            $this->descontoPedidoEfetivo(),
+            round($this->descontoPedidoEfetivo() + $this->valorTrocaPagamento(), 2),
             $this->acrescimoPedidoEfetivo(),
             $custos,
         );

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'orcamento_id',
     'item',
+    'is_separador',
     'product_id',
     'product_grade_id',
     'price_table_id',
@@ -27,12 +28,18 @@ class OrcamentoItem extends Model
     {
         return [
             'item' => 'integer',
+            'is_separador' => 'boolean',
             'price_table_id' => 'integer',
             'quantidade' => 'decimal:3',
             'preco_unitario' => 'decimal:2',
             'total' => 'decimal:2',
             'desconto' => 'decimal:2',
         ];
+    }
+
+    public function isSeparador(): bool
+    {
+        return (bool) $this->is_separador;
     }
 
     public function orcamento(): BelongsTo

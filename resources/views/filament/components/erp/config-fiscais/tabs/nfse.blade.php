@@ -203,15 +203,28 @@
                     step="1"
                     autocomplete="off"
                 >
+
+                <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="cfg-nfse-p-tot-trib-sn">Alíquota SN %</label>
+                <input
+                    id="cfg-nfse-p-tot-trib-sn"
+                    type="text"
+                    inputmode="decimal"
+                    wire:model="form.nfse_p_tot_trib_sn"
+                    class="erp-pcad-form__input erp-pcad-form__input--dps"
+                    maxlength="5"
+                    placeholder="0,00"
+                    autocomplete="off"
+                >
             </div>
 
             <p class="erp-config-fiscais-form__hint erp-config-fiscais-form__hint--compact">
                 Continuidade de outro sistema: última DPS 150, próximo número 151. DPS já gravadas não mudam.
+                ME/EPP do Simples: informe a alíquota aproximada total do PGDAS-D (pTotTribSN); a SEFIN rejeita indTotTrib (E0712).
             </p>
         @endif
 
         <p class="erp-config-fiscais-form__hint erp-config-fiscais-form__hint--compact">
-            O regime especial é obrigatório para emitir NFS-e. A apuração do Simples é opcional.
+            O regime especial é obrigatório para emitir NFS-e. A apuração do Simples é obrigatória para ME/EPP.
         </p>
     </fieldset>
 </div>

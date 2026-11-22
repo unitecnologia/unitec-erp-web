@@ -743,10 +743,26 @@
     text-align: center;
 }
 
-/* ---- Linha selecionada (azul forte, igual às outras telas) ---- */
-.erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-cell {
-    background: #60a5fa !important;
+/* ---- Linha focada (1 clique): azul médio, sem checkbox ---- */
+.erp-fv-monitor-page .fi-ta-row.erp-row-focus:not(.erp-row-selected) .fi-ta-cell {
+    background: #93c5fd !important;
     color: #0f172a !important;
+    box-shadow: none !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-focus:not(.erp-row-selected) {
+    box-shadow: inset 4px 0 0 #3b82f6;
+    outline: none;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-focus:not(.erp-row-selected):hover .fi-ta-cell {
+    background: #60a5fa !important;
+}
+
+/* ---- Linha marcada (checkbox / duplo clique): azul bem forte ---- */
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #2563eb !important;
+    color: #fff !important;
     box-shadow: none !important;
 }
 
@@ -756,13 +772,13 @@
 }
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
-    background: #3b82f6 !important;
+    background: #1d4ed8 !important;
 }
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
     font-weight: 400 !important;
-    color: #0f172a !important;
+    color: #fff !important;
 }
 
 /* ---- Detalhe: itens + pagamentos ---- */
@@ -1142,8 +1158,28 @@
     min-width: 1.15rem !important;
     min-height: 1.15rem !important;
     margin: 0 !important;
-    accent-color: #1d4ed8;
     flex-shrink: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1.5px solid #94a3b8;
+    border-radius: 3px;
+    background: #fff;
+    vertical-align: middle;
+}
+
+/* Marcado: verde forte + ✓ branco (bem visível na grade) */
+.erp-fv-monitor-page .erp-fv-mon__check:checked {
+    border-color: #15803d;
+    background-color: #16a34a;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5L6.5 11.5L12.5 4.5'/%3E%3C/svg%3E");
+    background-size: 0.85rem 0.85rem;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon__check:checked {
+    border-color: #166534;
+    background-color: #15803d;
 }
 
 /* Coluna do checkbox: área de clique maior */
@@ -1601,7 +1637,7 @@
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__currency,
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__amount {
-    color: inherit;
+    color: #fff !important;
     opacity: 1;
 }
 
@@ -1641,7 +1677,7 @@
 }
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-meio--pix {
-    color: #166534 !important;
+    color: #bbf7d0 !important;
 }
 
 /* ---- NF-e lote (overlay no Monitor) ---- */

@@ -4,11 +4,13 @@ namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use App\Support\Erp\Reports\Tabular\Concerns\AggregatesProductSales;
+use App\Support\Erp\Reports\Tabular\Concerns\LimitsRankingResults;
 use Illuminate\Http\Request;
 
 abstract class AbstractRankingVendasReport extends AbstractTabularReport
 {
     use AggregatesProductSales;
+    use LimitsRankingResults;
 
     abstract protected function sortOrder(): string;
 
@@ -40,24 +42,53 @@ abstract class AbstractRankingVendasReport extends AbstractTabularReport
 
     public function filterFields(): array
     {
-        return $this->withColumnsField($this->withEmpresaFilter($this->periodFilterFields()));
+        $fields = $this->withEmpresaFilter($this->periodFilterFields());
+        $fields[] = $this->resultLimitField();
+
+        return $this->withColumnsField($fields);
     }
 
     public function build(Request $request): array
     {
         [$de, $ate] = $this->periodFromRequest($request);
         $columns = $this->resolveColumns($request->query('cols'));
-        $rows = $this->mapRankingRows($this->productSalesAggregate($de, $ate, $request), $this->sortOrder());
+        $resultLimit = $this->resultLimitFromRequest($request);
+        $rankedTotal = $this->productSalesRankedTotal($de, $ate, $request);
 
-        return $this->result(
+        // Ordena por quantidade no SQL e carrega só a quantidade pedida (após o ranking correto).
+        $agg = $this->productSalesAggregate(
+            $de,
+            $ate,
+            $request,
+            'qtd',
+            $this->sortOrder(),
+            $resultLimit,
+        );
+        $rows = $this->applyResultLimit(
+            $this->mapRankingRows($agg, $this->sortOrder()),
+            $resultLimit,
+        );
+
+        $built = $this->result(
             $this->withEmpresaFilterValue([
                 'de' => $de->toDateString(),
                 'ate' => $ate->toDateString(),
+                'qtd_resultados' => (string) $resultLimit,
                 'cols' => $columns,
             ], $request),
             $columns,
             $rows,
-            $this->withEmpresaSummary(['PERÍODO: '.$this->periodLabel($de, $ate)], $request),
+            $this->withEmpresaSummary([
+                'PERÍODO: '.$this->periodLabel($de, $ate),
+                'Exibindo '.count($rows).' de '.$rankedTotal.' produto(s) no ranking (limite '.$resultLimit.').',
+            ], $request),
         );
+
+        $built['meta'] = [
+            'result_limit' => $resultLimit,
+            'ranked_total' => $rankedTotal,
+        ];
+
+        return $built;
     }
 }

@@ -95,11 +95,12 @@ class NfceEmitXNomeTStringTest extends TestCase
         $this->assertStringNotContainsString("\u{0102}", $xml);
     }
 
-    public function test_sanitize_text_antigo_ainda_deixaria_o_caractere_invalido(): void
+    public function test_sanitize_text_e_tstring_reparam_o_mojibake(): void
     {
         $origem = "JONITAM CONFECÇ\u{0150}ES LTDA";
 
-        $this->assertStringContainsString("\u{0150}", XmlHelper::sanitizeText($origem, 60));
+        $this->assertStringNotContainsString("\u{0150}", XmlHelper::sanitizeText($origem, 60));
         $this->assertStringNotContainsString("\u{0150}", XmlHelper::sanitizeTString($origem, 60));
+        $this->assertSame('JONITAM CONFECÇÕES LTDA', XmlHelper::sanitizeText($origem, 60));
     }
 }

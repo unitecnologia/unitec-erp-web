@@ -89,6 +89,12 @@
             window.Livewire.on('erp-hydrate-orcamentos-dates', ({ de, ate }) => {
                 scheduleOrcamentosPeriodHydration(de, ate);
             });
+
+            window.Livewire.on('erp-orcamento-reabrir-confirm-opened', () => {
+                window.setTimeout(() => {
+                    document.getElementById('erp-orc-reabrir-sim')?.focus();
+                }, 50);
+            });
         };
 
         const bootOrcamentosPeriodFilters = () => {

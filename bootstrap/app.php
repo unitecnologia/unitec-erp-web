@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sem isso, asset()/logo no /admin/login ficam com 127.0.0.1 atrás do túnel.
         $middleware->append(\App\Http\Middleware\SyncUrlOriginFromRequest::class);
         $middleware->append(\App\Http\Middleware\LanSessionCookieSecurity::class);
+        // Rodapé padrão dos viewers de relatório (Voltar ao Topo / Fechar); só HTML de tela.
+        $middleware->append(\App\Http\Middleware\InjectReportViewerEndActions::class);
 
         $middleware->web(prepend: [
             \App\Http\Middleware\EnsureStorageFrameworkDirectories::class,

@@ -4,6 +4,7 @@
     $marcado = in_array($key, $this->selecionados, true);
 @endphp
 
+{{-- Classes da linha: delegadas em erp-list.js (evita Alpine repetido em cada linha). --}}
 <input
     type="checkbox"
     class="erp-fv-mon__check"
@@ -11,11 +12,4 @@
     @checked($marcado)
     wire:click.stop="alternarSelecionado({{ $record->getKey() }})"
     wire:key="fv-sel-{{ $key }}-{{ $marcado ? '1' : '0' }}"
-    x-data
-    @click.stop="
-        const row = $el.closest('.fi-ta-row');
-        if (row) {
-            row.classList.toggle('erp-row-selected', $el.checked);
-        }
-    "
 />

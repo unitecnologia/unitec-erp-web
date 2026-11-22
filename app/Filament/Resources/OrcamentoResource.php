@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\OrcamentoResource\Pages;
+use App\Models\Contador;
 use App\Models\Orcamento;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
@@ -78,6 +79,21 @@ class OrcamentoResource extends Resource
                     ->state(fn (Orcamento $record): string => $record->clienteDisplayNome() ?: '—')
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
+                TextColumn::make('cliente_fone')
+                    ->label('Telefone')
+                    ->state(function (Orcamento $record): string {
+                        $fone = trim($record->clienteDisplayFone());
+
+                        if ($fone === '') {
+                            return '—';
+                        }
+
+                        $formatado = Contador::formatFone($fone);
+
+                        return $formatado !== '' ? $formatado : $fone;
+                    })
+                    ->wrap(false)
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('vendedor.nome')
                     ->label('Vendedor')
                     ->placeholder('—')

@@ -29,9 +29,13 @@ final class ForcaVendasMonitorTotaisAggregator
         $pedidoTable = (new Pedido)->getTable();
         $itensTable = (new PedidoItem)->getTable();
 
-        // Subconsulta só com os IDs filtrados: evita herdar withExists/eager loads
-        // pesados da grade (NF-e, PIX, etc.) e recalcular 4 vezes no summarizer.
-        $ids = (clone $query)->reorder()->pluck("{$table}.id");
+        // Só IDs filtrados: remove eager/withExists (PIX) herdados da grade.
+        // select() substitui colunas do withExists; withoutEagerLoads evita JOINs extras.
+        $ids = (clone $query)
+            ->withoutEagerLoads()
+            ->select(["{$table}.id"])
+            ->reorder()
+            ->pluck('id');
 
         if ($ids->isEmpty()) {
             return [

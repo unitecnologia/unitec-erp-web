@@ -66,16 +66,53 @@ class NfseDpsBuilder
                 ->values()
                 ->all(),
             'discriminacao' => $this->texto($nfse->discriminacao),
-            'valores' => [
-                'valor_servicos' => $this->decimal($nfse->valor_servicos),
-                'desconto' => $this->decimal($nfse->desconto),
-                'iss' => $this->decimal($nfse->iss),
-                'total' => $this->decimal($nfse->total),
-                'trib_issqn' => $this->texto($nfse->trib_issqn),
-                'tp_ret_issqn' => $this->texto($nfse->tp_ret_issqn),
-                'ind_tot_trib' => NfseIndicadorTotalTributos::NaoInformar->value,
-            ],
+            'valores' => $this->valores($nfse, $empresa),
         ];
+    }
+
+    /**
+     * ME/EPP (opSimpNac=3): SEFIN rejeita indTotTrib (E0712) — envia pTotTribSN.
+     * Demais regimes: indTotTrib=0 (não informar valores aproximados).
+     *
+     * @return array{valor_servicos: string, desconto: string, iss: string, total: string, trib_issqn: ?string, tp_ret_issqn: ?string, ind_tot_trib?: string, p_tot_trib_sn?: string}
+     */
+    private function valores(Nfse $nfse, Empresa $empresa): array
+    {
+        $valores = [
+            'valor_servicos' => $this->decimal($nfse->valor_servicos),
+            'desconto' => $this->decimal($nfse->desconto),
+            'iss' => $this->decimal($nfse->iss),
+            'total' => $this->decimal($nfse->total),
+            'trib_issqn' => $this->texto($nfse->trib_issqn),
+            'tp_ret_issqn' => $this->texto($nfse->tp_ret_issqn),
+        ];
+
+        if (NfseRegimeTributario::opSimpNac($empresa->regime_tributario) === '3') {
+            $pct = $this->percentualTotTribSn($empresa);
+
+            if ($pct === null) {
+                throw new NfseDpsNaoMontada('Informe a alíquota aproximada do Simples Nacional (Configurações Fiscais → NFS-e).');
+            }
+
+            $valores['p_tot_trib_sn'] = $pct;
+
+            return $valores;
+        }
+
+        $valores['ind_tot_trib'] = NfseIndicadorTotalTributos::NaoInformar->value;
+
+        return $valores;
+    }
+
+    private function percentualTotTribSn(Empresa $empresa): ?string
+    {
+        $texto = str_replace(',', '.', trim((string) ($empresa->nfse_p_tot_trib_sn ?? '')));
+
+        if ($texto === '' || ! is_numeric($texto) || bccomp($texto, '0', 2) !== 1) {
+            return null;
+        }
+
+        return bcadd($texto, '0', 2);
     }
 
     private function dhEmi(Nfse $nfse): string

@@ -29,7 +29,11 @@
     }
 @endphp
 
-<div class="fi-ta-ctn overflow-x-auto">
+{{-- wire:key por aba/epoch: Contingência tem coluna extra; sem remount o morph reaproveitava linhas da aba anterior. --}}
+<div
+    class="fi-ta-ctn overflow-x-auto"
+    wire:key="erp-nfce-grid-{{ $statusFilter }}-e{{ $listEpoch }}-p{{ $records->currentPage() }}"
+>
     <table class="fi-ta-table">
         <thead>
             <tr>
@@ -80,7 +84,11 @@
                         && $record->status === \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA
                         && ! $record->simulada;
                 @endphp
-                <tr class="{{ $rowClass }}" data-record-key="{{ $recordKey }}">
+                <tr
+                    class="{{ $rowClass }}"
+                    data-record-key="{{ $recordKey }}"
+                    wire:key="nfce-row-{{ $statusFilter }}-{{ $recordKey }}"
+                >
                     @foreach ($columns as $column)
                         @if ($column['key'] === 'transmitir')
                             <td @class(['fi-ta-cell', 'erp-nfce-col--transmitir', 'text-center'])>

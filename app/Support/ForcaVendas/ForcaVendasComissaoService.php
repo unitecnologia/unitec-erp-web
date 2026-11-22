@@ -51,6 +51,7 @@ final class ForcaVendasComissaoService
             $adicionais = ProdutoComissaoAdicional::porVendaIds($vendaIds);
             $formasSemComissao = ComissaoBasePagamento::formasSemComissao();
             $pagamentosPorVenda = ComissaoBasePagamento::pagamentosPorVendaIds($vendaIds);
+            $trocaPorVenda = ComissaoBasePagamento::trocaIdentificadaPorVendaIds($vendaIds);
 
             foreach ($vendas as $row) {
                 $vendaId = (int) ($row['venda_id'] ?? 0);
@@ -60,6 +61,11 @@ final class ForcaVendasComissaoService
                     $row['forma'] ?? null,
                     $pagamentosPorVenda[$vendaId] ?? null,
                     $formasSemComissao,
+                );
+                $base = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+                    $base,
+                    $totalVenda,
+                    $trocaPorVenda[$vendaId] ?? null,
                 );
                 $adicional = ComissaoBasePagamento::adicionalProporcional(
                     (float) ($adicionais[$vendaId] ?? 0),

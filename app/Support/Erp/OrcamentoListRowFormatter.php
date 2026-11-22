@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp;
 
+use App\Models\Contador;
 use App\Models\Orcamento;
 use Illuminate\Support\Carbon;
 
@@ -21,6 +22,7 @@ final class OrcamentoListRowFormatter
             'data' => e($this->formatData($record->data)),
             'hora' => e($record->horaExibicao() ?? '—'),
             'cliente' => e($record->clienteDisplayNome() ?: '—'),
+            'telefone' => e($this->formatTelefone($record)),
             'vendedor' => e($record->vendedor?->nome ?? '—'),
             'cidade' => e($record->clienteDisplayCidade() ?: '—'),
             'uf' => e($record->clienteDisplayUf() ?: '—'),
@@ -30,6 +32,19 @@ final class OrcamentoListRowFormatter
                 . '<span class="erp-orc-total-cell__amount" title="R$ ' . e($valor) . '">' . e($valor) . '</span></span>',
             'ver_itens' => $this->formatVerItensButton((int) $record->getKey()),
         ];
+    }
+
+    private function formatTelefone(Orcamento $record): string
+    {
+        $fone = trim($record->clienteDisplayFone());
+
+        if ($fone === '') {
+            return '—';
+        }
+
+        $formatado = Contador::formatFone($fone);
+
+        return $formatado !== '' ? $formatado : $fone;
     }
 
     private function formatNumero(mixed $state): string

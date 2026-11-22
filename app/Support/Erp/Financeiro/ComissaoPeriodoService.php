@@ -345,6 +345,7 @@ final class ComissaoPeriodoService
         $adicionais = ProdutoComissaoAdicional::porVendaIds($vendaIds);
         $formasSemComissao = ComissaoBasePagamento::formasSemComissao();
         $pagamentosPorVenda = ComissaoBasePagamento::pagamentosPorVendaIds($vendaIds);
+        $trocaPorVenda = ComissaoBasePagamento::trocaIdentificadaPorVendaIds($vendaIds);
 
         $baseAv = 0.0;
         $baseAp = 0.0;
@@ -360,6 +361,11 @@ final class ComissaoPeriodoService
                 $venda->forma_pagamento,
                 $pagamentosPorVenda[(int) $venda->id] ?? null,
                 $formasSemComissao,
+            );
+            $base = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+                $base,
+                $totalVenda,
+                $trocaPorVenda[(int) $venda->id] ?? null,
             );
             $adicional = ComissaoBasePagamento::adicionalProporcional(
                 (float) ($adicionais[(int) $venda->id] ?? 0),

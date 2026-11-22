@@ -575,6 +575,7 @@ class ErpMenu
                 static::link('Histórico de Orçamentos', route('erp.reports.tabular', ['slug' => 'historico-orcamentos']), permission: 'vendas.print', icon: 'heroicon-o-document-text', iconColor: 'erp-menu-bar__icon--indigo'),
                 static::link('Histórico de Vendas p/ Cliente', route('erp.reports.tabular', ['slug' => 'historico-vendas-cliente']), permission: 'vendas.print', icon: 'heroicon-o-user', iconColor: 'erp-menu-bar__icon--blue'),
                 static::link('Histórico de Vendas p/ Vendedor', route('erp.reports.tabular', ['slug' => 'historico-vendas-vendedor']), permission: 'vendas.print', icon: 'heroicon-o-user-group', iconColor: 'erp-menu-bar__icon--teal'),
+                static::link('Lucratividade por Venda', route('erp.reports.lucratividade-por-venda.filtros'), permission: 'vendas.print', icon: 'heroicon-o-currency-dollar', iconColor: 'erp-menu-bar__icon--green'),
                 static::link('Relatório de Vendas por PDV', route('erp.reports.tabular', ['slug' => 'vendas-pdv']), permission: 'vendas.print', icon: 'heroicon-o-calculator', iconColor: 'erp-menu-bar__icon--orange'),
                 static::link('Relatório Vendas por Forma de Pagamento', route('erp.reports.tabular', ['slug' => 'vendas-forma-pagamento']), permission: 'vendas.print', icon: 'heroicon-o-credit-card', iconColor: 'erp-menu-bar__icon--green'),
                 static::link('Relatório de Vendas por Produtos - Geral', route('erp.reports.tabular', ['slug' => 'vendas-produtos-geral']), permission: 'vendas.print', icon: 'heroicon-o-cube', iconColor: 'erp-menu-bar__icon--amber'),
@@ -710,7 +711,29 @@ class ErpMenu
             $item['icon_color'] = $iconColor;
         }
 
+        // Viewers/filtros de relatório são HTML standalone: wire:navigate + datepicker
+        // quebram type=date (envia d/m/Y) e o período cai no padrão errado.
+        if (static::isFullPageReportUrl($url)) {
+            $item['full_page'] = true;
+        }
+
         return $item;
+    }
+
+    /**
+     * URLs de relatório/impressão fora do shell Livewire do Filament.
+     */
+    public static function isFullPageReportUrl(?string $url): bool
+    {
+        if ($url === null || $url === '') {
+            return false;
+        }
+
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '');
+
+        return str_contains($path, '/admin/reports/')
+            || str_contains($path, '/admin/relatorio-')
+            || str_contains($path, '/admin/print/');
     }
 
     /**

@@ -223,8 +223,19 @@ abstract class AbstractTabularReport implements TabularReportDefinition
             return Carbon::instance($default)->startOfDay();
         }
 
+        $raw = trim((string) $value);
+
+        // Aceita Y-m-d e também d/m/Y (datepicker do shell Filament via wire:navigate).
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $raw, $m) === 1) {
+            try {
+                return Carbon::createFromFormat('d/m/Y', $raw)->startOfDay();
+            } catch (\Throwable) {
+                return Carbon::instance($default)->startOfDay();
+            }
+        }
+
         try {
-            return Carbon::parse((string) $value)->startOfDay();
+            return Carbon::parse($raw)->startOfDay();
         } catch (\Throwable) {
             return Carbon::instance($default)->startOfDay();
         }

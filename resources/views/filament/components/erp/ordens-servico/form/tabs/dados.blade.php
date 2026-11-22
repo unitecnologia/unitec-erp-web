@@ -49,39 +49,6 @@
     </div>
 
     <div class="erp-os-form-row">
-        <div class="erp-os-form-group erp-os-form-group--atendente">
-            <label class="erp-os-form-label" for="os-atendente">Técnico</label>
-            <select
-                id="os-atendente"
-                wire:model.live="atendenteId"
-                @disabled($readOnly)
-                class="erp-os-form-select"
-                x-on:change="
-                    if ($event.target.value) {
-                        $nextTick(() => {
-                            const el = document.getElementById('os-item-descricao');
-                            if (!el || el.disabled) return;
-                            el.removeAttribute('readonly');
-                            el.focus();
-                        });
-                    }
-                "
-                x-on:keydown.enter.prevent="
-                    if ($event.target.value) {
-                        const el = document.getElementById('os-item-descricao');
-                        if (!el || el.disabled) return;
-                        el.removeAttribute('readonly');
-                        el.focus();
-                    }
-                "
-            >
-                <option value="">Selecione...</option>
-                @foreach ($this->atendenteOptions as $atendente)
-                    <option value="{{ $atendente['id'] }}">{{ $atendente['nome'] }}</option>
-                @endforeach
-            </select>
-        </div>
-
         <div class="erp-os-form-group erp-os-form-group--sm">
             <label class="erp-os-form-label" for="os-data-inicio">Data Início</label>
             <input id="os-data-inicio" type="date" wire:model="dataInicio" @disabled($readOnly) class="erp-os-form-input">

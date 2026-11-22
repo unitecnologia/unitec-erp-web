@@ -51,6 +51,12 @@ class NfceListTable extends Component
     public ?int $highlightedRecordId = null;
 
     /**
+     * Epoch da grade: sobe a cada troca de aba para forçar remount do tbody
+     * (Contingência tem coluna checkbox; sem wire:key o morph deixava linhas da aba anterior).
+     */
+    public int $listEpoch = 0;
+
+    /**
      * Troca de aba: 1 request só na grade. Sem re-render do Filament pai.
      * Rodapé (totais do período) é responsabilidade exclusiva do ListNfces — não sobrescrever via JS.
      *
@@ -71,6 +77,7 @@ class NfceListTable extends Component
         $this->statusFilter = $normalized;
         $this->selectedTransmitIds = [];
         $this->highlightedRecordId = null;
+        $this->listEpoch++;
         $this->resetPage();
 
         // Denegado: destaca a 1ª nota na própria grade (aviso amarelo via JS, sem remount do pai).
@@ -170,7 +177,13 @@ class NfceListTable extends Component
         array $selectedTransmitIds = [],
         ?int $highlightedRecordId = null,
     ): void {
-        $this->statusFilter = PdvVendaNfce::normalizeTabFilter($statusFilter);
+        $normalized = PdvVendaNfce::normalizeTabFilter($statusFilter);
+
+        if ($normalized !== $this->statusFilter) {
+            $this->listEpoch++;
+        }
+
+        $this->statusFilter = $normalized;
         $this->searchColumn = $searchColumn;
         $this->localSearch = $localSearch;
         $this->periodoDeApplied = $periodoDeApplied;
@@ -178,6 +191,11 @@ class NfceListTable extends Component
         $this->chaveFilterApplied = $chaveFilterApplied;
         $this->selectedTransmitIds = array_values(array_map('strval', $selectedTransmitIds));
         $this->highlightedRecordId = $highlightedRecordId;
+
+        // Seleção de transmitir só vale na aba Contingência.
+        if ($this->statusFilter !== PdvVendaNfce::TAB_CONTINGENCIA) {
+            $this->selectedTransmitIds = [];
+        }
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;

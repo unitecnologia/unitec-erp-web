@@ -385,6 +385,7 @@
                         wire:ignore.self
                         value="{{ $this->codigoBarras }}"
                         autocomplete="off"
+                        autofocus
                         placeholder="Código, barras ou nome do produto — Enter"
                         role="combobox"
                         aria-autocomplete="list"
@@ -556,8 +557,13 @@
                 @endforelse
             </tbody>
         </table>
-        {{-- Template para o 1º item via JS (sem remorph). wire:ignore — não hidrata Livewire. --}}
-        <template id="erp-fv-tv-row-template" wire:ignore data-fv-has-custo="{{ $exibirCustoGrade ? '1' : '0' }}">
+        {{-- Template para o 1º item via JS (sem remorph). wire:key troca ao toggle de custo. --}}
+        <template
+            id="erp-fv-tv-row-template"
+            wire:key="fv-row-tpl-custo-{{ $exibirCustoGrade ? '1' : '0' }}"
+            wire:ignore
+            data-fv-has-custo="{{ $exibirCustoGrade ? '1' : '0' }}"
+        >
             <tr data-fv-item-key="">
                 <td class="erp-fv-tv__col-del">
                     <button type="button" class="erp-fv-tv__del-btn" title="Excluir item" aria-label="Excluir item">
@@ -655,10 +661,12 @@
                 <span>Total líquido</span>
                 <strong data-fv-total="liquido">R$ {{ $this->formatMoney($this->totalLiquido()) }}</strong>
             </div>
-            @if ((bool) (\App\Support\Erp\ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_mais_opcoes ?? false))
+            @if ($this->empresaExibirMaisOpcoesNaTelaVenda())
                 <div class="erp-fv-tv__mais-opcoes">
                     @include('filament.components.erp.forca-vendas.mais-opcoes-menu', [
                         'onMargem' => 'abrirMargemVenda',
+                        'onToggleCusto' => 'toggleExibirCustoProdutos',
+                        'exibirCusto' => $exibirCustoGrade,
                     ])
                 </div>
             @endif

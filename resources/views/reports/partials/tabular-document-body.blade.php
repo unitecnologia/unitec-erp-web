@@ -113,6 +113,11 @@
                         @endforeach
                     </tr>
                     @if (! empty($row['_items']) && is_array($row['_items']))
+                        @php
+                            $itemsHaveCusto = collect($row['_items'])->contains(
+                                static fn ($item): bool => is_array($item) && array_key_exists('custo', $item)
+                            );
+                        @endphp
                         <tr class="tabular-doc__items-row">
                             <td colspan="{{ max(1, count($columns)) }}">
                                 <table class="tabular-doc__detail">
@@ -124,6 +129,11 @@
                                             <th class="num">QTD</th>
                                             <th class="num">UNIT.</th>
                                             <th class="num">TOTAL ITEM</th>
+                                            @if ($itemsHaveCusto)
+                                                <th class="num">CUSTO HIST.</th>
+                                                <th class="num">LUCRO R$</th>
+                                                <th class="num">MARGEM %</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -135,6 +145,11 @@
                                                 <td class="num">{{ $item['qtd'] ?? '' }}</td>
                                                 <td class="num">{{ $item['unitario'] ?? '' }}</td>
                                                 <td class="num">{{ $item['total'] ?? '' }}</td>
+                                                @if ($itemsHaveCusto)
+                                                    <td class="num">{{ $item['custo'] ?? '' }}</td>
+                                                    <td class="num">{{ $item['lucro'] ?? '' }}</td>
+                                                    <td class="num">{{ $item['margem'] ?? '' }}</td>
+                                                @endif
                                             </tr>
                                         @endforeach
                                     </tbody>

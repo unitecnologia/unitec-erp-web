@@ -79,6 +79,15 @@ class OrcamentoBobinaBuilder
         }
 
         foreach ($orcamento->itens as $item) {
+            if ($item->isSeparador()) {
+                $titulo = mb_strtoupper(trim((string) ($item->descricao ?: '—')), 'UTF-8');
+                $lines[] = str_repeat('-', 32);
+                $lines[] = $titulo;
+                $lines[] = str_repeat('-', 32);
+
+                continue;
+            }
+
             $linha = $report->linhaImpressao($item);
             $descricao = mb_strtoupper($linha['produto'], 'UTF-8');
             $itemNum = str_pad((string) $item->item, 2, '0', STR_PAD_LEFT);

@@ -16,12 +16,14 @@ class NfceListTabsWiringTest extends TestCase
         $js = file_get_contents(public_path('js/erp-nfe-tab-counts.js'));
         $screen = file_get_contents(resource_path('views/filament/components/erp/nfce/screen.blade.php'));
         $parent = file_get_contents(app_path('Filament/Resources/NfceResource/Pages/ListNfces.php'));
+        $grid = file_get_contents(resource_path('views/livewire/erp/nfce-list-table.blade.php'));
 
         $this->assertIsString($child);
         $this->assertIsString($tabs);
         $this->assertIsString($js);
         $this->assertIsString($screen);
         $this->assertIsString($parent);
+        $this->assertIsString($grid);
 
         // Caminho das abas: só a grade; sem parent.call que remountava e orphanava o Livewire.
         $this->assertStringContainsString("erp.nfce-list-table", $tabs);
@@ -33,6 +35,11 @@ class NfceListTabsWiringTest extends TestCase
         $this->assertStringContainsString('ErpNfceAvisoRodape', $child);
         $this->assertStringContainsString('ErpNfceAvisoRodape', $js);
         $this->assertStringContainsString("erp-nfe-tab-counts.js') }}?v=3", $screen);
+
+        // Troca de aba força remount da grade (evita morph com coluna checkbox da Contingência).
+        $this->assertStringContainsString('listEpoch', $child);
+        $this->assertStringContainsString('erp-nfce-grid-{{ $statusFilter }}-e{{ $listEpoch }}', $grid);
+        $this->assertStringContainsString('wire:key="nfce-row-{{ $statusFilter }}-{{ $recordKey }}"', $grid);
 
         // Destaque de linha nas abas de aviso também evita remount.
         $highlightPos = strpos($parent, 'function highlightRecord(int | string $recordId): void');

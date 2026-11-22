@@ -29,6 +29,7 @@ class OrcamentoController
         }
 
         $itens = $orcamento->itens
+            ->filter(fn ($item): bool => ! $item->isSeparador())
             ->map(fn ($item): array => [
                 'product_id' => $item->product_id,
                 'descricao' => $item->descricao ?: $item->product?->descricao,

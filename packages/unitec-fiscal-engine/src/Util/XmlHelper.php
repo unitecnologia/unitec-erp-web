@@ -35,6 +35,8 @@ final class XmlHelper
 
     public static function sanitizeText(string $value, int $maxLength): string
     {
+        // Repara mojibake SCV antes do corte — não grava no banco.
+        $value = self::repairCommonMojibake($value);
         $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
         $value = mb_substr($value, 0, $maxLength, 'UTF-8');
 
@@ -42,24 +44,27 @@ final class XmlHelper
     }
 
     /**
-     * TString SEFAZ (emit/xNome, xFant, infCpl, etc.) — cStat 215/225.
+     * TString SEFAZ (emit/xNome, xFant, xProd, endereços, infCpl, etc.) — cStat 215/225.
      *
-     * Repara mojibake comum (Ő→Õ, Ă→Ã) e remove codepoints fora de Latin-1
+     * Repara mojibake comum (Ő→Õ, Ă→Ã, Ę→Ê, ş→º) e remove codepoints fora de Latin-1
      * (U+0020 + U+0021..U+00FF). Não altera cadastro: só o valor enviado no XML.
      */
     public static function sanitizeTString(string $value, int $maxLength = 60): string
     {
-        return self::sanitizeInfAdProd(self::repairCommonMojibake($value), $maxLength);
+        return self::sanitizeInfAdProd($value, $maxLength);
     }
 
     /**
-     * Sanitiza infAdProd / infCpl conforme padrão SEFAZ (TString — cStat 225).
+     * Sanitiza infAdProd / infCpl / demais TString conforme padrão SEFAZ (cStat 225).
      *
+     * Repara mojibake antes do filtro Latin-1 (senão Ő/Ă/Ę seriam descartados).
      * Remove quebras de linha, caracteres de controle, símbolos XML problemáticos
      * e codepoints fora do intervalo aceito (espaço + U+0021..U+00FF).
+     * Preserva acentuação portuguesa já correta (ÃÕÊÇ etc.).
      */
     public static function sanitizeInfAdProd(string $value, int $maxLength = 500): string
     {
+        $value = self::repairCommonMojibake($value);
         $value = str_replace(["\r\n", "\r", "\n", "\t"], ' ', $value);
         $value = preg_replace('/[\x{00A0}\x{1680}\x{2000}-\x{200B}\x{202F}\x{205F}\x{3000}\x{FEFF}]/u', ' ', $value) ?? $value;
         $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value) ?? $value;
@@ -93,15 +98,27 @@ final class XmlHelper
     }
 
     /**
-     * Corrige trocas frequentes de encoding em nomes BR (não grava no banco).
+     * Corrige bytes WIN1252 lidos como CP1250/ISO-8859-2 (migração SCV).
+     * Só o valor em memória/XML — não grava no banco.
+     *
+     * Ă→Ã, ă→ã, Ő→Õ, ő→õ, Ę→Ê, ę→ê, ş/Ş→º.
+     * Acentos portugueses válidos (ÃÕÊÇÁÉÍÓÚ etc.) permanecem intactos.
      */
     public static function repairCommonMojibake(string $value): string
     {
+        if ($value === '') {
+            return $value;
+        }
+
         return strtr($value, [
             "\u{0150}" => "\u{00D5}", // Ő → Õ
             "\u{0151}" => "\u{00F5}", // ő → õ
             "\u{0102}" => "\u{00C3}", // Ă → Ã
             "\u{0103}" => "\u{00E3}", // ă → ã
+            "\u{0118}" => "\u{00CA}", // Ę → Ê
+            "\u{0119}" => "\u{00EA}", // ę → ê
+            "\u{015F}" => "\u{00BA}", // ş → º (ex.: Nş. → Nº)
+            "\u{015E}" => "\u{00BA}", // Ş → º
         ]);
     }
 

@@ -114,8 +114,26 @@
         .viewer__field label { display: block; margin-bottom: 0.2rem; font-size: 0.72rem; font-weight: 700; color: #334155; }
         .viewer__field select,
         .viewer__field input[type="text"],
-        .viewer__field input[type="date"] {
-            width: 100%; padding: 0.35rem 0.45rem; border: 1px solid #94a3b8; border-radius: 4px; font-size: 0.78rem;
+        .viewer__field input[type="date"],
+        .viewer__field input[type="number"] {
+            width: 100%; padding: 0.35rem 0.45rem; border: 1px solid #94a3b8; border-radius: 4px;
+            background: #ffffff; color: #0f172a; font-size: 0.78rem; font-family: inherit;
+        }
+        .viewer__field input[type="number"] {
+            max-width: 7.5rem;
+            -moz-appearance: textfield;
+            appearance: auto;
+        }
+        .viewer__field input[type="number"]::-webkit-outer-spin-button,
+        .viewer__field input[type="number"]::-webkit-inner-spin-button {
+            opacity: 1;
+            height: 1.35em;
+        }
+        .viewer__field input[type="number"]:focus,
+        .viewer__field input[type="text"]:focus,
+        .viewer__field input[type="date"]:focus,
+        .viewer__field select:focus {
+            outline: none; border-color: #1e5a9e; box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
         }
         .viewer__lookup { position: relative; }
         .viewer__lookup-list {
@@ -296,6 +314,35 @@
                                     </select>
                                 @elseif ($type === 'date')
                                     <input id="filter-{{ $key }}" type="date" name="{{ $key }}" value="{{ $value }}">
+                                @elseif ($type === 'number')
+                                    @php
+                                        $numberListId = 'filter-'.$key.'-list';
+                                        $numberList = is_array($field['list'] ?? null) ? $field['list'] : [];
+                                        $numberValue = ($value !== '' && $value !== null)
+                                            ? $value
+                                            : ($filters[$key] ?? ($field['placeholder'] ?? '10'));
+                                    @endphp
+                                    <input
+                                        id="filter-{{ $key }}"
+                                        class="viewer__input viewer__input--number"
+                                        type="number"
+                                        name="{{ $key }}"
+                                        value="{{ $numberValue }}"
+                                        min="{{ $field['min'] ?? 1 }}"
+                                        max="{{ $field['max'] ?? 500 }}"
+                                        step="{{ $field['step'] ?? 1 }}"
+                                        placeholder="{{ $field['placeholder'] ?? '10' }}"
+                                        @if ($numberList !== []) list="{{ $numberListId }}" @endif
+                                        inputmode="numeric"
+                                        autocomplete="off"
+                                    >
+                                    @if ($numberList !== [])
+                                        <datalist id="{{ $numberListId }}">
+                                            @foreach ($numberList as $opt)
+                                                <option value="{{ $opt }}"></option>
+                                            @endforeach
+                                        </datalist>
+                                    @endif
                                 @elseif ($type === 'columns')
                                     <div class="viewer__columns">
                                         @foreach (($field['options'] ?? []) as $optionValue => $optionLabel)
@@ -325,7 +372,12 @@
                     @endforeach
 
                     <div class="viewer__actions">
-                        <button type="submit" class="viewer__btn">Atualizar preview</button>
+                        @if (! empty($requiresExplicitGenerate))
+                            <input type="hidden" name="gerar" value="1">
+                            <button type="submit" class="viewer__btn">Gerar</button>
+                        @else
+                            @include('reports.partials.viewer-mostrar-resultados-btn')
+                        @endif
                     </div>
                 </form>
             </aside>
@@ -680,7 +732,7 @@
             }
         @endphp
         @if ($expandMode === 'produtos')
-            <script src="{{ asset('js/erp-report-venda-produtos-expand.js') }}?v=1"></script>
+            <script src="{{ asset('js/erp-report-venda-produtos-expand.js') }}?v=2"></script>
             <script>
                 window.ErpReportVendaProdutosExpand.init({
                     detailsUrl: @json($detailsUrl),

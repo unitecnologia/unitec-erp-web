@@ -30,9 +30,16 @@ class TabularReportController extends Controller
 
         $requiresGenerate = $report->requiresExplicitGenerate();
         $wantsExport = $request->boolean('pdf') || $request->boolean('csv');
+        // Telas compactas de filtros (sem pré-visualização vazia).
+        $usesVendasGeralFilters = $requiresGenerate && $slug === 'historico-vendas';
+        $usesLucratividadePorVendaFilters = $requiresGenerate && $slug === 'lucratividade-por-venda';
+        $usesExternalFilters = $usesVendasGeralFilters || $usesLucratividadePorVendaFilters;
 
-        // Vendas Geral: abertura sem ?gerar=1 vai para a tela de filtros (sem consulta).
-        if ($requiresGenerate && ! $request->boolean('gerar') && ! $wantsExport) {
+        if ($usesExternalFilters && ! $request->boolean('gerar') && ! $wantsExport) {
+            if ($usesLucratividadePorVendaFilters) {
+                return redirect()->to($this->lucratividadePorVendaFiltersUrl($request));
+            }
+
             return redirect()->to($this->vendasGeralFiltersUrl($request));
         }
 
@@ -59,16 +66,24 @@ class TabularReportController extends Controller
         $truncated = (bool) ($meta['truncated'] ?? false);
         $rowCount = count($built['rows'] ?? []);
         $emptyMessage = (string) ($meta['empty_message'] ?? 'Nenhum registro encontrado para os filtros informados.');
+        $pendingGenerate = $requiresGenerate && ! $usesExternalFilters && ! $request->boolean('gerar') && ! $wantsExport;
 
         if ($requiresGenerate && $request->boolean('gerar') && $rowCount === 0 && ($meta['total_count'] ?? 0) === 0) {
             $emptyMessage = 'Nenhum registro encontrado para os filtros informados.';
+        }
+
+        $filtersBackUrl = null;
+        if ($usesVendasGeralFilters) {
+            $filtersBackUrl = $this->vendasGeralFiltersUrl($request);
+        } elseif ($usesLucratividadePorVendaFilters) {
+            $filtersBackUrl = $this->lucratividadePorVendaFiltersUrl($request);
         }
 
         $data = [
             'empresa' => $empresa,
             'empresaEndereco' => $this->formatEmpresaEndereco($empresa),
             'logoDataUri' => $this->logoDataUri($empresa),
-            'logoUrl' => $empresa?->logoUrl(),
+            'logoUrl' => $this->logoPublicUrl($empresa),
             'reportTitle' => $report->title(),
             'columnLabels' => array_merge($report->columns(), is_array($built['column_labels'] ?? null) ? $built['column_labels'] : []),
             'columns' => $built['columns'],
@@ -79,7 +94,7 @@ class TabularReportController extends Controller
             'summary' => $built['summary'],
             'numericColumns' => $built['numeric_columns'] ?? $report->numericColumns(),
             'filters' => $built['filters'],
-            'filterFields' => $requiresGenerate ? [] : $report->filterFields(),
+            'filterFields' => $usesExternalFilters ? [] : $report->filterFields(),
             'printedAt' => now(),
             'reportUrl' => ReportRegistry::route($slug),
             'closeUrl' => $this->resolveCloseUrl($request),
@@ -93,9 +108,9 @@ class TabularReportController extends Controller
                 ? route('erp.reports.tabular.details', ['slug' => $slug])
                 : null,
             'requiresExplicitGenerate' => $requiresGenerate,
-            'pendingGenerate' => false,
-            'hideFilterSidebar' => $requiresGenerate,
-            'filtersBackUrl' => $requiresGenerate ? $this->vendasGeralFiltersUrl($request) : null,
+            'pendingGenerate' => $pendingGenerate,
+            'hideFilterSidebar' => $usesExternalFilters,
+            'filtersBackUrl' => $filtersBackUrl,
             'reportMeta' => $meta,
             'extraSections' => is_array($built['extra_sections'] ?? null) ? $built['extra_sections'] : [],
             'paperOrientation' => $report->paperOrientation() === 'portrait' ? 'portrait' : 'landscape',
@@ -213,16 +228,56 @@ class TabularReportController extends Controller
      */
     protected function vendasGeralFiltersUrl(Request $request): string
     {
-        $params = $request->query();
-        unset($params['gerar'], $params['pdf'], $params['csv'], $params['auto'], $params['return']);
+        return $this->filtersPageUrl($request, route('erp.reports.vendas-geral.filtros'));
+    }
 
-        $base = route('erp.reports.vendas-geral.filtros');
+    /**
+     * URL da tela compacta de filtros da Lucratividade por Venda.
+     * Não reenvia de/ate — a tela de filtros sempre abre com mês atual + hoje (fuso local).
+     */
+    protected function lucratividadePorVendaFiltersUrl(Request $request): string
+    {
+        return $this->filtersPageUrl(
+            $request,
+            route('erp.reports.lucratividade-por-venda.filtros'),
+            ['de', 'ate'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $extraUnset
+     */
+    protected function filtersPageUrl(Request $request, string $base, array $extraUnset = []): string
+    {
+        $params = $request->query();
+        foreach (array_merge(['gerar', 'pdf', 'csv', 'auto', 'return'], $extraUnset) as $key) {
+            unset($params[$key]);
+        }
 
         if ($params === []) {
             return $base;
         }
 
         return $base.'?'.http_build_query($params);
+    }
+
+    /**
+     * URL da logomarca via rota autenticada (não depende do symlink public/storage).
+     */
+    protected function logoPublicUrl(?Empresa $empresa): ?string
+    {
+        if (! $empresa || blank($empresa->logo_path)) {
+            return null;
+        }
+
+        $path = ltrim(str_replace('\\', '/', (string) $empresa->logo_path), '/');
+        if ($path === '' || str_contains($path, '..')) {
+            return null;
+        }
+
+        $version = $empresa->updated_at?->timestamp ?? time();
+
+        return route('erp.storage.file', ['path' => $path]).'?v='.$version;
     }
 
     protected function formatEmpresaEndereco(?Empresa $empresa): string
@@ -256,13 +311,27 @@ class TabularReportController extends Controller
             return null;
         }
 
-        if (! Storage::disk('public')->exists($empresa->logo_path)) {
+        $path = ltrim(str_replace('\\', '/', (string) $empresa->logo_path), '/');
+        if ($path === '' || str_contains($path, '..')) {
             return null;
         }
 
-        $contents = Storage::disk('public')->get($empresa->logo_path);
-        $mime = Storage::disk('public')->mimeType($empresa->logo_path) ?: 'image/png';
+        $disk = Storage::disk('public');
+        if (! $disk->exists($path)) {
+            return null;
+        }
 
-        return 'data:' . $mime . ';base64,' . base64_encode($contents);
+        $contents = $disk->get($path);
+        if ($contents === false || $contents === null || $contents === '') {
+            return null;
+        }
+
+        $mime = $disk->mimeType($path) ?: 'image/png';
+        // Alguns drivers devolvem false; evita data URI inválido (ícone quebrado).
+        if (! is_string($mime) || $mime === '') {
+            $mime = 'image/png';
+        }
+
+        return 'data:'.$mime.';base64,'.base64_encode($contents);
     }
 }

@@ -122,6 +122,17 @@ document.addEventListener('livewire:init', () => {
         }, 50);
     });
 
+    window.Livewire.on('erp-orcamento-focus-separador-titulo', () => {
+        window.setTimeout(() => {
+            const input = document.getElementById('orc-separador-titulo');
+            if (! input) {
+                return;
+            }
+            input.focus();
+            input.select();
+        }, 50);
+    });
+
     window.Livewire.hook('morph.updated', () => {
         const page = document.querySelector('.erp-orcamentos-form-page');
 
@@ -208,6 +219,7 @@ function bindOrcLookupKeys() {
 
     window.__erpOrcLookupKeysBound = true;
 
+    // Capture + stopPropagation: setas/Enter não mexem no input nem disparam wire:keydown.
     document.addEventListener('keydown', (event) => {
         if (! document.querySelector('.erp-orcamentos-form-page') || document.querySelector('.erp-os-form-page')) {
             return;
@@ -237,6 +249,7 @@ function bindOrcLookupKeys() {
 
         if (key === 'Escape') {
             event.preventDefault();
+            event.stopPropagation();
             event.stopImmediatePropagation();
             getErpOrcamentosComponent()?.call(lookup.escapeMethod);
 
@@ -247,29 +260,47 @@ function bindOrcLookupKeys() {
             return;
         }
 
+        // Lista aberta: navegação 100% local (sem Livewire/remorph por seta).
         event.preventDefault();
+        event.stopPropagation();
         event.stopImmediatePropagation();
 
         if (key === 'Enter') {
-            const current = options.findIndex((el) => el.classList.contains(lookup.activeClass));
-            getErpOrcamentosComponent()?.call(lookup.enterMethod, current < 0 ? 0 : current);
+            if (event.repeat) {
+                return;
+            }
+
+            const current = orcLookupHighlightedIndex(options, lookup.activeClass, list);
+            getErpOrcamentosComponent()?.call(lookup.enterMethod, current);
 
             return;
         }
 
-        moveOrcLookupHighlight(options, key, lookup.activeClass);
+        moveOrcLookupHighlight(options, key, lookup.activeClass, list);
     }, true);
 }
 
-function moveOrcLookupHighlight(options, key, activeClass) {
-    const current = options.findIndex((el) => el.classList.contains(activeClass));
-    let next = 0;
+function orcLookupHighlightedIndex(options, activeClass, list) {
+    const fromDom = options.findIndex((el) => el.classList.contains(activeClass));
 
-    if (current >= 0) {
-        next = key === 'ArrowDown'
-            ? Math.min(options.length - 1, current + 1)
-            : Math.max(0, current - 1);
+    if (fromDom >= 0) {
+        return fromDom;
     }
+
+    const fromData = Number(list?.dataset?.orcHighlight ?? '0');
+
+    if (Number.isInteger(fromData) && fromData >= 0 && fromData < options.length) {
+        return fromData;
+    }
+
+    return 0;
+}
+
+function moveOrcLookupHighlight(options, key, activeClass, list) {
+    const current = orcLookupHighlightedIndex(options, activeClass, list);
+    let next = key === 'ArrowDown'
+        ? Math.min(options.length - 1, current + 1)
+        : Math.max(0, current - 1);
 
     options.forEach((el, index) => {
         const on = index === next;
@@ -280,7 +311,11 @@ function moveOrcLookupHighlight(options, key, activeClass) {
         }
     });
 
-    options[next].scrollIntoView({ block: 'nearest' });
+    if (list) {
+        list.dataset.orcHighlight = String(next);
+    }
+
+    options[next]?.scrollIntoView({ block: 'nearest' });
 }
 
 function bindOrcClienteLookupClickOutside() {

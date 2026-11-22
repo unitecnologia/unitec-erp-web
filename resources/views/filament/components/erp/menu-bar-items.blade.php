@@ -23,7 +23,11 @@
             </div>
         </div>
     @elseif (filled($item['url'] ?? null))
-        <a href="{{ $item['url'] }}" wire:navigate class="erp-menu-bar__link{{ $iconClass }}">
+        <a
+            href="{{ $item['url'] }}"
+            @if (empty($item['full_page'])) wire:navigate @endif
+            class="erp-menu-bar__link{{ $iconClass }}"
+        >
             @if ($hasIcon)
                 @if ($useLightIcons)
                     {!! \App\Support\Erp\ErpMenuIcons::svg((string) $item['icon'], $item['icon_color'] ?? null) !!}

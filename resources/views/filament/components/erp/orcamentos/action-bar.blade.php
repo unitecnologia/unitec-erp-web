@@ -15,7 +15,7 @@
         <span class="erp-orcamentos-actions__icon">↻</span>
         <span class="erp-orcamentos-actions__label"><kbd>F5</kbd> | Atualizar</span>
     </button>
-    <button type="button" wire:click="openPrintModal" class="erp-orcamentos-actions__btn" data-erp-key="F6">
+    <button type="button" wire:click="visualizarOrcamentoImpressao" class="erp-orcamentos-actions__btn" data-erp-key="F6">
         <span class="erp-orcamentos-actions__icon">🖨</span>
         <span class="erp-orcamentos-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>

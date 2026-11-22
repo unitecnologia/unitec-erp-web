@@ -533,6 +533,10 @@ trait ManagesPdvImportar
             $linhas = [];
 
             foreach ($orcamento->itens as $item) {
+                if ($item->isSeparador()) {
+                    continue;
+                }
+
                 $product = $item->product;
                 $descricao = $item->descricao
                     ?? ($product && $item->grade

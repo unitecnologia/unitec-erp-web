@@ -495,7 +495,7 @@ class NfeImportacaoService
     {
         $service = app(OrcamentoDescontoService::class);
         $itens = $orcamento->itens
-            ->filter(fn (OrcamentoItem $item): bool => (int) $item->product_id > 0)
+            ->filter(fn (OrcamentoItem $item): bool => ! $item->isSeparador() && (int) $item->product_id > 0)
             ->values();
         $cotas = $service->cotasDescontoGeral($itens, (float) ($orcamento->desconto_valor ?? 0));
 

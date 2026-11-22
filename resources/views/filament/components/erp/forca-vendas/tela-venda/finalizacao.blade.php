@@ -279,6 +279,8 @@
                                     $fvPrecisaParcelas = \App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper::precisaParcelasCarne($pdvFlags);
                                     $fvCartao = \App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper::isFormaCartao($pdvFlags);
                                     $fvTef = \App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper::isFormaTef($pdvFlags);
+                                    $fvTroca = mb_strtolower((string) ($meio['tipo_movimento'] ?? $meio['tipo'] ?? ''), 'UTF-8') === 'troca'
+                                        || mb_strtolower((string) ($meio['tipo'] ?? ''), 'UTF-8') === 'troca';
                                 @endphp
                                 <tr
                                     wire:key="fv-meio-{{ $meio['id'] }}"
@@ -291,6 +293,7 @@
                                     data-fv-precisa-parcelas="{{ $fvPrecisaParcelas ? '1' : '0' }}"
                                     data-fv-cartao="{{ $fvCartao ? '1' : '0' }}"
                                     data-fv-tef="{{ $fvTef ? '1' : '0' }}"
+                                    data-fv-troca="{{ $fvTroca ? '1' : '0' }}"
                                     @class([
                                         'erp-pdv__grid-row',
                                         'erp-pdv-finalizar__pay-row',

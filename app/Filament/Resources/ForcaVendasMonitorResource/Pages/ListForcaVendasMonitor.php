@@ -293,6 +293,9 @@ class ListForcaVendasMonitor extends ListRecords
             'delete' => null,
             'refresh' => null,
             'rowSelection' => false,
+            // 1 clique = destaque claro + detalhe; duplo = toggle checkbox (erp-list.js).
+            'monitorRowClicks' => true,
+            'doubleClickEdit' => false,
             'extraKeys' => [
                 'F9' => ['method' => 'openEmailModal'],
             ],
@@ -301,8 +304,7 @@ class ListForcaVendasMonitor extends ListRecords
 
     public function table(Table $table): Table
     {
-        // Seleção do pedido é feita apenas pela flag da linha; clicar em
-        // qualquer outra célula não altera nada.
+        // Clique: azul claro (detalhe). Duplo/checkbox: azul forte (marcado).
         return ForcaVendasMonitorResource::table($table)
             ->recordUrl(null)
             ->recordAction(null)
@@ -311,13 +313,28 @@ class ListForcaVendasMonitor extends ListRecords
                 $tint = 'erp-fv-mon--' . $situacao;
 
                 $classes = [$tint];
+                $key = (string) $record->getKey();
 
-                if (in_array((string) $record->getKey(), $this->selecionados, true)) {
+                if (in_array($key, $this->selecionados, true)) {
                     $classes[] = 'erp-row-selected';
+                }
+
+                if ((int) $this->highlightedRecordId === (int) $record->getKey()) {
+                    $classes[] = 'erp-row-focus';
                 }
 
                 return implode(' ', $classes);
             });
+    }
+
+    /**
+     * Destaque da linha (1 clique) — atualiza o painel de detalhe sem remount da grade.
+     */
+    public function highlightRecord(int|string $recordId): void
+    {
+        $this->highlightedRecordId = (int) $recordId;
+        $this->pushSelecaoToDetalhePanel();
+        $this->skipRender();
     }
 
     protected function getTableQuery(): Builder
@@ -325,13 +342,27 @@ class ListForcaVendasMonitor extends ListRecords
         $query = parent::getTableQuery()
             ->where('tipo', 'pedido')
             ->with([
-                'user',
-                'vendedor',
-                'pedido.itens',
-                'cliente',
-                'venda.nfes',
-                'venda.pdvVenda.nfce',
-            ]);
+                'user:id,name',
+                'vendedor:id,nome',
+                'cliente:id,nome_razao',
+                'empresa:id,param_pix_habilitar',
+                'pedido' => fn ($q) => $q
+                    ->select(['id', 'numero', 'subtotal', 'desconto_valor', 'forma_pagamento'])
+                    ->withSum('itens', 'desconto'),
+                'venda' => fn ($q) => $q
+                    ->select(['id', 'numero'])
+                    ->with([
+                        'nfes' => fn ($n) => $n
+                            ->select(['id', 'venda_id', 'numero', 'modelo', 'status']),
+                        'pdvVenda' => fn ($p) => $p
+                            ->select(['id', 'venda_id'])
+                            ->with([
+                                'nfce' => fn ($c) => $c
+                                    ->select(['id', 'pdv_venda_id', 'numero', 'status', 'simulada']),
+                            ]),
+                    ]),
+            ])
+            ->withExists(['pixCobrancasPedido as tem_pix_api']);
 
         if (array_key_exists($this->situacaoFilter, ForcaVendasOrder::situacaoLabels())) {
             if ($this->situacaoFilter === ForcaVendasOrder::SITUACAO_PENDENTE) {
@@ -674,6 +705,7 @@ class ListForcaVendasMonitor extends ListRecords
             return $this->totaisCachePayload;
         }
 
+        // Query filtrada sem eager/withExists da grade (já limpos no aggregator).
         $totais = ForcaVendasMonitorTotaisAggregator::fromQuery($this->getTableQuery());
 
         if ($key !== '') {
@@ -1491,10 +1523,7 @@ class ListForcaVendasMonitor extends ListRecords
         if ($index !== false) {
             unset($this->selecionados[$index]);
             $this->selecionados = array_values($this->selecionados);
-
-            if ((int) $this->highlightedRecordId === (int) $recordId) {
-                $this->highlightedRecordId = null;
-            }
+            // Mantém highlightedRecordId: azul claro + detalhe após desmarcar.
 
             $this->pushSelecaoToDetalhePanel();
             $this->skipRender();
@@ -2207,7 +2236,7 @@ class ListForcaVendasMonitor extends ListRecords
 
         $orderId = count($this->selecionados) === 1
             ? (int) $this->selecionados[0]
-            : (int) ($this->highlightedRecordId ?? 0);
+            : 0;
 
         if ($orderId <= 0) {
             $this->avisa('Selecione um pedido para reabrir.', 'warning');
@@ -2649,7 +2678,7 @@ class ListForcaVendasMonitor extends ListRecords
             ->danger()
             ->send();
 
-        unset($this->nfceEmitirEstado);
+        unset($this->nfceEmitirEstado, $this->nfeEmitirEstado, $this->nfeAbrirEstado);
         $this->pushSelecaoToDetalhePanel();
 
         Log::info('Monitor NFC-e não autorizada (tempos)', [
@@ -3068,15 +3097,14 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        // Sem seleção: abre tela em branco (nova venda).
-        if (! $this->highlightedRecordId && $this->selecionados === []) {
+        // Sem flag: nova venda. Destaque (azul claro) não conta — só a checkbox.
+        if ($this->selecionados === []) {
             $this->redirect(ForcaVendasTelaVendaPage::getUrl());
 
             return;
         }
 
-        $recordId = $this->highlightedRecordId
-            ?: (int) ($this->selecionados[count($this->selecionados) - 1] ?? 0);
+        $recordId = (int) ($this->selecionados[0] ?? 0);
 
         if ($recordId <= 0) {
             Notification::make()

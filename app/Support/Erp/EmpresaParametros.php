@@ -257,11 +257,22 @@ final class EmpresaParametros
             ],
             'param_monitor_vendas_exibir_mais_opcoes' => [
                 'label' => 'Exibir “Mais opções” na Tela de Venda e Monitor',
+                'hint' => 'Na Tela de Venda, libera o menu com “Exibir/Ocultar custo dos produtos” (oculto por padrão) e “Margem da venda”. No Monitor, libera “Mais opções” (margem). Independente do parâmetro de custo nas grades.',
                 'default' => false,
             ],
             'param_monitor_vendas_exibir_custo_produto' => [
                 'label' => 'Exibir custo dos produtos nas grades',
-                'hint' => 'Exibe o custo unitário atual dos produtos na Tela de Venda e no Monitor.',
+                'hint' => 'No Monitor, exibe o custo unitário atual dos produtos diretamente na grade quando habilitado. Não controla a Tela de Venda (lá o custo fica em “Mais opções”). Independente do Orçamento.',
+                'default' => false,
+            ],
+            'param_orcamento_permitir_visualizar_margem' => [
+                'label' => 'Exibir “Mais opções” na Tela de Orçamento',
+                'hint' => 'Quando habilitado, o Lançamento de Orçamento exibe “Mais opções” para mostrar/ocultar o custo dos produtos e a margem da venda. Desabilitado: nenhuma informação de custo/margem no orçamento. Independente do parâmetro da Tela de Venda e Monitor.',
+                'default' => false,
+            ],
+            'param_orcamento_permitir_separadores_grupo' => [
+                'label' => 'Permitir separadores de grupo no Orçamento',
+                'hint' => 'Quando habilitado, o Lançamento de Orçamento exibe o campo “Título do grupo” para inserir separadores na sequência dos itens. Separadores não são produtos e não entram em totais, custo ou margem. Desabilitado: oculta o campo; orçamentos já gravados mantêm os separadores.',
                 'default' => false,
             ],
             'param_monitor_vendas_imp_valor_liquido' => [
@@ -619,6 +630,7 @@ final class EmpresaParametros
             'nfse_proximo_rps' => ['label' => 'Próximo Nº RPS', 'default' => '', 'type' => 'string'],
             'nfse_tipo_rps' => ['label' => 'Tipo RPS', 'default' => '1', 'type' => 'string'],
             'nfse_aliquota_iss' => ['label' => 'Alíquota ISS (%)', 'default' => '', 'type' => 'string'],
+            'nfse_p_tot_trib_sn' => ['label' => 'Alíquota aproximada SN (%)', 'default' => '', 'type' => 'string'],
             'nfse_ws_usuario' => ['label' => 'Usuário WebService', 'default' => '', 'type' => 'string'],
             'nfse_ws_senha' => ['label' => 'Senha WebService', 'default' => '', 'type' => 'string'],
             'nfse_url_producao' => ['label' => 'URL Produção', 'default' => '', 'type' => 'string'],
@@ -1745,6 +1757,7 @@ final class EmpresaParametros
             'forca_vendas' => 'Força de Vendas',
             'vendas_internas' => 'Vendas Internas',
             'monitor_vendas' => 'Monitor de vendas',
+            'orcamento' => 'Orçamento',
         ];
     }
 
@@ -2145,6 +2158,10 @@ final class EmpresaParametros
 
         if (str_starts_with($field, 'param_monitor_vendas_')) {
             return 'monitor_vendas';
+        }
+
+        if (str_starts_with($field, 'param_orcamento_')) {
+            return 'orcamento';
         }
 
         return 'fiscal';

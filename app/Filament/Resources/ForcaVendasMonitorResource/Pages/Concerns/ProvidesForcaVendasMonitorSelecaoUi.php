@@ -15,6 +15,7 @@ use App\Support\Erp\Financeiro\FaturamentoPendenciaFinanceiraGuard;
 use App\Support\Erp\Nfce\NfceRegularizacaoService;
 use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
+use App\Support\Fiscal\VendaFiscalLock;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasMargemVendaCalculator;
 use Illuminate\Database\Eloquent\Builder;
@@ -198,7 +199,60 @@ trait ProvidesForcaVendasMonitorSelecaoUi
                 ->all();
         }
 
+        // Dinheiro/PIX/caixa (sem CR): uma linha por meio com o valor real do payload.
+        $doPayload = $this->pagamentosDoPayload($order);
+        if ($doPayload !== []) {
+            return $doPayload;
+        }
+
         return $this->pagamentosPrevistos($order);
+    }
+
+    /**
+     * Meios mistos da TV (payload.pagamentos) — uma linha por meio, sem juntar "A / B".
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function pagamentosDoPayload(ForcaVendasOrder $order): array
+    {
+        $linhas = ForcaVendasMonitorResource::meioPagamentoLinhas($order);
+        if ($linhas === []) {
+            return [];
+        }
+
+        // Só com valor persistido (não inventa split do cabeçalho "DINHEIRO / PIX").
+        $comValor = [];
+        foreach ($linhas as $linha) {
+            if (($linha['valor'] ?? null) === null) {
+                continue;
+            }
+            $valor = round((float) $linha['valor'], 2);
+            if ($valor <= 0.009) {
+                continue;
+            }
+            $comValor[] = [
+                'nome' => (string) $linha['nome'],
+                'valor' => $valor,
+            ];
+        }
+
+        if ($comValor === []) {
+            return [];
+        }
+
+        $hoje = ErpTimezone::toLocal()->format('d/m/Y');
+        $out = [];
+
+        foreach ($comValor as $i => $linha) {
+            $out[] = [
+                'meio' => mb_strtoupper(trim($linha['nome']), 'UTF-8'),
+                'parcela' => $i + 1,
+                'vencimento' => $hoje,
+                'valor' => $linha['valor'],
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -223,9 +277,16 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         }
         $n = count($dias);
         $forma = trim((string) ($order->payload['forma_pagamento'] ?? ''));
-        $meio = $forma !== ''
-            ? $forma
-            : (ContaReceber::formaLabels()[$this->formaContaReceber($order)] ?? '—');
+        // Cabeçalho misto sem payload.pagamentos: mostra o 1º meio (não cola "A / B" na grade).
+        if ($forma !== '' && preg_match('/[\/+]/', $forma) === 1) {
+            $partes = preg_split('/\s*(?:\/|\+)\s*/u', $forma) ?: [];
+            $primeiro = trim((string) ($partes[0] ?? ''));
+            $meio = $primeiro !== '' ? mb_strtoupper($primeiro, 'UTF-8') : $forma;
+        } else {
+            $meio = $forma !== ''
+                ? $forma
+                : (ContaReceber::formaLabels()[$this->formaContaReceber($order)] ?? '—');
+        }
         $hoje = ErpTimezone::toLocal()->startOfDay();
         $parcelaBase = floor($total / $n * 100) / 100;
 
@@ -263,7 +324,13 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
         return ForcaVendasMonitorResource::ordersQuery()
             ->whereIn('id', $ids)
-            ->with(['pedido', 'venda.cliente', 'venda.itens'])
+            ->with([
+                'pedido',
+                'venda.cliente',
+                'venda.itens',
+                // Status fiscal real da NFC-e (não o rótulo NC-##### da grade).
+                'venda.pdvVenda.nfce:id,pdv_venda_id,numero,status,simulada',
+            ])
             ->get();
     }
 
@@ -299,13 +366,6 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
         $orders = $this->pedidosSelecionados();
 
-        if ($orders->isEmpty() && $this->highlightedRecordId) {
-            $orders = ForcaVendasMonitorResource::ordersQuery()
-                ->whereKey((int) $this->highlightedRecordId)
-                ->with(['venda.cliente', 'venda.itens', 'pedido'])
-                ->get();
-        }
-
         if ($orders->isEmpty()) {
             return $disabled;
         }
@@ -331,6 +391,15 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
             if (! $venda) {
                 $motivos[] = $dav.': venda não encontrada.';
+
+                continue;
+            }
+
+            // NFC-e autorizada/contingência (relação eager-loaded) — mesma regra da transmissão.
+            $motivoNfce = VendaFiscalLock::motivoBloqueioNfePorVenda($venda);
+
+            if ($motivoNfce !== null) {
+                $motivos[] = $dav.': '.$motivoNfce;
 
                 continue;
             }
@@ -483,13 +552,6 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
         $orders = $this->pedidosSelecionados();
 
-        if ($orders->isEmpty() && $this->highlightedRecordId) {
-            $orders = ForcaVendasMonitorResource::ordersQuery()
-                ->whereKey((int) $this->highlightedRecordId)
-                ->with(['venda'])
-                ->get();
-        }
-
         if ($orders->count() !== 1) {
             if ($orders->count() > 1) {
                 $disabled['title'] = 'Selecione apenas um pedido para abrir a NF-e.';
@@ -556,13 +618,6 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         }
 
         $orders = $this->pedidosSelecionados();
-
-        if ($orders->isEmpty() && $this->highlightedRecordId) {
-            $orders = ForcaVendasMonitorResource::ordersQuery()
-                ->whereKey((int) $this->highlightedRecordId)
-                ->with(['pedido', 'venda'])
-                ->get();
-        }
 
         if ($orders->isEmpty()) {
             return $disabled;
@@ -717,7 +772,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             ];
         }
 
-        if ($nMarcados === 0 && ! $this->highlightedRecordId) {
+        if ($nMarcados === 0) {
             return [
                 'enabled' => false,
                 'title' => 'Selecione um pedido para reabrir.',
@@ -738,6 +793,10 @@ trait ProvidesForcaVendasMonitorSelecaoUi
     }
 
     /**
+     * Estado do botão Tela de Venda.
+     * Usa só as flags (selecionados): o destaque (highlightedRecordId) alimenta o
+     * detalhe e não trava o botão — sem flags = nova venda em branco.
+     *
      * @return array{enabled: bool, title: string}
      */
     #[Computed]
@@ -750,14 +809,16 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             ];
         }
 
-        if (count($this->selecionados) > 1) {
+        $nMarcados = count($this->selecionados);
+
+        if ($nMarcados > 1) {
             return [
                 'enabled' => false,
                 'title' => 'Abra apenas um pedido por vez na Tela de Venda. Desmarque a seleção em lote.',
             ];
         }
 
-        if (count($this->selecionados) === 1 || $this->highlightedRecordId) {
+        if ($nMarcados === 1) {
             $situacao = array_values($this->situacoesDaSelecao())[0] ?? null;
 
             if ($situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
@@ -794,7 +855,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             ];
         }
 
-        if ($nMarcados === 0 && ! $this->highlightedRecordId) {
+        if ($nMarcados === 0) {
             return [
                 'enabled' => false,
                 'title' => 'Selecione um pedido na lista para enviar.',
@@ -900,7 +961,8 @@ trait ProvidesForcaVendasMonitorSelecaoUi
     }
 
     /**
-     * Situação dos pedidos da seleção (flags; se nenhuma, o destaque).
+     * Situação dos pedidos com checkbox marcada.
+     * Destaque (highlightedRecordId) alimenta só o painel de detalhe — não a barra.
      *
      * @return array<int, string>
      */
@@ -915,10 +977,6 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             ->filter()
             ->unique()
             ->values();
-
-        if ($ids->isEmpty() && $this->highlightedRecordId) {
-            $ids = collect([(int) $this->highlightedRecordId]);
-        }
 
         if ($ids->isEmpty()) {
             return $this->situacoesSelecaoBarraMemo = [];

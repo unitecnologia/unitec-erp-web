@@ -306,13 +306,15 @@ final class NfceRegularizacaoQuery
             return [];
         }
 
-        $pdv = DB::table('pdv_vendas as pv')
+        $pdvRows = DB::table('pdv_vendas as pv')
             ->leftJoin('pdv_caixa_sessoes as s', 's.id', '=', 'pv.pdv_caixa_sessao_id')
             ->leftJoin('terminais as t', 't.id', '=', 's.terminal_id')
             ->leftJoin('pdv_venda_nfce as nf', 'nf.pdv_venda_id', '=', 'pv.id')
             ->leftJoin('people as pp', 'pp.id', '=', 'pv.person_id')
             ->whereIn('pv.venda_id', $ids)
+            ->orderBy('pv.id')
             ->get([
+                'pv.id as pdv_id',
                 'pv.venda_id',
                 'pv.origem',
                 'pv.numero as pdv_numero',
@@ -326,8 +328,35 @@ final class NfceRegularizacaoQuery
                 'nf.status as nfce_status',
                 'nf.numero as nfce_numero',
                 DB::raw('SUBSTRING('.DB::getQueryGrammar()->wrap('nf.motivo_rejeicao').', 1, 200) as nfce_motivo'),
-            ])
-            ->keyBy('venda_id');
+            ]);
+
+        // Prefere PDV real (SCV/caixa) sobre registro só fiscal da regularização.
+        $pdv = $pdvRows
+            ->groupBy('venda_id')
+            ->map(function (Collection $group) {
+                return $group->first(fn ($row): bool => (string) ($row->origem ?? '') !== PdvVenda::ORIGEM_REGULARIZACAO_FISCAL)
+                    ?? $group->first();
+            });
+
+        // Uma consulta de pagamentos para a página (sem N+1). Inclui todos os PDVs
+        // da página para, se o preferido não tiver detalhe, tentar o irmão.
+        $pdvIds = $pdvRows->pluck('pdv_id')->filter()->map(fn ($id): int => (int) $id)->values()->all();
+        $pagamentosPorPdv = $pdvIds === []
+            ? collect()
+            : DB::table('pdv_venda_pagamentos')
+                ->whereIn('pdv_venda_id', $pdvIds)
+                ->orderBy('id')
+                ->get(['pdv_venda_id', 'forma', 'valor'])
+                ->groupBy('pdv_venda_id');
+
+        $pdvIdsPorVenda = $pdvRows->groupBy('venda_id')->map(function (Collection $group): array {
+            return $group
+                ->sortBy(fn ($row): int => (string) ($row->origem ?? '') === PdvVenda::ORIGEM_REGULARIZACAO_FISCAL ? 1 : 0)
+                ->pluck('pdv_id')
+                ->map(fn ($id): int => (int) $id)
+                ->values()
+                ->all();
+        });
 
         $fv = ErpSchema::hasTable('forca_vendas_orders')
             ? DB::table('forca_vendas_orders')
@@ -385,6 +414,31 @@ final class NfceRegularizacaoQuery
 
             $edicao = self::consumidorEditavel($record, $pdvRow, $consumidorFinal, $fvRow);
 
+            $pdvPagamentos = [];
+            foreach ($pdvIdsPorVenda->get($id, []) as $pdvIdCand) {
+                $grupo = $pagamentosPorPdv->get($pdvIdCand, collect());
+                if ($grupo->isEmpty()) {
+                    continue;
+                }
+                foreach ($grupo as $pag) {
+                    $pdvPagamentos[] = [
+                        'forma' => (string) ($pag->forma ?? ''),
+                        'valor' => is_numeric($pag->valor ?? null) ? (float) $pag->valor : null,
+                    ];
+                }
+                // Detalhe do primeiro PDV com linhas (preferência já ordenada: real antes).
+                break;
+            }
+
+            $fvPagamentos = self::pagamentosFromFvPayload($fvRow->payload ?? null);
+            $linhasPagamento = NfceRegularizacaoPagamentos::resolverLinhas(
+                $pdvPagamentos,
+                $fvPagamentos,
+                (string) ($record->forma_pagamento ?? ''),
+            );
+            $formaLabel = NfceRegularizacaoPagamentos::rotuloGrade($linhasPagamento);
+            $formaTitle = NfceRegularizacaoPagamentos::tooltipGrade($linhasPagamento);
+
             $rows[] = [
                 'id' => $id,
                 'numero' => (string) $record->numero,
@@ -400,7 +454,8 @@ final class NfceRegularizacaoQuery
                 'edit_cpf' => $edicao['cpf'],
                 'caixa' => $pdvReal && filled($pdvRow->terminal ?? null) ? (string) $pdvRow->terminal : '—',
                 'vendedor' => $vendedor !== '' ? mb_strtoupper($vendedor, 'UTF-8') : '—',
-                'forma' => filled($record->forma_pagamento) ? (string) $record->forma_pagamento : '—',
+                'forma' => $formaLabel,
+                'forma_title' => $formaTitle !== '' ? $formaTitle : $formaLabel,
                 'total' => round((float) $record->total, 2),
                 'situacao' => $situacao,
                 'situacao_tone' => $tone,
@@ -410,6 +465,28 @@ final class NfceRegularizacaoQuery
         }
 
         return $rows;
+    }
+
+    /**
+     * @return list<array{forma?: string, valor?: float, descricao?: string, forma_pagamento?: string}>|null
+     */
+    private static function pagamentosFromFvPayload(mixed $payloadRaw): ?array
+    {
+        if ($payloadRaw === null) {
+            return null;
+        }
+
+        $payload = is_array($payloadRaw)
+            ? $payloadRaw
+            : (is_string($payloadRaw) ? (json_decode($payloadRaw, true) ?: null) : null);
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $raw = $payload['pagamentos'] ?? null;
+
+        return is_array($raw) ? $raw : null;
     }
 
     /**

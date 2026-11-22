@@ -42,18 +42,26 @@ final class ErpDashboardSalesMixChart
             $pedidos = static::sumPedidos($inicio, $fim, $empresaScope);
             $os = static::sumOs($inicio, $fim, $empresaScope);
 
-            if ($pdv <= 0 && $pedidos <= 0 && $os <= 0) {
+            // Só segmentos com movimento — legenda e pizza sem categorias zeradas.
+            $segments = [];
+            if ($pdv > 0) {
+                $segments[] = ['label' => 'PDV', 'value' => round($pdv, 2), 'color' => '#1e5a9e'];
+            }
+            if ($pedidos > 0) {
+                $segments[] = ['label' => 'Pedidos', 'value' => round($pedidos, 2), 'color' => '#0d9488'];
+            }
+            if ($os > 0) {
+                $segments[] = ['label' => 'OS', 'value' => round($os, 2), 'color' => '#c2410c'];
+            }
+
+            if ($segments === []) {
                 return null;
             }
 
             return [
-                'labels' => ['PDV', 'Pedidos', 'OS'],
-                'values' => [
-                    round($pdv, 2),
-                    round($pedidos, 2),
-                    round($os, 2),
-                ],
-                'colors' => ['#1e5a9e', '#0d9488', '#c2410c'],
+                'labels' => array_column($segments, 'label'),
+                'values' => array_column($segments, 'value'),
+                'colors' => array_column($segments, 'color'),
                 'unit' => 'money',
             ];
         } catch (Throwable) {
@@ -105,13 +113,16 @@ final class ErpDashboardSalesMixChart
     }
 
     /**
-     * OS faturadas (finalizada/entregue) no período — total_geral do cabeçalho, sem venda espelho.
+     * OS realmente faturadas no período (finalizada/entregue + evidência de faturamento).
+     * Usa total_geral da OS — venda espelho (plataforma=os) fica fora de Pedidos.
      *
      * @param  int|list<int>|null  $empresaScope
      */
     private static function sumOs(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
-        if (! ErpSchema::hasTable((new OrdemServico)->getTable())) {
+        $table = (new OrdemServico)->getTable();
+
+        if (! ErpSchema::hasTable($table)) {
             return 0.0;
         }
 
@@ -122,8 +133,23 @@ final class ErpDashboardSalesMixChart
             ])
             ->whereNotNull('data_termino');
 
+        // Só faturamento real (espelho / pagamentos) — exclui "finalizar" sem caixa/financeiro.
+        $temVendaId = ErpSchema::hasColumn($table, 'venda_id');
+        $temFatPgto = ErpSchema::hasColumn($table, 'faturamento_pagamentos');
+
+        if ($temVendaId && $temFatPgto) {
+            $q->where(function ($query): void {
+                $query->whereNotNull('venda_id')
+                    ->orWhereNotNull('faturamento_pagamentos');
+            });
+        } elseif ($temVendaId) {
+            $q->whereNotNull('venda_id');
+        } elseif ($temFatPgto) {
+            $q->whereNotNull('faturamento_pagamentos');
+        }
+
         ErpDashboardDateFilter::whereDateColumnBetween($q, 'data_termino', $from, $to);
-        ErpEmpresaScopeFilter::applyColumn($q, (new OrdemServico)->getTable(), $empresaScope);
+        ErpEmpresaScopeFilter::applyColumn($q, $table, $empresaScope);
 
         return (float) $q->sum('total_geral');
     }

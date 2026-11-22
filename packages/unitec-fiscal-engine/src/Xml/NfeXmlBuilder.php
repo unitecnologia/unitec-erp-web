@@ -223,11 +223,11 @@ final class NfeXmlBuilder
 
         $ender = $emit->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'enderEmit');
         $emit->appendChild($ender);
-        XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeText($emitente->logradouro, 60));
-        XmlHelper::append($ender, 'nro', XmlHelper::sanitizeText($emitente->numero, 60));
-        XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeText($emitente->bairro, 60));
+        XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeTString($emitente->logradouro, 60));
+        XmlHelper::append($ender, 'nro', XmlHelper::sanitizeTString($emitente->numero, 60));
+        XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeTString($emitente->bairro, 60));
         XmlHelper::append($ender, 'cMun', $emitente->codigoMunicipio);
-        XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeText($emitente->municipio, 60));
+        XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeTString($emitente->municipio, 60));
         XmlHelper::append($ender, 'UF', strtoupper($emitente->uf));
         XmlHelper::append($ender, 'CEP', str_pad(NumberFormatter::onlyDigits($emitente->cep), 8, '0', STR_PAD_LEFT));
         XmlHelper::append($ender, 'cPais', '1058');
@@ -260,15 +260,15 @@ final class NfeXmlBuilder
         }
 
         $nome = $homologacao ? self::HOMOLOGACAO_DEST : ($destinatario->nome ?: 'DESTINATARIO');
-        XmlHelper::append($dest, 'xNome', XmlHelper::sanitizeText($nome, 60));
+        XmlHelper::append($dest, 'xNome', XmlHelper::sanitizeTString($nome, 60));
 
         $ender = $dest->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'enderDest');
         $dest->appendChild($ender);
-        XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeText($destinatario->logradouro, 60));
-        XmlHelper::append($ender, 'nro', XmlHelper::sanitizeText($destinatario->numero, 60));
-        XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeText($destinatario->bairro, 60));
+        XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeTString($destinatario->logradouro, 60));
+        XmlHelper::append($ender, 'nro', XmlHelper::sanitizeTString($destinatario->numero, 60));
+        XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeTString($destinatario->bairro, 60));
         XmlHelper::append($ender, 'cMun', $destinatario->codigoMunicipio);
-        XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeText($destinatario->municipio, 60));
+        XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeTString($destinatario->municipio, 60));
         XmlHelper::append($ender, 'UF', strtoupper($destinatario->uf));
         XmlHelper::append($ender, 'CEP', str_pad(NumberFormatter::onlyDigits($destinatario->cep), 8, '0', STR_PAD_LEFT));
         XmlHelper::append($ender, 'cPais', '1058');
@@ -301,7 +301,7 @@ final class NfeXmlBuilder
         $descricao = $forcarHomologacao ? self::HOMOLOGACAO_ITEM : $item->descricao;
         XmlHelper::append($prod, 'cProd', XmlHelper::sanitizeText($item->codigo, 60));
         XmlHelper::append($prod, 'cEAN', 'SEM GTIN');
-        XmlHelper::append($prod, 'xProd', XmlHelper::sanitizeText($descricao, 120));
+        XmlHelper::append($prod, 'xProd', XmlHelper::sanitizeTString($descricao, 120));
         XmlHelper::append($prod, 'NCM', str_pad(NumberFormatter::onlyDigits($item->ncm), 8, '0', STR_PAD_LEFT));
         $cestRaw = trim((string) ($item->cest ?? ''));
         if ($cestRaw !== '') {
@@ -545,7 +545,7 @@ final class NfeXmlBuilder
                 XmlHelper::append(
                     $transporta,
                     'xNome',
-                    XmlHelper::sanitizeText((string) $detalhe->transportadoraNome, 60),
+                    XmlHelper::sanitizeTString((string) $detalhe->transportadoraNome, 60),
                 );
             }
 
@@ -561,7 +561,7 @@ final class NfeXmlBuilder
                 XmlHelper::append(
                     $transporta,
                     'xEnder',
-                    XmlHelper::sanitizeText((string) $detalhe->transportadoraEndereco, 60),
+                    XmlHelper::sanitizeTString((string) $detalhe->transportadoraEndereco, 60),
                 );
             }
 
@@ -569,7 +569,7 @@ final class NfeXmlBuilder
                 XmlHelper::append(
                     $transporta,
                     'xMun',
-                    XmlHelper::sanitizeText((string) $detalhe->transportadoraMunicipio, 60),
+                    XmlHelper::sanitizeTString((string) $detalhe->transportadoraMunicipio, 60),
                 );
             }
 
@@ -728,11 +728,11 @@ final class NfeXmlBuilder
         $infNFe->appendChild($infAdic);
 
         if ($fisco !== '') {
-            XmlHelper::append($infAdic, 'infAdFisco', XmlHelper::sanitizeText($fisco, 2000));
+            XmlHelper::append($infAdic, 'infAdFisco', XmlHelper::sanitizeTString($fisco, 2000));
         }
 
         if ($texto !== '') {
-            XmlHelper::append($infAdic, 'infCpl', XmlHelper::sanitizeText($texto, 5000));
+            XmlHelper::append($infAdic, 'infCpl', XmlHelper::sanitizeTString($texto, 5000));
         }
     }
 

@@ -434,8 +434,9 @@ class NfseDpsXmlGerador
         $tribIssqn = $this->texto($valores['trib_issqn'] ?? null);
         $tpRetIssqn = $this->texto($valores['tp_ret_issqn'] ?? null);
         $indTotTrib = $this->texto($valores['ind_tot_trib'] ?? null);
+        $pTotTribSn = $this->texto($valores['p_tot_trib_sn'] ?? null);
 
-        if ($tribIssqn === null || $tpRetIssqn === null || $indTotTrib === null) {
+        if ($tribIssqn === null || $tpRetIssqn === null || ($indTotTrib === null && $pTotTribSn === null)) {
             return;
         }
 
@@ -446,7 +447,14 @@ class NfseDpsXmlGerador
         $trib->appendChild($municipal);
 
         $totais = $doc->createElementNS(self::NS, 'totTrib');
-        $this->campo($doc, $totais, 'indTotTrib', $indTotTrib);
+
+        // Choice XSD: ME/EPP usa pTotTribSN; demais regimes podem usar indTotTrib.
+        if ($pTotTribSn !== null) {
+            $this->campo($doc, $totais, 'pTotTribSN', $pTotTribSn);
+        } else {
+            $this->campo($doc, $totais, 'indTotTrib', $indTotTrib);
+        }
+
         $trib->appendChild($totais);
         $valoresNo->appendChild($trib);
     }

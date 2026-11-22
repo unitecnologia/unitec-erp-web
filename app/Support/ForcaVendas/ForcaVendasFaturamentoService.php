@@ -21,6 +21,7 @@ use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
 use App\Support\Erp\ConsumidorFinalGuard;
+use App\Support\Erp\Dre\VendaItemCustoHistorico;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
@@ -346,6 +347,12 @@ class ForcaVendasFaturamentoService
 
         $avancar('Movimentando estoque');
 
+        // D2.6: preserva custo já capturado em refaturamento (não reescreve vendas antigas fora deste fluxo).
+        $custoPreservado = [];
+        if ($sincronizarItens && VendaItemCustoHistorico::tabelaTemCusto('venda_itens')) {
+            $custoPreservado = VendaItemCustoHistorico::mapaPreservarPorProduto((int) $venda->id);
+        }
+
         if ($sincronizarItens) {
             VendaItem::query()->where('venda_id', (int) $venda->id)->delete();
         }
@@ -359,6 +366,23 @@ class ForcaVendasFaturamentoService
         // 1 query de produtos para N itens (estoque + comissão sem N+1).
         $pedido->loadMissing(['itens.product']);
 
+        // D2.6: 1 query de custos (PEP/produto/compra) para todos os itens — padrão PDV, sem N+1.
+        $custoLote = [];
+        $gravaCusto = VendaItemCustoHistorico::tabelaTemCusto('venda_itens');
+        if ($gravaCusto) {
+            $productIds = [];
+            foreach ($pedido->itens as $itemCusto) {
+                $pid = (int) ($itemCusto->product_id ?? 0);
+                if ($pid > 0) {
+                    $productIds[] = $pid;
+                }
+            }
+            $custoLote = VendaItemCustoHistorico::resolverLote(
+                $productIds,
+                $empresaId !== null && $empresaId > 0 ? $empresaId : null,
+            );
+        }
+
         foreach ($pedido->itens as $item) {
             if (! $item->product_id) {
                 continue;
@@ -366,6 +390,18 @@ class ForcaVendasFaturamentoService
 
             /** @var Product|null $product */
             $product = $item->product;
+
+            $custoSnap = [];
+            if ($gravaCusto) {
+                $custoSnap = VendaItemCustoHistorico::dePreservadoOuResolver(
+                    (int) $item->product_id,
+                    (float) $item->quantidade,
+                    $empresaId !== null && $empresaId > 0 ? $empresaId : null,
+                    $custoPreservado,
+                    $product,
+                    $custoLote,
+                );
+            }
 
             $vendaItem = VendaItem::query()->create([
                 'venda_id' => $venda->id,
@@ -375,6 +411,7 @@ class ForcaVendasFaturamentoService
                 'total' => $item->total,
                 // Preserva regra do creating(); evita SELECT products por item.
                 'comissao_pct' => VendaItem::snapshotComissaoPct((int) $item->product_id, $product),
+                ...$custoSnap,
             ]);
 
             if ($product) {

@@ -27,7 +27,7 @@ class EmpresaMonitorVendasExibirCustoProdutoTest extends TestCase
             $fields['param_monitor_vendas_exibir_custo_produto']['label'],
         );
         $this->assertSame(
-            'Exibe o custo unitário atual dos produtos na Tela de Venda e no Monitor.',
+            'No Monitor, exibe o custo unitário atual dos produtos diretamente na grade quando habilitado. Não controla a Tela de Venda (lá o custo fica em “Mais opções”). Independente do Orçamento.',
             $fields['param_monitor_vendas_exibir_custo_produto']['hint'],
         );
         $this->assertSame(

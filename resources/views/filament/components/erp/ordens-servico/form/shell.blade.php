@@ -8,28 +8,36 @@
     ];
 @endphp
 
-{{-- Abas principais: troca local (Alpine). Campos ficam no DOM → não perde digitação; sem round-trip Livewire. --}}
-<div
-    class="erp-os-shell"
-    x-data="{ tab: @entangle('activeFormTab') }"
->
-    <div class="erp-os-shell__tabs" role="tablist">
-        @foreach ($mainTabs as $tab => $label)
-            <button
-                type="button"
-                role="tab"
-                @click="tab = '{{ $tab }}'"
-                :class="{ 'erp-os-shell__tab--active': tab === '{{ $tab }}' }"
-                :aria-selected="tab === '{{ $tab }}' ? 'true' : 'false'"
-                @class([
-                    'erp-os-shell__tab',
-                    'erp-os-shell__tab--active' => $this->activeFormTab === $tab,
-                ])
-            >{{ $label }}</button>
-        @endforeach
+{{-- Abas: Alpine local. Faixa operacional FORA do Alpine (igual TV) para remorph do Estoque. --}}
+<div class="erp-os-shell">
+    <div class="erp-os-shell__tabs-row">
+        <div
+            class="erp-os-shell__tabs"
+            role="tablist"
+            x-data="{ tab: @entangle('activeFormTab') }"
+        >
+            @foreach ($mainTabs as $tab => $label)
+                <button
+                    type="button"
+                    role="tab"
+                    @click="tab = '{{ $tab }}'"
+                    :class="{ 'erp-os-shell__tab--active': tab === '{{ $tab }}' }"
+                    :aria-selected="tab === '{{ $tab }}' ? 'true' : 'false'"
+                    @class([
+                        'erp-os-shell__tab',
+                        'erp-os-shell__tab--active' => $this->activeFormTab === $tab,
+                    ])
+                >{{ $label }}</button>
+            @endforeach
+        </div>
+
+        @include('filament.components.erp.ordens-servico.form.operacional')
     </div>
 
-    <div class="erp-os-shell__workspace">
+    <div
+        class="erp-os-shell__workspace"
+        x-data="{ tab: @entangle('activeFormTab') }"
+    >
         <div class="erp-os-shell__content">
             {{-- erp-os-shell__panel restaura a cadeia flex (grade Serviços/Peças) sob x-show --}}
             <div class="erp-os-shell__panel" x-show="tab === 'dados'" x-cloak role="tabpanel">

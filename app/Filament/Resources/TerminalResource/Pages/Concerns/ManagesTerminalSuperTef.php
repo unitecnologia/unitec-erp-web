@@ -11,6 +11,7 @@ use App\Support\Erp\Tef\Scope\ScopeTefDiagnostico;
 use App\Support\Erp\Tef\Scope\ScopeTefPdvGate;
 use App\Support\Erp\Tef\Scope\ScopeTefTerminalConfig;
 use App\Support\Erp\Tef\SuperTefApiClient;
+use App\Support\Erp\Tef\SuperTefFormasPagamento;
 use App\Support\Erp\Tef\SuperTefSofthouseToken;
 use App\Support\Erp\Tef\SuperTefTerminalConfig;
 use App\Support\Erp\Tef\TefProviderId;
@@ -380,6 +381,11 @@ trait ManagesTerminalSuperTef
         // Mantém usa_tef=false: a carga offline exporta essa flag e o menu Ctrl+T depende dela no cliente.
         $terminal->usa_tef = false;
         $terminal->save();
+
+        // Formas SUPERTEF só entram/reativam quando o SuperTEF fica habilitado neste terminal.
+        if ($ativoSuper) {
+            SuperTefFormasPagamento::ensureAtivas();
+        }
 
         if (! $registrarLog) {
             return;

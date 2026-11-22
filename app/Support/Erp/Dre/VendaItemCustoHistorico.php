@@ -231,13 +231,19 @@ final class VendaItemCustoHistorico
     }
 
     /**
-     * Preserva snapshots antes de delete+recreate (FV/OS/mirror).
+     * Preserva snapshots já capturados antes de delete+recreate (FV/OS/mirror).
      *
-     * @return array<int, array<string, mixed>> product_id => attrs (primeiro item ok por produto)
+     * D2.6 no refaturamento:
+     * - OK: mantém o histórico original (recalcula só custo_total pela qtd atual).
+     * - Indisponível / não aplicável: também preserva — não injeta custo cadastrado
+     *   depois como se fosse o histórico do fechamento original.
+     * - Sem captura (situacao nula): não entra no mapa; o 1º faturamento resolve normalmente.
+     *
+     * @return array<int, array<string, mixed>> product_id => attrs (primeiro item com captura por produto)
      */
     public static function mapaPreservarPorProduto(int $vendaId): array
     {
-        if ($vendaId <= 0 || ! Schema::hasTable('venda_itens') || ! ErpSchema::hasColumn('venda_itens', 'custo_situacao')) {
+        if ($vendaId <= 0 || ! self::tabelaTemCusto('venda_itens')) {
             return [];
         }
 
@@ -245,6 +251,7 @@ final class VendaItemCustoHistorico
         foreach (DB::table('venda_itens')
             ->where('venda_id', $vendaId)
             ->whereNotNull('custo_situacao')
+            ->where('custo_situacao', '!=', '')
             ->orderBy('id')
             ->get(['product_id', 'custo_unitario', 'custo_total', 'custo_origem', 'custo_situacao', 'quantidade']) as $row
         ) {
@@ -263,6 +270,7 @@ final class VendaItemCustoHistorico
 
     /**
      * @param  array<int, array<string, mixed>>  $preservado
+     * @param  array<int, array{unitario: ?float, origem: string}>|null  $lote  Saída de resolverLote(); evita N+1.
      * @return array<string, mixed>
      */
     public static function dePreservadoOuResolver(
@@ -271,6 +279,7 @@ final class VendaItemCustoHistorico
         ?int $empresaId,
         array $preservado,
         ?Product $product = null,
+        ?array $lote = null,
     ): array {
         if (isset($preservado[$productId])) {
             $base = $preservado[$productId];
@@ -284,7 +293,60 @@ final class VendaItemCustoHistorico
             return $base;
         }
 
+        if ($lote !== null) {
+            return self::snapshotDoLote($productId, $quantidade, $lote, $product);
+        }
+
         return self::snapshot($productId, $quantidade, $empresaId, $product);
+    }
+
+    /**
+     * Monta snapshot a partir de um mapa já resolvido em lote (sem nova consulta).
+     *
+     * @param  array<int, array{unitario: ?float, origem: string}>  $lote
+     * @return array{
+     *   custo_unitario: ?string,
+     *   custo_total: ?string,
+     *   custo_origem: string,
+     *   custo_situacao: string
+     * }
+     */
+    public static function snapshotDoLote(
+        int $productId,
+        float $quantidade,
+        array $lote,
+        ?Product $product = null,
+    ): array {
+        if ($productId <= 0) {
+            return self::indisponivel();
+        }
+
+        if ($product !== null && (bool) ($product->is_servico ?? false)) {
+            return self::naoAplicavel();
+        }
+
+        $row = $lote[$productId] ?? null;
+        if ($row === null) {
+            return self::indisponivel();
+        }
+
+        if (($row['origem'] ?? '') === self::ORIGEM_NAO_APLICAVEL) {
+            return self::naoAplicavel();
+        }
+
+        if ($row['unitario'] === null) {
+            return self::indisponivel();
+        }
+
+        $qtd = abs($quantidade);
+        $unit = (float) $row['unitario'];
+
+        return [
+            'custo_unitario' => number_format($unit, 4, '.', ''),
+            'custo_total' => number_format(round($unit * $qtd, 2), 2, '.', ''),
+            'custo_origem' => (string) ($row['origem'] ?: self::ORIGEM_PRODUTO),
+            'custo_situacao' => self::SITUACAO_OK,
+        ];
     }
 
     public static function tabelaTemCusto(string $table): bool

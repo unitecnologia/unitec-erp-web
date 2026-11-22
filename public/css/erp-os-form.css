@@ -175,15 +175,42 @@
     gap: 0.45rem;
 }
 
+.erp-os-shell__tabs-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.55rem;
+    flex-shrink: 0;
+}
+
 .erp-os-shell__tabs {
     display: flex;
     flex-wrap: wrap;
     gap: 0.2rem;
-    flex-shrink: 0;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 0.2rem;
     background: #dbe6f3;
     border: 1px solid #b6c7db;
     border-radius: 8px;
+}
+
+.erp-os-shell__oper.erp-fv-tv__oper {
+    flex: 1 1 28rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid #b6c7db;
+    border-radius: 8px;
+    background: #dbe6f3;
+}
+
+.erp-os-shell__oper .erp-fv-tv__oper-field--vendedor,
+.erp-os-shell__oper .erp-fv-tv__oper-field--caixa,
+.erp-os-shell__oper .erp-fv-tv__oper-field--estoque,
+.erp-os-shell__oper .erp-fv-tv__oper-field--tabela {
+    flex: 1 1 7.5rem;
+    max-width: 12rem;
 }
 
 .erp-os-shell__tab {

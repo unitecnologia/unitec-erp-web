@@ -3,6 +3,7 @@
 namespace App\Support\Fiscal;
 
 use App\Models\PdvVendaNfce;
+use App\Models\Venda;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,8 @@ final class VendaFiscalLock
     public const ESPERA_SEGUNDOS = 5;
 
     public const MENSAGEM_OCUPADA = 'Venda em emissão fiscal (NFC-e/NF-e) por outro processo. Aguarde e tente novamente.';
+
+    public const MENSAGEM_NFCE_BLOQUEIA_NFE = 'A venda vinculada já possui NFC-e autorizada/contingência. Cancele a NFC-e antes de emitir NF-e.';
 
     /**
      * @template T
@@ -56,5 +59,52 @@ final class VendaFiscalLock
                 $q->where('nf.simulada', false)->orWhereNull('nf.simulada');
             })
             ->exists();
+    }
+
+    /**
+     * Motivo para bloquear NF-e a partir do registro NFC-e já carregado (sem query).
+     * Autorizada/contingência reais bloqueiam; rejeitada/cancelada/simulada não.
+     * Não usa o número NC como prova — só status (+ flag simulada).
+     */
+    public static function motivoBloqueioNfePorNfce(?PdvVendaNfce $nfce): ?string
+    {
+        if ($nfce === null) {
+            return null;
+        }
+
+        if ((bool) $nfce->simulada || (string) $nfce->status === PdvVendaNfce::STATUS_SIMULADA) {
+            return null;
+        }
+
+        return match ((string) $nfce->status) {
+            PdvVendaNfce::STATUS_AUTORIZADA,
+            PdvVendaNfce::STATUS_CONTINGENCIA => self::MENSAGEM_NFCE_BLOQUEIA_NFE,
+            default => null,
+        };
+    }
+
+    /**
+     * Preferência: relação venda.pdvVenda.nfce já eager-loaded (Monitor).
+     * Fallback: consulta vendaTemNfceValida (ação direta / serviço).
+     */
+    public static function motivoBloqueioNfePorVenda(Venda $venda): ?string
+    {
+        if ($venda->relationLoaded('pdvVenda')) {
+            $pdv = $venda->pdvVenda;
+
+            if ($pdv === null) {
+                return null;
+            }
+
+            if ($pdv->relationLoaded('nfce')) {
+                return self::motivoBloqueioNfePorNfce($pdv->nfce);
+            }
+        }
+
+        $vendaId = (int) $venda->id;
+
+        return $vendaId > 0 && self::vendaTemNfceValida($vendaId)
+            ? self::MENSAGEM_NFCE_BLOQUEIA_NFE
+            : null;
     }
 }

@@ -1,27 +1,47 @@
 @php
     $etapa = $this->etapa;
     $finOpen = $etapa === 'finalizacao';
-    $isEdicaoPedido = (bool) $this->pedidoId;
 @endphp
 
 <div
     class="erp-fv-tv-root"
     data-fv-dirty="{{ count($this->itens) > 0 ? '1' : '0' }}"
+    data-fv-focus-boot="{{ $this->fvVendaGeracao }}:{{ $this->operacaoUuid }}"
     x-data
     x-init="$nextTick(() => {
         if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen) || @js($this->fvImportarOrcamentoOpen) || @js($this->boletoContaPickOpen) || @js($this->margemModalOpen) || @js($this->observacaoPedidoModalOpen) || @js($this->observacaoClienteModalOpen) || @js($this->tabPrecoItemModalOpen) || @js($this->fvImprimirPosVendaOpen)) return;
-        // Após lançar item / fechar modal o Livewire remonta: não roubar o foco de volta ao cliente.
-        if (@js(count($this->itens) > 0) || window.__erpFvTvInitialFocusDone) {
+        const boot = $el.getAttribute('data-fv-focus-boot') || '';
+        // Mesma venda (remorph/modal): não roubar o foco. Nova venda/SPA: boot muda e foca de novo.
+        if (boot && window.__erpFvTvFocusBoot === boot) return;
+        if (@js(count($this->itens) > 0)) {
+            window.__erpFvTvFocusBoot = boot;
             return;
         }
-        window.__erpFvTvInitialFocusDone = true;
-        const clienteEl = document.getElementById('fv-tv-cliente-busca');
-        if (clienteEl && !@js($isEdicaoPedido)) {
-            clienteEl.focus();
-            clienteEl.select?.();
-            return;
-        }
-        $refs.barcode?.focus();
+        let n = 0;
+        const printOpen = () => {
+            const m = document.querySelector('[data-erp-fv-imprimir-pos-venda]');
+            return !!(m && m.getAttribute('aria-hidden') === 'false');
+        };
+        const go = () => {
+            if (printOpen()) {
+                window.__erpFvTvFocusBoot = boot;
+                window.erpFvImprimirPosVendaFocusDefault?.();
+                return;
+            }
+            const el = document.getElementById('fv-tv-barcode') || $refs.barcode;
+            if (!el) return;
+            if (document.activeElement === el) {
+                window.__erpFvTvFocusBoot = boot;
+                return;
+            }
+            el.removeAttribute('readonly');
+            el.focus();
+            el.select?.();
+            // Poucos frames: Livewire hydrate tira foco de input wire:ignore.
+            if (++n < 6) requestAnimationFrame(go);
+            else window.__erpFvTvFocusBoot = boot;
+        };
+        go();
     })"
     x-on:keydown.window.capture="
         const finOpen = $wire.etapa === 'finalizacao';
@@ -383,7 +403,7 @@
     "
     x-on:fv-tela-venda-focus-cliente.window="
         $nextTick(() => {
-            if ($wire.fvImprimirPosVendaOpen || document.querySelector('[data-erp-fv-imprimir-pos-venda]')) {
+            if ($wire.fvImprimirPosVendaOpen) {
                 window.erpFvImprimirPosVendaFocusDefault?.();
                 return;
             }
@@ -395,25 +415,27 @@
     x-on:fv-tela-venda-focus-barcode.window="
         $nextTick(() => {
             requestAnimationFrame(() => {
-                // Após faturar com “permanecer”, o reset da TV dispara focus-barcode no mesmo
-                // ciclo e roubava o foco do modal de impressão (anel azul sumia).
-                if ($wire.fvImprimirPosVendaOpen || document.querySelector('[data-erp-fv-imprimir-pos-venda]')) {
+                // Modal de impressão aberto de verdade (sempre está no DOM com x-show).
+                if ($wire.fvImprimirPosVendaOpen) {
                     window.erpFvImprimirPosVendaFocusDefault?.();
                     return;
                 }
                 const el = document.getElementById('fv-tv-barcode') || $refs.barcode;
-                if (el) {
-                    el.value = $wire.codigoBarras ?? '';
-                    window.erpFvCloseProdutoLookup?.();
-                    el.focus();
-                    el.select?.();
-                }
+                if (!el) return;
+                el.value = $wire.codigoBarras ?? '';
+                window.erpFvCloseProdutoLookup?.();
+                el.removeAttribute('readonly');
+                el.focus();
+                el.select?.();
+                const root = document.querySelector('.erp-fv-tv-root');
+                const boot = root?.getAttribute('data-fv-focus-boot') || '';
+                if (boot) window.__erpFvTvFocusBoot = boot;
             });
         })
     "
     x-on:fv-tela-venda-focus-qtd.window="
         $nextTick(() => {
-            if ($wire.fvImprimirPosVendaOpen || document.querySelector('[data-erp-fv-imprimir-pos-venda]')) {
+            if ($wire.fvImprimirPosVendaOpen) {
                 window.erpFvImprimirPosVendaFocusDefault?.();
                 return;
             }
@@ -433,7 +455,7 @@
     "
     x-on:fv-tela-venda-focus-preco.window="
         $nextTick(() => {
-            if ($wire.fvImprimirPosVendaOpen || document.querySelector('[data-erp-fv-imprimir-pos-venda]')) {
+            if ($wire.fvImprimirPosVendaOpen) {
                 window.erpFvImprimirPosVendaFocusDefault?.();
                 return;
             }
@@ -717,20 +739,71 @@
             return (neg ? '-' : '') + intFmt + ',' + frac;
         };
 
+        window.erpFvRowIsTroca = function (row) {
+            return row?.getAttribute?.('data-fv-troca') === '1';
+        };
+
+        /** Soma valores TROCA (desconto identificado — não conta como informado). */
+        window.erpFvSomaTrocaPagamento = function (root) {
+            let soma = 0;
+            window.erpFvPayRows(root).forEach((row, i) => {
+                if (! window.erpFvRowIsTroca(row)) return;
+                soma += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
+            });
+            return Math.round(soma * 100) / 100;
+        };
+
+        /** Base do F4 (itens) + acréscimo − desconto, sem TROCA. */
+        window.erpFvTotalBaseSemTroca = function (root) {
+            const baseAttr = root.querySelector('[data-erp-fv-ajuste-base]')?.getAttribute('data-erp-fv-ajuste-base');
+            const base = Number.isFinite(Number(baseAttr)) ? Number(baseAttr) : 0;
+            const pctDesc = window.erpFvAjusteEl(root, 'desconto-pct');
+            const valDesc = window.erpFvAjusteEl(root, 'desconto-valor');
+            const pctAcr = window.erpFvAjusteEl(root, 'acrescimo-pct');
+            const valAcr = window.erpFvAjusteEl(root, 'acrescimo-valor');
+            if (! pctDesc || ! valDesc || ! pctAcr || ! valAcr) {
+                return Math.max(0, window.erpFvParseMoneyBr(root.querySelector('[data-erp-fv-total-pagar]')?.textContent)
+                    + window.erpFvSomaTrocaPagamento(root));
+            }
+            const descValor = window.erpFvAjusteParse(valDesc.value);
+            const descPct = window.erpFvAjusteParse(pctDesc.value);
+            const acrValor = window.erpFvAjusteParse(valAcr.value);
+            const acrPct = window.erpFvAjusteParse(pctAcr.value);
+            const descEfetivo = descValor > 0
+                ? Math.min(descValor, Math.max(0, base))
+                : (descPct > 0 ? (base * descPct) / 100 : 0);
+            const acrEfetivo = acrValor > 0
+                ? acrValor
+                : (acrPct > 0 ? (base * acrPct) / 100 : 0);
+            return Math.max(0, Math.round((base + acrEfetivo - descEfetivo) * 100) / 100);
+        };
+
         window.erpFvUpdateFinTotaisUi = function (root) {
             if (! root) return;
-            const total = window.erpFvParseMoneyBr(root.querySelector('[data-erp-fv-total-pagar]')?.textContent);
+            const baseSemTroca = window.erpFvTotalBaseSemTroca(root);
+            const troca = Math.min(window.erpFvSomaTrocaPagamento(root), baseSemTroca);
+            const total = Math.max(0, Math.round((baseSemTroca - troca) * 100) / 100);
+            const format = window.erpFvFormatMoneyBr;
+            root.querySelectorAll('[data-erp-fv-total-pagar]').forEach((el) => {
+                el.textContent = format(total);
+            });
+            const split = root.querySelector('[data-erp-dividir-conta]');
+            if (split) {
+                split.setAttribute('data-erp-dividir-total', total.toFixed(2));
+            }
+
             let informado = 0;
-            root.querySelectorAll('[id^="erp-fv-finalizar-valor-"]').forEach((el) => {
-                informado += window.erpFvParseMoneyBr(el.value);
+            window.erpFvPayRows(root).forEach((row, i) => {
+                if (window.erpFvRowIsTroca(row)) return;
+                informado += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
             });
             informado = Math.round(informado * 100) / 100;
             const restante = Math.max(0, Math.round((total - informado) * 100) / 100);
             const troco = Math.max(0, Math.round((informado - total) * 100) / 100);
             const restEl = root.querySelector('[data-erp-fv-restante]');
             const trocoEl = root.querySelector('[data-erp-fv-troco]');
-            if (restEl) restEl.textContent = window.erpFvFormatMoneyBr(restante);
-            if (trocoEl) trocoEl.textContent = window.erpFvFormatMoneyBr(troco);
+            if (restEl) restEl.textContent = format(restante);
+            if (trocoEl) trocoEl.textContent = format(troco);
         };
 
         /**
@@ -797,7 +870,9 @@
             const acrEfetivo = acrValor > 0
                 ? acrValor
                 : (acrPct > 0 ? (base * acrPct) / 100 : 0);
-            const total = Math.round((base + acrEfetivo - descEfetivo) * 100) / 100;
+            const baseSemTroca = Math.max(0, Math.round((base + acrEfetivo - descEfetivo) * 100) / 100);
+            const troca = Math.min(window.erpFvSomaTrocaPagamento(root), baseSemTroca);
+            const total = Math.max(0, Math.round((baseSemTroca - troca) * 100) / 100);
 
             root.querySelectorAll('[data-erp-fv-total-pagar]').forEach((el) => {
                 el.textContent = format(total);
@@ -818,10 +893,11 @@
             const rows = window.erpFvPayRows(root);
             if (! rows.length) return;
             let informado = 0;
-            rows.forEach((_, i) => {
+            rows.forEach((row, i) => {
+                if (window.erpFvRowIsTroca(row)) return;
                 informado += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
             });
-            if (informado <= 0) return;
+            if (informado <= 0 && window.erpFvSomaTrocaPagamento(root) <= 0) return;
 
             let index = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--selected'));
             if (index < 0) {
@@ -842,17 +918,22 @@
                 tr?.classList.toggle('erp-pdv-finalizar__pay-row--filled', valorNum > 0.009);
             };
 
+            const alvoTroca = window.erpFvRowIsTroca(row);
+            const base = alvoTroca ? window.erpFvTotalBaseSemTroca(root) : total;
             let outros = 0;
-            rows.forEach((_, i) => {
+            rows.forEach((r, i) => {
                 if (i === index) return;
+                if (! alvoTroca && window.erpFvRowIsTroca(r)) return;
+                if (alvoTroca && window.erpFvRowIsTroca(r)) return;
                 outros += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
             });
-            const restanteLinha = Math.max(0, Math.round((total - outros) * 100) / 100);
+            const restanteLinha = Math.max(0, Math.round((base - outros) * 100) / 100);
 
             if (row.getAttribute('data-fv-a-prazo') === '1') {
                 const totalPositivo = Math.max(0, total);
                 const valorFinal = restanteLinha > 0 ? Math.min(restanteLinha, totalPositivo) : totalPositivo;
-                rows.forEach((_, i) => {
+                rows.forEach((r, i) => {
+                    if (window.erpFvRowIsTroca(r)) return;
                     paint(i, i === index ? valorFinal : 0);
                 });
                 return;
@@ -1031,10 +1112,13 @@
             let valorAplicar = null;
 
             if (atual <= 0.009) {
-                const total = window.erpFvParseMoneyBr(root.querySelector('[data-erp-fv-total-pagar]')?.textContent);
+                const isTroca = window.erpFvRowIsTroca(rows[index]);
+                const baseSemTroca = window.erpFvTotalBaseSemTroca(root);
+                const total = Math.max(0, Math.round((baseSemTroca - window.erpFvSomaTrocaPagamento(root)) * 100) / 100);
                 if (aPrazo) {
                     rows.forEach((row, i) => {
                         if (i === index) return;
+                        if (window.erpFvRowIsTroca(row)) return;
                         const other = document.getElementById('erp-fv-finalizar-valor-' + i);
                         if (! other) return;
                         other.value = '0,00';
@@ -1043,10 +1127,19 @@
                         row.classList.remove('erp-pdv-finalizar__pay-row--filled');
                     });
                     valorAplicar = window.erpFvFormatMoneyBr(total);
+                } else if (isTroca) {
+                    let outros = 0;
+                    rows.forEach((row, i) => {
+                        if (i === index) return;
+                        if (window.erpFvRowIsTroca(row)) return;
+                        outros += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
+                    });
+                    valorAplicar = window.erpFvFormatMoneyBr(Math.max(0, Math.round((baseSemTroca - outros) * 100) / 100));
                 } else {
                     let outros = 0;
-                    rows.forEach((_, i) => {
+                    rows.forEach((row, i) => {
                         if (i === index) return;
+                        if (window.erpFvRowIsTroca(row)) return;
                         outros += window.erpFvParseMoneyBr(document.getElementById('erp-fv-finalizar-valor-' + i)?.value);
                     });
                     valorAplicar = window.erpFvFormatMoneyBr(Math.max(0, Math.round((total - outros) * 100) / 100));
@@ -1540,10 +1633,18 @@
 
         const btns = () => Array.from(
             document.querySelectorAll('[data-erp-fv-imprimir-actions] [data-erp-fv-imprimir-btn]')
-        ).filter((el) => el instanceof HTMLButtonElement && !el.disabled);
+        ).filter((el) => {
+            // Há 2 "nao" no DOM (x-show); só o visível conta.
+            if (!(el instanceof HTMLButtonElement) || el.disabled) return false;
+            return el.offsetParent !== null || el.getClientRects().length > 0;
+        });
 
         const focusBtn = (btn) => {
             if (!(btn instanceof HTMLButtonElement) || btn.disabled) return;
+            document.querySelectorAll('[data-erp-fv-imprimir-actions] .is-erp-focus').forEach((el) => {
+                el.classList.remove('is-erp-focus');
+            });
+            btn.classList.add('is-erp-focus');
             try {
                 btn.focus({ preventScroll: true, focusVisible: true });
             } catch (e) {

@@ -16,6 +16,7 @@ class TabularReportRegistryTest extends TestCase
 
         $this->assertArrayHasKey('curva-abc', $map);
         $this->assertArrayHasKey('historico-vendas', $map);
+        $this->assertArrayHasKey('lucratividade-por-venda', $map);
         $this->assertArrayHasKey('visitas-realizadas-sem-venda', $map);
         $this->assertArrayHasKey('contas-receber', $map);
         $this->assertArrayHasKey('plano-contas', $map);
@@ -29,7 +30,7 @@ class TabularReportRegistryTest extends TestCase
         $this->assertArrayHasKey('faturamento-servicos', $map);
         $this->assertArrayHasKey('documentos-fiscais-por-os', $map);
         $this->assertArrayHasKey('os-por-forma-pagamento', $map);
-        $this->assertCount(51, $map);
+        $this->assertCount(52, $map);
         $this->assertTrue(ReportRegistry::has('conferencia-estoque'));
         $this->assertFalse(ReportRegistry::has('inexistente'));
     }

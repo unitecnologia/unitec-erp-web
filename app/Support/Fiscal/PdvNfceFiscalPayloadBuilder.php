@@ -197,7 +197,7 @@ final class PdvNfceFiscalPayloadBuilder
 
             $forma = trim((string) $pagamento->forma);
             $tipo = $this->mapTipoPagamento($forma);
-            $isCartao = in_array($tipo, ['03', '04'], true);
+            $isCartao = FormaPagamentoNfceTPagMap::isCartao($tipo);
             // SuperTEF continua integrado na cobrança (API/NSU/autorização), mas no XML fiscal
             // usa tpIntegra=2 como POS não integrado: sem CNPJ de adquirente (emulador não fornece).
             $isSuperTef = $isCartao && $this->isPagamentoCartaoSuperTef($forma, (string) ($pagamento->cartao_maquininha ?? ''));
@@ -649,7 +649,7 @@ final class PdvNfceFiscalPayloadBuilder
             }
             $forma = trim((string) $pagamento->forma);
             $tipo = $this->mapTipoPagamento($forma);
-            if (! in_array($tipo, ['03', '04'], true)) {
+            if (! FormaPagamentoNfceTPagMap::isCartao($tipo)) {
                 continue;
             }
             if ($this->isPagamentoCartaoSuperTef($forma, (string) ($pagamento->cartao_maquininha ?? ''))) {
@@ -721,35 +721,10 @@ final class PdvNfceFiscalPayloadBuilder
 
     private function mapTipoPagamento(string $forma): string
     {
-        $forma = mb_strtoupper(trim($forma), 'UTF-8');
+        $creditoCliente = ClienteCreditoMovimentacao::isFormaPdv($forma)
+            || $this->formaCadastradaComoCreditoCliente($forma);
 
-        if (
-            ClienteCreditoMovimentacao::isFormaPdv($forma)
-            || $this->formaCadastradaComoCreditoCliente($forma)
-        ) {
-            return '05';
-        }
-
-        return match (true) {
-            str_contains($forma, 'DINHEIRO') => '01',
-            str_contains($forma, 'CHEQUE') => '02',
-            // PIX antes de crédito/débito para não confundir descrições compostas.
-            // 20 = PIX estático (QR/chave fixa no PDV) — não exige grupo card.
-            str_contains($forma, 'PIX') => '20',
-            str_contains($forma, 'BOLETO') => '15',
-            str_contains($forma, 'DEPOSITO') || str_contains($forma, 'DEPÓSITO') => '16',
-            str_contains($forma, 'TRANSFERENCIA') || str_contains($forma, 'TRANSFERÊNCIA') => '18',
-            str_contains($forma, 'CREDIARIO')
-                || str_contains($forma, 'CREDIÁRIO')
-                || str_contains($forma, 'PRAZO')
-                || str_contains($forma, 'FIADO') => '05',
-            str_contains($forma, 'CREDITO') || str_contains($forma, 'CRÉDITO') => '03',
-            str_contains($forma, 'DEBITO') || str_contains($forma, 'DÉBITO') => '04',
-            // TEF sem detalhe de débito/crédito: trata como débito POS.
-            str_contains($forma, 'TEF') => '04',
-            // TROCA e demais → 99 (exige xPag no XML).
-            default => '99',
-        };
+        return FormaPagamentoNfceTPagMap::fromDescricao($forma, $creditoCliente);
     }
 
     private function formaCadastradaComoCreditoCliente(string $forma): bool

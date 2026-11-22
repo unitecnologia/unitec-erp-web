@@ -150,4 +150,55 @@ class NfseDpsBuilderTest extends TestCase
         $this->assertArrayNotHasKey('cCIB', $dps['servicos'][0]['obra']);
         $this->assertArrayNotHasKey('end', $dps['servicos'][0]['obra']);
     }
+
+    public function test_me_epp_envia_p_tot_trib_sn_sem_ind_tot_trib(): void
+    {
+        $empresa = new Empresa([
+            'cnpj' => '00.000.000/0001-91',
+            'razao_social' => 'PRESTADOR SN',
+            'regime_tributario' => 'simples',
+            'cidade_codigo' => '4203204',
+            'uf' => 'SC',
+        ]);
+        $empresa->id = 1;
+        $empresa->setAttribute('nfse_ambiente', 'producao');
+        $empresa->setAttribute('nfse_p_tot_trib_sn', '6.00');
+
+        $nota = new Nfse([
+            'status' => Nfse::STATUS_ABERTA,
+            'serie_dps' => '1',
+            'numero_dps' => 19,
+            'competencia' => '2026-11-01',
+            'data_emissao' => '2026-11-19',
+            'tomador_nome' => 'TOMADOR',
+            'valor_servicos' => '100.00',
+            'desconto' => '0.00',
+            'iss' => '0.00',
+            'total' => '100.00',
+            'trib_issqn' => '1',
+            'tp_ret_issqn' => '1',
+            'municipio_prestacao_codigo' => '4203204',
+        ]);
+        $nota->setRelation('empresa', $empresa);
+        $nota->setRelation('itens', collect([
+            new NfseItem([
+                'descricao' => 'SERVICO',
+                'quantidade' => '1.000',
+                'valor' => '100.00',
+                'total' => '100.00',
+                'c_trib_nac' => '010701',
+                'c_nbs' => '114011000',
+            ]),
+        ]));
+
+        $dps = app(NfseDpsBuilder::class)->montar($nota);
+
+        $this->assertSame('6.00', $dps['valores']['p_tot_trib_sn']);
+        $this->assertArrayNotHasKey('ind_tot_trib', $dps['valores']);
+
+        $xml = app(\App\Support\Erp\Nfse\NfseDpsXmlGerador::class)->gerar($dps);
+
+        $this->assertStringContainsString('<pTotTribSN>6.00</pTotTribSN>', $xml);
+        $this->assertStringNotContainsString('<indTotTrib>', $xml);
+    }
 }

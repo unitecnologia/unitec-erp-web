@@ -12,6 +12,7 @@ use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Vendas\EstornarVendaService;
 use App\Support\ContadorCloud\ContadorCloudSyncService;
 use App\Support\Fiscal\NfceNumeracao;
+use App\Support\Fiscal\NfceRecuperarConferenciaService;
 use App\Support\Fiscal\PdvNfceConsultaService;
 use App\Support\Fiscal\PdvNfceEmissionService;
 use App\Support\Fiscal\PdvNfceInutilizacaoService;
@@ -169,6 +170,9 @@ trait ManagesNfceFiscalActions
         $primeiraEtapaErro = null;
         $ultimoStatus = null;
         $ultimoMotivo = null;
+        $ultimoResumoConferencia = null;
+        $conferenciaExigeIntervencao = false;
+        $conferenciaService = app(NfceRecuperarConferenciaService::class);
 
         foreach ($ids as $id) {
             $nfce = $this->findNfceNoEscopo($id);
@@ -192,6 +196,16 @@ trait ManagesNfceFiscalActions
                         $empresa,
                         VendasParametro::forEmpresa((int) $empresa->id),
                     );
+                }
+
+                // Conferência produto + pagamento somente após status real da SEFAZ
+                // (e após resolver duplicidade → se ficou autorizada, nada é alterado).
+                $conferencia = $conferenciaService->conferirEAtualizar($nfce);
+                if ($conferencia->temAlteracoesOuAvisos() || $conferencia->executada || $conferencia->motivoPula !== '') {
+                    $ultimoResumoConferencia = $conferencia->resumoNotificacao();
+                }
+                if ($conferencia->exigeIntervencao()) {
+                    $conferenciaExigeIntervencao = true;
                 }
 
                 $ok++;
@@ -252,12 +266,23 @@ trait ManagesNfceFiscalActions
             if (filled($ultimoMotivo)) {
                 $body .= ' — '.$ultimoMotivo;
             }
+            if (filled($ultimoResumoConferencia)) {
+                $body .= "\n\n".$ultimoResumoConferencia;
+            }
 
-            Notification::make()
-                ->title('Consulta SEFAZ concluída.')
-                ->body($body)
-                ->success()
-                ->send();
+            $notification = Notification::make()
+                ->title($conferenciaExigeIntervencao
+                    ? 'Consulta SEFAZ concluída — há divergências que exigem intervenção.'
+                    : 'Consulta SEFAZ concluída.')
+                ->body($body);
+
+            if ($conferenciaExigeIntervencao) {
+                $notification->warning();
+            } else {
+                $notification->success();
+            }
+
+            $notification->send();
 
             return;
         }
@@ -265,13 +290,23 @@ trait ManagesNfceFiscalActions
         $notification = Notification::make()
             ->title($erros > 0
                 ? "{$ok} consultada(s), {$erros} com erro."
-                : "{$ok} NFC-e consultadas na SEFAZ.");
+                : ($conferenciaExigeIntervencao
+                    ? "{$ok} NFC-e consultadas — há divergências que exigem intervenção."
+                    : "{$ok} NFC-e consultadas na SEFAZ."));
 
-        if ($erros > 0) {
+        $bodyMulti = '';
+        if ($erros > 0 && filled($primeiraMensagemErro)) {
+            $bodyMulti = $primeiraMensagemErro;
+        }
+        if (filled($ultimoResumoConferencia)) {
+            $bodyMulti = trim($bodyMulti."\n\n".$ultimoResumoConferencia);
+        }
+        if ($bodyMulti !== '') {
+            $notification->body($bodyMulti);
+        }
+
+        if ($erros > 0 || $conferenciaExigeIntervencao) {
             $notification->warning();
-            if (filled($primeiraMensagemErro)) {
-                $notification->body($primeiraMensagemErro);
-            }
         } else {
             $notification->success();
         }

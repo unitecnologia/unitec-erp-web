@@ -15,13 +15,14 @@ use Illuminate\Support\Facades\Schema;
 trait AggregatesProductSales
 {
     /**
-     * @return Collection<int, object>
+     * Base comum: itens de vendas fechadas no período (com produto).
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\VendaItem>
      */
-    protected function productSalesAggregate(CarbonInterface $de, CarbonInterface $ate, ?Request $request = null): Collection
+    protected function productSalesBaseQuery(CarbonInterface $de, CarbonInterface $ate, ?Request $request = null)
     {
         $query = VendaItem::query()
             ->join('vendas', 'vendas.id', '=', 'venda_itens.venda_id')
-            ->leftJoin('products', 'products.id', '=', 'venda_itens.product_id')
             ->where('vendas.status', Venda::STATUS_FECHADO)
             ->whereBetween('vendas.data', [$de->toDateString(), $ate->toDateString()])
             ->whereNotNull('venda_itens.product_id');
@@ -29,6 +30,43 @@ trait AggregatesProductSales
         if ($request && Schema::hasColumn((new Venda)->getTable(), 'empresa_id')) {
             ReportEmpresaScope::applyToQuery($query, $request, 'vendas.empresa_id');
         }
+
+        return $query;
+    }
+
+    /**
+     * Quantidade de produtos distintos no ranking (leve — só COUNT).
+     */
+    protected function productSalesRankedTotal(CarbonInterface $de, CarbonInterface $ate, ?Request $request = null): int
+    {
+        return (int) $this->productSalesBaseQuery($de, $ate, $request)
+            ->distinct()
+            ->count('venda_itens.product_id');
+    }
+
+    /**
+     * Agrega vendas por produto.
+     *
+     * @param  'receita'|'qtd'  $orderMetric
+     * @return Collection<int, object>
+     */
+    protected function productSalesAggregate(
+        CarbonInterface $de,
+        CarbonInterface $ate,
+        ?Request $request = null,
+        string $orderMetric = 'receita',
+        string $orderDir = 'desc',
+        int $limit = 5000,
+    ): Collection {
+        $query = $this->productSalesBaseQuery($de, $ate, $request)
+            ->leftJoin('products', 'products.id', '=', 'venda_itens.product_id');
+
+        $vi = AbstractTabularReport::sqlTable('venda_itens');
+        $orderExpr = $orderMetric === 'qtd'
+            ? "SUM({$vi}.quantidade)"
+            : "SUM({$vi}.total)";
+        $dir = strtolower($orderDir) === 'asc' ? 'asc' : 'desc';
+        $fetchLimit = max(1, min($limit, 5000));
 
         return $query
             ->groupBy(
@@ -39,19 +77,19 @@ trait AggregatesProductSales
                 'products.preco_custo',
                 'products.preco_compra',
             )
-            ->orderByDesc(DB::raw('SUM(' . AbstractTabularReport::sqlTable('venda_itens') . '.total)'))
-            ->limit(5000)
+            ->orderByRaw("{$orderExpr} {$dir}")
+            ->limit($fetchLimit)
             ->get([
                 'venda_itens.product_id',
                 'products.codigo',
                 'products.descricao',
                 'products.grupo',
-                DB::raw('SUM(' . AbstractTabularReport::sqlTable('venda_itens') . '.quantidade) as qtd'),
-                DB::raw('SUM(' . AbstractTabularReport::sqlTable('venda_itens') . '.total) as receita'),
+                DB::raw("SUM({$vi}.quantidade) as qtd"),
+                DB::raw("SUM({$vi}.total) as receita"),
                 DB::raw(
-                    'SUM(' . AbstractTabularReport::sqlTable('venda_itens') . '.quantidade * COALESCE('
-                    . AbstractTabularReport::sqlTable('products') . '.preco_custo, '
-                    . AbstractTabularReport::sqlTable('products') . '.preco_compra, 0)) as custo'
+                    "SUM({$vi}.quantidade * COALESCE("
+                    .AbstractTabularReport::sqlTable('products').'.preco_custo, '
+                    .AbstractTabularReport::sqlTable('products').'.preco_compra, 0)) as custo'
                 ),
             ]);
     }

@@ -88,7 +88,7 @@ function bindRowSelection(page, config) {
 
     // Destaque visual no cliente (highlightRecord usa skipRender e não remonta a grade).
     // Não competir com wire:click do olho/botões (capture dispara highlightRecord em paralelo).
-    // Monitor e telas com rowSelection:false só selecionam pela flag/checkbox.
+    // Monitor: 1 clique = azul claro + detalhe; duplo = toggle checkbox (azul forte).
     if (config.rowSelection !== false) {
         page.addEventListener('click', (event) => {
             if (isErpListInteractiveTarget(event.target)) {
@@ -104,6 +104,68 @@ function bindRowSelection(page, config) {
             selectErpListRow(page, row);
             syncHighlightToLivewire(page, row);
         }, true);
+    } else if (config.monitorRowClicks) {
+        page.addEventListener('click', (event) => {
+            if (isErpListInteractiveTarget(event.target)) {
+                return;
+            }
+
+            const row = event.target.closest('.fi-ta-row');
+
+            if (! isDataRow(page, row)) {
+                return;
+            }
+
+            focusMonitorRow(page, row);
+            syncHighlightToLivewire(page, row);
+        }, true);
+
+        // Checkbox: wire:click usa skipRender — atualiza classes no cliente (antes era Alpine/linha).
+        page.addEventListener('click', (event) => {
+            const check = event.target;
+            if (! (check instanceof HTMLInputElement) || ! check.classList.contains('erp-fv-mon__check')) {
+                return;
+            }
+
+            const row = check.closest('.fi-ta-row');
+            if (! row) {
+                return;
+            }
+
+            // checked já refletiu o clique nativo antes deste bubble/capture.
+            queueMicrotask(() => {
+                row.classList.toggle('erp-row-selected', check.checked);
+                row.classList.add('erp-row-focus');
+                page.querySelectorAll('.fi-ta-row.erp-row-focus').forEach((r) => {
+                    if (r !== row) {
+                        r.classList.remove('erp-row-focus');
+                    }
+                });
+            });
+        }, true);
+
+        page.addEventListener('dblclick', (event) => {
+            if (isErpListInteractiveTarget(event.target)) {
+                return;
+            }
+
+            const row = event.target.closest('.fi-ta-row');
+
+            if (! isDataRow(page, row)) {
+                return;
+            }
+
+            focusMonitorRow(page, row);
+
+            const check = row.querySelector('input.erp-fv-mon__check');
+
+            if (check instanceof HTMLInputElement) {
+                // Reusa o wire:click do checkbox (alternarSelecionado + skipRender).
+                check.click();
+            }
+        });
+
+        return;
     }
 
     page.addEventListener('dblclick', (event) => {
@@ -287,6 +349,17 @@ function selectErpListRow(page, row) {
             classes.length > 0 && classes.some((cls) => row.classList.contains(cls)),
         );
     });
+}
+
+/** Monitor: azul claro na linha focada; não remove erp-row-selected das marcadas. */
+function focusMonitorRow(page, row) {
+    page.querySelectorAll('.fi-ta-row.erp-row-focus').forEach((focused) => {
+        if (focused !== row) {
+            focused.classList.remove('erp-row-focus');
+        }
+    });
+
+    row.classList.add('erp-row-focus');
 }
 
 function getRecordKeyFromRow(row) {

@@ -114,17 +114,24 @@
                                                 </thead>
                                                 <tbody>
                                                     @forelse ($this->viewModalItens as $item)
-                                                        <tr class="erp-orc-itens__row">
-                                                            <td class="erp-orc-itens__col-item">{{ $item['numero'] ?? '' }}</td>
-                                                            <td>{{ $item['codigo'] }}</td>
-                                                            <td>{{ $item['descricao'] }}</td>
-                                                            <td class="erp-orc-itens__cell-input--num">{{ $item['quantidade'] }}</td>
-                                                            <td>{{ $item['unidade'] }}</td>
-                                                            <td class="erp-orc-itens__cell-input--num">{{ $item['preco'] }}</td>
-                                                            <td class="erp-orc-itens__cell-input--num">{{ $item['desconto'] ?? '0,00' }}</td>
-                                                            <td class="erp-orc-itens__cell-input--num">{{ $item['total'] }}</td>
-                                                            <td>{{ $item['grade'] ?: '—' }}</td>
-                                                        </tr>
+                                                        @if (! empty($item['is_separador']))
+                                                            <tr class="erp-orc-itens__row erp-orc-itens__row-separador">
+                                                                <td class="erp-orc-itens__col-item">{{ $item['numero'] ?? '' }}</td>
+                                                                <td colspan="8"><strong>{{ $item['descricao'] }}</strong></td>
+                                                            </tr>
+                                                        @else
+                                                            <tr class="erp-orc-itens__row">
+                                                                <td class="erp-orc-itens__col-item">{{ $item['numero'] ?? '' }}</td>
+                                                                <td>{{ $item['codigo'] }}</td>
+                                                                <td>{{ $item['descricao'] }}</td>
+                                                                <td class="erp-orc-itens__cell-input--num">{{ $item['quantidade'] }}</td>
+                                                                <td>{{ $item['unidade'] }}</td>
+                                                                <td class="erp-orc-itens__cell-input--num">{{ $item['preco'] }}</td>
+                                                                <td class="erp-orc-itens__cell-input--num">{{ $item['desconto'] ?? '0,00' }}</td>
+                                                                <td class="erp-orc-itens__cell-input--num">{{ $item['total'] }}</td>
+                                                                <td>{{ $item['grade'] ?: '—' }}</td>
+                                                            </tr>
+                                                        @endif
                                                     @empty
                                                         <tr>
                                                             <td colspan="9" class="erp-orc-itens__empty">Nenhum item informado.</td>

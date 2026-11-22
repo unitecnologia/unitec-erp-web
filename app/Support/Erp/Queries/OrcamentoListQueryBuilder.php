@@ -52,6 +52,7 @@ class OrcamentoListQueryBuilder
             "{$table}.cliente_nome",
             "{$table}.cliente_cidade",
             "{$table}.cliente_uf",
+            "{$table}.cliente_fone",
             "{$table}.vendedor_id",
             "{$table}.plataforma",
             "{$table}.total",
@@ -60,7 +61,7 @@ class OrcamentoListQueryBuilder
         ]);
 
         $query->with(array_values(array_filter([
-            'cliente:id,nome_razao,cidade_nome,uf',
+            'cliente:id,nome_razao,cidade_nome,uf,fone1,fone2',
             'vendedor:id,nome',
             'forcaVendasOrder:id,orcamento_id',
             $this->vendasInternasOrderRelation('id,orcamento_id'),

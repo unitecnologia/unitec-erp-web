@@ -445,11 +445,21 @@ trait ManagesForcaVendasMonitorEmailModal
 
     protected function resolvePedidoEnvioId(): ?int
     {
-        if ($this->highlightedRecordId) {
-            return (int) $this->highlightedRecordId;
+        // Só checkbox marcada — destaque azul não conta como seleção de ação.
+        if (count($this->selecionados) !== 1) {
+            Notification::make()
+                ->title(
+                    count($this->selecionados) > 1
+                        ? 'Envie apenas um pedido por vez. Desmarque a seleção em lote.'
+                        : 'Selecione um pedido na lista para enviar.'
+                )
+                ->warning()
+                ->send();
+
+            return null;
         }
 
-        $selecionado = (int) ($this->selecionados[count($this->selecionados) - 1] ?? 0);
+        $selecionado = (int) ($this->selecionados[0] ?? 0);
 
         if ($selecionado > 0) {
             return $selecionado;

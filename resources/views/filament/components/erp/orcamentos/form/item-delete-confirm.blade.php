@@ -1,11 +1,12 @@
 @if ($this->itemDeleteConfirmIndex !== null)
     @php
         $item = $this->itens[$this->itemDeleteConfirmIndex] ?? null;
+        $isSeparador = ! empty($item['is_separador']);
         $codigo = trim((string) ($item['product_codigo'] ?? ''));
         $descricao = trim((string) ($item['descricao'] ?? ''));
-        $qtde = trim((string) ($item['quantidade'] ?? ''));
-        $unidade = trim((string) ($item['unidade'] ?? ''));
-        $total = trim((string) ($item['total'] ?? ''));
+        $qtde = $isSeparador ? '' : trim((string) ($item['quantidade'] ?? ''));
+        $unidade = $isSeparador ? '' : trim((string) ($item['unidade'] ?? ''));
+        $total = $isSeparador ? '' : trim((string) ($item['total'] ?? ''));
     @endphp
     @teleport('body')
         <div
@@ -33,11 +34,13 @@
                 <div class="erp-orc-item-delete-modal__icon" aria-hidden="true">!</div>
 
                 <h2 id="erp-orc-item-delete-title" class="erp-orc-item-delete-modal__title">
-                    Excluir este item?
+                    {{ $isSeparador ? 'Excluir este separador?' : 'Excluir este item?' }}
                 </h2>
 
                 <p id="erp-orc-item-delete-desc" class="erp-orc-item-delete-modal__lead">
-                    Ele será retirado da lista deste orçamento.
+                    {{ $isSeparador
+                        ? 'O título de grupo será retirado da lista deste orçamento.'
+                        : 'Ele será retirado da lista deste orçamento.' }}
                 </p>
 
                 @if ($item)

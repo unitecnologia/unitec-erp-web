@@ -36,7 +36,7 @@ final class NfeEmissionService
             $nfe->refresh();
 
             if (VendaFiscalLock::vendaTemNfceValida($vendaId)) {
-                throw new FiscalEngineException('A venda vinculada já possui NFC-e autorizada/contingência. Cancele a NFC-e antes de emitir NF-e.');
+                throw new FiscalEngineException(VendaFiscalLock::MENSAGEM_NFCE_BLOQUEIA_NFE);
             }
 
             return $this->transmitirSemTrava($nfe, $empresa, $onProgress);

@@ -730,6 +730,19 @@ class ForcaVendasTelaVendaService
             ));
         }
 
+        // TROCA rateada nos itens (Tela de Venda): meta para comissão respeitar nao_pagar_comissao.
+        if (isset($data['troca_desconto']) && is_array($data['troca_desconto'])) {
+            $tv = round((float) ($data['troca_desconto']['valor'] ?? 0), 2);
+            if ($tv > 0.009) {
+                $payload['troca_desconto'] = [
+                    'valor' => $tv,
+                    'forma_pagamento_id' => (int) ($data['troca_desconto']['forma_pagamento_id'] ?? 0),
+                    'descricao' => (string) ($data['troca_desconto']['descricao'] ?? 'TROCA'),
+                    'nao_pagar_comissao' => (bool) ($data['troca_desconto']['nao_pagar_comissao'] ?? false),
+                ];
+            }
+        }
+
         return $payload;
     }
 

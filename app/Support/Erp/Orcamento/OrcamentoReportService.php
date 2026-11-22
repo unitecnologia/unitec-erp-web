@@ -43,6 +43,10 @@ class OrcamentoReportService
         $qtdTotal = 0.0;
 
         foreach ($orcamento->itens as $item) {
+            if ($item->isSeparador()) {
+                continue;
+            }
+
             $qtdTotal += (float) $item->quantidade;
             $bruto += round((float) $item->quantidade * (float) $item->preco_unitario, 2);
         }

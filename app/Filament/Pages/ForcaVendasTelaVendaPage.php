@@ -367,7 +367,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         if ($this->pedidoId) {
             $this->carregarPedidoExistente((int) $this->pedidoId);
-            $this->dispatch('fv-tela-venda-focus-barcode');
+            // Foco inicial: x-init da TV (evita corrida do dispatch no mount).
 
             return;
         }
@@ -376,8 +376,7 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        // Nova venda: CONSUMIDOR FINAL já selecionado; Enter na razão → código do produto.
-        $this->dispatch('fv-tela-venda-focus-cliente');
+        // Foco inicial no código/barras/nome: só x-init (dispatch no mount perde a corrida).
     }
 
     public function getHeading(): string|Htmlable|null
@@ -507,7 +506,7 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         Notification::make()->title('Nova venda iniciada.')->success()->send();
-        $this->dispatch('fv-tela-venda-focus-cliente');
+        $this->dispatch('fv-tela-venda-focus-barcode');
     }
 
     /**
@@ -1496,6 +1495,10 @@ class ForcaVendasTelaVendaPage extends Page
 
         $this->formaSelecionadaId = (int) ($this->meiosPagamento[$index]['id'] ?? 0);
         $this->selectedPagamentoIndex = $index;
+
+        if ($this->meioEhTroca($this->meiosPagamento[$index] ?? [])) {
+            $this->sincronizarObservacaoTroca();
+        }
     }
 
     public function adicionarItem(?string $qtdRaw = null, ?string $precoRaw = null): void
@@ -2350,6 +2353,8 @@ class ForcaVendasTelaVendaPage extends Page
             $this->formaSelecionadaId = (int) ($this->meiosPagamento[$selectedIndex]['id'] ?? 0);
         }
 
+        $this->sincronizarObservacaoTroca();
+
         if ($skipRender) {
             $this->skipRender();
         }
@@ -2454,6 +2459,9 @@ class ForcaVendasTelaVendaPage extends Page
         if (! $this->flushCpfNotaEObservacoes($cpfNota, $observacoes, true, skipRender: false)) {
             return;
         }
+
+        // Reaplica marcador TROCA após o flush do DOM (evita perder/duplicar a linha).
+        $this->sincronizarObservacaoTroca();
 
         // Sucesso com permanecer/impressão: skipRender + patch DOM (ver finalizarUiAposConcluirSemRemorph).
         // Redirect ao Monitor já chama skipRender via HandlesRedirects.
@@ -2724,7 +2732,9 @@ class ForcaVendasTelaVendaPage extends Page
                 $this->operacaoUuid = (string) Str::uuid();
             }
 
-            $order = $this->gravarPedidoComIdempotencia($svc, $user, [
+            $this->sincronizarObservacaoTroca();
+
+            $dadosPendente = [
                 'uuid' => $this->operacaoUuid,
                 'empresa_id' => (int) $this->vendaEmpresaId,
                 'orcamento_id' => $this->orcamentoOrigemId,
@@ -2742,7 +2752,13 @@ class ForcaVendasTelaVendaPage extends Page
                 'cartao_canhoto' => null,
                 'transporte' => $this->fvTransportePayload(),
                 'itens' => $this->itensParaGravar(),
-            ], $existente);
+            ];
+            $trocaDescontoPendente = $this->metaTrocaDescontoParaPayload();
+            if ($trocaDescontoPendente !== null) {
+                $dadosPendente['troca_desconto'] = $trocaDescontoPendente;
+            }
+
+            $order = $this->gravarPedidoComIdempotencia($svc, $user, $dadosPendente, $existente);
 
             if (! $existente) {
                 $this->pedidoId = (int) $order->id;
@@ -2850,9 +2866,13 @@ class ForcaVendasTelaVendaPage extends Page
             }
         }
 
+        // TROCA = desconto identificado (obs + rateio); não entra como recebimento.
+        $this->sincronizarObservacaoTroca();
+
         // Restante automático só por atalho — F10 não preenche sozinho.
         $totalInformado = $this->totalInformado();
         $totalLiquido = $this->totalLiquido();
+        $valorTroca = $this->valorTrocaPagamento();
 
         if ($totalInformado + 0.009 < $totalLiquido) {
             $this->gravando = false;
@@ -2867,14 +2887,17 @@ class ForcaVendasTelaVendaPage extends Page
 
         $pagamentosPositivos = $this->pagamentosPositivosParaFaturar();
 
-        if ($pagamentosPositivos === []) {
+        // 100% TROCA: total a pagar zera — sem meios financeiros.
+        if ($pagamentosPositivos === [] && ! ($valorTroca > 0.009 && $totalLiquido <= 0.009)) {
             $this->gravando = false;
             Notification::make()->title('Selecione um meio de pagamento.')->warning()->send();
 
             return;
         }
 
-        if ($msgTroco = $this->validarExcessoPagamentoNaoMonetario($totalInformado, $totalLiquido, $pagamentosPositivos)) {
+        if ($pagamentosPositivos !== []
+            && ($msgTroco = $this->validarExcessoPagamentoNaoMonetario($totalInformado, $totalLiquido, $pagamentosPositivos))
+        ) {
             $this->gravando = false;
             Notification::make()
                 ->title('Pagamento inválido.')
@@ -2885,7 +2908,13 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $formaPrincipal = $pagamentosPositivos[0];
+        $formaPrincipal = $pagamentosPositivos[0] ?? $this->meioTrocaPrincipalParaCabecalho();
+        if ($formaPrincipal === null) {
+            $this->gravando = false;
+            Notification::make()->title('Selecione um meio de pagamento.')->warning()->send();
+
+            return;
+        }
 
         if ($faturar) {
             try {
@@ -3007,7 +3036,9 @@ class ForcaVendasTelaVendaPage extends Page
                 $this->operacaoUuid = (string) Str::uuid();
             }
 
-            $rotuloFormaCabecalho = $this->rotuloFormaPagamentoCabecalho($pagamentosPositivos);
+            $rotuloFormaCabecalho = $pagamentosPositivos === []
+                ? mb_strtoupper(trim((string) ($formaPrincipal['descricao'] ?? 'TROCA')), 'UTF-8')
+                : $this->rotuloFormaPagamentoCabecalho($pagamentosPositivos);
 
             $dadosGravar = [
                 'uuid' => $this->operacaoUuid,
@@ -3031,6 +3062,11 @@ class ForcaVendasTelaVendaPage extends Page
                 'transporte' => $this->fvTransportePayload(),
                 'itens' => $this->itensParaGravar(),
             ];
+
+            $trocaDesconto = $this->metaTrocaDescontoParaPayload();
+            if ($trocaDesconto !== null) {
+                $dadosGravar['troca_desconto'] = $trocaDesconto;
+            }
 
             // Só força null na condição quando à vista (parcelado preserva Prazo Avulso do app).
             if ($aVista) {
@@ -3347,7 +3383,16 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function focarCodigoProdutoNovaVenda(): void
     {
-        $this->js('window.__erpFvTvInitialFocusDone = true;');
+        // Direto no DOM (após skipRender do modal de impressão o dispatch sozinho às vezes perde).
+        $this->js(<<<'JS'
+            queueMicrotask(() => {
+                const el = document.getElementById('fv-tv-barcode');
+                if (!el) return;
+                el.removeAttribute('readonly');
+                try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+                el.select?.();
+            });
+        JS);
         $this->dispatch('fv-tela-venda-focus-barcode');
     }
 
@@ -3601,11 +3646,11 @@ class ForcaVendasTelaVendaPage extends Page
     #[Computed]
     public function exibirCustoProdutoGrade(): bool
     {
-        return (bool) (ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_custo_produto ?? false);
+        return $this->empresaExibirMaisOpcoesNaTelaVenda() && $this->tvExibirCustoProdutos;
     }
 
     /**
-     * Custos unitários em lote para a grade (só quando o parâmetro está ligado).
+     * Custos unitários em lote para a grade (só quando o usuário pediu exibir via Mais opções).
      *
      * @return array<int, float>
      */
@@ -3629,11 +3674,15 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function totalLiquido(): float
     {
-        $brutoItens = round(array_sum(array_map(fn (array $i): float => (float) $i['total'], $this->itens)), 2);
-        $acr = $this->acrescimoPedidoEfetivo();
-        $desc = $this->descontoPedidoEfetivo();
+        return round(max(0, $this->totalBaseSemTroca() - $this->valorTrocaPagamento()), 2);
+    }
 
-        return round($brutoItens + $acr - $desc, 2);
+    /** Subtotal a pagar antes da TROCA (itens + acréscimo − desconto F4). */
+    private function totalBaseSemTroca(): float
+    {
+        $brutoItens = round(array_sum(array_map(fn (array $i): float => (float) $i['total'], $this->itens)), 2);
+
+        return round(max(0, $brutoItens + $this->acrescimoPedidoEfetivo() - $this->descontoPedidoEfetivo()), 2);
     }
 
     /**
@@ -3653,8 +3702,15 @@ class ForcaVendasTelaVendaPage extends Page
 
     public function totalInformado(): float
     {
+        // TROCA não é recebimento — só meios financeiros cobrem o líquido.
         return round(array_sum(array_map(
-            fn (array $m): float => ErpMoney::parseBr($m['valor'] ?? '0'),
+            function (array $m): float {
+                if ($this->meioEhTroca($m)) {
+                    return 0.0;
+                }
+
+                return ErpMoney::parseBr($m['valor'] ?? '0');
+            },
             $this->meiosPagamento
         )), 2);
     }
@@ -3679,6 +3735,10 @@ class ForcaVendasTelaVendaPage extends Page
         $out = [];
 
         foreach ($this->meiosPagamento as $meio) {
+            if ($this->meioEhTroca($meio)) {
+                continue;
+            }
+
             $valor = ErpMoney::parseBr($meio['valor'] ?? '0');
             if ($valor <= 0.009) {
                 continue;
@@ -3700,6 +3760,38 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         return $out;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function meioTrocaPrincipalParaCabecalho(): ?array
+    {
+        foreach ($this->meiosPagamento as $meio) {
+            if (! $this->meioEhTroca($meio)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($meio['valor'] ?? '0') <= 0.009) {
+                continue;
+            }
+
+            return [
+                'id' => (int) ($meio['id'] ?? 0),
+                'forma_pagamento_id' => (int) ($meio['id'] ?? 0),
+                'descricao' => (string) ($meio['descricao'] ?? 'TROCA'),
+                'forma_pagamento' => (string) ($meio['descricao'] ?? 'TROCA'),
+                'forma' => (string) ($meio['descricao'] ?? 'TROCA'),
+                'valor' => 0.0,
+                'valor_br' => '0,00',
+                'tipo' => (string) ($meio['tipo'] ?? 'troca'),
+                'tipo_movimento' => (string) ($meio['tipo_movimento'] ?? 'troca'),
+                'aparece_contas_receber' => false,
+                'atalho' => (string) ($meio['atalho'] ?? ''),
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -5159,15 +5251,9 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function carregarEstoqueDoVendedor(Vendedor $vendedor): void
     {
-        $estoque = $vendedor->estoque_id ? Estoque::query()->find($vendedor->estoque_id) : null;
-
-        if ($estoque) {
-            $this->estoqueId = (int) $estoque->id;
-            $this->estoqueLabel = $estoque->label();
-        } else {
-            $this->estoqueId = null;
-            $this->estoqueLabel = '';
-        }
+        $resolvido = \App\Support\Erp\VendedorEstoque::fromVendedor($vendedor);
+        $this->estoqueId = $resolvido['id'];
+        $this->estoqueLabel = $resolvido['label'];
     }
 
     private function estoqueOperacionalDefinido(): bool
@@ -5463,6 +5549,7 @@ class ForcaVendasTelaVendaPage extends Page
                 'modo_prazo' => FormaPagamento::normalizeModoPrazo($f->modo_prazo ?? null),
                 'usa_pos' => (bool) ($f->usa_pos ?? false),
                 'considerar_a_vista' => (bool) ($f->considerar_a_vista ?? false),
+                'nao_pagar_comissao' => (bool) ($f->nao_pagar_comissao ?? false),
             ];
         })->all();
     }
@@ -5549,6 +5636,7 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        $alvoTroca = $this->meioEhTroca($this->meiosPagamento[$index]);
         $outros = 0.0;
 
         foreach ($this->meiosPagamento as $i => $meio) {
@@ -5556,11 +5644,22 @@ class ForcaVendasTelaVendaPage extends Page
                 continue;
             }
 
+            // TROCA não cobre o restante das outras formas (é desconto).
+            if (! $alvoTroca && $this->meioEhTroca($meio)) {
+                continue;
+            }
+
+            if ($alvoTroca && $this->meioEhTroca($meio)) {
+                continue;
+            }
+
             $outros += ErpMoney::parseBr($meio['valor'] ?? '0');
         }
 
-        $restante = max(0, round($this->totalLiquido() - $outros, 2));
+        $base = $alvoTroca ? $this->totalBaseSemTroca() : $this->totalLiquido();
+        $restante = max(0, round($base - $outros, 2));
         $this->meiosPagamento[$index]['valor'] = ErpMoney::formatBr($restante);
+        $this->sincronizarObservacaoTroca();
 
         if (PdvFinalizarPagamentosHelper::isFormaAPrazoPagamento($this->meiosPagamento[$index] ?? [])) {
             $pagamentos = array_map(static fn (array $m): array => [
@@ -6279,7 +6378,9 @@ class ForcaVendasTelaVendaPage extends Page
     {
         $base = round(array_sum(array_map(fn (array $i): float => (float) $i['total'], $this->itens)), 2);
 
-        $descontoRateio = $this->ratearValorNosItens(min($this->descontoPedidoEfetivo(), max(0, $base)), $base);
+        // Desconto F4 + TROCA (desconto identificado) no mesmo rateio — sem cabeçalho duplicado.
+        $descontoCabecalho = round($this->descontoPedidoEfetivo() + $this->valorTrocaPagamento(), 2);
+        $descontoRateio = $this->ratearValorNosItens(min($descontoCabecalho, max(0, $base)), $base);
         $acrescimoRateio = $this->ratearValorNosItens($this->acrescimoPedidoEfetivo(), $base);
 
         $itens = [];
@@ -6343,6 +6444,111 @@ class ForcaVendasTelaVendaPage extends Page
         }
 
         return 0.0;
+    }
+
+    /**
+     * Soma dos valores informados em meios TROCA (tetado ao total base sem troca).
+     */
+    private function valorTrocaPagamento(): float
+    {
+        $soma = 0.0;
+
+        foreach ($this->meiosPagamento as $meio) {
+            if (! $this->meioEhTroca($meio)) {
+                continue;
+            }
+
+            $soma += ErpMoney::parseBr($meio['valor'] ?? '0');
+        }
+
+        $soma = round($soma, 2);
+
+        if ($soma <= 0) {
+            return 0.0;
+        }
+
+        return round(min($soma, $this->totalBaseSemTroca()), 2);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meio
+     */
+    private function meioEhTroca(array $meio): bool
+    {
+        $movimento = mb_strtolower(trim((string) ($meio['tipo_movimento'] ?? '')), 'UTF-8');
+        if ($movimento === 'troca') {
+            return true;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($meio['tipo'] ?? '')), 'UTF-8');
+
+        return $tipo === 'troca';
+    }
+
+    /**
+     * Mantém uma linha "TROCA: R$ XX,XX" nas observações (cria/atualiza/remove).
+     */
+    private function sincronizarObservacaoTroca(): void
+    {
+        $linhas = preg_split("/\r\n|\n|\r/", (string) $this->observacoes) ?: [];
+        $filtradas = [];
+
+        foreach ($linhas as $linha) {
+            $trim = trim((string) $linha);
+            if ($trim === '') {
+                continue;
+            }
+
+            if (preg_match('/^TROCA:\s*R\$/iu', $trim) === 1) {
+                continue;
+            }
+
+            $filtradas[] = $trim;
+        }
+
+        $valor = $this->valorTrocaPagamento();
+        if ($valor > 0.009) {
+            $filtradas[] = 'TROCA: R$ '.$this->formatMoney($valor);
+        }
+
+        $this->observacoes = $this->observacaoPedidoCaixaAlta(implode("\n", $filtradas));
+    }
+
+    /**
+     * Meta para comissão: valor rateado + flag `nao_pagar_comissao` da forma TROCA.
+     *
+     * @return array{valor: float, forma_pagamento_id: int, descricao: string, nao_pagar_comissao: bool}|null
+     */
+    private function metaTrocaDescontoParaPayload(): ?array
+    {
+        $valor = $this->valorTrocaPagamento();
+        if ($valor <= 0.009) {
+            return null;
+        }
+
+        foreach ($this->meiosPagamento as $meio) {
+            if (! $this->meioEhTroca($meio)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($meio['valor'] ?? '0') <= 0.009) {
+                continue;
+            }
+
+            return [
+                'valor' => $valor,
+                'forma_pagamento_id' => (int) ($meio['id'] ?? 0),
+                'descricao' => (string) ($meio['descricao'] ?? 'TROCA'),
+                'nao_pagar_comissao' => (bool) ($meio['nao_pagar_comissao'] ?? false),
+            ];
+        }
+
+        return [
+            'valor' => $valor,
+            'forma_pagamento_id' => 0,
+            'descricao' => 'TROCA',
+            'nao_pagar_comissao' => false,
+        ];
     }
 
     private function acrescimoPedidoEfetivo(): float

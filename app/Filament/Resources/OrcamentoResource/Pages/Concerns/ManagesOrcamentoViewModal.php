@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrcamentoResource\Pages\Concerns;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Orcamento\OrcamentoItemDisplayNumbers;
 use App\Support\Erp\Orcamento\OrcamentoReportService;
 use Filament\Notifications\Notification;
 
@@ -61,14 +62,35 @@ trait ManagesOrcamentoViewModal
 
         $report = app(OrcamentoReportService::class);
 
-        $this->viewModalItens = $orcamento->itens
+        $itensOrdenados = $orcamento->itens
             ->sortByDesc('item')
-            ->values()
-            ->map(function (OrcamentoItem $item) use ($report): array {
+            ->values();
+
+        $displayNums = OrcamentoItemDisplayNumbers::fromFlags(
+            $itensOrdenados->map(fn (OrcamentoItem $item): bool => $item->isSeparador())->all()
+        );
+
+        $this->viewModalItens = $itensOrdenados
+            ->map(function (OrcamentoItem $item, int $index) use ($report, $displayNums): array {
+                if ($item->isSeparador()) {
+                    return [
+                        'numero' => '',
+                        'codigo' => '—',
+                        'descricao' => mb_strtoupper((string) ($item->descricao ?? ''), 'UTF-8'),
+                        'quantidade' => '—',
+                        'unidade' => '—',
+                        'preco' => '—',
+                        'desconto' => '—',
+                        'total' => '—',
+                        'grade' => '—',
+                        'is_separador' => true,
+                    ];
+                }
+
                 $linha = $report->linhaImpressao($item);
 
                 return [
-                    'numero' => (int) $item->item,
+                    'numero' => $displayNums[$index] ?? '',
                     'codigo' => $this->formatOrcamentoItemCodigo($item->product?->codigo),
                     'descricao' => mb_strtoupper((string) ($item->descricao ?? $item->product?->descricao ?? ''), 'UTF-8'),
                     'quantidade' => ErpMoney::formatBr((float) $item->quantidade, 3),
@@ -77,6 +99,7 @@ trait ManagesOrcamentoViewModal
                     'desconto' => ErpMoney::formatBr($linha['desconto']),
                     'total' => ErpMoney::formatBr($linha['subtotal']),
                     'grade' => mb_strtoupper((string) ($item->grade?->descricao ?? ''), 'UTF-8') ?: '—',
+                    'is_separador' => false,
                 ];
             })
             ->all();

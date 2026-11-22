@@ -164,11 +164,11 @@ final class NfceXmlBuilder
 
         $ender = $emit->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'enderEmit');
         $emit->appendChild($ender);
-        XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeText($emitente->logradouro, 60));
-        XmlHelper::append($ender, 'nro', XmlHelper::sanitizeText($emitente->numero, 60));
-        XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeText($emitente->bairro, 60));
+        XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeTString($emitente->logradouro, 60));
+        XmlHelper::append($ender, 'nro', XmlHelper::sanitizeTString($emitente->numero, 60));
+        XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeTString($emitente->bairro, 60));
         XmlHelper::append($ender, 'cMun', $emitente->codigoMunicipio);
-        XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeText($emitente->municipio, 60));
+        XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeTString($emitente->municipio, 60));
         XmlHelper::append($ender, 'UF', strtoupper($emitente->uf));
         XmlHelper::append($ender, 'CEP', str_pad(NumberFormatter::onlyDigits($emitente->cep), 8, '0', STR_PAD_LEFT));
         XmlHelper::append($ender, 'cPais', '1058');
@@ -208,17 +208,17 @@ final class NfceXmlBuilder
         $nome = $request->homologacao
             ? self::HOMOLOGACAO_DEST
             : ($destinatario->nome ?: 'CONSUMIDOR');
-        XmlHelper::append($dest, 'xNome', XmlHelper::sanitizeText($nome, 60));
+        XmlHelper::append($dest, 'xNome', XmlHelper::sanitizeTString($nome, 60));
 
         if ($destinatario->hasEndereco()) {
             $ender = $dest->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'enderDest');
             $dest->appendChild($ender);
 
-            XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeText((string) $destinatario->logradouro, 60));
-            XmlHelper::append($ender, 'nro', XmlHelper::sanitizeText((string) ($destinatario->numero ?: 'S/N'), 60));
-            XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeText((string) $destinatario->bairro, 60));
+            XmlHelper::append($ender, 'xLgr', XmlHelper::sanitizeTString((string) $destinatario->logradouro, 60));
+            XmlHelper::append($ender, 'nro', XmlHelper::sanitizeTString((string) ($destinatario->numero ?: 'S/N'), 60));
+            XmlHelper::append($ender, 'xBairro', XmlHelper::sanitizeTString((string) $destinatario->bairro, 60));
             XmlHelper::append($ender, 'cMun', NumberFormatter::onlyDigits((string) $destinatario->codigoMunicipio));
-            XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeText((string) $destinatario->municipio, 60));
+            XmlHelper::append($ender, 'xMun', XmlHelper::sanitizeTString((string) $destinatario->municipio, 60));
             XmlHelper::append($ender, 'UF', strtoupper(trim((string) $destinatario->uf)));
             XmlHelper::append(
                 $ender,
@@ -252,7 +252,7 @@ final class NfceXmlBuilder
         $descricao = $forcarHomologacao ? self::HOMOLOGACAO_ITEM : $item->descricao;
         XmlHelper::append($prod, 'cProd', XmlHelper::sanitizeText($item->codigo, 60));
         XmlHelper::append($prod, 'cEAN', 'SEM GTIN');
-        XmlHelper::append($prod, 'xProd', XmlHelper::sanitizeText($descricao, 120));
+        XmlHelper::append($prod, 'xProd', XmlHelper::sanitizeTString($descricao, 120));
         XmlHelper::append($prod, 'NCM', str_pad(NumberFormatter::onlyDigits($item->ncm), 8, '0', STR_PAD_LEFT));
         $cestRaw = trim((string) ($item->cest ?? ''));
         if ($cestRaw !== '') {
@@ -403,7 +403,7 @@ final class NfceXmlBuilder
 
         $infAdic = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'infAdic');
         $infNFe->appendChild($infAdic);
-        XmlHelper::append($infAdic, 'infCpl', XmlHelper::sanitizeText($texto, 5000));
+        XmlHelper::append($infAdic, 'infCpl', XmlHelper::sanitizeTString($texto, 5000));
     }
 
     private function appendRespTecnico(DOMElement $infNFe, ?RespTecnicoDto $respTecnico): void
@@ -416,7 +416,7 @@ final class NfceXmlBuilder
         $infNFe->appendChild($infRespTec);
 
         XmlHelper::append($infRespTec, 'CNPJ', NumberFormatter::onlyDigits($respTecnico->cnpj));
-        XmlHelper::append($infRespTec, 'xContato', XmlHelper::sanitizeText($respTecnico->contato, 60));
+        XmlHelper::append($infRespTec, 'xContato', XmlHelper::sanitizeTString($respTecnico->contato, 60));
         XmlHelper::append($infRespTec, 'email', mb_substr(trim($respTecnico->email), 0, 60, 'UTF-8'));
         XmlHelper::append($infRespTec, 'fone', NumberFormatter::onlyDigits($respTecnico->fone));
 

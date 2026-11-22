@@ -33,11 +33,11 @@
                         <div class="erp-rvg-grid">
                             <label class="erp-rvg-field">
                                 <span>Data inicial</span>
-                                <input type="date" name="de" value="{{ $values['de'] }}" required>
+                                <input type="date" name="de" value="{{ $values['de'] }}" required data-erp-native-date>
                             </label>
                             <label class="erp-rvg-field">
                                 <span>Data final</span>
-                                <input type="date" name="ate" value="{{ $values['ate'] }}" required>
+                                <input type="date" name="ate" value="{{ $values['ate'] }}" required data-erp-native-date>
                             </label>
                             <label class="erp-rvg-field erp-rvg-field--cliente">
                                 <span>Cliente (código ou nome)</span>

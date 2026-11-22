@@ -75,17 +75,10 @@ class ForcaVendasMonitorResource extends Resource
      */
     public static function getEloquentQuery(): Builder
     {
+        // Eager/withExists ficam na página (getTableQuery): count/totais/poll
+        // não pagam EXISTS de PIX nem coleções pesadas na abertura.
         return self::constrainEmpresaAtiva(parent::getEloquentQuery())
-            ->where('tipo', 'pedido')
-            ->with([
-                'pedido',
-                'cliente',
-                'vendedor',
-                'user',
-                'venda',
-                'empresa:id,param_pix_habilitar',
-            ])
-            ->withExists(['pixCobrancasPedido as tem_pix_api']);
+            ->where('tipo', 'pedido');
     }
 
     /**
@@ -489,7 +482,17 @@ class ForcaVendasMonitorResource extends Resource
      */
     public static function totalDesconto(ForcaVendasOrder $record): float
     {
-        $somaItens = round((float) ($record->pedido?->itens?->sum('desconto') ?? 0), 2);
+        $pedido = $record->pedido;
+        $somaItens = 0.0;
+
+        if ($pedido) {
+            // withSum('itens', 'desconto') na grade — evita carregar todos os itens.
+            if (array_key_exists('itens_sum_desconto', $pedido->getAttributes())) {
+                $somaItens = round((float) $pedido->itens_sum_desconto, 2);
+            } elseif ($pedido->relationLoaded('itens')) {
+                $somaItens = round((float) $pedido->itens->sum('desconto'), 2);
+            }
+        }
 
         if ($somaItens > 0) {
             return $somaItens;
@@ -498,7 +501,7 @@ class ForcaVendasMonitorResource extends Resource
         $payload = is_array($record->payload) ? $record->payload : [];
 
         return round((float) (
-            $record->pedido?->desconto_valor
+            $pedido?->desconto_valor
             ?? $payload['desconto_valor']
             ?? 0
         ), 2);

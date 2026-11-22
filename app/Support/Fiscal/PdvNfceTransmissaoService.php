@@ -8,6 +8,7 @@ use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
+use App\Support\Erp\Nfce\NfceScvInconsistenteDesvinculoService;
 use Unitec\FiscalEngine\Dto\ConsultarNfceResponse;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 
@@ -53,6 +54,10 @@ final class PdvNfceTransmissaoService
     {
         if ($nfce->simulada) {
             throw new FiscalEngineException('NFC-e simulada não pode ser transmitida à SEFAZ.');
+        }
+
+        if ($bloqueioArquivo = NfceScvInconsistenteDesvinculoService::bloqueiaRetransmissao($nfce)) {
+            throw new FiscalEngineException($bloqueioArquivo);
         }
 
         $parametros = VendasParametro::forEmpresa((int) $empresa->id);

@@ -44,6 +44,7 @@ class ComissaoVendedoresReport
         $adicionais = ProdutoComissaoAdicional::porVendaIds($vendaIds);
         $formasSemComissao = ComissaoBasePagamento::formasSemComissao();
         $pagamentosPorVenda = ComissaoBasePagamento::pagamentosPorVendaIds($vendaIds);
+        $trocaPorVenda = ComissaoBasePagamento::trocaIdentificadaPorVendaIds($vendaIds);
 
         $grupos = [];
 
@@ -54,6 +55,11 @@ class ComissaoVendedoresReport
                 $venda->forma_pagamento,
                 $pagamentosPorVenda[(int) $venda->id] ?? null,
                 $formasSemComissao,
+            );
+            $base = ComissaoBasePagamento::aplicarTrocaIdentificadaNaBase(
+                $base,
+                $totalVenda,
+                $trocaPorVenda[(int) $venda->id] ?? null,
             );
             $adicional = ComissaoBasePagamento::adicionalProporcional(
                 (float) ($adicionais[(int) $venda->id] ?? 0),

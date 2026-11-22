@@ -23,6 +23,10 @@ class EmpresaMonitorVendasMaisOpcoesTest extends TestCase
             $fields['param_monitor_vendas_exibir_mais_opcoes']['label'],
         );
         $this->assertSame(
+            'Na Tela de Venda, libera o menu com “Exibir/Ocultar custo dos produtos” (oculto por padrão) e “Margem da venda”. No Monitor, libera “Mais opções” (margem). Independente do parâmetro de custo nas grades.',
+            $fields['param_monitor_vendas_exibir_mais_opcoes']['hint'],
+        );
+        $this->assertSame(
             'monitor_vendas',
             EmpresaParametros::permissionGroupForField('param_monitor_vendas_exibir_mais_opcoes'),
         );

@@ -382,15 +382,22 @@ class ListFormasPagamento extends ListRecords
     public function updatedFormTipo(mixed $value): void
     {
         // Só sugere na criação; edição e escolha manual não são sobrescritas.
-        if ($this->formId !== null || $this->tipoMovimentoManual) {
+        if ($this->formId !== null) {
             return;
         }
 
         $tipo = is_string($value) ? mb_strtolower(trim($value), 'UTF-8') : '';
 
-        $this->form['tipo_movimento'] = $tipo !== ''
-            ? FormaPagamento::defaultTipoMovimento($tipo)
-            : 'nenhum';
+        if (! $this->tipoMovimentoManual) {
+            $this->form['tipo_movimento'] = $tipo !== ''
+                ? FormaPagamento::defaultTipoMovimento($tipo)
+                : 'nenhum';
+        }
+
+        // Novos cadastros: TROCA sugere "Não pagar comissão" (pode desmarcar).
+        if ($tipo === 'troca') {
+            $this->form['nao_pagar_comissao'] = true;
+        }
     }
 
     public function updatedFormTipoMovimento(mixed $value): void

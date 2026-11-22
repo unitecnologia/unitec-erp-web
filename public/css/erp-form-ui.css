@@ -902,18 +902,19 @@
     background: #eef4fb;
 }
 
-/* TV impressão pós-venda: foco inicial é programático — :focus-visible não pinta.
-   Usa o estado :focus real (mesmo anel azul do Tab/setas). */
-.erp-fv-imprimir-pos-venda .erp-aviso-modal__btn:focus {
-    outline: 3px solid rgba(30, 90, 158, 0.45);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18);
+/* TV impressão pós-venda: foco programático no Não — anel bem visível. */
+.erp-fv-imprimir-pos-venda .erp-aviso-modal__btn:focus,
+.erp-fv-imprimir-pos-venda .erp-aviso-modal__btn.is-erp-focus {
+    outline: 3px solid #1e5a9e !important;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(30, 90, 158, 0.28);
 }
 
-.erp-fv-imprimir-pos-venda.erp-aviso-modal--info .erp-aviso-modal__btn--secondary:focus {
-    border-color: var(--erp-brand-primary, #1e5a9e);
-    color: var(--erp-brand-primary-dark, #0f3460);
-    background: #eef4fb;
+.erp-fv-imprimir-pos-venda.erp-aviso-modal--info .erp-aviso-modal__btn--secondary:focus,
+.erp-fv-imprimir-pos-venda.erp-aviso-modal--info .erp-aviso-modal__btn--secondary.is-erp-focus {
+    border-color: #1e5a9e;
+    color: #0f3460;
+    background: #dbeafe;
 }
 
 .erp-aviso-modal__hint {

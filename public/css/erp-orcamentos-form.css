@@ -1831,3 +1831,98 @@
 .erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-selected .erp-orc-itens__preco-alerta {
     color: #fbbf24;
 }
+
+/* Com separador: encolhe a pesquisa e encaixa título+OK na mesma linha */
+.erp-orcamentos-form-page .erp-orc-produto-bar--com-separador .erp-fv-tv__row--produto {
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 0.4rem;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar--com-separador .erp-fv-tv__field--barcode {
+    flex: 1 1 0;
+    min-width: 9.5rem;
+    max-width: none;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar--com-separador .erp-orc-separador-inline {
+    flex: 0 1 13.5rem;
+    min-width: 9rem;
+    max-width: 15rem;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar--com-separador .erp-orc-separador-inline-ok {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+}
+
+.erp-orc-separador-inline-ok__spacer {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.1;
+    visibility: hidden;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar--com-separador .erp-orc-separador-inline .erp-nfe__input {
+    min-height: 2.1rem;
+    padding: 0.22rem 0.45rem;
+    border: 1.5px solid #7fa0c4;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar--com-separador .erp-orc-separador-inline .erp-nfe__input:focus {
+    outline: none;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.erp-orc-separador-bar__ok {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.1rem;
+    min-width: 2.5rem;
+    padding: 0 0.7rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #1e293b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-orc-separador-bar__ok:hover:not(:disabled) {
+    background: #e2e8f0;
+    border-color: #64748b;
+}
+
+.erp-orc-separador-bar__ok:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.erp-orc-itens__row-separador td {
+    background: #eef2f7;
+    border-top: 1px solid #d0d7e2;
+    border-bottom: 1px solid #d0d7e2;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.erp-orc-itens__row-separador.is-selected td {
+    background: #dbeafe !important;
+}
+
+.erp-orc-itens__separador-titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #1e293b;
+    padding: 0.18rem 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

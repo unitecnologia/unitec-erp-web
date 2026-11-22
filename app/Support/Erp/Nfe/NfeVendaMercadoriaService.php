@@ -13,6 +13,7 @@ use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
+use App\Support\Fiscal\VendaFiscalLock;
 use Illuminate\Database\Eloquent\Builder;
 use RuntimeException;
 
@@ -57,6 +58,13 @@ class NfeVendaMercadoriaService
 
         if ($this->temNfeAtiva($venda)) {
             throw new RuntimeException('Esta venda já possui NF-e vinculada.');
+        }
+
+        $venda->loadMissing(['pdvVenda.nfce']);
+        $motivoNfce = VendaFiscalLock::motivoBloqueioNfePorVenda($venda);
+
+        if ($motivoNfce !== null) {
+            throw new RuntimeException($motivoNfce);
         }
     }
 

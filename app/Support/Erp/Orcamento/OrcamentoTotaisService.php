@@ -8,7 +8,11 @@ final class OrcamentoTotaisService
 {
     public function recalcular(Orcamento $orcamento): void
     {
-        $subtotal = (float) $orcamento->itens()->sum('total');
+        $subtotal = (float) $orcamento->itens()
+            ->where(function ($query): void {
+                $query->where('is_separador', false)->orWhereNull('is_separador');
+            })
+            ->sum('total');
         $desconto = (float) $orcamento->desconto_valor;
         $total = round(max(0, $subtotal - $desconto), 2);
 

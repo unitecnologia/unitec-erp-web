@@ -151,7 +151,22 @@
                                 open: false,
                                 ativo: 0,
                                 q: @js($this->filtroClienteNome()),
-                                itens: @js($this->clientesLookupData()),
+                                itens: [],
+                                itensLoaded: false,
+                                itensLoading: false,
+                                async ensureItens() {
+                                    if (this.itensLoaded || this.itensLoading) return;
+                                    this.itensLoading = true;
+                                    try {
+                                        const data = await $wire.clientesLookupData();
+                                        this.itens = Array.isArray(data) ? data : [];
+                                        this.itensLoaded = true;
+                                    } catch (e) {
+                                        this.itens = [];
+                                    } finally {
+                                        this.itensLoading = false;
+                                    }
+                                },
                                 filtrados() {
                                     const t = this.q.toLowerCase().trim();
                                     const base = t === '' ? this.itens : this.itens.filter(c => c.busca.includes(t));
@@ -160,7 +175,11 @@
                                 opcoes() {
                                     return [{ id: 'todos', nome: '<todos os clientes>' }, ...this.filtrados()];
                                 },
-                                abrir() { this.open = true; this.ativo = 0; },
+                                abrir() {
+                                    this.open = true;
+                                    this.ativo = 0;
+                                    this.ensureItens();
+                                },
                                 mover(d) {
                                     if (! this.open) { this.abrir(); return; }
                                     const total = this.opcoes().length;
@@ -186,13 +205,14 @@
                         >
                             <input type="text" x-model="q"
                                    @focus="abrir()" @click="abrir()"
-                                   @input="open = true; ativo = 0"
+                                   @input="open = true; ativo = 0; ensureItens()"
                                    @keydown.arrow-down.prevent="mover(1)"
                                    @keydown.arrow-up.prevent="mover(-1)"
                                    @keydown.enter.prevent="confirmar()"
                                    class="erp-nfe__input erp-fv-mon__combo-input"
                                    placeholder="Digite nome ou CNPJ..." autocomplete="off">
                             <div class="erp-fv-mon__combo-panel" x-ref="panel" x-show="open" x-cloak x-transition.opacity>
+                                <div class="erp-fv-mon__combo-empty" x-show="itensLoading">Carregando...</div>
                                 <template x-for="(op, i) in opcoes()" :key="op.id">
                                     <button type="button"
                                             class="erp-fv-mon__combo-item"
@@ -201,7 +221,7 @@
                                             @click="escolher(op.id, op.id === 'todos' ? '' : op.nome)"
                                             x-text="op.nome"></button>
                                 </template>
-                                <div class="erp-fv-mon__combo-empty" x-show="filtrados().length === 0 && q.trim() !== ''">Nenhum cliente encontrado</div>
+                                <div class="erp-fv-mon__combo-empty" x-show="!itensLoading && filtrados().length === 0 && q.trim() !== ''">Nenhum cliente encontrado</div>
                             </div>
                         </div>
                     @elseif ($this->filtroCampo === 'meio_pgto')

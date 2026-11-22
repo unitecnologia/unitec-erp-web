@@ -1,8 +1,17 @@
 /**
- * Expansão sob demanda: número da venda → produtos (Relatório de Vendas Geral).
+ * Expansão sob demanda: número da venda → produtos (Relatório de Vendas Geral / Lucratividade).
  */
 (function () {
     'use strict';
+
+    var DEFAULT_COLUMNS = [
+        { key: 'codigo', label: 'CÓDIGO', num: false },
+        { key: 'descricao', label: 'DESCRIÇÃO', num: false },
+        { key: 'grupo', label: 'GRUPO', num: false },
+        { key: 'qtd', label: 'QTD', num: true },
+        { key: 'unitario', label: 'UNIT.', num: true },
+        { key: 'total', label: 'TOTAL ITEM', num: true },
+    ];
 
     function qs(sel, root) {
         return (root || document).querySelector(sel);
@@ -15,6 +24,14 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function resolveColumns(meta) {
+        var cols = meta && Array.isArray(meta.detail_columns) ? meta.detail_columns : null;
+        if (cols && cols.length) {
+            return cols;
+        }
+        return DEFAULT_COLUMNS;
     }
 
     function buildDetailsUrl(baseUrl, filters, expand, page) {
@@ -41,16 +58,24 @@
         return baseUrl + '?' + params.toString();
     }
 
-    function renderRowsHtml(rows) {
+    function renderHeadHtml(columns) {
+        return columns.map(function (col) {
+            return '<th' + (col.num ? ' class="num"' : '') + '>' + escapeHtml(col.label || col.key) + '</th>';
+        }).join('');
+    }
+
+    function renderRowsHtml(rows, columns) {
         return (rows || []).map(function (row) {
             return (
                 '<tr>' +
-                '<td>' + escapeHtml(row.codigo) + '</td>' +
-                '<td>' + escapeHtml(row.descricao) + '</td>' +
-                '<td>' + escapeHtml(row.grupo) + '</td>' +
-                '<td class="num">' + escapeHtml(row.qtd) + '</td>' +
-                '<td class="num">' + escapeHtml(row.unitario) + '</td>' +
-                '<td class="num">' + escapeHtml(row.total) + '</td>' +
+                columns.map(function (col) {
+                    var key = col.key || '';
+                    return (
+                        '<td' + (col.num ? ' class="num"' : '') + '>' +
+                        escapeHtml(row[key]) +
+                        '</td>'
+                    );
+                }).join('') +
                 '</tr>'
             );
         }).join('');
@@ -70,10 +95,7 @@
             '<div class="tabular-doc__detail-wrap">' +
             '<div class="tabular-doc__detail-status">Carregando produtos…</div>' +
             '<table class="tabular-doc__detail" hidden>' +
-            '<thead><tr>' +
-            '<th>CÓDIGO</th><th>DESCRIÇÃO</th><th>GRUPO</th>' +
-            '<th class="num">QTD</th><th class="num">UNIT.</th><th class="num">TOTAL ITEM</th>' +
-            '</tr></thead>' +
+            '<thead><tr></tr></thead>' +
             '<tbody></tbody>' +
             '</table>' +
             '<div class="tabular-doc__detail-meta" hidden>' +
@@ -97,14 +119,21 @@
 
     function applyPage(detailRow, payload, append) {
         var table = qs('.tabular-doc__detail', detailRow);
+        var theadRow = qs('thead tr', table);
         var tbody = qs('tbody', table);
         var meta = payload.meta || {};
         var rows = payload.rows || [];
+        var columns = resolveColumns(meta);
 
         if (!append) {
+            theadRow.innerHTML = renderHeadHtml(columns);
             tbody.innerHTML = '';
+            detailRow._erpDetailColumns = columns;
+        } else {
+            columns = detailRow._erpDetailColumns || columns;
         }
-        tbody.insertAdjacentHTML('beforeend', renderRowsHtml(rows));
+
+        tbody.insertAdjacentHTML('beforeend', renderRowsHtml(rows, columns));
         table.hidden = false;
 
         var metaWrap = qs('.tabular-doc__detail-meta', detailRow);

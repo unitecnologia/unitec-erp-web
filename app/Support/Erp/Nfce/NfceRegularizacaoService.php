@@ -283,11 +283,184 @@ final class NfceRegularizacaoService
 
         $alvo ??= $this->criarVendaFiscal($venda);
 
+        $this->garantirPagamentosEmissao($venda, $alvo);
+
         if ($consumidor !== null) {
             $this->aplicarConsumidor($alvo, $consumidor);
         }
 
         return (int) $alvo->id;
+    }
+
+    /**
+     * Garante que o PDV usado na emissão tem pagamentos detalhados seguros.
+     * Nunca deixa DIVERSOS (cabeçalho SCV) virar tPag=99 quando há detalhe real.
+     * Não altera pdv_venda_pagamentos já existentes — só valida ou copia em registro novo.
+     */
+    private function garantirPagamentosEmissao(Venda $venda, PdvVenda $alvo): void
+    {
+        $alvo->loadMissing('pagamentos');
+
+        $pdvPagamentos = $alvo->pagamentos
+            ->map(static fn (PdvVendaPagamento $p): array => [
+                'forma' => (string) ($p->forma ?? ''),
+                'valor' => is_numeric($p->valor) ? (float) $p->valor : null,
+            ])
+            ->all();
+
+        // Se o alvo (ex.: regularização nova) ainda não tem detalhe, tenta PDV original da venda.
+        if ($pdvPagamentos === [] || $this->pagamentosSoGenericos($pdvPagamentos)) {
+            $origem = $this->carregarPagamentosVinculadosVenda((int) $venda->id, (int) $alvo->id);
+            if ($origem !== []) {
+                $pdvPagamentos = $origem;
+            }
+        }
+
+        $fvPagamentos = $this->pagamentosPayloadForcaVendas($venda);
+
+        $linhas = NfceRegularizacaoPagamentos::garantirParaEmissao(
+            $pdvPagamentos,
+            $fvPagamentos,
+            (string) ($venda->forma_pagamento ?? ''),
+            (float) $venda->total,
+            (string) ($venda->numero ?? ''),
+        );
+
+        // PDV reutilizado com detalhe válido: só valida (não grava).
+        if (! $alvo->pagamentos->isEmpty() && ! $this->pagamentosSoGenericos(
+            $alvo->pagamentos->map(static fn (PdvVendaPagamento $p): array => [
+                'forma' => (string) ($p->forma ?? ''),
+                'valor' => is_numeric($p->valor) ? (float) $p->valor : null,
+            ])->all()
+        )) {
+            // Confere se o que está no PDV bate com o resolvido (evita emitir com DIVERSOS residual).
+            $formasAlvo = $alvo->pagamentos
+                ->map(static fn (PdvVendaPagamento $p): string => mb_strtoupper(trim((string) $p->forma), 'UTF-8'))
+                ->filter()
+                ->values()
+                ->all();
+            foreach ($formasAlvo as $forma) {
+                if (NfceRegularizacaoPagamentos::ehRotuloInutilizavel($forma)) {
+                    throw new DomainException(
+                        'Pagamento genérico (ex.: DIVERSOS) no PDV da venda nº '.$venda->numero
+                        .'. Não é seguro emitir a NFC-e sem os meios reais.'
+                    );
+                }
+            }
+
+            return;
+        }
+
+        // Registro fiscal novo (ou PDV sem detalhe utilizável): grava só no alvo de regularização.
+        if (! $alvo->isRegularizacaoFiscal()) {
+            throw new DomainException(
+                'A venda nº '.$venda->numero.' não possui pagamentos detalhados seguros para emitir a NFC-e.'
+            );
+        }
+
+        PdvVendaPagamento::query()->where('pdv_venda_id', $alvo->id)->delete();
+        foreach ($linhas as $linha) {
+            PdvVendaPagamento::query()->create([
+                'pdv_venda_id' => $alvo->id,
+                'forma' => $linha['forma'],
+                'valor' => $linha['valor'],
+            ]);
+        }
+
+        $alvo->forceFill([
+            'forma_pagamento' => NfceRegularizacaoPagamentos::cabecalhoFromLinhas($linhas),
+        ])->save();
+        $alvo->unsetRelation('pagamentos');
+        $alvo->load('pagamentos');
+    }
+
+    /**
+     * @param  list<array{forma: string, valor: float|null}>  $pagamentos
+     */
+    private function pagamentosSoGenericos(array $pagamentos): bool
+    {
+        if ($pagamentos === []) {
+            return true;
+        }
+
+        foreach ($pagamentos as $pag) {
+            if (! NfceRegularizacaoPagamentos::ehRotuloInutilizavel((string) ($pag['forma'] ?? ''))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<array{forma: string, valor: float|null}>
+     */
+    private function carregarPagamentosVinculadosVenda(int $vendaId, int $excetoPdvId): array
+    {
+        $pdvIds = PdvVenda::query()
+            ->where('venda_id', $vendaId)
+            ->when($excetoPdvId > 0, static fn ($q) => $q->whereKeyNot($excetoPdvId))
+            ->orderByRaw('CASE WHEN origem = ? THEN 1 ELSE 0 END', [PdvVenda::ORIGEM_REGULARIZACAO_FISCAL])
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        if ($pdvIds === []) {
+            return [];
+        }
+
+        $rows = PdvVendaPagamento::query()
+            ->whereIn('pdv_venda_id', $pdvIds)
+            ->orderBy('id')
+            ->get(['pdv_venda_id', 'forma', 'valor']);
+
+        foreach ($pdvIds as $pdvId) {
+            $doPdv = $rows->where('pdv_venda_id', $pdvId);
+            if ($doPdv->isEmpty()) {
+                continue;
+            }
+
+            $mapped = $doPdv->map(static fn (PdvVendaPagamento $p): array => [
+                'forma' => (string) ($p->forma ?? ''),
+                'valor' => is_numeric($p->valor) ? (float) $p->valor : null,
+            ])->all();
+
+            if (! $this->pagamentosSoGenericos($mapped)) {
+                return $mapped;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private function pagamentosPayloadForcaVendas(Venda $venda): ?array
+    {
+        if (! ErpSchema::hasTable('forca_vendas_orders')) {
+            return null;
+        }
+
+        $payloadRaw = DB::table('forca_vendas_orders')
+            ->where('venda_id', $venda->id)
+            ->value('payload');
+
+        if ($payloadRaw === null) {
+            return null;
+        }
+
+        $payload = is_array($payloadRaw)
+            ? $payloadRaw
+            : (is_string($payloadRaw) ? (json_decode($payloadRaw, true) ?: null) : null);
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $raw = $payload['pagamentos'] ?? null;
+
+        return is_array($raw) ? $raw : null;
     }
 
     /**
@@ -461,6 +634,9 @@ final class NfceRegularizacaoService
     /**
      * Registro só fiscal (sem caixa) com a cópia exata da venda: itens, quantidades, preços,
      * descontos/acréscimos e total. Não baixa estoque nem gera financeiro.
+     *
+     * Pagamentos: prioriza detalhe vinculado à venda (PDV/FV); nunca grava DIVERSOS como tPag=99
+     * quando há meios reais. Bloqueia se não for possível determinar com segurança.
      */
     private function criarVendaFiscal(Venda $venda): PdvVenda
     {
@@ -471,8 +647,18 @@ final class NfceRegularizacaoService
         }
 
         $linhas = $this->montarLinhas($venda);
-        $forma = trim((string) ($venda->forma_pagamento ?? '')) ?: 'DINHEIRO';
         $total = round((float) $venda->total, 2);
+
+        $pdvPagamentos = $this->carregarPagamentosVinculadosVenda((int) $venda->id, 0);
+        $fvPagamentos = $this->pagamentosPayloadForcaVendas($venda);
+        $pagamentos = NfceRegularizacaoPagamentos::garantirParaEmissao(
+            $pdvPagamentos,
+            $fvPagamentos,
+            (string) ($venda->forma_pagamento ?? ''),
+            $total,
+            (string) ($venda->numero ?? ''),
+        );
+        $forma = NfceRegularizacaoPagamentos::cabecalhoFromLinhas($pagamentos);
 
         $pdvVenda = PdvVenda::query()->create([
             'pdv_caixa_sessao_id' => null,
@@ -514,13 +700,15 @@ final class NfceRegularizacaoService
             ]);
         }
 
-        PdvVendaPagamento::query()->create([
-            'pdv_venda_id' => $pdvVenda->id,
-            'forma' => $forma,
-            'valor' => $total,
-        ]);
+        foreach ($pagamentos as $pagamento) {
+            PdvVendaPagamento::query()->create([
+                'pdv_venda_id' => $pdvVenda->id,
+                'forma' => $pagamento['forma'],
+                'valor' => $pagamento['valor'],
+            ]);
+        }
 
-        return $pdvVenda;
+        return $pdvVenda->load('pagamentos');
     }
 
     /**

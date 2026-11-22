@@ -15,7 +15,8 @@ class MonitorNfceEmitirWiringTest extends TestCase
         $blade = file_get_contents(resource_path('views/filament/components/erp/forca-vendas/monitor-action-bar.blade.php'));
 
         $this->assertIsString($blade);
-        $this->assertStringContainsString('$nfceBtn = $this->nfceEmitirEstado', $blade);
+        $this->assertStringContainsString('$temMarcados = count($this->selecionados) > 0', $blade);
+        $this->assertStringContainsString('$this->nfceEmitirEstado', $blade);
         $this->assertStringContainsString('emitirNfceDoBotao', $blade);
         $this->assertStringContainsString("! (\$nfceBtn['enabled'] ?? false)", $blade);
         $this->assertStringContainsString('nfceTransmitindo', $blade);

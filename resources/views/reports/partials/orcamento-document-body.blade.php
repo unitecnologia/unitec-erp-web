@@ -135,18 +135,24 @@
         </thead>
         <tbody>
             @forelse ($orcamento->itens as $item)
-                @php
-                    $linha = $report->linhaImpressao($item);
-                @endphp
-                <tr>
-                    <td class="col-codigo">{{ $linha['codigo'] }}</td>
-                    <td class="produto">{{ mb_strtoupper($linha['produto'], 'UTF-8') }}</td>
-                    <td class="col-un">{{ $linha['unidade'] }}</td>
-                    <td class="col-qtd">{{ OrcamentoReportService::formatQuantidade($linha['quantidade']) }}</td>
-                    <td class="col-unit">{{ OrcamentoReportService::formatMoney($linha['valor_unitario']) }}</td>
-                    <td class="col-desc">{{ OrcamentoReportService::formatMoney($linha['desconto']) }}</td>
-                    <td class="col-sub">{{ OrcamentoReportService::formatMoney($linha['subtotal']) }}</td>
-                </tr>
+                @if ($item->isSeparador())
+                    <tr class="orc-doc__separador">
+                        <td colspan="7">{{ mb_strtoupper((string) ($item->descricao ?: '—'), 'UTF-8') }}</td>
+                    </tr>
+                @else
+                    @php
+                        $linha = $report->linhaImpressao($item);
+                    @endphp
+                    <tr>
+                        <td class="col-codigo">{{ $linha['codigo'] }}</td>
+                        <td class="produto">{{ mb_strtoupper($linha['produto'], 'UTF-8') }}</td>
+                        <td class="col-un">{{ $linha['unidade'] }}</td>
+                        <td class="col-qtd">{{ OrcamentoReportService::formatQuantidade($linha['quantidade']) }}</td>
+                        <td class="col-unit">{{ OrcamentoReportService::formatMoney($linha['valor_unitario']) }}</td>
+                        <td class="col-desc">{{ OrcamentoReportService::formatMoney($linha['desconto']) }}</td>
+                        <td class="col-sub">{{ OrcamentoReportService::formatMoney($linha['subtotal']) }}</td>
+                    </tr>
+                @endif
             @empty
                 <tr>
                     <td colspan="7">Nenhum item informado.</td>

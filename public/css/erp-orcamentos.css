@@ -510,7 +510,8 @@
     font-size: 0.875rem;
 }
 
-/* â”€â”€ Larguras das colunas (fixas nas estreitas, flex no cliente) â”€ */
+/* --- Larguras das colunas (fixas nas estreitas, flex no cliente) --- */
+/* Ordem Livewire: Número | Data | Cliente | Telefone | Vendedor | Cidade | UF | Plataforma | Situação | Total | olho */
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(1),
 .erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -524,25 +525,31 @@
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(2),
 .erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
-    width: 5.85rem;
-    max-width: 5.85rem;
+    width: 9rem;
+    min-width: 9rem;
+    max-width: 9rem;
     padding-inline: 0.15rem !important;
+    white-space: nowrap;
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(3),
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(3) {
-    width: 3.35rem;
-    max-width: 3.35rem;
-    padding-inline: 0.12rem !important;
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-orcamentos-page .fi-ta-header-cell-cliente\.nome-razao,
+.erp-orcamentos-page .fi-ta-cell-cliente\.nome-razao {
+    width: auto !important;
+    min-width: 7.5rem;
+    max-width: 11.5rem;
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(4),
 .erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(4),
-.erp-orcamentos-page .fi-ta-header-cell-cliente\.nome-razao,
-.erp-orcamentos-page .fi-ta-cell-cliente\.nome-razao {
-    width: auto !important;
-    min-width: 8rem;
-    max-width: 13rem;
+.erp-orcamentos-page .fi-ta-header-cell-cliente-fone,
+.erp-orcamentos-page .fi-ta-cell-cliente-fone {
+    width: 7.25rem;
+    min-width: 6.75rem;
+    max-width: 8rem;
+    padding-inline: 0.12rem !important;
+    white-space: nowrap;
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(5),
@@ -558,9 +565,9 @@
 .erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-orcamentos-page .fi-ta-header-cell-cliente\.cidade-nome,
 .erp-orcamentos-page .fi-ta-cell-cliente\.cidade-nome {
-    width: 12.5rem;
-    max-width: 14rem;
-    min-width: 11rem;
+    width: 11.5rem;
+    max-width: 13rem;
+    min-width: 10rem;
     padding-inline: 0.15rem !important;
 }
 
@@ -608,6 +615,7 @@
     padding-inline: 0.18rem 0.22rem !important;
     overflow: hidden !important;
     white-space: nowrap !important;
+    text-align: left !important;
 }
 
 .erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(10) .fi-ta-col,
@@ -637,11 +645,12 @@
 }
 
 .erp-orcamentos-page .erp-orc-total-cell {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.2rem;
-    width: 100%;
+    justify-content: flex-start;
+    gap: 0.28rem;
+    width: auto;
+    max-width: 100%;
     min-width: 0;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -653,11 +662,11 @@
 }
 
 .erp-orcamentos-page .erp-orc-total-cell__amount {
-    flex: 0 0 7ch;
-    width: 7ch;
-    min-width: 7ch;
-    max-width: 7ch;
-    text-align: right;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    text-align: left;
     color: var(--erp-text, #0f172a);
     white-space: nowrap;
     overflow: hidden;
@@ -1293,7 +1302,7 @@
     }
 }
 
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(11) .fi-ta-col,
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(10) .fi-ta-col,
 .erp-orcamentos-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -2294,5 +2303,112 @@
     border: 1px solid #94a3b8;
     background: #fff;
     color: #0f172a;
+}
+
+.erp-orc-reabrir-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+}
+
+.erp-orc-reabrir-modal .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 42%);
+}
+
+.erp-orc-reabrir-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(26rem, calc(100vw - 2rem));
+    padding: 1.35rem 1.35rem 1.1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 18px 48px rgb(15 23 42 / 22%);
+    text-align: center;
+}
+
+.erp-orc-reabrir-modal__close {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    width: 1.85rem;
+    height: 1.85rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-orc-reabrir-modal__close:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.erp-orc-reabrir-modal__icon {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    margin: 0 auto 0.7rem;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.erp-orc-reabrir-modal__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 750;
+    color: #0f172a;
+}
+
+.erp-orc-reabrir-modal__lead {
+    margin: 0 0 1rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: #334155;
+}
+
+.erp-orc-reabrir-modal__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.55rem;
+}
+
+.erp-orc-reabrir-modal__btn {
+    min-width: 5.4rem;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-orc-reabrir-modal__btn--primary {
+    border: 1px solid #1d4ed8;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+}
+
+.erp-orc-reabrir-modal__btn--ghost {
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #0f172a;
+}
+
+.erp-orc-reabrir-modal__hint {
+    margin: 0.8rem 0 0;
+    font-size: 0.72rem;
+    color: #94a3b8;
 }
 

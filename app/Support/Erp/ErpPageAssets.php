@@ -20,7 +20,7 @@ class ErpPageAssets
         'notas-fornecedores' => ['css/erp-nfe.css', 'css/erp-notas-fornecedores.css'],
         'vendas' => ['css/erp-vendas.css'],
         'log-operacoes' => ['css/erp-operacao-logs.css'],
-        'orcamentos' => ['css/erp-orcamentos.css', 'css/erp-form-ui.css', 'css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-fv-tela-venda.css', 'css/erp-orcamentos-form.css', 'css/erp-equipamento-modal.css'],
+        'orcamentos' => ['css/erp-orcamentos.css', 'css/erp-form-ui.css', 'css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-forca-vendas.css', 'css/erp-fv-tela-venda.css', 'css/erp-orcamentos-form.css', 'css/erp-equipamento-modal.css'],
         'ordens-servico' => [
             'css/erp-orcamentos.css',
             'css/erp-form-ui.css',
@@ -117,7 +117,7 @@ class ErpPageAssets
         'people' => ['css/erp-pessoas-form.css'],
         'empresas' => ['css/erp-empresas-form.css', 'css/erp-cclass-trib-modal.css'],
         'terminais' => ['css/erp-terminais-form.css', 'css/erp-terminais.css'],
-        'orcamentos' => ['css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-fv-tela-venda.css', 'css/erp-orcamentos-form.css', 'css/erp-equipamento-modal.css'],
+        'orcamentos' => ['css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-forca-vendas.css', 'css/erp-fv-tela-venda.css', 'css/erp-orcamentos-form.css', 'css/erp-equipamento-modal.css'],
         'ordens-servico' => ['css/erp-os-form.css', 'css/erp-form-ui.css', 'css/erp-nfe.css', 'css/erp-pdv.css', 'css/erp-fv-tela-venda.css', 'css/erp-orcamentos-form.css'],
         'devolucoes-venda' => ['css/erp-devolucao-venda-form.css'],
         'config-fiscais' => ['css/erp-config-fiscais.css'],

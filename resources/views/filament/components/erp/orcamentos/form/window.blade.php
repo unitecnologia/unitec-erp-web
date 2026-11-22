@@ -76,4 +76,5 @@
     @include('filament.components.erp.orcamentos.form.post-save-prompt')
     @include('filament.components.erp.orcamentos.form.item-delete-confirm')
     @include('filament.components.erp.orcamentos.form.desconto-item')
+    @include('filament.components.erp.forca-vendas.tela-venda.margem-venda')
 </div>
