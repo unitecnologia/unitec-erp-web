@@ -32,9 +32,7 @@ class NfseSefinClient
             throw new NfseSefinNaoEnviada('XML assinado da DPS ausente.');
         }
 
-        if ($certificate->certificatePem === '' || $certificate->privateKeyPem === '') {
-            throw new NfseSefinNaoEnviada('Certificado ou chave privada da empresa ausente.');
-        }
+        $this->exigirCertificado($certificate);
 
         $payload = json_encode([
             'dpsXmlGZipB64' => base64_encode(gzencode($xmlAssinado)),
@@ -48,11 +46,69 @@ class NfseSefinClient
                 'Accept' => 'application/json',
             ],
             corpo: $payload,
-            mtls: [
-                'certificado' => $certificate->certificatePem,
-                'chave_privada' => $certificate->privateKeyPem,
-            ],
+            mtls: $this->mtls($certificate),
         );
+    }
+
+    public function prepararEvento(string $chaveAcesso, string $xmlAssinado, Certificate $certificate): NfseSefinRequisicao
+    {
+        if (trim($xmlAssinado) === '') {
+            throw new NfseNaoTransmitida('XML assinado do pedido de evento ausente.');
+        }
+
+        $this->exigirCertificado($certificate);
+
+        $payload = json_encode([
+            'pedidoRegistroEventoXmlGZipB64' => base64_encode(gzencode($xmlAssinado)),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        return new NfseSefinRequisicao(
+            url: NfseSefinEndpoints::eventos($this->ambiente, $chaveAcesso),
+            metodo: 'POST',
+            headers: [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ],
+            corpo: $payload,
+            mtls: $this->mtls($certificate),
+        );
+    }
+
+    public function prepararConsultaEvento(
+        string $chaveAcesso,
+        string $tipoEvento,
+        string $numSeqEvento,
+        Certificate $certificate,
+    ): NfseSefinRequisicao {
+        $this->exigirCertificado($certificate);
+
+        return new NfseSefinRequisicao(
+            url: NfseSefinEndpoints::evento($this->ambiente, $chaveAcesso, $tipoEvento, $numSeqEvento),
+            metodo: 'GET',
+            headers: [
+                'Accept' => 'application/json',
+            ],
+            corpo: '',
+            mtls: $this->mtls($certificate),
+        );
+    }
+
+    private function exigirCertificado(Certificate $certificate): void
+    {
+        if ($certificate->certificatePem === '' || $certificate->privateKeyPem === '') {
+            throw new NfseSefinNaoEnviada('Certificado ou chave privada da empresa ausente.');
+        }
+    }
+
+    /**
+     * @return array{certificado: string, chave_privada: string}
+     */
+    private function mtls(Certificate $certificate): array
+    {
+        return [
+            'certificado' => $certificate->certificatePem,
+            'chave_privada' => $certificate->privateKeyPem,
+        ];
     }
 
     public function enviar(string $xmlAssinado, Certificate $certificate, NfseSefinTransporte $transporte): void

@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api\UnitecOs;
 use App\Models\OrdemServico;
 use App\Models\Person;
 use App\Models\User;
+use App\Support\Erp\Os\OsFiscalLock;
 use App\Support\Erp\PersonCpfCnpjUnicidade;
 use App\Support\Erp\PersonDocumentoDuplicadoException;
 use App\Support\UnitecOs\OrdemServicoApiPayload;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -462,143 +464,156 @@ class OrdemServicoController
             'finalizar' => ['nullable', 'boolean'],
         ]);
 
-        DB::transaction(function () use ($os, $data, $user): void {
-            $agora = now();
-            $empresaId = (int) ($user->empresa_id ?? 0);
-            $vendedorId = $user->vendedor_id ? (int) $user->vendedor_id : null;
+        try {
+            OsFiscalLock::executar((int) $os->id, function () use ($os, $data, $user): void {
+                DB::transaction(function () use ($os, $data, $user): void {
+                    $travada = OrdemServico::query()->whereKey($os->id)->lockForUpdate()->first();
 
-            if (! empty($data['iniciar_atendimento'])) {
-                if ($empresaId <= 0) {
-                    throw ValidationException::withMessages([
-                        'empresa_id' => 'Usuário sem empresa. Não é possível iniciar atendimento.',
-                    ]);
-                }
+                    if (! $travada instanceof OrdemServico) {
+                        throw ValidationException::withMessages([
+                            'os' => 'OS não encontrada.',
+                        ]);
+                    }
 
-                if ($vendedorId === null) {
-                    throw ValidationException::withMessages([
-                        'tecnico' => 'Usuário sem técnico/vendedor vinculado.',
-                    ]);
-                }
+                    self::assertOsPodeSerMutadaPelaApi($travada);
 
-                if ($os->situacao === OrdemServico::SITUACAO_ABERTA) {
-                    $os->situacao = OrdemServico::SITUACAO_ANDAMENTO;
-                }
+                    $agora = now();
+                    $empresaId = (int) ($user->empresa_id ?? 0);
+                    $vendedorId = $user->vendedor_id ? (int) $user->vendedor_id : null;
 
-                // Se já iniciada, não cria novo horário.
-                if (blank($os->hora_inicio)) {
-                    $os->hora_inicio = $agora->format('H:i:s');
-                }
-                if (blank($os->data_inicio)) {
-                    $os->data_inicio = $agora->toDateString();
-                }
+                    if (! empty($data['iniciar_atendimento'])) {
+                        if ($empresaId <= 0) {
+                            throw ValidationException::withMessages([
+                                'empresa_id' => 'Usuário sem empresa. Não é possível iniciar atendimento.',
+                            ]);
+                        }
 
-                $os->atendente_id = $vendedorId;
-            }
+                        if ($vendedorId === null) {
+                            throw ValidationException::withMessages([
+                                'tecnico' => 'Usuário sem técnico/vendedor vinculado.',
+                            ]);
+                        }
 
-            // Não sobrescreve horário de início já gravado.
-            if (
-                array_key_exists('hora_inicio', $data)
-                && filled($data['hora_inicio'])
-                && blank($os->hora_inicio)
-            ) {
-                $hora = trim((string) $data['hora_inicio']);
-                $os->hora_inicio = strlen($hora) === 5 ? $hora.':00' : $hora;
-            }
+                        if ($travada->situacao === OrdemServico::SITUACAO_ABERTA) {
+                            $travada->situacao = OrdemServico::SITUACAO_ANDAMENTO;
+                        }
 
-            if (array_key_exists('status', $data) && filled($data['status']) && empty($data['finalizar'])) {
-                $situacao = OrdemServicoApiPayload::situacaoFromApp((string) $data['status']);
-                if ($situacao !== null && ! self::osJaFaturada($os)) {
-                    $os->situacao = $situacao;
-                }
-            }
+                        if (blank($travada->hora_inicio)) {
+                            $travada->hora_inicio = $agora->format('H:i:s');
+                        }
+                        if (blank($travada->data_inicio)) {
+                            $travada->data_inicio = $agora->toDateString();
+                        }
 
-            if (array_key_exists('servico_realizado', $data)) {
-                $os->laudo = trim((string) ($data['servico_realizado'] ?? '')) ?: null;
-            }
+                        $travada->atendente_id = $vendedorId;
+                    }
 
-            if (array_key_exists('observacoes', $data)) {
-                $os->observacoes = trim((string) ($data['observacoes'] ?? '')) ?: null;
-            }
+                    if (
+                        array_key_exists('hora_inicio', $data)
+                        && filled($data['hora_inicio'])
+                        && blank($travada->hora_inicio)
+                    ) {
+                        $hora = trim((string) $data['hora_inicio']);
+                        $travada->hora_inicio = strlen($hora) === 5 ? $hora.':00' : $hora;
+                    }
 
-            $os->usuario_id = $user->id;
-            $os->save();
+                    if (array_key_exists('status', $data) && filled($data['status']) && empty($data['finalizar'])) {
+                        $situacao = OrdemServicoApiPayload::situacaoFromApp((string) $data['status']);
+                        if ($situacao !== null) {
+                            $travada->situacao = $situacao;
+                        }
+                    }
 
-            $vendedorId = $user->vendedor_id ? (int) $user->vendedor_id : null;
+                    if (array_key_exists('servico_realizado', $data)) {
+                        $travada->laudo = trim((string) ($data['servico_realizado'] ?? '')) ?: null;
+                    }
 
-            if (array_key_exists('pecas', $data)) {
-                $os->itens()->where('tipo', 'P')->delete();
-                self::gravarItensCatalogo($os, $user, $vendedorId, (array) $data['pecas'], 'P', permitirPrecoManual: false);
-            }
+                    if (array_key_exists('observacoes', $data)) {
+                        $travada->observacoes = trim((string) ($data['observacoes'] ?? '')) ?: null;
+                    }
 
-            if (array_key_exists('servicos', $data)) {
-                // O app não envia o texto por serviço (lançado no web): reaplica pelo produto/descrição.
-                $servicoPrestado = $os->itens()
-                    ->where('tipo', 'S')
-                    ->whereNotNull('servico_prestado')
-                    ->get(['product_id', 'discriminacao', 'servico_prestado'])
-                    ->mapWithKeys(static fn ($item): array => [
-                        ($item->product_id ? 'p'.$item->product_id : 'd'.mb_strtoupper((string) $item->discriminacao, 'UTF-8')) => $item->servico_prestado,
-                    ])
-                    ->all();
+                    $travada->usuario_id = $user->id;
+                    $travada->save();
 
-                $os->itens()->where('tipo', 'S')->delete();
-                self::gravarItensCatalogo($os, $user, $vendedorId, (array) $data['servicos'], 'S', permitirPrecoManual: true, servicoPrestado: $servicoPrestado);
-            }
+                    $vendedorId = $user->vendedor_id ? (int) $user->vendedor_id : null;
 
-            if (array_key_exists('pecas', $data) || array_key_exists('servicos', $data)) {
-                self::recalcularTotaisOs($os);
-            }
+                    if (array_key_exists('pecas', $data)) {
+                        $travada->itens()->where('tipo', 'P')->delete();
+                        self::gravarItensCatalogo($travada, $user, $vendedorId, (array) $data['pecas'], 'P', permitirPrecoManual: false);
+                    }
 
-            if (! empty($data['finalizar'])) {
-                if ($empresaId <= 0) {
-                    throw ValidationException::withMessages([
-                        'empresa_id' => 'Usuário sem empresa. Não é possível finalizar a OS.',
-                    ]);
-                }
+                    if (array_key_exists('servicos', $data)) {
+                        $servicoPrestado = $travada->itens()
+                            ->where('tipo', 'S')
+                            ->whereNotNull('servico_prestado')
+                            ->get(['product_id', 'discriminacao', 'servico_prestado'])
+                            ->mapWithKeys(static fn ($item): array => [
+                                ($item->product_id ? 'p'.$item->product_id : 'd'.mb_strtoupper((string) $item->discriminacao, 'UTF-8')) => $item->servico_prestado,
+                            ])
+                            ->all();
 
-                if ($vendedorId === null) {
-                    throw ValidationException::withMessages([
-                        'tecnico' => 'Usuário sem técnico/vendedor vinculado.',
-                    ]);
-                }
+                        $travada->itens()->where('tipo', 'S')->delete();
+                        self::gravarItensCatalogo($travada, $user, $vendedorId, (array) $data['servicos'], 'S', permitirPrecoManual: true, servicoPrestado: $servicoPrestado);
+                    }
 
-                $os->refresh();
+                    if (array_key_exists('pecas', $data) || array_key_exists('servicos', $data)) {
+                        self::recalcularTotaisOs($travada);
+                    }
 
-                if (self::osJaFaturada($os)) {
-                    return;
-                }
+                    if (! empty($data['finalizar'])) {
+                        if ($empresaId <= 0) {
+                            throw ValidationException::withMessages([
+                                'empresa_id' => 'Usuário sem empresa. Não é possível finalizar a OS.',
+                            ]);
+                        }
 
-                $atendimentoIniciado = filled($os->hora_inicio)
-                    || in_array($os->situacao, [
-                        OrdemServico::SITUACAO_ANDAMENTO,
-                        OrdemServico::SITUACAO_ABERTA,
-                    ], true);
+                        if ($vendedorId === null) {
+                            throw ValidationException::withMessages([
+                                'tecnico' => 'Usuário sem técnico/vendedor vinculado.',
+                            ]);
+                        }
 
-                if (! $atendimentoIniciado) {
-                    throw ValidationException::withMessages([
-                        'atendimento' => 'Inicie o atendimento antes de enviar a OS para faturamento.',
-                    ]);
-                }
+                        $travada->refresh();
+                        self::assertOsPodeSerMutadaPelaApi($travada);
 
-                $qtdServicos = $os->itens()->where('tipo', 'S')->count();
-                if ($qtdServicos < 1) {
-                    throw ValidationException::withMessages([
-                        'servicos' => 'Informe pelo menos um serviço realizado antes de enviar para faturamento.',
-                    ]);
-                }
+                        $atendimentoIniciado = filled($travada->hora_inicio)
+                            || in_array($travada->situacao, [
+                                OrdemServico::SITUACAO_ANDAMENTO,
+                                OrdemServico::SITUACAO_ABERTA,
+                            ], true);
 
-                // No ERP fica aberta para o faturamento. O app lê data_termino como "em faturamento".
-                $os->situacao = OrdemServico::SITUACAO_ABERTA;
-                if (blank($os->data_termino)) {
-                    $os->data_termino = $agora->toDateString();
-                }
-                if (blank($os->hora_termino)) {
-                    $os->hora_termino = $agora->format('H:i:s');
-                }
-                $os->usuario_id = $user->id;
-                $os->save();
-            }
-        });
+                        if (! $atendimentoIniciado) {
+                            throw ValidationException::withMessages([
+                                'atendimento' => 'Inicie o atendimento antes de enviar a OS para faturamento.',
+                            ]);
+                        }
+
+                        $qtdServicos = $travada->itens()->where('tipo', 'S')->count();
+                        if ($qtdServicos < 1) {
+                            throw ValidationException::withMessages([
+                                'servicos' => 'Informe pelo menos um serviço realizado antes de enviar para faturamento.',
+                            ]);
+                        }
+
+                        $travada->situacao = OrdemServico::SITUACAO_ABERTA;
+                        if (blank($travada->data_termino)) {
+                            $travada->data_termino = $agora->toDateString();
+                        }
+                        if (blank($travada->hora_termino)) {
+                            $travada->hora_termino = $agora->format('H:i:s');
+                        }
+                        $travada->usuario_id = $user->id;
+                        $travada->save();
+                    }
+
+                    $os->setRawAttributes($travada->getAttributes(), true);
+                });
+            });
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages([
+                'os' => $exception->getMessage(),
+            ]);
+        }
 
         $os->refresh()->load(['atendente', 'cliente', 'itens.product']);
 
@@ -617,6 +632,18 @@ class OrdemServicoController
             OrdemServico::SITUACAO_FINALIZADA,
             OrdemServico::SITUACAO_ENTREGUE,
         ], true);
+    }
+
+    /**
+     * @throws DomainException
+     */
+    private static function assertOsPodeSerMutadaPelaApi(OrdemServico $os): void
+    {
+        if (! $os->isEditable()) {
+            throw new DomainException('OS faturada ou cancelada não pode ser alterada pelo aplicativo.');
+        }
+
+        OsFiscalLock::assertPodeAlterar($os);
     }
 
     /**

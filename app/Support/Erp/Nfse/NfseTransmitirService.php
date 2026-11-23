@@ -7,6 +7,7 @@ use App\Models\Nfse;
 use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\Os\OsFiscalLock;
 use App\Support\Fiscal\NfceFiscalCertificateResolver;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -24,66 +25,70 @@ class NfseTransmitirService
     public function transmitir(Nfse $nfse): NfseTransmissaoResultado
     {
         $nfse->loadMissing(['empresa', 'itens']);
-        $this->garantirPronta($nfse);
-        $this->reservarEnvio($nfse);
+        $osIds = OsFiscalLock::idsOsDaNfse($nfse);
 
-        try {
-            $xml = $this->gerador->gerar($this->builder->montar($nfse));
-            $this->exigirXmlValido($xml);
-            $certificado = $this->assinador->certificadoDaNota($nfse);
-            $assinado = $this->assinador->assinarNota($nfse, $xml);
-            $this->assinador->validar($assinado, $certificado);
-            $this->exigirXmlValido($assinado);
+        return OsFiscalLock::executarParaOsIds($osIds, function () use ($nfse): NfseTransmissaoResultado {
+            $this->garantirPronta($nfse);
+            $this->reservarEnvio($nfse);
 
-            $empresa = $nfse->empresa;
+            try {
+                $xml = $this->gerador->gerar($this->builder->montar($nfse));
+                $this->exigirXmlValido($xml);
+                $certificado = $this->assinador->certificadoDaNota($nfse);
+                $assinado = $this->assinador->assinarNota($nfse, $xml);
+                $this->assinador->validar($assinado, $certificado);
+                $this->exigirXmlValido($assinado);
 
-            if (! $empresa instanceof Empresa) {
-                throw new NfseNaoTransmitida('Empresa da NFS-e não encontrada.');
+                $empresa = $nfse->empresa;
+
+                if (! $empresa instanceof Empresa) {
+                    throw new NfseNaoTransmitida('Empresa da NFS-e não encontrada.');
+                }
+
+                $ambiente = NfseSefinAmbiente::daEmpresa($empresa->nfse_ambiente);
+
+                if (! str_contains($assinado, '<tpAmb>'.$ambiente->tpAmb().'</tpAmb>')) {
+                    throw new NfseNaoTransmitida('A DPS não está no ambiente configurado da NFS-e.');
+                }
+
+                $client = NfseSefinClient::daEmpresa($empresa);
+                $requisicao = $client->preparar($assinado, $certificado);
+                $payload = json_decode($requisicao->corpo, true, 512, JSON_THROW_ON_ERROR);
+                $restaurado = gzdecode(base64_decode((string) ($payload['dpsXmlGZipB64'] ?? ''), true));
+
+                if ($requisicao->url !== $ambiente->url() || ! NfseSefinEndpoints::urlOficial($requisicao->url) || $restaurado !== $assinado) {
+                    throw new NfseNaoTransmitida('A DPS pronta para envio não confere com o XML assinado.');
+                }
+
+                $resposta = $this->envio->enviar($requisicao);
+            } catch (NfseNaoTransmitida $exception) {
+                $this->liberarEnvio($nfse);
+
+                throw $exception;
+            } catch (NfseDpsNaoAssinada|NfseDpsNaoMontada $exception) {
+                $this->liberarEnvio($nfse);
+
+                throw new NfseNaoTransmitida($exception->getMessage());
+            } catch (Throwable) {
+                $this->liberarEnvio($nfse);
+
+                throw new NfseNaoTransmitida('Não foi possível transmitir a DPS.');
             }
 
-            $ambiente = NfseSefinAmbiente::daEmpresa($empresa->nfse_ambiente);
-
-            if (! str_contains($assinado, '<tpAmb>'.$ambiente->tpAmb().'</tpAmb>')) {
-                throw new NfseNaoTransmitida('A DPS não está no ambiente configurado da NFS-e.');
+            if ($resposta->autorizada()) {
+                return new NfseTransmissaoResultado(
+                    $this->registrarAutorizacao($nfse, $resposta, $assinado),
+                    true,
+                    [],
+                    $resposta->alertas,
+                );
             }
 
-            $client = NfseSefinClient::daEmpresa($empresa);
-            $requisicao = $client->preparar($assinado, $certificado);
-            $payload = json_decode($requisicao->corpo, true, 512, JSON_THROW_ON_ERROR);
-            $restaurado = gzdecode(base64_decode((string) ($payload['dpsXmlGZipB64'] ?? ''), true));
-
-            if ($requisicao->url !== $ambiente->url() || ! NfseSefinEndpoints::urlOficial($requisicao->url) || $restaurado !== $assinado) {
-                throw new NfseNaoTransmitida('A DPS pronta para envio não confere com o XML assinado.');
-            }
-
-            $resposta = $this->envio->enviar($requisicao);
-        } catch (NfseNaoTransmitida $exception) {
             $this->liberarEnvio($nfse);
+            $nfse->refresh();
 
-            throw $exception;
-        } catch (NfseDpsNaoAssinada|NfseDpsNaoMontada $exception) {
-            $this->liberarEnvio($nfse);
-
-            throw new NfseNaoTransmitida($exception->getMessage());
-        } catch (Throwable) {
-            $this->liberarEnvio($nfse);
-
-            throw new NfseNaoTransmitida('Não foi possível transmitir a DPS.');
-        }
-
-        if ($resposta->autorizada()) {
-            return new NfseTransmissaoResultado(
-                $this->registrarAutorizacao($nfse, $resposta, $assinado),
-                true,
-                [],
-                $resposta->alertas,
-            );
-        }
-
-        $this->liberarEnvio($nfse);
-        $nfse->refresh();
-
-        return new NfseTransmissaoResultado($nfse, false, $resposta->erros, []);
+            return new NfseTransmissaoResultado($nfse, false, $resposta->erros, []);
+        });
     }
 
     public function certificadoValido(Empresa $empresa): bool
@@ -222,20 +227,25 @@ class NfseTransmitirService
             throw new NfseNaoTransmitida('A NFS-e autorizada não retornou o XML.');
         }
 
+        $numeroNfse = NfseSefinXmlLeitor::numeroNfse($resposta->xmlNfse);
+
         $nfse->fill([
             'status' => Nfse::STATUS_AUTORIZADA,
             'id_dps' => $resposta->idDps,
             'chave_acesso' => $resposta->chaveAcesso,
             'chave' => $resposta->chaveAcesso,
+            'numero_nfse' => $numeroNfse,
             'tipo_ambiente' => $resposta->tipoAmbiente,
             'versao_aplicativo' => $resposta->versaoAplicativo,
             'data_hora_processamento' => $resposta->dataHoraProcessamento,
             'xml_nfse' => $resposta->xmlNfse,
             'xml_dps' => $xmlDps,
             'alertas' => $resposta->alertas === [] ? null : $resposta->alertas,
-            'transmitindo_em' => null,
         ]);
         $nfse->save();
+
+        // reservarEnvio grava transmitindo_em em outra instância; null no fill pode não sujar o model.
+        Nfse::query()->whereKey($nfse->id)->update(['transmitindo_em' => null]);
 
         $nfse = $nfse->fresh(['itens', 'empresa']) ?? $nfse;
         $empresa = $nfse->empresa;

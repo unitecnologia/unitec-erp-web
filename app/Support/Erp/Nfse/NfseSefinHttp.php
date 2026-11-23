@@ -9,14 +9,28 @@ class NfseSefinHttp implements NfseSefinEnvio
 {
     public function enviar(NfseSefinRequisicao $requisicao): NfseSefinResposta
     {
+        [$status, $body] = $this->executar($requisicao);
+
+        return NfseSefinResposta::interpretar($status, $body);
+    }
+
+    /**
+     * Transporte mTLS bruto (emissão, eventos e consultas) sem interpretar o JSON.
+     *
+     * @return array{0: int, 1: string}
+     */
+    public function executar(NfseSefinRequisicao $requisicao): array
+    {
         $host = strtolower((string) parse_url($requisicao->url, PHP_URL_HOST));
 
         if ($host === '' || ! NfseSefinEndpoints::urlOficial($requisicao->url)) {
             throw new NfseNaoTransmitida('O host da SEFIN Nacional não está habilitado para esta transmissão.');
         }
 
-        if ($requisicao->metodo !== 'POST') {
-            throw new NfseNaoTransmitida('A emissão da DPS só aceita POST.');
+        $metodo = strtoupper($requisicao->metodo);
+
+        if (! in_array($metodo, ['POST', 'GET'], true)) {
+            throw new NfseNaoTransmitida('A SEFIN Nacional só aceita GET ou POST nesta integração.');
         }
 
         $certPath = tempnam(sys_get_temp_dir(), 'nfse-cert-');
@@ -37,25 +51,30 @@ class NfseSefinHttp implements NfseSefinEnvio
                 throw new NfseNaoTransmitida('Não foi possível abrir a conexão com a SEFIN Nacional.');
             }
 
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $requisicao->corpo,
+            $opcoes = [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                ],
+                CURLOPT_HTTPHEADER => $this->headers($requisicao),
                 CURLOPT_SSLCERT => $certPath,
                 CURLOPT_SSLKEY => $keyPath,
                 CURLOPT_SSLCERTTYPE => 'PEM',
                 CURLOPT_SSLKEYTYPE => 'PEM',
                 CURLOPT_TIMEOUT => 60,
                 CURLOPT_CONNECTTIMEOUT => 20,
-            ] + SslTransportOptions::curlOptions());
+                CURLOPT_CUSTOMREQUEST => $metodo,
+            ] + SslTransportOptions::curlOptions();
 
+            if ($metodo === 'POST') {
+                $opcoes[CURLOPT_POST] = true;
+                $opcoes[CURLOPT_POSTFIELDS] = $requisicao->corpo;
+            } else {
+                $opcoes[CURLOPT_HTTPGET] = true;
+            }
+
+            curl_setopt_array($ch, $opcoes);
             $body = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $erroCurl = curl_error($ch);
             curl_close($ch);
         } finally {
             @unlink($certPath);
@@ -63,9 +82,33 @@ class NfseSefinHttp implements NfseSefinEnvio
         }
 
         if ($body === false || $status === 0) {
-            throw new NfseNaoTransmitida('Não foi possível transmitir a DPS.');
+            $detalhe = trim($erroCurl ?? '');
+
+            throw new NfseNaoTransmitida(
+                $detalhe !== ''
+                    ? 'Não foi possível comunicar com a SEFIN Nacional ('.$detalhe.').'
+                    : 'Não foi possível comunicar com a SEFIN Nacional.'
+            );
         }
 
-        return NfseSefinResposta::interpretar($status, (string) $body);
+        return [$status, (string) $body];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function headers(NfseSefinRequisicao $requisicao): array
+    {
+        $linhas = [];
+
+        foreach ($requisicao->headers as $nome => $valor) {
+            $linhas[] = $nome.': '.$valor;
+        }
+
+        if ($linhas === []) {
+            $linhas[] = 'Accept: application/json';
+        }
+
+        return $linhas;
     }
 }

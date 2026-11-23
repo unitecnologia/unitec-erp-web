@@ -6,10 +6,7 @@ use App\Models\Boleto;
 use App\Models\CaixaLancamento;
 use App\Models\ContaReceber;
 use App\Models\EstoqueMovimentacao;
-use App\Models\Nfe;
-use App\Models\Nfse;
 use App\Models\OrdemServico;
-use App\Models\PdvVendaNfce;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpContext;
@@ -35,18 +32,6 @@ final class OsReabrirService
     public const OPERACAO_CANCELAR = 'CANCELAR_ORDEM_SERVICO';
 
     private const SITUACOES_FATURADAS = [OrdemServico::SITUACAO_FINALIZADA, OrdemServico::SITUACAO_ENTREGUE];
-
-    /**
-     * NFS-e nesses status ainda não existe na prefeitura (ou foi cancelada).
-     *
-     * @var list<string>
-     */
-    private const NFSE_LIBERADA = [Nfse::STATUS_ABERTA, Nfse::STATUS_CANCELADA, Nfse::STATUS_REJEITADA];
-
-    /**
-     * @var list<string>
-     */
-    private const NFE_EMITIDA = [Nfe::STATUS_TRANSMITIDA, Nfe::STATUS_CONTINGENCIA, Nfe::STATUS_DUPLICIDADE];
 
     public function __construct(
         private readonly PdvStockService $stock = new PdvStockService(),
@@ -74,44 +59,10 @@ final class OsReabrirService
 
     private function bloqueioDocumentos(OrdemServico $os, string $acao): ?string
     {
-        $nfse = Nfse::query()
-            ->daOrdemServico((int) $os->id)
-            ->whereNotIn('status', self::NFSE_LIBERADA)
-            ->orderByDesc('id')
-            ->first();
+        $motivo = OsFiscalLock::motivoBloqueioDocumentos($os, $acao, $os);
 
-        if ($nfse instanceof Nfse) {
-            $numero = trim((string) ($nfse->numero_nfse ?: $nfse->numero_dps));
-
-            return 'Esta OS tem NFS-e emitida'.($numero !== '' ? ' (nº '.$numero.')' : '').'. Cancele a NFS-e antes de '.$acao.' a OS.';
-        }
-
-        $nfe = $this->nfeEmitida($os);
-
-        if ($nfe instanceof Nfe) {
-            $numero = trim((string) ($nfe->numero ?? ''));
-
-            return 'Esta OS tem NF-e emitida'.($numero !== '' ? ' (nº '.$numero.')' : '').'. Cancele a NF-e antes de '.$acao.' a OS.';
-        }
-
-        $nfce = PdvVendaNfce::query()
-            ->where('ordem_servico_id', (int) $os->id)
-            ->where(fn ($q) => $q->where('simulada', false)->orWhereNull('simulada'))
-            ->whereIn('status', [
-                PdvVendaNfce::STATUS_AUTORIZADA,
-                PdvVendaNfce::STATUS_CONTINGENCIA,
-                PdvVendaNfce::STATUS_DUPLICIDADE,
-                PdvVendaNfce::STATUS_PENDENTE,
-                PdvVendaNfce::STATUS_REJEITADA,
-                PdvVendaNfce::STATUS_DENEGADA,
-            ])
-            ->orderByDesc('id')
-            ->first();
-
-        if ($nfce instanceof PdvVendaNfce) {
-            $numero = trim((string) ($nfce->numero ?? ''));
-
-            return 'Esta OS tem NFC-e emitida'.($numero !== '' ? ' (nº '.$numero.')' : '').'. Cancele a NFC-e antes de '.$acao.' a OS.';
+        if ($motivo !== null) {
+            return $motivo;
         }
 
         if ($this->boletosRegistrados($os)->isNotEmpty()) {
@@ -166,52 +117,54 @@ final class OsReabrirService
             throw new DomainException($motivo);
         }
 
-        $resumo = DB::transaction(function () use ($os, $bloqueio, $situacaoFinal): array {
-            $travada = OrdemServico::query()->whereKey($os->id)->lockForUpdate()->first();
+        $resumo = OsFiscalLock::executar((int) $os->id, function () use ($os, $bloqueio, $situacaoFinal): array {
+            return DB::transaction(function () use ($os, $bloqueio, $situacaoFinal): array {
+                $travada = OrdemServico::query()->whereKey($os->id)->lockForUpdate()->first();
 
-            if (! $travada instanceof OrdemServico) {
-                throw new DomainException('Ordem de serviço não encontrada.');
-            }
-
-            $motivo = $bloqueio($travada);
-
-            if ($motivo !== null) {
-                throw new DomainException($motivo);
-            }
-
-            $situacaoAnterior = (string) $travada->situacao;
-            $resumo = ['situacao_anterior' => $situacaoAnterior, 'faturamento_estornado' => false];
-            $payload = ['situacao' => $situacaoFinal];
-
-            if (in_array($situacaoAnterior, self::SITUACOES_FATURADAS, true)) {
-                $resumo = array_merge($resumo, $this->estornarFaturamento($travada), ['faturamento_estornado' => true]);
-                $payload = array_merge($payload, $this->limpezaFaturamento($travada));
-            }
-
-            $orcamentoIdVinculado = filled($travada->orcamento_id) ? (int) $travada->orcamento_id : 0;
-
-            $travada->forceFill($payload)->save();
-
-            $espelho = app(OsVendaEspelhoService::class);
-
-            if ($situacaoFinal === OrdemServico::SITUACAO_ABERTA) {
-                $espelho->marcarAberta($travada);
-
-                if ($orcamentoIdVinculado > 0) {
-                    app(OsOrcamentoVinculo::class)
-                        ->garantirImportadoAoReabrirOs($orcamentoIdVinculado);
+                if (! $travada instanceof OrdemServico) {
+                    throw new DomainException('Ordem de serviço não encontrada.');
                 }
-            } elseif ($situacaoFinal === OrdemServico::SITUACAO_CANCELADA) {
-                $espelho->marcarCancelada($travada);
 
-                // Mantém orcamento_id na OS cancelada; devolve FECHADO só se não houver outro uso.
-                if ($orcamentoIdVinculado > 0) {
-                    app(OsOrcamentoVinculo::class)
-                        ->devolverAposCancelarOs($orcamentoIdVinculado, (int) $travada->id);
+                $motivo = $bloqueio($travada);
+
+                if ($motivo !== null) {
+                    throw new DomainException($motivo);
                 }
-            }
 
-            return $resumo;
+                $situacaoAnterior = (string) $travada->situacao;
+                $resumo = ['situacao_anterior' => $situacaoAnterior, 'faturamento_estornado' => false];
+                $payload = ['situacao' => $situacaoFinal];
+
+                if (in_array($situacaoAnterior, self::SITUACOES_FATURADAS, true)) {
+                    $resumo = array_merge($resumo, $this->estornarFaturamento($travada), ['faturamento_estornado' => true]);
+                    $payload = array_merge($payload, $this->limpezaFaturamento($travada));
+                }
+
+                $orcamentoIdVinculado = filled($travada->orcamento_id) ? (int) $travada->orcamento_id : 0;
+
+                $travada->forceFill($payload)->save();
+
+                $espelho = app(OsVendaEspelhoService::class);
+
+                if ($situacaoFinal === OrdemServico::SITUACAO_ABERTA) {
+                    $espelho->marcarAberta($travada);
+
+                    if ($orcamentoIdVinculado > 0) {
+                        app(OsOrcamentoVinculo::class)
+                            ->garantirImportadoAoReabrirOs($orcamentoIdVinculado);
+                    }
+                } elseif ($situacaoFinal === OrdemServico::SITUACAO_CANCELADA) {
+                    $espelho->marcarCancelada($travada);
+
+                    // Mantém orcamento_id na OS cancelada; devolve FECHADO só se não houver outro uso.
+                    if ($orcamentoIdVinculado > 0) {
+                        app(OsOrcamentoVinculo::class)
+                            ->devolverAposCancelarOs($orcamentoIdVinculado, (int) $travada->id);
+                    }
+                }
+
+                return $resumo;
+            });
         });
 
         $os->refresh();
@@ -406,27 +359,6 @@ final class OsReabrirService
         }
 
         return $devolvidas;
-    }
-
-    /**
-     * NF-e de peças gerada pela OS (NfeOrdemServicoService grava o número da OS em npedido).
-     */
-    private function nfeEmitida(OrdemServico $os): ?Nfe
-    {
-        $numero = ltrim(preg_replace('/\D/', '', (string) $os->numero) ?? '', '0');
-
-        if ($numero === '') {
-            return null;
-        }
-
-        return Nfe::query()
-            ->whereIn('status', self::NFE_EMITIDA)
-            ->whereIn('npedido', [$numero, 'OS-'.$numero, 'OS '.$numero])
-            ->where('obs_contribuinte', 'like', '%ORIGINADA DA OS%')
-            ->when($os->empresa_id, fn (Builder $q) => $q->where('empresa_id', (int) $os->empresa_id))
-            ->when($os->cliente_id, fn (Builder $q) => $q->where('cliente_id', (int) $os->cliente_id))
-            ->orderByDesc('id')
-            ->first();
     }
 
     /**

@@ -173,6 +173,13 @@ class CaixaConta extends Model
      */
     public static function ensureCaixaGeral(): self
     {
+        // Mesmo request (ex.: faturamento OS) chama várias vezes — evita SELECT repetido.
+        static $memo = null;
+
+        if ($memo instanceof self) {
+            return $memo;
+        }
+
         $conta = self::query()
             ->whereRaw('UPPER(nome) = ?', [self::NOME_CAIXA_GERAL])
             ->first();
@@ -191,7 +198,7 @@ class CaixaConta extends Model
                 $conta->save();
             }
 
-            return $conta;
+            return $memo = $conta;
         }
 
         $codigo = 1;
@@ -200,7 +207,7 @@ class CaixaConta extends Model
             $codigo = (int) self::query()->max('codigo') + 1;
         }
 
-        return self::query()->create([
+        return $memo = self::query()->create([
             'codigo' => $codigo,
             'nome' => self::NOME_CAIXA_GERAL,
             'tipo' => self::TIPO_SUBCAIXA,

@@ -1,4 +1,13 @@
 @if ($this->osNfceEmitirModalOpen)
+    @php
+        $conferencia = is_array($this->osNfceEmitirConferencia) ? $this->osNfceEmitirConferencia : [];
+        $itens = is_array($conferencia['itens'] ?? null) ? $conferencia['itens'] : [];
+        $subtotal = (float) ($conferencia['subtotal'] ?? 0);
+        $descontoPecas = (float) ($conferencia['desconto_pecas'] ?? 0);
+        $descontoNfce = (float) ($conferencia['desconto'] ?? 0);
+        $acrescimoNfce = (float) ($conferencia['acrescimo'] ?? 0);
+        $totalNfce = (float) ($conferencia['total'] ?? 0);
+    @endphp
     <div
         class="erp-lookup-modal erp-os-nfce-emitir-modal"
         wire:keydown.escape.window="cancelarOsNfceEmitirModal"
@@ -14,7 +23,7 @@
             aria-labelledby="erp-os-nfce-emitir-title"
         >
             <div class="erp-lookup-modal__titlebar">
-                <span id="erp-os-nfce-emitir-title">NFC-e Peças — Consumidor</span>
+                <span id="erp-os-nfce-emitir-title">NFC-e Peças — Conferência</span>
                 <button
                     type="button"
                     class="erp-lookup-modal__close"
@@ -24,6 +33,69 @@
             </div>
 
             <div class="erp-lookup-modal__body erp-os-nfce-emitir-modal__body">
+                <section class="erp-os-nfce-emitir-modal__conferencia" aria-label="Peças da NFC-e">
+                    <div class="erp-os-nfce-emitir-modal__conferencia-head">
+                        <h3 class="erp-os-nfce-emitir-modal__section-title">Peças (somente leitura)</h3>
+                        <p class="erp-os-nfce-emitir-modal__conferencia-hint">Valores iguais aos que serão enviados à SEFAZ.</p>
+                    </div>
+
+                    <div class="erp-os-nfce-emitir-modal__grid-wrap">
+                        <table class="erp-os-nfce-emitir-modal__grid">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Descrição</th>
+                                    <th scope="col" class="is-num">Qtd</th>
+                                    <th scope="col" class="is-num">Unitário</th>
+                                    <th scope="col" class="is-num">Desconto</th>
+                                    <th scope="col" class="is-num">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($itens as $item)
+                                    <tr>
+                                        <td class="is-desc" title="{{ $item['descricao'] ?? '' }}">{{ $item['descricao'] ?? '—' }}</td>
+                                        <td class="is-num">{{ number_format((float) ($item['quantidade'] ?? 0), 3, ',', '.') }}</td>
+                                        <td class="is-num">{{ number_format((float) ($item['valor_unitario'] ?? 0), 2, ',', '.') }}</td>
+                                        <td class="is-num">{{ number_format((float) ($item['desconto'] ?? 0), 2, ',', '.') }}</td>
+                                        <td class="is-num">{{ number_format((float) ($item['total'] ?? 0), 2, ',', '.') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="is-empty">Nenhuma peça para emitir.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <dl class="erp-os-nfce-emitir-modal__totais">
+                        <div class="erp-os-nfce-emitir-modal__totais-row">
+                            <dt>Subtotal</dt>
+                            <dd>R$ {{ number_format($subtotal, 2, ',', '.') }}</dd>
+                        </div>
+                        <div class="erp-os-nfce-emitir-modal__totais-row">
+                            <dt title="Já refletidos no total de cada peça">Descontos das peças</dt>
+                            <dd>R$ {{ number_format($descontoPecas, 2, ',', '.') }}</dd>
+                        </div>
+                        @if ($descontoNfce > 0.0001)
+                            <div class="erp-os-nfce-emitir-modal__totais-row">
+                                <dt>Desconto NFC-e</dt>
+                                <dd>R$ {{ number_format($descontoNfce, 2, ',', '.') }}</dd>
+                            </div>
+                        @endif
+                        @if ($acrescimoNfce > 0.0001)
+                            <div class="erp-os-nfce-emitir-modal__totais-row">
+                                <dt>Acréscimo</dt>
+                                <dd>R$ {{ number_format($acrescimoNfce, 2, ',', '.') }}</dd>
+                            </div>
+                        @endif
+                        <div class="erp-os-nfce-emitir-modal__totais-row is-total">
+                            <dt>Total NFC-e</dt>
+                            <dd>R$ {{ number_format($totalNfce, 2, ',', '.') }}</dd>
+                        </div>
+                    </dl>
+                </section>
+
                 <p class="erp-os-nfce-emitir-modal__hint">
                     Informe CPF e nome se quiser identificar o consumidor. Deixe em branco para consumidor não identificado.
                     NFC-e não aceita CNPJ — para pessoa jurídica use F10 | NF-e Peças.

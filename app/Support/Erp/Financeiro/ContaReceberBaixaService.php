@@ -587,7 +587,12 @@ final class ContaReceberBaixaService
         ?int $planoContaId = null,
         ?string $planoNome = null,
     ): void {
-        if (! Schema::hasTable((new CaixaLancamento)->getTable()) || $valor <= 0) {
+        static $caixaTabelaOk = null;
+        static $caixaTemEmpresaId = null;
+        $caixaTabela = (new CaixaLancamento)->getTable();
+        $caixaTabelaOk ??= Schema::hasTable($caixaTabela);
+
+        if (! $caixaTabelaOk || $valor <= 0) {
             return;
         }
 
@@ -609,7 +614,9 @@ final class ContaReceberBaixaService
             'saida' => $saida ? $valor : 0,
         ];
 
-        if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
+        $caixaTemEmpresaId ??= Schema::hasColumn($caixaTabela, 'empresa_id');
+
+        if ($caixaTemEmpresaId) {
             $payload['empresa_id'] = $empresaId;
         }
 

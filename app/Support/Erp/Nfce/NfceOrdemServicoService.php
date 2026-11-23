@@ -15,6 +15,7 @@ use App\Support\Erp\DocumentoBrasileiroValidator;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpSchema;
 use App\Support\Erp\Nfe\NfeOrdemServicoService;
+use App\Support\Erp\Os\OsFiscalLock;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Pdv\TerminalResolver;
@@ -57,10 +58,15 @@ final class NfceOrdemServicoService
         PdvVendaNfce::STATUS_CONTINGENCIA,
     ];
 
+    /**
+     * @param  PdvNfceEmissionService|object  $emissionService
+     * @param  PdvNfceTransmissaoService|object  $transmissaoService
+     * @param  PdvNfceFiscalPayloadBuilder|object  $payloadBuilder
+     */
     public function __construct(
-        private readonly PdvNfceEmissionService $emissionService = new PdvNfceEmissionService(),
-        private readonly PdvNfceTransmissaoService $transmissaoService = new PdvNfceTransmissaoService(),
-        private readonly PdvNfceFiscalPayloadBuilder $payloadBuilder = new PdvNfceFiscalPayloadBuilder(),
+        private readonly object $emissionService = new PdvNfceEmissionService(),
+        private readonly object $transmissaoService = new PdvNfceTransmissaoService(),
+        private readonly object $payloadBuilder = new PdvNfceFiscalPayloadBuilder(),
     ) {}
 
     /**
@@ -181,44 +187,46 @@ final class NfceOrdemServicoService
         $obsUsuario = trim((string) ($observacoes ?? ''));
 
         try {
-            // Trecho crítico curto: lock + prepara espelho fiscal. SEFAZ fora da transaction.
-            $preparado = DB::transaction(function () use ($ordem, $consumidorNorm, $obsUsuario): array {
-                $travada = OrdemServico::query()->whereKey($ordem->id)->lockForUpdate()->first();
+            // Trecho crítico curto: lock fiscal OS + prepara espelho. SEFAZ fora da transaction.
+            $preparado = OsFiscalLock::executar((int) $ordem->id, function () use ($ordem, $consumidorNorm, $obsUsuario): array {
+                return DB::transaction(function () use ($ordem, $consumidorNorm, $obsUsuario): array {
+                    $travada = OrdemServico::query()->whereKey($ordem->id)->lockForUpdate()->first();
 
-                if (! $travada instanceof OrdemServico) {
-                    throw new DomainException('Ordem de serviço não encontrada.');
-                }
+                    if (! $travada instanceof OrdemServico) {
+                        throw new DomainException('Ordem de serviço não encontrada.');
+                    }
 
-                $travada->load(['cliente', 'itens.product', 'empresa', 'nfcePecasEmitida', 'nfePecasEmitida']);
+                    $travada->load(['cliente', 'itens.product', 'empresa', 'nfcePecasEmitida', 'nfePecasEmitida']);
 
-                $motivo = $this->motivoBloqueioEmissao($travada);
+                    $motivo = $this->motivoBloqueioEmissao($travada);
 
-                if ($motivo !== null) {
-                    throw new DomainException($motivo);
-                }
+                    if ($motivo !== null) {
+                        throw new DomainException($motivo);
+                    }
 
-                $existente = $this->nfceRetransmissivel($travada);
-                $obsFiscal = $this->montarObservacoesFiscais($travada, $obsUsuario);
+                    $existente = $this->nfceRetransmissivel($travada);
+                    $obsFiscal = $this->montarObservacoesFiscais($travada, $obsUsuario);
 
-                if ($existente !== null) {
-                    $existente->loadMissing('pdvVenda');
-                    $this->aplicarConsumidorEObs($existente->pdvVenda, $consumidorNorm, $obsFiscal);
+                    if ($existente !== null) {
+                        $existente->loadMissing('pdvVenda');
+                        $this->aplicarConsumidorEObs($existente->pdvVenda, $consumidorNorm, $obsFiscal);
+
+                        return [
+                            'modo' => 'retransmitir',
+                            'nfce_id' => (int) $existente->id,
+                            'ordem_id' => (int) $travada->id,
+                            'pdv_venda_id' => (int) $existente->pdv_venda_id,
+                        ];
+                    }
+
+                    $pdvVenda = $this->criarVendaFiscalPecas($travada, $consumidorNorm, $obsFiscal);
 
                     return [
-                        'modo' => 'retransmitir',
-                        'nfce_id' => (int) $existente->id,
+                        'modo' => 'nova',
+                        'pdv_venda_id' => (int) $pdvVenda->id,
                         'ordem_id' => (int) $travada->id,
-                        'pdv_venda_id' => (int) $existente->pdv_venda_id,
                     ];
-                }
-
-                $pdvVenda = $this->criarVendaFiscalPecas($travada, $consumidorNorm, $obsFiscal);
-
-                return [
-                    'modo' => 'nova',
-                    'pdv_venda_id' => (int) $pdvVenda->id,
-                    'ordem_id' => (int) $travada->id,
-                ];
+                });
             });
         } catch (DomainException $exception) {
             return $this->resultado(self::STATUS_REJEITADA, $exception->getMessage());
@@ -380,6 +388,39 @@ final class NfceOrdemServicoService
     }
 
     /**
+     * Espelho das peças/totais que a NFC-e enviará à SEFAZ (mesma conta de criarVendaFiscalPecas).
+     * Somente leitura — não grava nada.
+     *
+     * @return array{
+     *     itens: list<array{descricao: string, quantidade: float, valor_unitario: float, desconto: float, total: float}>,
+     *     subtotal: float,
+     *     desconto_pecas: float,
+     *     desconto: float,
+     *     acrescimo: float,
+     *     total: float
+     * }
+     */
+    public function conferirPecas(OrdemServico $ordem): array
+    {
+        $espelho = $this->montarEspelhoPecas($ordem);
+
+        return [
+            'itens' => array_map(static fn (array $l): array => [
+                'descricao' => $l['descricao'],
+                'quantidade' => $l['q'],
+                'valor_unitario' => $l['preco'],
+                'desconto' => $l['desconto_os'],
+                'total' => $l['total'],
+            ], $espelho['linhas']),
+            'subtotal' => $espelho['subtotal'],
+            'desconto_pecas' => $espelho['desconto_pecas'],
+            'desconto' => $espelho['desconto'],
+            'acrescimo' => $espelho['acrescimo'],
+            'total' => $espelho['total'],
+        ];
+    }
+
+    /**
      * @param  array{person_id: int|null, nome: string, cpf: string}  $consumidor
      */
     private function criarVendaFiscalPecas(OrdemServico $ordem, array $consumidor, string $observacoesFiscais): PdvVenda
@@ -390,19 +431,13 @@ final class NfceOrdemServicoService
             throw new DomainException('Usuário não identificado para emitir a NFC-e.');
         }
 
-        $linhas = $this->montarLinhasPecas($ordem);
-        $total = round(array_sum(array_map(static fn (array $l): float => $l['total'], $linhas)), 2);
-
-        if ($total <= 0) {
-            throw new DomainException('Total das peças inválido para NFC-e.');
-        }
-
+        $espelho = $this->montarEspelhoPecas($ordem);
+        $linhas = $espelho['linhas'];
+        $total = $espelho['total'];
+        $subtotal = $espelho['subtotal'];
+        $desconto = $espelho['desconto'];
+        $acrescimo = $espelho['acrescimo'];
         $forma = $this->formaPagamentoPdv($ordem);
-        $subtotal = round(array_sum(array_map(
-            static fn (array $l): float => round($l['preco'] * $l['q'], 2),
-            $linhas,
-        )), 2);
-        $desconto = max(0.0, round($subtotal - $total, 2));
 
         $dados = [
             'pdv_caixa_sessao_id' => null,
@@ -415,7 +450,7 @@ final class NfceOrdemServicoService
             'numero' => max(1, (int) (preg_replace('/\D/', '', (string) ($ordem->numero ?? $ordem->id)) ?: $ordem->id)),
             'subtotal' => $subtotal,
             'desconto' => $desconto,
-            'acrescimo' => 0,
+            'acrescimo' => $acrescimo,
             'total' => $total,
             'forma_pagamento' => $forma,
             'fiscal' => false,
@@ -447,7 +482,7 @@ final class NfceOrdemServicoService
                 'unidade' => $linha['unidade'],
                 'quantidade' => $linha['q'],
                 'preco_unitario' => $linha['preco'],
-                'desconto' => $linha['desconto'],
+                'desconto' => 0,
                 'acrescimo' => 0,
                 'total' => $linha['total'],
             ]);
@@ -463,7 +498,52 @@ final class NfceOrdemServicoService
     }
 
     /**
-     * @return list<array{product_id: int, codigo: string|null, descricao: string, unidade: string, q: float, preco: float, desconto: float, total: float}>
+     * Conta única usada na conferência do modal e na montagem da venda fiscal.
+     *
+     * @return array{
+     *     linhas: list<array{product_id: int, codigo: string|null, descricao: string, unidade: string, q: float, preco: float, desconto_os: float, total: float}>,
+     *     subtotal: float,
+     *     desconto_pecas: float,
+     *     desconto: float,
+     *     acrescimo: float,
+     *     total: float
+     * }
+     */
+    private function montarEspelhoPecas(OrdemServico $ordem): array
+    {
+        $linhas = $this->montarLinhasPecas($ordem);
+        $total = round(array_sum(array_map(static fn (array $l): float => $l['total'], $linhas)), 2);
+
+        if ($total <= 0) {
+            throw new DomainException('Total das peças inválido para NFC-e.');
+        }
+
+        // preco_unitario no PDV é decimal(12,2): round(total/q,2)*q pode divergir do total da OS.
+        // Fecha a NFC-e com desconto/acréscimo do cabeçalho (vDesc/vOutro) para vNF bater.
+        $subtotal = round(array_sum(array_map(
+            static fn (array $l): float => round($l['preco'] * $l['q'], 2),
+            $linhas,
+        )), 2);
+        $diff = round($subtotal - $total, 2);
+        $desconto = max(0.0, $diff);
+        $acrescimo = max(0.0, -$diff);
+        $descontoPecas = round(array_sum(array_map(
+            static fn (array $l): float => $l['desconto_os'],
+            $linhas,
+        )), 2);
+
+        return [
+            'linhas' => $linhas,
+            'subtotal' => $subtotal,
+            'desconto_pecas' => $descontoPecas,
+            'desconto' => $desconto,
+            'acrescimo' => $acrescimo,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * @return list<array{product_id: int, codigo: string|null, descricao: string, unidade: string, q: float, preco: float, desconto_os: float, total: float}>
      */
     private function montarLinhasPecas(OrdemServico $ordem): array
     {
@@ -507,7 +587,7 @@ final class NfceOrdemServicoService
                 'unidade' => mb_strtoupper((string) ($product->unidade ?: 'UN'), 'UTF-8'),
                 'q' => $q,
                 'preco' => $preco,
-                'desconto' => 0.0,
+                'desconto_os' => round(max(0.0, (float) ($item->desconto ?? 0)), 2),
                 'total' => $total,
             ];
         }

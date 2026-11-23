@@ -27,7 +27,7 @@
 
                 <p class="erp-nfse-cancelar-modal__label">Motivo do cancelamento</p>
                 <div class="erp-nfse-cancelar-modal__motivos" role="radiogroup">
-                    @foreach (\App\Models\Nfse::motivosCancelamento() as $codigo => $rotulo)
+                    @foreach ($this->nfseCancelarMotivos() as $codigo => $rotulo)
                         <label @class([
                             'erp-nfse-cancelar-modal__motivo',
                             'is-selected' => $this->nfseCancelarMotivo === (string) $codigo,
@@ -39,7 +39,11 @@
                 </div>
 
                 <p class="erp-nfse-cancelar-modal__aviso">
-                    O pedido vai para a prefeitura. Depois de cancelada, a NFS-e não pode ser reativada e a OS fica liberada para uma nova nota.
+                    @if ($this->nfseCancelarProvedor === 'nacional')
+                        O pedido vai para a SEFIN Nacional (evento e101101). Depois de cancelada, a NFS-e não pode ser reativada e a OS fica liberada para uma nova nota.
+                    @else
+                        O pedido vai para a prefeitura. Depois de cancelada, a NFS-e não pode ser reativada e a OS fica liberada para uma nova nota.
+                    @endif
                 </p>
             </div>
             <footer class="erp-orc-equip-modal__footer erp-nfse-cancelar-modal__footer">

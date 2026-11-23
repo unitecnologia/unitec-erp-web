@@ -44,6 +44,11 @@ final class OsFaturamentoService
             throw new \RuntimeException('Esta OS não pode ser faturada.');
         }
 
+        $motivoFiscal = OsFiscalLock::motivoBloqueioAlteracao($os);
+        if ($motivoFiscal !== null) {
+            throw new \RuntimeException($motivoFiscal);
+        }
+
         if ($os->cliente_id === null) {
             throw new \RuntimeException('Informe o cliente da OS.');
         }
@@ -78,6 +83,11 @@ final class OsFaturamentoService
 
             if (in_array($travada->situacao, [OrdemServico::SITUACAO_FINALIZADA, OrdemServico::SITUACAO_ENTREGUE, OrdemServico::SITUACAO_CANCELADA], true)) {
                 throw new \RuntimeException('Esta OS não pode ser faturada.');
+            }
+
+            $motivoFiscalTravada = OsFiscalLock::motivoBloqueioAlteracao($travada);
+            if ($motivoFiscalTravada !== null) {
+                throw new \RuntimeException($motivoFiscalTravada);
             }
 
             $documento = 'OS-'.preg_replace('/\D/', '', (string) $os->numero);

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\UnitecOs;
 use App\Models\OrdemServico;
 use App\Models\OrdemServicoImagem;
 use App\Models\User;
+use App\Support\Erp\Os\OsFiscalLock;
 use App\Support\UnitecOs\OrdemServicoImagemService;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ class OrdemServicoMidiaController
     ): JsonResponse {
         $user = $this->user($request);
         $os = $this->findScopedOs($user, $id);
+        $this->assertOsPodeReceberMidia($os);
 
         $data = $request->validate([
             'foto' => ['required', 'file', 'image', 'max:12288'],
@@ -44,6 +47,7 @@ class OrdemServicoMidiaController
     ): JsonResponse {
         $user = $this->user($request);
         $os = $this->findScopedOs($user, $id);
+        $this->assertOsPodeReceberMidia($os);
 
         $data = $request->validate([
             'assinatura' => ['required', 'file', 'mimes:png,jpg,jpeg,webp', 'max:8192'],
@@ -128,6 +132,21 @@ class OrdemServicoMidiaController
         }
 
         return $os;
+    }
+
+    private function assertOsPodeReceberMidia(OrdemServico $os): void
+    {
+        try {
+            if (! $os->isEditable()) {
+                throw new DomainException('OS faturada ou cancelada não pode receber mídia.');
+            }
+
+            OsFiscalLock::assertPodeAlterar($os);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages([
+                'os' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function scopedQuery(User $user): ?Builder

@@ -89,4 +89,129 @@ class OsDescontoFechamentoRateioTest extends TestCase
         $this->assertEqualsWithDelta(0.0, ErpMoney::parseBr($com['itens'][1]['desconto']), 0.001);
         $this->assertEqualsWithDelta(15.0, ErpMoney::parseBr($com['itens'][0]['total']), 0.001);
     }
+
+    public function test_desconto_100_por_cento_zera_totais_e_respeita_centavos(): void
+    {
+        $itens = [
+            [
+                'tipo' => 'P',
+                'qtd' => '1,000',
+                'preco' => '33,33',
+                'acrescimo' => '0,00',
+                'desconto' => '0,00',
+                'total' => '33,33',
+            ],
+            [
+                'tipo' => 'S',
+                'qtd' => '1,000',
+                'preco' => '33,33',
+                'acrescimo' => '0,00',
+                'desconto' => '0,00',
+                'total' => '33,33',
+            ],
+            [
+                'tipo' => 'P',
+                'qtd' => '1,000',
+                'preco' => '33,34',
+                'acrescimo' => '0,00',
+                'desconto' => '0,00',
+                'total' => '33,34',
+            ],
+        ];
+
+        $resultado = OsDescontoFechamentoRateio::aplicar($itens, 100.00);
+
+        $this->assertSame(100.00, $resultado['desconto_aplicado']);
+
+        $somaTotais = 0.0;
+        foreach ($resultado['itens'] as $item) {
+            $somaTotais += ErpMoney::parseBr($item['total']);
+            $this->assertEqualsWithDelta(
+                ErpMoney::parseBr($item['preco']),
+                ErpMoney::parseBr($item['desconto']),
+                0.001,
+            );
+        }
+
+        $this->assertEqualsWithDelta(0.0, $somaTotais, 0.001);
+    }
+
+    public function test_desconto_maior_que_base_e_limitado_ao_total(): void
+    {
+        $itens = [
+            [
+                'qtd' => '1,000',
+                'preco' => '50,00',
+                'acrescimo' => '0,00',
+                'desconto' => '0,00',
+                'total' => '50,00',
+            ],
+        ];
+
+        $resultado = OsDescontoFechamentoRateio::aplicar($itens, 999.99);
+
+        $this->assertSame(50.0, $resultado['desconto_aplicado']);
+        $this->assertEqualsWithDelta(0.0, ErpMoney::parseBr($resultado['itens'][0]['total']), 0.001);
+    }
+
+    public function test_rateio_preserva_acrescimo_do_item_no_recalculo(): void
+    {
+        $itens = [
+            [
+                'qtd' => '1,000',
+                'preco' => '100,00',
+                'acrescimo' => '10,00',
+                'desconto' => '0,00',
+                'total' => '110,00',
+            ],
+            [
+                'qtd' => '1,000',
+                'preco' => '90,00',
+                'acrescimo' => '0,00',
+                'desconto' => '0,00',
+                'total' => '90,00',
+            ],
+        ];
+
+        $resultado = OsDescontoFechamentoRateio::aplicar($itens, 20.00);
+
+        $this->assertSame(20.0, $resultado['desconto_aplicado']);
+        $this->assertEqualsWithDelta(10.0, ErpMoney::parseBr($resultado['itens'][0]['acrescimo']), 0.001);
+
+        $t0 = ErpMoney::parseBr($resultado['itens'][0]['total']);
+        $t1 = ErpMoney::parseBr($resultado['itens'][1]['total']);
+
+        // Base 200: 110→11,00; último 20−11 = 9,00 → totais 99 e 81.
+        $this->assertEqualsWithDelta(99.0, $t0, 0.001);
+        $this->assertEqualsWithDelta(81.0, $t1, 0.001);
+        $this->assertEqualsWithDelta(180.0, $t0 + $t1, 0.001);
+    }
+
+    public function test_desconto_por_item_ja_aplicado_entra_na_base_do_f4(): void
+    {
+        $itens = [
+            [
+                'qtd' => '1,000',
+                'preco' => '100,00',
+                'acrescimo' => '0,00',
+                'desconto' => '20,00',
+                'total' => '80,00',
+            ],
+            [
+                'qtd' => '1,000',
+                'preco' => '20,00',
+                'acrescimo' => '0,00',
+                'desconto' => '0,00',
+                'total' => '20,00',
+            ],
+        ];
+
+        $resultado = OsDescontoFechamentoRateio::aplicar($itens, 10.00);
+
+        $this->assertSame(10.0, $resultado['desconto_aplicado']);
+        // Base 100: 80→8,00; último 2,00 (+20 individual no 1º → desconto 28).
+        $this->assertEqualsWithDelta(28.0, ErpMoney::parseBr($resultado['itens'][0]['desconto']), 0.001);
+        $this->assertEqualsWithDelta(2.0, ErpMoney::parseBr($resultado['itens'][1]['desconto']), 0.001);
+        $this->assertEqualsWithDelta(90.0, ErpMoney::parseBr($resultado['itens'][0]['total']) + ErpMoney::parseBr($resultado['itens'][1]['total']), 0.001);
+    }
 }

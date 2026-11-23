@@ -57,6 +57,7 @@ class NfseSefinRespostaTest extends TestCase
         $this->assertSame(NfseSefinEndpoints::HOST_PRODUCAO, parse_url(NfseSefinEndpoints::NFSE_PRODUCAO, PHP_URL_HOST));
         $this->assertTrue(NfseSefinEndpoints::urlOficial(NfseSefinEndpoints::NFSE_PRODUCAO));
         $this->assertTrue(NfseSefinEndpoints::urlOficial(NfseSefinEndpoints::NFSE_PRODUCAO_RESTRITA));
+        $this->assertTrue(NfseSefinEndpoints::urlOficial(NfseSefinEndpoints::NFSE_PRODUCAO.'/42032042254644503000129000000000004826110170089842/eventos'));
         $this->assertFalse(NfseSefinEndpoints::urlOficial('https://sefin.nfse.gov.br/API/SefinNacional/nfse'));
         $this->assertNotSame(NfseSefinEndpoints::HOST_PRODUCAO, NfseSefinEndpoints::HOST_PRODUCAO_RESTRITA);
 

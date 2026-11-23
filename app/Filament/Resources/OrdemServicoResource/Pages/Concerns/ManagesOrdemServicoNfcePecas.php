@@ -28,6 +28,20 @@ trait ManagesOrdemServicoNfcePecas
     #[\Livewire\Attributes\Locked]
     public ?int $osNfceEmitirOrdemId = null;
 
+    /**
+     * Espelho somente leitura das peças/totais (iguais à NFC-e).
+     *
+     * @var array{
+     *     itens?: list<array{descricao: string, quantidade: float, valor_unitario: float, desconto: float, total: float}>,
+     *     subtotal?: float,
+     *     desconto_pecas?: float,
+     *     desconto?: float,
+     *     acrescimo?: float,
+     *     total?: float
+     * }
+     */
+    public array $osNfceEmitirConferencia = [];
+
     public ?string $osNfceFiscalSucessoDetalhe = null;
 
     public ?int $osNfceFiscalSucessoId = null;
@@ -75,12 +89,21 @@ trait ManagesOrdemServicoNfcePecas
 
     protected function abrirOsNfceEmitirModal(OrdemServico $ordem): void
     {
+        try {
+            $conferencia = app(NfceOrdemServicoService::class)->conferirPecas($ordem);
+        } catch (DomainException $exception) {
+            $this->mostrarOsNfceFiscalErro('NÃO FOI POSSÍVEL EMITIR A NFC-E', $exception->getMessage());
+
+            return;
+        }
+
         $prefill = $this->preencherConsumidorModalDaOs($ordem);
 
         $this->osNfceEmitirOrdemId = (int) $ordem->id;
         $this->osNfceEmitirCpf = $prefill['cpf'];
         $this->osNfceEmitirNome = $prefill['nome'];
         $this->osNfceEmitirObservacoes = '';
+        $this->osNfceEmitirConferencia = $conferencia;
         $this->osNfceEmitirModalOpen = true;
     }
 
@@ -123,6 +146,7 @@ trait ManagesOrdemServicoNfcePecas
         $this->osNfceEmitirCpf = '';
         $this->osNfceEmitirNome = '';
         $this->osNfceEmitirObservacoes = '';
+        $this->osNfceEmitirConferencia = [];
     }
 
     public function confirmarOsNfceEmitirModal(): void

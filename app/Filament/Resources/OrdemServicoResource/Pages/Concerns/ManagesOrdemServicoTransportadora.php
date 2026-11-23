@@ -6,7 +6,10 @@ use App\Models\OrdemServico;
 use App\Models\Transportadora;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpSchema;
+use App\Support\Erp\Os\OsFiscalLock;
+use DomainException;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
@@ -147,8 +150,22 @@ trait ManagesOrdemServicoTransportadora
 
     public function confirmarOsTransporteModal(): void
     {
+        if (method_exists($this, 'osReadOnly') && $this->osReadOnly()) {
+            Notification::make()->title('OS não pode ser alterada.')->warning()->send();
+
+            return;
+        }
+
         $this->normalizarOsTransporteCampos();
-        $this->persistirOsTransporteNaOrdem();
+
+        try {
+            $this->persistirOsTransporteNaOrdem();
+        } catch (DomainException $exception) {
+            Notification::make()->title($exception->getMessage())->warning()->send();
+
+            return;
+        }
+
         $this->osTransporteModalOpen = false;
         $this->fecharOsSugestoesTransportadora();
 
@@ -405,8 +422,22 @@ trait ManagesOrdemServicoTransportadora
 
     public function limparOsTransporte(): void
     {
+        if (method_exists($this, 'osReadOnly') && $this->osReadOnly()) {
+            Notification::make()->title('OS não pode ser alterada.')->warning()->send();
+
+            return;
+        }
+
         $this->resetOsTransporte();
-        $this->persistirOsTransporteNaOrdem();
+
+        try {
+            $this->persistirOsTransporteNaOrdem();
+        } catch (DomainException $exception) {
+            Notification::make()->title($exception->getMessage())->warning()->send();
+
+            return;
+        }
+
         $this->osTransporteModalOpen = false;
 
         Notification::make()
@@ -417,6 +448,8 @@ trait ManagesOrdemServicoTransportadora
 
     /**
      * Grava o JSON transporte na OS atual (sem migration = no-op).
+     *
+     * @throws DomainException
      */
     protected function persistirOsTransporteNaOrdem(): void
     {
@@ -429,8 +462,27 @@ trait ManagesOrdemServicoTransportadora
             return;
         }
 
+        $osId = (int) $ordem->getKey();
         $payload = $this->osTransportePayload();
-        $ordem->forceFill(['transporte' => $payload])->saveQuietly();
+
+        OsFiscalLock::executar($osId, function () use ($osId, $payload, $ordem): void {
+            DB::transaction(function () use ($osId, $payload, $ordem): void {
+                $travada = OrdemServico::query()->whereKey($osId)->lockForUpdate()->first();
+
+                if (! $travada instanceof OrdemServico) {
+                    throw new DomainException('Ordem de serviço não encontrada.');
+                }
+
+                if (! $travada->isEditable()) {
+                    throw new DomainException('Ordem de serviço não pode ser alterada.');
+                }
+
+                OsFiscalLock::assertPodeAlterar($travada);
+
+                $travada->forceFill(['transporte' => $payload])->saveQuietly();
+                $ordem->setRawAttributes($travada->getAttributes(), true);
+            });
+        });
     }
 
     /**

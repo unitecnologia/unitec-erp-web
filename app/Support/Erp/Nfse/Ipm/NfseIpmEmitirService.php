@@ -8,6 +8,7 @@ use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Erp\Nfse\NfseTransmissaoResultado;
+use App\Support\Erp\Os\OsFiscalLock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -24,54 +25,58 @@ class NfseIpmEmitirService
     public function transmitir(Nfse $nfse): NfseTransmissaoResultado
     {
         $nfse->loadMissing(['empresa', 'itens']);
-        $empresa = $nfse->empresa;
+        $osIds = OsFiscalLock::idsOsDaNfse($nfse);
 
-        if (! $empresa instanceof Empresa) {
-            throw new NfseNaoTransmitida('Empresa da NFS-e não encontrada.');
-        }
+        return OsFiscalLock::executarParaOsIds($osIds, function () use ($nfse): NfseTransmissaoResultado {
+            $empresa = $nfse->empresa;
 
-        if (strtolower(trim((string) $empresa->nfse_provedor)) !== 'ipm') {
-            throw new NfseNaoTransmitida('O provedor desta NFS-e não é IPM.');
-        }
+            if (! $empresa instanceof Empresa) {
+                throw new NfseNaoTransmitida('Empresa da NFS-e não encontrada.');
+            }
 
-        $teste = $this->cliente->modoTeste($empresa);
-        $this->reservarEnvio($nfse);
+            if (strtolower(trim((string) $empresa->nfse_provedor)) !== 'ipm') {
+                throw new NfseNaoTransmitida('O provedor desta NFS-e não é IPM.');
+            }
 
-        try {
-            $xml = $this->xmlAssinado($nfse, $teste);
-            $resposta = $this->cliente->enviar($empresa, $xml, $teste);
-        } catch (NfseNaoTransmitida $exception) {
+            $teste = $this->cliente->modoTeste($empresa);
+            $this->reservarEnvio($nfse);
+
+            try {
+                $xml = $this->xmlAssinado($nfse, $teste);
+                $resposta = $this->cliente->enviar($empresa, $xml, $teste);
+            } catch (NfseNaoTransmitida $exception) {
+                $this->liberarEnvio($nfse);
+
+                throw $exception;
+            } catch (Throwable) {
+                $this->liberarEnvio($nfse);
+
+                throw new NfseNaoTransmitida('Não foi possível transmitir a NFS-e ao IPM.');
+            }
+
+            if ($teste || $resposta->modoTeste) {
+                return $this->resultadoTeste($nfse, $xml, $resposta);
+            }
+
+            if ($resposta->autorizada) {
+                return new NfseTransmissaoResultado(
+                    $this->registrarAutorizacao($nfse, $empresa, $xml, $resposta),
+                    true,
+                    [],
+                    $resposta->alertas,
+                );
+            }
+
+            $this->guardarRetorno($nfse, $xml, $resposta->xmlRetorno);
             $this->liberarEnvio($nfse);
+            $nfse->refresh();
 
-            throw $exception;
-        } catch (Throwable) {
-            $this->liberarEnvio($nfse);
+            $erros = $resposta->erros !== []
+                ? $resposta->erros
+                : [['codigo' => '', 'descricao' => 'O provedor IPM rejeitou a NFS-e.']];
 
-            throw new NfseNaoTransmitida('Não foi possível transmitir a NFS-e ao IPM.');
-        }
-
-        if ($teste || $resposta->modoTeste) {
-            return $this->resultadoTeste($nfse, $xml, $resposta);
-        }
-
-        if ($resposta->autorizada) {
-            return new NfseTransmissaoResultado(
-                $this->registrarAutorizacao($nfse, $empresa, $xml, $resposta),
-                true,
-                [],
-                $resposta->alertas,
-            );
-        }
-
-        $this->guardarRetorno($nfse, $xml, $resposta->xmlRetorno);
-        $this->liberarEnvio($nfse);
-        $nfse->refresh();
-
-        $erros = $resposta->erros !== []
-            ? $resposta->erros
-            : [['codigo' => '', 'descricao' => 'O provedor IPM rejeitou a NFS-e.']];
-
-        return new NfseTransmissaoResultado($nfse, false, $erros, $resposta->alertas);
+            return new NfseTransmissaoResultado($nfse, false, $erros, $resposta->alertas);
+        });
     }
 
     /**

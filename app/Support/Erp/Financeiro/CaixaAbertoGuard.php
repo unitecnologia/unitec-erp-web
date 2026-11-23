@@ -22,7 +22,11 @@ final class CaixaAbertoGuard
 
     public function tabelaPronta(): bool
     {
-        return Schema::hasTable('caixa_livro_movimentos');
+        // Cache por request: Schema::hasTable bate no information_schema a cada chamada
+        // e o faturamento/caixa invocam o guard várias vezes no mesmo fluxo.
+        static $pronta = null;
+
+        return $pronta ??= Schema::hasTable('caixa_livro_movimentos');
     }
 
     public function mensagem(): string

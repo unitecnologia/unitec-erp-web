@@ -27,7 +27,9 @@ use App\Support\Erp\FormaPagamentoAtalho;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
 use App\Support\Erp\Os\OsDescontoFechamentoRateio;
 use App\Support\Erp\Os\OsFaturamentoService;
+use App\Support\Erp\Os\OsFiscalLock;
 use App\Support\Erp\Os\OsProdutoLookupService;
+use DomainException;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\Erp\Pdv\PdvNotaClienteService;
@@ -336,7 +338,15 @@ trait ErpOrdemServicoFormPage
 
     public function osReadOnly(): bool
     {
-        return $this->isEditingOs() && ! ($this->record?->isEditable() ?? true);
+        if (! $this->isEditingOs() || ! ($this->record instanceof OrdemServico)) {
+            return false;
+        }
+
+        if (! $this->record->isEditable()) {
+            return true;
+        }
+
+        return OsFiscalLock::existeDocumentoBloqueante((int) $this->record->id);
     }
 
     public function osPodeEmitirNfse(): bool
@@ -3666,7 +3676,7 @@ trait ErpOrdemServicoFormPage
         $usuarioId = Auth::id();
 
         try {
-            DB::transaction(function () use (
+            $persistBody = function () use (
                 $subPecas,
                 $subServicos,
                 $descPecas,
@@ -3717,9 +3727,6 @@ trait ErpOrdemServicoFormPage
                     'total_produtos' => $totalPecas,
                     'total_servicos' => $totalServicos,
                     'total_geral' => $totalGeral,
-                    'situacao' => $finalizar
-                        ? OrdemServico::SITUACAO_FINALIZADA
-                        : OrdemServico::SITUACAO_ABERTA,
                 ];
 
                 if ($finalizar) {
@@ -3734,29 +3741,43 @@ trait ErpOrdemServicoFormPage
                 $novoOrcamentoId = filled($this->orcamentoOrigemId) ? (int) $this->orcamentoOrigemId : null;
                 $novoOrcamentoId = ($novoOrcamentoId !== null && $novoOrcamentoId > 0) ? $novoOrcamentoId : null;
 
+                /** @var OrdemServico|null $ordem */
+                $ordem = null;
+
                 if ($this->isEditingOs()) {
-                    /** @var OrdemServico $ordem */
-                    $ordem = $this->record;
-                    $travada = OrdemServico::query()->whereKey($ordem->getKey())->lockForUpdate()->first();
+                    /** @var OrdemServico $record */
+                    $record = $this->record;
+                    $travada = OrdemServico::query()->whereKey($record->getKey())->lockForUpdate()->first();
 
                     if (! $travada instanceof OrdemServico || ! $travada->pertenceAEmpresaAtiva()) {
-                        throw new \RuntimeException('Esta OS não pertence à empresa ativa.');
+                        throw new DomainException('Esta OS não pertence à empresa ativa.');
                     }
+
+                    if (! $travada->isEditable()) {
+                        throw new DomainException('Ordem de serviço não pode ser alterada. Somente OS abertas ou em andamento podem ser editadas.');
+                    }
+
+                    OsFiscalLock::assertPodeAlterar($travada);
 
                     if (filled($travada->empresa_id)) {
                         $attributes['empresa_id'] = (int) $travada->empresa_id;
                     }
 
+                    // Nunca reabrir via gravar: situação só muda pelo faturamento/OsReabrirService.
+                    $attributes['situacao'] = $finalizar
+                        ? OrdemServico::SITUACAO_FINALIZADA
+                        : (string) $travada->situacao;
+
                     $orcamentoAnteriorId = filled($travada->orcamento_id) ? (int) $travada->orcamento_id : null;
                     $osId = (int) $travada->getKey();
 
-                    // Mesmo vínculo já gravado: só atualiza a OS (não reprocessa importação).
-                    // Troca/remoção: libera o anterior se livre; novo vínculo exige elegibilidade.
                     if ($novoOrcamentoId !== null && $novoOrcamentoId !== $orcamentoAnteriorId) {
                         $vinculoOrc->vincularAoGravarOs($novoOrcamentoId, $osId);
                     }
 
-                    $ordem->update($attributes);
+                    $travada->update($attributes);
+                    $ordem = $travada;
+                    $this->record = $travada;
 
                     if (
                         $orcamentoAnteriorId !== null
@@ -3765,11 +3786,13 @@ trait ErpOrdemServicoFormPage
                         $vinculoOrc->devolverSeLivre($orcamentoAnteriorId, $osId);
                     }
                 } else {
-                    // OS nova: valida + IMPORTADO antes do create (rollback se a TX falhar).
                     if ($novoOrcamentoId !== null) {
                         $vinculoOrc->vincularAoGravarOs($novoOrcamentoId);
                     }
 
+                    $attributes['situacao'] = $finalizar
+                        ? OrdemServico::SITUACAO_FINALIZADA
+                        : OrdemServico::SITUACAO_ABERTA;
                     $attributes['empresa_id'] = $empresaId;
                     OrdemServico::query()->lockForUpdate()->orderByDesc('id')->limit(1)->first();
                     $ordem = OrdemServico::query()->create([
@@ -3782,7 +3805,27 @@ trait ErpOrdemServicoFormPage
 
                 $this->sincronizarItensPersistidos($ordem, $empresaId, $usuarioId);
                 $this->salvarEquipamentoDaOs((int) ($empresaId ?: ErpContext::currentEmpresaId()));
-            });
+            };
+
+            $osIdLock = ($this->isEditingOs() && $this->record instanceof OrdemServico)
+                ? (int) $this->record->getKey()
+                : 0;
+
+            if ($osIdLock > 0) {
+                OsFiscalLock::executar($osIdLock, function () use ($persistBody): void {
+                    DB::transaction($persistBody);
+                });
+            } else {
+                DB::transaction($persistBody);
+            }
+        } catch (DomainException $exception) {
+            Notification::make()
+                ->title('Não foi possível salvar a ordem de serviço.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return false;
         } catch (\Throwable $exception) {
             report($exception);
 

@@ -55,6 +55,11 @@ return new class extends Migration
             return true;
         }
 
+        $driver = Schema::getConnection()->getDriverName();
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return false;
+        }
+
         $prefix = (string) Schema::getConnection()->getTablePrefix();
         $full = $prefix.$table;
         $db = Schema::getConnection()->getDatabaseName();

@@ -2,10 +2,14 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\Nfse\Ipm\NfseIpmCancelarService;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
+use App\Support\Erp\Nfse\NfseSefinCancelarService;
+use App\Support\Erp\Nfse\NfseSefinEventoXmlGerador;
+use App\Support\Erp\Nfse\NfseSefinXmlLeitor;
 use Filament\Notifications\Notification;
 
 trait ManagesNfseCancelamento
@@ -15,6 +19,8 @@ trait ManagesNfseCancelamento
     public ?int $nfseCancelarId = null;
 
     public string $nfseCancelarMotivo = '1';
+
+    public string $nfseCancelarProvedor = '';
 
     public function cancelarNfse(): void
     {
@@ -38,19 +44,50 @@ trait ManagesNfseCancelamento
             return;
         }
 
-        if ($nfse->status !== Nfse::STATUS_AUTORIZADA || blank($nfse->numero_nfse)) {
+        if ($nfse->status !== Nfse::STATUS_AUTORIZADA) {
             Notification::make()->title('Só é possível cancelar NFS-e autorizada.')->warning()->send();
 
             return;
         }
 
-        if (! $this->nfseProvedorIpm($nfse->empresa)) {
-            $this->mostrarNfseFiscalErro('CANCELAMENTO INDISPONÍVEL', 'O cancelamento automático está disponível só para o provedor IPM. Cancele esta NFS-e no portal nacional.');
+        $empresa = $nfse->empresa;
+        $ipm = $this->nfseProvedorIpm($empresa);
+        $nacional = $this->nfseProvedorNacional($empresa);
+
+        if (! $ipm && ! $nacional) {
+            $this->mostrarNfseFiscalErro(
+                'CANCELAMENTO INDISPONÍVEL',
+                'O cancelamento automático está disponível para os provedores IPM e Nacional.',
+            );
 
             return;
         }
 
+        if ($ipm && blank($nfse->numero_nfse)) {
+            Notification::make()->title('Só é possível cancelar NFS-e autorizada.')->warning()->send();
+
+            return;
+        }
+
+        if ($nacional) {
+            $chave = preg_replace('/\D/', '', (string) ($nfse->chave_acesso ?: $nfse->chave)) ?? '';
+
+            if (strlen($chave) !== 50) {
+                Notification::make()->title('Só é possível cancelar NFS-e Nacional com chave de acesso.')->warning()->send();
+
+                return;
+            }
+
+            if (blank($nfse->numero_nfse)) {
+                $numero = NfseSefinXmlLeitor::numeroNfse($nfse->xml_nfse);
+                if ($numero !== null) {
+                    $nfse->forceFill(['numero_nfse' => $numero])->save();
+                }
+            }
+        }
+
         $this->nfseCancelarId = (int) $nfse->id;
+        $this->nfseCancelarProvedor = $ipm ? 'ipm' : 'nacional';
         $this->nfseCancelarMotivo = '1';
         $this->nfseCancelarModalOpen = true;
     }
@@ -59,6 +96,7 @@ trait ManagesNfseCancelamento
     {
         $this->nfseCancelarModalOpen = false;
         $this->nfseCancelarId = null;
+        $this->nfseCancelarProvedor = '';
     }
 
     public function confirmarNfseCancelar(): void
@@ -80,8 +118,15 @@ trait ManagesNfseCancelamento
             return;
         }
 
+        $provedor = $this->nfseCancelarProvedor !== ''
+            ? $this->nfseCancelarProvedor
+            : ($this->nfseProvedorIpm($nfse->empresa) ? 'ipm' : 'nacional');
+        $rotuloProvedor = $provedor === 'ipm' ? 'IPM' : 'SEFIN Nacional';
+
         try {
-            $resultado = app(NfseIpmCancelarService::class)->cancelar($nfse, $this->nfseCancelarMotivo);
+            $resultado = $provedor === 'ipm'
+                ? app(NfseIpmCancelarService::class)->cancelar($nfse, $this->nfseCancelarMotivo)
+                : app(NfseSefinCancelarService::class)->cancelar($nfse, $this->nfseCancelarMotivo);
         } catch (NfseNaoTransmitida $exception) {
             $this->fecharNfseCancelar();
             $this->mostrarNfseFiscalErro('NÃO FOI POSSÍVEL CANCELAR A NFS-E', $exception->getMessage());
@@ -90,7 +135,10 @@ trait ManagesNfseCancelamento
         } catch (\Throwable $exception) {
             report($exception);
             $this->fecharNfseCancelar();
-            $this->mostrarNfseFiscalErro('NÃO FOI POSSÍVEL CANCELAR A NFS-E', 'Falha inesperada ao enviar o cancelamento ao IPM.');
+            $this->mostrarNfseFiscalErro(
+                'NÃO FOI POSSÍVEL CANCELAR A NFS-E',
+                'Falha inesperada ao enviar o cancelamento ao '.$rotuloProvedor.'.',
+            );
 
             return;
         }
@@ -107,11 +155,11 @@ trait ManagesNfseCancelamento
 
             $this->mostrarNfseFiscalErro(
                 'NÃO FOI POSSÍVEL CANCELAR A NFS-E',
-                $mensagem !== '' ? $mensagem : 'O provedor IPM não confirmou o cancelamento.',
+                $mensagem !== '' ? $mensagem : 'O provedor '.$rotuloProvedor.' não confirmou o cancelamento.',
                 $codigo !== '' ? $codigo : null,
                 false,
-                'Esta é uma mensagem do provedor IPM.',
-                'Código IPM',
+                'Esta é uma mensagem do provedor '.$rotuloProvedor.'.',
+                'Código '.$rotuloProvedor,
             );
 
             return;
@@ -119,11 +167,30 @@ trait ManagesNfseCancelamento
 
         unset($this->nfseRegistros, $this->nfseListagemTotaisFormatados);
 
+        $numero = trim((string) ($resultado['nfse']->numero_nfse ?? ''));
+        if ($numero === '') {
+            $numero = (string) ($resultado['nfse']->numero_dps ?? '');
+        }
+
         Notification::make()
-            ->title('NFS-e nº '.$resultado['nfse']->numero_nfse.' cancelada.')
-            ->body('Cancelamento confirmado pela prefeitura.')
+            ->title('NFS-e nº '.$numero.' cancelada.')
+            ->body($provedor === 'ipm'
+                ? 'Cancelamento confirmado pela prefeitura.'
+                : 'Cancelamento confirmado pela SEFIN Nacional.')
             ->success()
             ->send();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function nfseCancelarMotivos(): array
+    {
+        if ($this->nfseCancelarProvedor === 'nacional') {
+            return NfseSefinEventoXmlGerador::motivos();
+        }
+
+        return Nfse::motivosCancelamento();
     }
 
     /**
@@ -135,17 +202,35 @@ trait ManagesNfseCancelamento
             return null;
         }
 
-        $nfse = Nfse::query()->find($this->nfseCancelarId, ['id', 'numero_nfse', 'tomador_nome', 'total', 'data_emissao']);
+        $nfse = Nfse::query()->find($this->nfseCancelarId, [
+            'id',
+            'numero_nfse',
+            'numero_dps',
+            'tomador_nome',
+            'total',
+            'data_emissao',
+            'xml_nfse',
+        ]);
 
         if ($nfse === null) {
             return null;
         }
 
+        $numero = trim((string) ($nfse->numero_nfse ?? ''));
+        if ($numero === '') {
+            $numero = (string) (NfseSefinXmlLeitor::numeroNfse($nfse->xml_nfse) ?? $nfse->numero_dps ?? '—');
+        }
+
         return [
-            'numero' => (string) $nfse->numero_nfse,
+            'numero' => $numero,
             'tomador' => (string) ($nfse->tomador_nome ?: '—'),
             'total' => $this->formatarNfseListagemDinheiro($nfse->total),
             'emissao' => $nfse->data_emissao?->format('d/m/Y') ?? '—',
         ];
+    }
+
+    protected function nfseProvedorNacional(?Empresa $empresa): bool
+    {
+        return strtolower(trim((string) ($empresa?->nfse_provedor ?? ''))) === 'nacional';
     }
 }
