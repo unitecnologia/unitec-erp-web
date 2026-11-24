@@ -10,6 +10,7 @@ use App\Support\Erp\Dre\VendaItemCustoHistorico;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Reports\LucratividadePorVenda\LucratividadeVendaCustoResolver;
+use App\Support\Erp\Reports\LucratividadePorVenda\LucratividadeVendaLucroPercentual;
 use App\Support\Erp\Reports\LucratividadePorVenda\LucratividadeVendaReceitaRateio;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use App\Support\Erp\Reports\Tabular\ExpandableTabularReport;
@@ -71,7 +72,7 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
             'total_liquido' => 'TOTAL LÍQUIDO',
             'custo_historico' => 'CUSTO HIST.',
             'lucro' => 'LUCRO R$',
-            'margem' => 'MARGEM %',
+            'margem' => 'LUCRO %',
         ];
     }
 
@@ -87,7 +88,7 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
             'total_liquido' => 'TOTAL LÍQUIDO',
             'custo_historico' => 'CUSTO HIST.',
             'lucro' => 'LUCRO R$',
-            'margem' => 'MARGEM %',
+            'margem' => 'LUCRO %',
         ];
     }
 
@@ -326,12 +327,9 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
             if ($resolved['disponivel'] && $resolved['custo_liquido'] !== null) {
                 $custoStr = $resolved['custo_liquido'];
                 $lucroStr = TefMoney::sub($liquido, $custoStr);
-                $margem = ((float) $liquido) > 0.0000001
-                    ? (((float) $lucroStr) / (float) $liquido) * 100
-                    : 0.0;
                 $custoFmt = static::formatMoney((float) $custoStr);
                 $lucroFmt = static::formatMoney((float) $lucroStr);
-                $margemFmt = static::formatPercent($margem);
+                $margemFmt = LucratividadeVendaLucroPercentual::rotulo($liquido, $custoStr);
             } else {
                 $custoFmt = LucratividadeVendaCustoResolver::LABEL_INDISPONIVEL;
                 $lucroFmt = LucratividadeVendaCustoResolver::LABEL_INDISPONIVEL;
@@ -390,7 +388,7 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
                 continue;
             }
             if ($column === 'margem') {
-                $footer[$column] = $universoCusto['disponivel']
+                $footer[$column] = ($universoCusto['disponivel'] && ($universoCusto['margem_disponivel'] ?? true))
                     ? static::formatPercent((float) $universoCusto['margem'])
                     : LucratividadeVendaCustoResolver::LABEL_INDISPONIVEL;
 
@@ -459,7 +457,7 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
      * Monta a única linha do modo Resumido.
      * Sem custo completo → Indisponível em custo/lucro/margem (sem inventar lucro).
      *
-     * @param  array{disponivel: bool, custo_liquido: string, lucro: string, margem: float, pendencia: string}  $universoCusto
+     * @param  array{disponivel: bool, custo_liquido: string, lucro: string, margem: float, margem_disponivel?: bool, pendencia: string}  $universoCusto
      * @return array<string, string>
      */
     public function formatResumidoRow(int $qtd, string $receitaLiquida, array $universoCusto): array
@@ -472,7 +470,9 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
         if ($universoCusto['disponivel']) {
             $row['custo_historico'] = static::formatMoney((float) $universoCusto['custo_liquido']);
             $row['lucro'] = static::formatMoney((float) $universoCusto['lucro']);
-            $row['margem'] = static::formatPercent((float) $universoCusto['margem']);
+            $row['margem'] = ($universoCusto['margem_disponivel'] ?? true)
+                ? static::formatPercent((float) $universoCusto['margem'])
+                : LucratividadeVendaCustoResolver::LABEL_INDISPONIVEL;
         } else {
             $indisponivel = LucratividadeVendaCustoResolver::LABEL_INDISPONIVEL;
             $row['custo_historico'] = $indisponivel;
@@ -601,13 +601,13 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
             ['key' => 'total', 'label' => 'TOTAL ITEM', 'num' => true],
             ['key' => 'custo', 'label' => 'CUSTO HIST.', 'num' => true],
             ['key' => 'lucro', 'label' => 'LUCRO R$', 'num' => true],
-            ['key' => 'margem', 'label' => 'MARGEM %', 'num' => true],
+            ['key' => 'margem', 'label' => 'LUCRO %', 'num' => true],
         ];
     }
 
     /**
      * @param  Builder<\Illuminate\Database\Eloquent\Model>  $base
-     * @return array{disponivel: bool, custo_liquido: string, lucro: string, margem: float, pendencia: string}
+     * @return array{disponivel: bool, custo_liquido: string, lucro: string, margem: float, margem_disponivel: bool, pendencia: string}
      */
     private function universeCustoLucro(Builder $base, string $receitaLiquida): array
     {
@@ -616,6 +616,7 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
             'custo_liquido' => '0.00',
             'lucro' => '0.00',
             'margem' => 0.0,
+            'margem_disponivel' => false,
             'pendencia' => '',
         ];
 
@@ -740,16 +741,15 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
             $custoLiq = '0.00';
         }
         $lucro = TefMoney::sub($receitaLiquida, $custoLiq);
-        $margem = ((float) $receitaLiquida) > 0.0000001
-            ? (((float) $lucro) / (float) $receitaLiquida) * 100
-            : 0.0;
+        $margem = LucratividadeVendaLucroPercentual::sobreCusto($receitaLiquida, $custoLiq);
 
         return [
             'disponivel' => true,
             'custo_liquido' => $custoLiq,
             'lucro' => $lucro,
-            'margem' => $margem,
+            'margem' => $margem ?? 0.0,
             'pendencia' => '',
+            'margem_disponivel' => $margem !== null,
         ];
     }
 
@@ -965,11 +965,8 @@ class LucratividadePorVendaReport extends AbstractTabularReport implements Expan
         }
 
         $lucro = TefMoney::sub($totalRateado, $agg['custo']);
-        $margem = ((float) $totalRateado) > 0.0000001
-            ? (((float) $lucro) / (float) $totalRateado) * 100
-            : 0.0;
         $base['lucro'] = self::formatMoney((float) $lucro);
-        $base['margem'] = self::formatPercent($margem);
+        $base['margem'] = LucratividadeVendaLucroPercentual::rotulo($totalRateado, $agg['custo']);
 
         return $base;
     }

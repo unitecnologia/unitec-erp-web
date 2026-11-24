@@ -56,6 +56,10 @@
                         <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['conta'] ?? '—' }}</span>
                     </div>
                     <div class="erp-caixa-view-modal__field">
+                        <span class="erp-caixa-view-modal__label">Meio de pagamento</span>
+                        <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['meio_pagamento'] ?? 'Não informado' }}</span>
+                    </div>
+                    <div class="erp-caixa-view-modal__field">
                         <span class="erp-caixa-view-modal__label">Entrada</span>
                         <span class="erp-caixa-view-modal__value erp-caixa-view-modal__value--entrada">{{ $this->viewModalData['entrada'] ?? '0,00' }}</span>
                     </div>

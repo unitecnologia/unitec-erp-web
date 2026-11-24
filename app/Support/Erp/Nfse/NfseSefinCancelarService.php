@@ -7,7 +7,6 @@ use App\Models\Nfse;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 use Unitec\FiscalEngine\Certificate\Certificate;
 
@@ -23,7 +22,7 @@ class NfseSefinCancelarService
     /**
      * @return array{nfse: Nfse, cancelada: bool, erros: list<array{codigo: string, descricao: string}>}
      */
-    public function cancelar(Nfse $nfse, string $codigoUi): array
+    public function cancelar(Nfse $nfse, string $codigoUi, ?string $xMotivoLivre = null): array
     {
         $nfse->loadMissing('empresa');
         $empresa = $nfse->empresa;
@@ -44,15 +43,44 @@ class NfseSefinCancelarService
             $certificado = $this->certificados->certificadoDaNota($nfse);
             $client = NfseSefinClient::daEmpresa($empresa);
 
-            $consultaPrevia = $this->consultarEventoCancelamento($client, $chave, $certificado);
+            // Sempre consulta GET 101101/001 antes de qualquer novo POST.
+            // Se já houver evento registrado, confirma localmente sem reenviar.
+            // Se a consulta falhar, não POST — evita duplicar evento já aceito.
+            $consultaPrevia = $this->consultarEventoCancelamento($client, $chave, $certificado, $nfse);
 
-            if ($consultaPrevia instanceof NfseSefinEventoResposta && $consultaPrevia->registrado) {
-                return $this->confirmarLocalmente($nfse, $codigoUi, $consultaPrevia);
+            if ($consultaPrevia['status'] === NfseSefinCancelamentoConsulta::REGISTRADO) {
+                NfseSefinCancelamentoLog::falha(
+                    NfseSefinCancelamentoLog::OPERACAO_GET_CONSULTA,
+                    $nfse,
+                    $chave,
+                    [
+                        'http' => $consultaPrevia['resposta']?->http ?? 200,
+                        'registrado' => true,
+                        'resultado_consulta' => 'confirmado_por_consulta_previa',
+                        'motivo' => 'Cancelamento já registrado na SEFIN; nenhum novo POST foi enviado.',
+                    ],
+                );
+
+                return $this->confirmarLocalmente($nfse, $codigoUi, $consultaPrevia['resposta'], $xMotivoLivre);
+            }
+
+            if ($consultaPrevia['status'] === NfseSefinCancelamentoConsulta::ERRO_COMUNICACAO) {
+                $this->liberar($nfse);
+
+                return [
+                    'nfse' => $nfse->refresh(),
+                    'cancelada' => false,
+                    'erros' => [[
+                        'codigo' => '',
+                        'descricao' => 'Não foi possível consultar o evento de cancelamento na SEFIN. '
+                            .'Tente novamente sem reenviar até a consulta responder, para evitar duplicidade.',
+                    ]],
+                ];
             }
 
             $xmlAssinado = $this->assinador->assinarCancelamento(
                 $nfse,
-                $this->xml->gerarCancelamento($nfse, $codigoUi),
+                $this->xml->gerarCancelamento($nfse, $codigoUi, $xMotivoLivre),
             );
             $requisicao = $client->prepararEvento($chave, $xmlAssinado, $certificado);
 
@@ -60,51 +88,73 @@ class NfseSefinCancelarService
                 [$http, $body] = $this->http->executar($requisicao);
                 $resposta = NfseSefinEventoResposta::interpretar($http, $body);
             } catch (NfseNaoTransmitida $exception) {
-                $resposta = $this->reconciliarAposIncerteza($client, $chave, $certificado, $exception->getMessage());
+                $resposta = $this->reconciliarAposIncerteza(
+                    $client,
+                    $chave,
+                    $certificado,
+                    $nfse,
+                    $exception->getMessage(),
+                );
             } catch (Throwable $exception) {
                 report($exception);
                 $resposta = $this->reconciliarAposIncerteza(
                     $client,
                     $chave,
                     $certificado,
+                    $nfse,
                     'Falha de comunicação com a SEFIN Nacional.',
                 );
             }
 
-            if ($resposta->jaCancelada && ($resposta->xmlEvento === null || ! $resposta->registrado)) {
-                $consultada = $this->consultarEventoCancelamento($client, $chave, $certificado);
-                if ($consultada instanceof NfseSefinEventoResposta && $consultada->registrado) {
-                    $resposta = $consultada;
-                } elseif ($resposta->jaCancelada) {
-                    $resposta = new NfseSefinEventoResposta(
-                        http: $resposta->http,
-                        registrado: true,
-                        jaCancelada: true,
-                        xmlEvento: $resposta->xmlEvento,
-                        protocolo: $resposta->protocolo,
-                        dataHoraProcessamento: $resposta->dataHoraProcessamento,
-                        tipoAmbiente: $resposta->tipoAmbiente,
-                        versaoAplicativo: $resposta->versaoAplicativo,
-                        alertas: $resposta->alertas,
-                        erros: [],
-                    );
+            // E0840 / "já cancelada" sem XML: só confirma se o GET 101101/001 trouxer e101101.
+            // E0840 sozinho nunca confirma (pode ser confirmação do tomador, análise fiscal, etc.).
+            if (
+                ! $resposta->registrado
+                && (
+                    $resposta->jaCancelada
+                    || NfseSefinEventoResposta::exigeConsultaConfirmacao($resposta->erros)
+                )
+            ) {
+                $consultada = $this->consultarEventoCancelamento($client, $chave, $certificado, $nfse);
+
+                if ($consultada['status'] === NfseSefinCancelamentoConsulta::REGISTRADO) {
+                    return $this->confirmarLocalmente($nfse, $codigoUi, $consultada['resposta'], $xMotivoLivre);
                 }
             }
 
             if (! $resposta->registrado) {
                 $this->liberar($nfse);
+                $erros = $resposta->erros !== [] ? $resposta->erros : [[
+                    'codigo' => '',
+                    'descricao' => 'A SEFIN Nacional não confirmou o cancelamento.',
+                ]];
+                $motivo = $resposta->mensagemErros();
+                if ($motivo === '') {
+                    $motivo = $erros[0]['descricao'] ?? 'A SEFIN Nacional não confirmou o cancelamento.';
+                }
+
+                NfseSefinCancelamentoLog::falha(
+                    NfseSefinCancelamentoLog::OPERACAO_POST_CANCELAMENTO,
+                    $nfse,
+                    $chave,
+                    [
+                        'http' => $resposta->http,
+                        'registrado' => false,
+                        'ja_cancelada' => $resposta->jaCancelada,
+                        'erros' => $erros,
+                        'motivo' => $motivo,
+                        'resultado_consulta' => 'nao_confirmado',
+                    ],
+                );
 
                 return [
                     'nfse' => $nfse->refresh(),
                     'cancelada' => false,
-                    'erros' => $resposta->erros !== [] ? $resposta->erros : [[
-                        'codigo' => '',
-                        'descricao' => 'A SEFIN Nacional não confirmou o cancelamento.',
-                    ]],
+                    'erros' => $erros,
                 ];
             }
 
-            return $this->confirmarLocalmente($nfse, $codigoUi, $resposta);
+            return $this->confirmarLocalmente($nfse, $codigoUi, $resposta, $xMotivoLivre);
         } catch (NfseNaoTransmitida $exception) {
             $this->liberar($nfse);
 
@@ -125,17 +175,25 @@ class NfseSefinCancelarService
         NfseSefinClient $client,
         string $chave,
         Certificate $certificado,
+        Nfse $nfse,
         string $motivo,
     ): NfseSefinEventoResposta {
-        Log::warning('NFS-e Nacional: cancelamento com retorno incerto; consultando evento.', [
-            'chave' => $chave,
-            'motivo' => $motivo,
-        ]);
+        NfseSefinCancelamentoLog::falha(
+            NfseSefinCancelamentoLog::OPERACAO_POST_CANCELAMENTO,
+            $nfse,
+            $chave,
+            [
+                'http' => 0,
+                'registrado' => false,
+                'motivo' => $motivo,
+                'resultado_consulta' => 'incerto_aguardando_consulta',
+            ],
+        );
 
-        $consultada = $this->consultarEventoCancelamento($client, $chave, $certificado);
+        $consultada = $this->consultarEventoCancelamento($client, $chave, $certificado, $nfse);
 
-        if ($consultada instanceof NfseSefinEventoResposta && $consultada->registrado) {
-            return $consultada;
+        if ($consultada['status'] === NfseSefinCancelamentoConsulta::REGISTRADO) {
+            return $consultada['resposta'];
         }
 
         return new NfseSefinEventoResposta(
@@ -155,11 +213,19 @@ class NfseSefinCancelarService
         );
     }
 
+    /**
+     * @return array{
+     *     status: string,
+     *     resposta: ?NfseSefinEventoResposta,
+     *     motivo: ?string
+     * }
+     */
     private function consultarEventoCancelamento(
         NfseSefinClient $client,
         string $chave,
         Certificate $certificado,
-    ): ?NfseSefinEventoResposta {
+        Nfse $nfse,
+    ): array {
         try {
             $requisicao = $client->prepararConsultaEvento(
                 $chave,
@@ -168,33 +234,55 @@ class NfseSefinCancelarService
                 $certificado,
             );
             [$http, $body] = $this->http->executar($requisicao);
-            $resposta = NfseSefinEventoResposta::interpretar($http, $body);
-
-            return $resposta->registrado ? $resposta : null;
+            $resultado = NfseSefinCancelamentoConsulta::classificar($http, $body);
         } catch (Throwable $exception) {
-            Log::info('NFS-e Nacional: consulta de evento de cancelamento sem confirmação.', [
-                'chave' => $chave,
-                'erro' => $exception->getMessage(),
-            ]);
-
-            return null;
+            $resultado = [
+                'status' => NfseSefinCancelamentoConsulta::ERRO_COMUNICACAO,
+                'resposta' => null,
+                'motivo' => $exception->getMessage(),
+            ];
         }
+
+        if ($resultado['status'] === NfseSefinCancelamentoConsulta::REGISTRADO) {
+            return $resultado;
+        }
+
+        NfseSefinCancelamentoLog::falha(
+            NfseSefinCancelamentoLog::OPERACAO_GET_CONSULTA,
+            $nfse,
+            $chave,
+            [
+                'http' => $resultado['resposta']?->http ?? 0,
+                'registrado' => false,
+                'ja_cancelada' => $resultado['resposta']?->jaCancelada ?? false,
+                'erros' => $resultado['resposta']?->erros ?? [],
+                'resultado_consulta' => $resultado['status'],
+                'motivo' => $resultado['motivo'] ?? 'A SEFIN Nacional não confirmou o cancelamento.',
+            ],
+        );
+
+        return $resultado;
     }
 
     /**
      * @return array{nfse: Nfse, cancelada: bool, erros: list<array{codigo: string, descricao: string}>}
      */
-    private function confirmarLocalmente(Nfse $nfse, string $codigoUi, NfseSefinEventoResposta $resposta): array
-    {
-        $motivo = NfseSefinEventoXmlGerador::mapearMotivo($codigoUi);
+    private function confirmarLocalmente(
+        Nfse $nfse,
+        string $codigoUi,
+        NfseSefinEventoResposta $resposta,
+        ?string $xMotivoLivre = null,
+    ): array {
+        $motivo = NfseSefinEventoXmlGerador::mapearMotivo($codigoUi, $xMotivoLivre);
 
+        // protocolo varchar(40) guarda o da emissão. Id EVT (~62) fica só em xml_cancelamento.
         $nfse->fill([
             'status' => Nfse::STATUS_CANCELADA,
             'cancelamento_codigo' => $motivo['codigo'],
             'cancelada_em' => now(),
             'cancelada_por' => mb_substr(trim((string) (Auth::user()?->name ?? '')), 0, 120) ?: null,
             'xml_cancelamento' => $resposta->xmlEvento,
-            'protocolo' => $resposta->protocolo ?: $nfse->protocolo,
+            'protocolo' => self::protocoloParaGravar($resposta->protocolo, $nfse->protocolo),
         ]);
         $nfse->save();
         Nfse::query()->whereKey($nfse->id)->update(['transmitindo_em' => null]);
@@ -207,6 +295,25 @@ class NfseSefinCancelarService
         }
 
         return ['nfse' => $nfse, 'cancelada' => true, 'erros' => []];
+    }
+
+    /**
+     * Nunca substitui o protocolo da emissão pelo Id EVT do cancelamento (SQL 1406 / varchar 40).
+     */
+    public static function protocoloParaGravar(?string $protocoloEvento, mixed $protocoloEmissao): ?string
+    {
+        $emissao = trim((string) ($protocoloEmissao ?? ''));
+        $evento = trim((string) ($protocoloEvento ?? ''));
+
+        if ($emissao !== '') {
+            return mb_substr($emissao, 0, 40, 'UTF-8');
+        }
+
+        if ($evento === '' || str_starts_with(strtoupper($evento), 'EVT')) {
+            return null;
+        }
+
+        return mb_strlen($evento, 'UTF-8') <= 40 ? $evento : null;
     }
 
     private function garantirNumeroNfse(Nfse $nfse): void

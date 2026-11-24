@@ -437,6 +437,41 @@ trait ManagesPdvVenda
         $this->dispatch('erp-pdv-focus-finalizar-pagamento', index: 0);
     }
 
+    /**
+     * Após cadastro rápido (+ Cadastrar Cliente) no finalizar — preserva meios/valores.
+     */
+    public function aplicarClienteFinalizarPorId(int $clienteId): void
+    {
+        $person = Person::query()
+            ->whereKey($clienteId)
+            ->where('is_cliente', true)
+            ->where('ativo', true)
+            ->first();
+
+        if (! $person) {
+            Notification::make()->title('Cliente não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $nome = mb_strtoupper(trim((string) ($person->nome_razao ?? '')), 'UTF-8');
+        $this->finalizarForm['cliente'] = $nome !== '' ? $nome : 'CONSUMIDOR FINAL';
+        $this->finalizarClienteId = (int) $person->id;
+        $this->finalizarClienteSearch = $this->finalizarForm['cliente'];
+        $this->finalizarClienteConsulta = false;
+        $this->finalizarClienteResults = [];
+        $this->selectedFinalizarClienteIndex = null;
+        $this->syncCpfNotaFromClienteSelecionado([
+            'person_id' => (int) $person->id,
+            'nome' => $nome,
+            'cpf_cnpj' => (string) ($person->cpf_cnpj ?? ''),
+            'pessoa_tipo' => (string) ($person->pessoa_tipo ?? ''),
+        ]);
+        $this->sincronizarTabelaPrazoComCliente();
+        $this->sincronizarLinhaCreditoCliente();
+        $this->dispatch('erp-pdv-focus-finalizar-pagamento', index: 0);
+    }
+
     public function cancelFinalizarClienteConsulta(): void
     {
         if (! $this->finalizarClienteConsulta) {

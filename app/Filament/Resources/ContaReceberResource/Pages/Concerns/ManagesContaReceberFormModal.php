@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ContaReceberResource\Pages\Concerns;
 
+use App\Filament\Concerns\ManagesErpPersonCreateOverlay;
 use App\Models\Boleto;
 use App\Models\BoletoContaApi;
 use App\Models\ContaReceber;
@@ -20,6 +21,8 @@ use InvalidArgumentException;
 
 trait ManagesContaReceberFormModal
 {
+    use ManagesErpPersonCreateOverlay;
+
     public bool $contaFormModalOpen = false;
 
     public ?int $contaFormRecordId = null;
@@ -355,6 +358,42 @@ trait ManagesContaReceberFormModal
         $this->contaFormClienteLookupOpen = false;
         $this->contaFormClienteResults = [];
         $this->contaFormClienteIndex = null;
+    }
+
+    protected function canOpenPersonCreateOverlay(): bool
+    {
+        if (! $this->contaFormModalOpen) {
+            $this->notifyPersonCreateBlocked('Abra o cadastro da conta para incluir um cliente.');
+
+            return false;
+        }
+
+        if ($this->contaFormSomenteVencimento) {
+            $this->notifyPersonCreateBlocked('Neste modo o cliente não pode ser alterado.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function applyPersonCreatedFromOverlay(int $clienteId): void
+    {
+        $person = Person::query()
+            ->whereKey($clienteId)
+            ->where('is_cliente', true)
+            ->first();
+
+        if (! $person) {
+            Notification::make()->title('Cliente não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->contaFormClienteId = (string) $person->id;
+        $this->contaFormClienteBusca = mb_strtoupper(trim((string) ($person->nome_razao ?? '')), 'UTF-8');
+        $this->resetErrorBag('contaFormClienteId');
+        $this->closeContaFormClienteLookup();
     }
 
     public function salvarContaForm(): void

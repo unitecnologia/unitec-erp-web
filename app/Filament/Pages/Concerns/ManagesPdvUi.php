@@ -195,9 +195,47 @@ trait ManagesPdvUi
         }
     }
 
+    /** list = consulta no índice; create = cadastro rápido (+ Cadastrar Cliente). */
+    public string $personOverlayMode = 'list';
+
     public function getPersonOverlayUrlProperty(): string
     {
+        if ($this->personOverlayMode === 'create') {
+            return PersonResource::getUrl('create') . '?tipo=clientes&orcamento=1&os_embed=1';
+        }
+
         return PersonResource::getUrl('index') . '?pdv=1';
+    }
+
+    public function openPessoasCadastro(): void
+    {
+        if (! $this->caixaAberto) {
+            Notification::make()
+                ->title('Caixa fechado.')
+                ->body('Abra o caixa com F2 antes de continuar.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->personOverlayMode = 'create';
+        $this->overlayProductOpen = false;
+        $this->overlayPersonOpen = true;
+        $this->dispatch('erp-pdv-overlay-opened', type: 'person');
+    }
+
+    public function applyOverlayPersonSaved(int $clienteId): void
+    {
+        $this->overlayPersonOpen = false;
+        $this->personOverlayMode = 'list';
+        $this->dispatch('erp-pdv-overlay-closed');
+
+        if ($clienteId <= 0 || ! method_exists($this, 'aplicarClienteFinalizarPorId')) {
+            return;
+        }
+
+        $this->aplicarClienteFinalizarPorId($clienteId);
     }
 
     public function getProductOverlayUrlProperty(): string
@@ -525,6 +563,7 @@ trait ManagesPdvUi
             return;
         }
 
+        $this->personOverlayMode = 'list';
         $this->overlayProductOpen = false;
         $this->overlayPersonOpen = true;
         $this->dispatch('erp-pdv-overlay-opened', type: 'person');
@@ -537,6 +576,7 @@ trait ManagesPdvUi
         }
 
         $this->overlayPersonOpen = false;
+        $this->personOverlayMode = 'list';
         $this->dispatch('erp-pdv-overlay-closed');
     }
 

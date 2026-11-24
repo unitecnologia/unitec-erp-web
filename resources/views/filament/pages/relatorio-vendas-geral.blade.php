@@ -127,6 +127,7 @@
                     <label class="erp-rvg-check"><input type="checkbox" wire:model="apenas_resumo"> Exibir apenas resumo</label>
                     <label class="erp-rvg-check"><input type="checkbox" wire:model="exibir_formas"> Exibir formas de pagamento</label>
                     <label class="erp-rvg-check"><input type="checkbox" wire:model="exibir_grafico"> Análise gráfica diária</label>
+                    <label class="erp-rvg-check"><input type="checkbox" wire:model="exibir_pct_lucro"> Exibir % de lucro</label>
                 </div>
             </section>
 

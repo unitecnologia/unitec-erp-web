@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Reports\Tabular;
 
+use App\Support\Erp\Reports\Tabular\Definitions\AjustesEstoqueReport;
 use App\Support\Erp\Reports\Tabular\Definitions\BalancoFinanceiroReport;
 use App\Support\Erp\Reports\Tabular\Definitions\CancelamentosDescontosMesasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ConferenciaEstoqueReport;
@@ -33,6 +34,7 @@ use App\Support\Erp\Reports\Tabular\Definitions\OsPorFormaPagamentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\OutrasSaidasMovimentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PecasUtilizadasOsReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PlanoContasReport;
+use App\Support\Erp\Reports\Tabular\Definitions\PosicaoEstoqueReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutividadePorTecnicoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PrecoAlteradoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutosLucratividadeReport;
@@ -78,6 +80,8 @@ class ReportRegistry
             'estoque-grade' => EstoqueGradeReport::class,
             'estoque-minimo' => EstoqueMinimoReport::class,
             'estoque-negativo' => EstoqueNegativoReport::class,
+            'posicao-estoque' => PosicaoEstoqueReport::class,
+            'ajustes-estoque' => AjustesEstoqueReport::class,
             'conferencia-estoque' => ConferenciaEstoqueReport::class,
             'validade-produtos' => ValidadeProdutosReport::class,
             'validade-lotes' => ValidadeLotesReport::class,

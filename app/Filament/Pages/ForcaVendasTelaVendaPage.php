@@ -42,6 +42,8 @@ use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaImportarOrcamento;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaListarVendas;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaMargem;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaParcelas;
+use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaClienteCadastro;
+use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaProdutoCadastro;
 use App\Filament\Pages\Concerns\ManagesForcaVendasTelaVendaTransportadora;
 use App\Filament\Pages\Concerns\ManagesPdvFinalizarCartaoCanhoto;
 use BackedEnum;
@@ -65,7 +67,9 @@ class ForcaVendasTelaVendaPage extends Page
     use ManagesForcaVendasTelaVendaImportarOrcamento;
     use ManagesForcaVendasTelaVendaListarVendas;
     use ManagesForcaVendasTelaVendaMargem;
+    use ManagesForcaVendasTelaVendaClienteCadastro;
     use ManagesForcaVendasTelaVendaParcelas;
+    use ManagesForcaVendasTelaVendaProdutoCadastro;
     use ManagesForcaVendasTelaVendaTransportadora;
     use ManagesPdvFinalizarCartaoCanhoto;
 
@@ -6159,7 +6163,7 @@ class ForcaVendasTelaVendaPage extends Page
         $order->update(['payload' => $payload]);
     }
 
-    private function aplicarProdutoSelecionado(Product $product): void
+    protected function aplicarProdutoSelecionado(Product $product, bool $allowSkipRender = true): void
     {
         $this->descontoPct = '0,00';
         $this->descontoValor = '0,00';
@@ -6170,12 +6174,15 @@ class ForcaVendasTelaVendaPage extends Page
         $this->carregarProdutoNoForm($product);
 
         // Com Tab. Preço o foco fica no modal; senão skipRender + payload JS (sem remorph).
+        // allowSkipRender=false quando o overlay de cadastro precisa sair do DOM no mesmo request.
         if (! $this->tabPrecoItemModalOpen) {
             if ($this->parseDecimal($this->quantidade) <= 0) {
                 $this->quantidade = '1,000';
             }
             $this->recalcularTotalItem();
-            $this->skipRender();
+            if ($allowSkipRender) {
+                $this->skipRender();
+            }
             $this->dispatchFvItemStaged();
         }
     }
@@ -6230,7 +6237,7 @@ class ForcaVendasTelaVendaPage extends Page
         );
     }
 
-    private function findExactProduct(string $term): ?Product
+    protected function findExactProduct(string $term): ?Product
     {
         return Product::query()
             ->where('ativo', true)

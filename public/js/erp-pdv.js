@@ -688,13 +688,28 @@ function bindErpPdvLivewireEvents() {
 }
 
 window.addEventListener('message', (event) => {
-    if (event.data?.type !== 'erp-pdv-overlay-close') {
-        return;
-    }
-
     const component = getErpPdvComponent();
 
     if (! component) {
+        return;
+    }
+
+    // Cadastro rápido (+ Cadastrar Cliente) usa o mesmo postMessage do Orçamento/OS.
+    if (event.data?.type === 'erp-orcamento-overlay-close') {
+        const clienteId = Number.parseInt(String(event.data.clienteId ?? ''), 10);
+
+        if (! Number.isNaN(clienteId) && clienteId > 0) {
+            component.call('applyOverlayPersonSaved', clienteId);
+
+            return;
+        }
+
+        component.call('closePersonOverlay');
+
+        return;
+    }
+
+    if (event.data?.type !== 'erp-pdv-overlay-close') {
         return;
     }
 

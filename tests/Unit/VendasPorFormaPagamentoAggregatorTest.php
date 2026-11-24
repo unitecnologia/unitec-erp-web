@@ -8,6 +8,7 @@ use App\Models\PdvVendaPagamento;
 use App\Models\Person;
 use App\Models\User;
 use App\Models\Venda;
+use App\Support\Erp\ErpSchema;
 use App\Support\Erp\Reports\VendasPorFormaPagamentoAggregator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -22,6 +23,7 @@ class VendasPorFormaPagamentoAggregatorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        ErpSchema::flush();
 
         if (! Schema::hasTable('vendas')) {
             $this->criarSchemaSqlite();
@@ -70,6 +72,29 @@ class VendasPorFormaPagamentoAggregatorTest extends TestCase
         $this->assertArrayNotHasKey('DINHEIRO', $porForma);
         $this->assertArrayNotHasKey('DINHEIRO / PIX', $porForma);
         $this->assertSame(7.07, round((float) $porForma['PIX']['total'], 2));
+    }
+
+    public function test_venda_mista_fv_rateia_pelas_parcelas_do_payload(): void
+    {
+        if (! Schema::hasTable('forca_vendas_orders')) {
+            $this->markTestSkipped('Tabela forca_vendas_orders ausente.');
+        }
+
+        $data = Carbon::parse('2099-08-28');
+        $this->criarVendaFvMista($data, 35.00, 15.00);
+        $this->criarVendaCabecalho($data, 'DINHEIRO', 70.00);
+        $this->criarVendaCabecalho($data, 'PIX', 100.00);
+
+        $detailed = VendasPorFormaPagamentoAggregator::aggregateDetailed($data, $data);
+        $porForma = $this->indexarPorForma($detailed['rows']);
+
+        $this->assertArrayNotHasKey('DINHEIRO / PIX', $porForma);
+        $this->assertSame(105.00, round((float) $porForma['DINHEIRO']['total'], 2));
+        $this->assertSame(115.00, round((float) $porForma['PIX']['total'], 2));
+        $this->assertSame(2.0, (float) $porForma['DINHEIRO']['qtd']);
+        $this->assertSame(2.0, (float) $porForma['PIX']['qtd']);
+        $this->assertSame(3, $detailed['vendas_unicas']);
+        $this->assertSame(220.00, round((float) $detailed['total'], 2));
     }
 
     /**
@@ -151,6 +176,50 @@ class VendasPorFormaPagamentoAggregatorTest extends TestCase
         ]);
     }
 
+    private function criarVendaFvMista(Carbon $data, float $dinheiro, float $pix): void
+    {
+        $total = round($dinheiro + $pix, 2);
+        $venda = Venda::query()->create([
+            'numero' => $this->numeroUnico(),
+            'data' => $data->toDateString(),
+            'hora' => '12:00:00',
+            'cliente_id' => $this->criarCliente()->id,
+            'total' => $total,
+            'forma_pagamento' => 'DINHEIRO / PIX',
+            'status' => Venda::STATUS_FECHADO,
+            'tipo' => Venda::TIPO_PEDIDO,
+            'plataforma' => Venda::PLATAFORMA_ERP,
+        ]);
+
+        \App\Models\ForcaVendasOrder::query()->create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'device_uuid' => 'test-device',
+            'user_id' => User::factory()->create()->id,
+            'empresa_id' => Schema::hasColumn('vendas', 'empresa_id') ? ($venda->empresa_id ?? null) : null,
+            'tipo' => \App\Models\ForcaVendasOrder::TIPO_PEDIDO,
+            'cliente_id' => $venda->cliente_id,
+            'venda_id' => $venda->id,
+            'total' => $total,
+            'status' => \App\Models\ForcaVendasOrder::STATUS_IMPORTADO,
+            'situacao' => \App\Models\ForcaVendasOrder::SITUACAO_FATURADO,
+            'payload' => [
+                'forma_pagamento' => 'DINHEIRO / PIX',
+                'pagamentos' => [
+                    [
+                        'forma_pagamento' => 'DINHEIRO',
+                        'forma' => 'DINHEIRO',
+                        'valor' => $dinheiro,
+                    ],
+                    [
+                        'forma_pagamento' => 'PIX',
+                        'forma' => 'PIX',
+                        'valor' => $pix,
+                    ],
+                ],
+            ],
+        ]);
+    }
+
     private function criarCliente(): Person
     {
         return Person::query()->create([
@@ -228,6 +297,22 @@ class VendasPorFormaPagamentoAggregatorTest extends TestCase
             $table->unsignedBigInteger('pdv_venda_id');
             $table->string('forma', 30);
             $table->decimal('valor', 12, 2);
+            $table->timestamps();
+        });
+
+        Schema::create('forca_vendas_orders', function (Blueprint $table): void {
+            $table->id();
+            $table->uuid('uuid')->nullable();
+            $table->string('device_uuid')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->unsignedBigInteger('empresa_id')->nullable();
+            $table->string('tipo', 20)->nullable();
+            $table->unsignedBigInteger('cliente_id')->nullable();
+            $table->unsignedBigInteger('venda_id')->nullable();
+            $table->decimal('total', 15, 2)->default(0);
+            $table->string('status', 30)->nullable();
+            $table->string('situacao', 30)->nullable();
+            $table->json('payload')->nullable();
             $table->timestamps();
         });
     }

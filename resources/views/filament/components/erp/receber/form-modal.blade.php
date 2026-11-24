@@ -121,58 +121,63 @@
 
             <label class="erp-receber-form-modal__field erp-receber-form-modal__field--wide">
                 <span>Cliente</span>
-                <div class="erp-receber-form-modal__cliente">
-                    <input
-                        type="text"
-                        class="erp-receber-form-modal__input @if ($somenteVencimento) {{ $roClass }} @endif"
-                        wire:model.live.debounce.250ms="contaFormClienteBusca"
-                        @if (! $somenteVencimento)
-                            wire:focus="openContaFormClienteLookup"
-                            wire:keydown.arrow-up.prevent="moveContaFormClienteSelection(-1)"
-                            wire:keydown.arrow-down.prevent="moveContaFormClienteSelection(1)"
-                            wire:keydown.enter.prevent="handleContaFormClienteEnter"
-                        @endif
-                        placeholder="PESQUISAR CLIENTE"
-                        autocomplete="off"
-                        data-erp-uppercase
-                        @disabled($somenteVencimento)
-                        @readonly($somenteVencimento)
-                        @if ($somenteVencimento) tabindex="-1" @endif
-                    >
-                    @if (! $somenteVencimento && $this->contaFormClienteLookupOpen && filled(trim($this->contaFormClienteBusca)))
-                        @if ($this->contaFormClienteResults !== [])
-                            <div class="erp-receber-form-modal__cliente-lookup">
-                                <table class="erp-receber-form-modal__cliente-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Código</th>
-                                            <th>Razão social</th>
-                                            <th>CNPJ/CPF</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($this->contaFormClienteResults as $index => $row)
-                                            <tr
-                                                wire:key="conta-form-cliente-{{ $row['id'] }}"
-                                                wire:click="highlightContaFormClienteResult({{ $index }})"
-                                                wire:dblclick.prevent="selectContaFormClienteResult({{ $index }})"
-                                                @class(['erp-receber-form-modal__cliente-row', 'erp-receber-form-modal__cliente-row--active' => $this->contaFormClienteIndex === $index])
-                                            >
-                                                <td>{{ $row['codigo'] !== '' ? $row['codigo'] : '—' }}</td>
-                                                <td>{{ $row['nome'] }}</td>
-                                                <td>{{ $row['cpf_cnpj'] !== '' ? $row['cpf_cnpj'] : '—' }}</td>
+                <div class="erp-receber-form-modal__cliente-with-btn">
+                    <div class="erp-receber-form-modal__cliente">
+                        <input
+                            type="text"
+                            class="erp-receber-form-modal__input @if ($somenteVencimento) {{ $roClass }} @endif"
+                            wire:model.live.debounce.250ms="contaFormClienteBusca"
+                            @if (! $somenteVencimento)
+                                wire:focus="openContaFormClienteLookup"
+                                wire:keydown.arrow-up.prevent="moveContaFormClienteSelection(-1)"
+                                wire:keydown.arrow-down.prevent="moveContaFormClienteSelection(1)"
+                                wire:keydown.enter.prevent="handleContaFormClienteEnter"
+                            @endif
+                            placeholder="PESQUISAR CLIENTE"
+                            autocomplete="off"
+                            data-erp-uppercase
+                            @disabled($somenteVencimento)
+                            @readonly($somenteVencimento)
+                            @if ($somenteVencimento) tabindex="-1" @endif
+                        >
+                        @if (! $somenteVencimento && $this->contaFormClienteLookupOpen && filled(trim($this->contaFormClienteBusca)))
+                            @if ($this->contaFormClienteResults !== [])
+                                <div class="erp-receber-form-modal__cliente-lookup">
+                                    <table class="erp-receber-form-modal__cliente-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>Razão social</th>
+                                                <th>CNPJ/CPF</th>
                                             </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <div class="erp-receber-form-modal__cliente-lookup erp-receber-form-modal__cliente-lookup--empty">
-                                Nenhum cliente encontrado.
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            @foreach ($this->contaFormClienteResults as $index => $row)
+                                                <tr
+                                                    wire:key="conta-form-cliente-{{ $row['id'] }}"
+                                                    wire:click="highlightContaFormClienteResult({{ $index }})"
+                                                    wire:dblclick.prevent="selectContaFormClienteResult({{ $index }})"
+                                                    @class(['erp-receber-form-modal__cliente-row', 'erp-receber-form-modal__cliente-row--active' => $this->contaFormClienteIndex === $index])
+                                                >
+                                                    <td>{{ $row['codigo'] !== '' ? $row['codigo'] : '—' }}</td>
+                                                    <td>{{ $row['nome'] }}</td>
+                                                    <td>{{ $row['cpf_cnpj'] !== '' ? $row['cpf_cnpj'] : '—' }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="erp-receber-form-modal__cliente-lookup erp-receber-form-modal__cliente-lookup--empty">
+                                    Nenhum cliente encontrado.
+                                </div>
+                            @endif
                         @endif
-                    @endif
-                    @error('contaFormClienteId') <em class="erp-receber-form-modal__error">{{ $message }}</em> @enderror
+                        @error('contaFormClienteId') <em class="erp-receber-form-modal__error">{{ $message }}</em> @enderror
+                    </div>
+                    @include('filament.components.erp.shared.btn-cadastrar-cliente', [
+                        'disabled' => $somenteVencimento,
+                    ])
                 </div>
             </label>
 
@@ -314,3 +319,11 @@
         </footer>
     </div>
 </div>
+
+@include('filament.components.erp.shared.person-create-overlay')
+
+@php
+    $receberOverlayFitJsPath = public_path('js/erp-form-overlay-fit.js');
+    $receberOverlayFitJsVersion = is_file($receberOverlayFitJsPath) ? (string) filemtime($receberOverlayFitJsPath) : '1';
+@endphp
+<script src="{{ asset('js/erp-form-overlay-fit.js') }}?v={{ $receberOverlayFitJsVersion }}" defer></script>

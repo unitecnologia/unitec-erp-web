@@ -19,5 +19,8 @@
 @php
     $jsPath = public_path('js/erp-orcamentos-form.js');
     $jsVersion = file_exists($jsPath) ? filemtime($jsPath) : time();
+    $fitPath = public_path('js/erp-form-overlay-fit.js');
+    $fitVersion = file_exists($fitPath) ? filemtime($fitPath) : time();
 @endphp
+<script src="{{ asset('js/erp-form-overlay-fit.js') }}?v={{ $fitVersion }}" defer></script>
 <script src="{{ asset('js/erp-orcamentos-form.js') }}?v={{ $jsVersion }}" defer></script>

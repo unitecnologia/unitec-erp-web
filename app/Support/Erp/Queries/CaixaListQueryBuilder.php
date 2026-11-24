@@ -200,7 +200,7 @@ class CaixaListQueryBuilder
      */
     protected function localSearchColumns(): array
     {
-        return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
+        return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida', 'meio_pagamento'];
     }
 
     protected function applyLocalSearch(Builder $query, string $term, ?string $searchColumn = null): void
@@ -227,6 +227,7 @@ class CaixaListQueryBuilder
             'conta' => $query->whereHas('conta', fn (Builder $contaQuery): Builder => $contaQuery->where('nome', 'like', $prefixLike)),
             'entrada' => $this->applyLocalSearchByMoney($query, $term, 'entrada'),
             'saida' => $this->applyLocalSearchByMoney($query, $term, 'saida'),
+            'meio_pagamento' => CaixaLancamentoMeioPagamentoFiltro::apply($query, $term),
             default => null,
         };
     }

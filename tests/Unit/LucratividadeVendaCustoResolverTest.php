@@ -128,11 +128,13 @@ class LucratividadeVendaCustoResolverTest extends TestCase
     public function test_resumido_exibe_lucro_quando_custo_disponivel(): void
     {
         $report = new LucratividadePorVendaReport;
+        // Lucro 180 / custo 120 = 150% (sobre o custo, não sobre a venda).
         $row = $report->formatResumidoRow(3, '300.00', [
             'disponivel' => true,
             'custo_liquido' => '120.00',
             'lucro' => '180.00',
-            'margem' => 60.0,
+            'margem' => 150.0,
+            'margem_disponivel' => true,
             'pendencia' => '',
         ]);
 
@@ -140,6 +142,6 @@ class LucratividadeVendaCustoResolverTest extends TestCase
         $this->assertSame('300,00', $row['total_liquido']);
         $this->assertSame('120,00', $row['custo_historico']);
         $this->assertSame('180,00', $row['lucro']);
-        $this->assertSame('60,00%', $row['margem']);
+        $this->assertSame('150,00%', $row['margem']);
     }
 }

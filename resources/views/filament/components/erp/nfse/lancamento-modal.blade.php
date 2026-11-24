@@ -8,6 +8,7 @@
         @unless ($this->nfseSomenteLeitura())
             wire:keydown.f2.window.prevent="gravarNfse"
             wire:keydown.f6.window.prevent="openNfseImportOs"
+            wire:keydown.f8.window.prevent="openProdutosCadastro"
         @endunless
         @if ($this->nfseId && ! $this->nfseSomenteLeitura())
             wire:keydown.f3.window.prevent="transmitirNfse"
@@ -139,6 +140,11 @@
                                         </ul>
                                     @endif
                                 </label>
+
+                                @include('filament.components.erp.shared.btn-cadastrar-cliente', [
+                                    'disabled' => $this->nfseSomenteLeitura(),
+                                    'title' => 'Cadastrar tomador / cliente',
+                                ])
 
                                 <label class="erp-nfe-cliente__field erp-nfe-cliente__field--doc">
                                     <span>CPF/CNPJ</span>
@@ -800,6 +806,24 @@
 
                         <button
                             type="button"
+                            @unless ($this->nfseSomenteLeitura()) wire:click="openProdutosCadastro" @endunless
+                            class="erp-nfe-actions__btn"
+                            title="Cadastrar produto / serviço (mesmo cadastro da OS)"
+                            data-erp-key="F8"
+                            @disabled($this->nfseSomenteLeitura())
+                        >
+                            <span class="erp-nfe-actions__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                    <path d="M3.27 6.96L12 12.01l8.73-5.05"/>
+                                    <path d="M12 22.08V12"/>
+                                </svg>
+                            </span>
+                            <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Produtos</span>
+                        </button>
+
+                        <button
+                            type="button"
                             class="erp-nfe-actions__btn erp-nfe-actions__btn--close"
                             wire:click="closeNfseModal"
                             title="Sair"
@@ -863,5 +887,13 @@
         @include('filament.components.erp.nfse.lancamento-desconto-item')
         @include('filament.components.erp.nfse.servico-prestado-modal')
         @include('filament.components.erp.nfse.equipamento-modal')
+        @include('filament.components.erp.shared.person-create-overlay')
+        @include('filament.components.erp.shared.product-create-overlay')
     </div>
 @endif
+
+@php
+    $nfseOverlayFitJsPath = public_path('js/erp-form-overlay-fit.js');
+    $nfseOverlayFitJsVersion = is_file($nfseOverlayFitJsPath) ? (string) filemtime($nfseOverlayFitJsPath) : '1';
+@endphp
+<script src="{{ asset('js/erp-form-overlay-fit.js') }}?v={{ $nfseOverlayFitJsVersion }}" defer></script>

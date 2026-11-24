@@ -567,6 +567,18 @@ trait ManagesNfeItemGrid
             return;
         }
 
+        if ($this->overlayProductOpen ?? false) {
+            $this->closeProductOverlay();
+
+            return;
+        }
+
+        if ($this->overlayPersonOpen ?? false) {
+            $this->closePersonOverlay();
+
+            return;
+        }
+
         if ($this->transportadoraModalOpen ?? false) {
             $this->closeTransportadoraModal();
 

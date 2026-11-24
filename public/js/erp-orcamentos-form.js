@@ -175,6 +175,90 @@ window.addEventListener('message', (event) => {
     component.call('closePersonOverlay');
 });
 
+/**
+ * Encaixa o iframe do cadastro rápido na altura real (sem vão abaixo do rodapé).
+ * Mesmo padrão da OS / Tela de Venda.
+ */
+function bindOrcOverlayContentFit(iframe) {
+    if (! iframe || iframe.dataset.erpOverlayFitBound === '1') {
+        return;
+    }
+
+    iframe.dataset.erpOverlayFitBound = '1';
+
+    const applyFit = () => {
+        let doc;
+
+        try {
+            doc = iframe.contentDocument;
+        } catch (e) {
+            return;
+        }
+
+        if (! doc) {
+            return;
+        }
+
+        const windowEl = doc.querySelector('.erp-produtos-window, .erp-pessoas-window');
+
+        if (! windowEl) {
+            return;
+        }
+
+        const measured = Math.ceil(windowEl.getBoundingClientRect().height);
+
+        if (measured < 80) {
+            return;
+        }
+
+        const maxH = Math.max(120, Math.floor(window.innerHeight - 24));
+        const next = Math.min(measured, maxH);
+        iframe.style.height = next + 'px';
+        iframe.style.flex = '0 0 auto';
+
+        const panel = iframe.closest('.erp-form-overlay__panel');
+
+        if (panel) {
+            panel.style.height = next + 'px';
+        }
+    };
+
+    const onLoad = () => {
+        applyFit();
+        window.setTimeout(applyFit, 50);
+        window.setTimeout(applyFit, 200);
+
+        let doc;
+
+        try {
+            doc = iframe.contentDocument;
+        } catch (e) {
+            return;
+        }
+
+        const windowEl = doc?.querySelector('.erp-produtos-window, .erp-pessoas-window');
+
+        if (! windowEl || typeof ResizeObserver === 'undefined') {
+            return;
+        }
+
+        const observer = new ResizeObserver(() => applyFit());
+        observer.observe(windowEl);
+    };
+
+    iframe.addEventListener('load', onLoad);
+
+    if (iframe.contentDocument?.readyState === 'complete') {
+        onLoad();
+    }
+}
+
+function watchOrcOverlayIframes() {
+    document
+        .querySelectorAll('.erp-orcamentos-form-page .erp-form-overlay iframe[data-erp-form-overlay-iframe]')
+        .forEach(bindOrcOverlayContentFit);
+}
+
 function initErpOrcamentosForm() {
     const page = document.querySelector('.erp-orcamentos-form-page');
 
@@ -187,6 +271,23 @@ function initErpOrcamentosForm() {
     }
 
     bindErpOrcamentosFormKeys();
+    watchOrcOverlayIframes();
+
+    if (! window.__erpOrcOverlayFitHook) {
+        window.__erpOrcOverlayFitHook = true;
+
+        const scheduleFit = () => queueMicrotask(watchOrcOverlayIframes);
+
+        document.addEventListener('livewire:navigated', scheduleFit);
+
+        if (window.Livewire?.hook) {
+            window.Livewire.hook('morph.updated', scheduleFit);
+        } else {
+            document.addEventListener('livewire:init', () => {
+                window.Livewire?.hook?.('morph.updated', scheduleFit);
+            });
+        }
+    }
     bindOrcClienteLookupClickOutside();
     bindOrcProdutoLookupFloating();
     bindOrcLookupKeys();

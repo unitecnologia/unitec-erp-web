@@ -79,6 +79,9 @@ class VendasGeralRelatorioPage extends Page
     #[Url(as: 'exibir_grafico', except: false)]
     public bool $exibir_grafico = false;
 
+    #[Url(as: 'exibir_pct_lucro', except: false)]
+    public bool $exibir_pct_lucro = false;
+
     #[Url(as: 'agrupar', except: 'nenhum')]
     public string $agrupar = 'nenhum';
 
@@ -178,6 +181,7 @@ class VendasGeralRelatorioPage extends Page
         $this->apenas_resumo = false;
         $this->exibir_formas = false;
         $this->exibir_grafico = false;
+        $this->exibir_pct_lucro = false;
         $this->agrupar = 'nenhum';
         $this->erroValidacao = '';
     }
@@ -253,6 +257,9 @@ class VendasGeralRelatorioPage extends Page
         }
         if ($this->exibir_grafico) {
             $params['exibir_grafico'] = 1;
+        }
+        if ($this->exibir_pct_lucro) {
+            $params['exibir_pct_lucro'] = 1;
         }
         if ($forGenerate) {
             $params['gerar'] = 1;

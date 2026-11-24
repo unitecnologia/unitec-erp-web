@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
+use App\Filament\Concerns\ManagesErpPersonCreateOverlay;
+use App\Filament\Concerns\ManagesErpProductCreateOverlay;
 use App\Filament\Resources\PersonResource;
 use App\Models\Cfop;
 use App\Models\DevolucaoCompra;
@@ -49,6 +51,9 @@ use Livewire\Attributes\Locked;
 
 trait ManagesNfeEmissaoModal
 {
+    use ManagesErpPersonCreateOverlay;
+    use ManagesErpProductCreateOverlay;
+
     use ManagesNfeItemGrid;
 
     public bool $nfeModalOpen = false;
@@ -274,6 +279,12 @@ trait ManagesNfeEmissaoModal
         $this->fecharNfeModalDescontoItem();
         $this->fecharNfeInfoAdicionaisModal();
         $this->fecharNfeClienteFiscalIncompleto();
+        if ($this->overlayProductOpen ?? false) {
+            $this->overlayProductOpen = false;
+        }
+        if ($this->overlayPersonOpen ?? false) {
+            $this->overlayPersonOpen = false;
+        }
         if ($this->transportadoraModalOpen ?? false) {
             $this->closeTransportadoraModal();
         }
@@ -1879,6 +1890,90 @@ trait ManagesNfeEmissaoModal
         $this->recalculateNfeTotais();
         $this->nfeModalMainTab = 'itens';
         $this->dispatch('erp-nfe-focus-item-produto');
+    }
+
+    protected function canOpenPersonCreateOverlay(): bool
+    {
+        if (! $this->nfeModalOpen) {
+            $this->notifyPersonCreateBlocked('Abra o lançamento da NF-e para cadastrar um cliente.');
+
+            return false;
+        }
+
+        if ($this->nfeModalStatus !== 'ABERTA') {
+            $this->notifyPersonCreateBlocked('NF-e não está aberta — cadastro de cliente bloqueado.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function applyPersonCreatedFromOverlay(int $clienteId): void
+    {
+        $this->selecionarNfeCliente($clienteId);
+    }
+
+    protected function afterPersonOverlayClosed(): void
+    {
+        $this->dispatch('erp-nfe-focus-cliente');
+    }
+
+    protected function canOpenProductCreateOverlay(): bool
+    {
+        if (! $this->nfeModalOpen) {
+            $this->notifyProductCreateBlocked('Abra o lançamento da NF-e para cadastrar um produto.');
+
+            return false;
+        }
+
+        if ($this->nfeModalStatus !== 'ABERTA') {
+            $this->notifyProductCreateBlocked('NF-e não está aberta — cadastro de produto bloqueado.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function applyProductCreatedFromOverlay(string $codigo): void
+    {
+        $codigo = mb_strtoupper(trim($codigo), 'UTF-8');
+
+        if ($codigo === '') {
+            return;
+        }
+
+        $product = $this->findNfeProductByCodigo($codigo);
+
+        if (! $product) {
+            $this->nfeItemProdutoSearch = $codigo;
+            Notification::make()
+                ->title('Produto gravado.')
+                ->body('Busque pelo código na barra Produto para incluir na NF-e.')
+                ->success()
+                ->send();
+            $this->dispatch('erp-nfe-focus-item-produto');
+
+            return;
+        }
+
+        $this->stageNfeProductForEntry($product);
+    }
+
+    protected function afterProductOverlayClosed(): void
+    {
+        $this->dispatch('erp-nfe-focus-item-produto');
+    }
+
+    protected function productCreateOverlayScreenTitle(): string
+    {
+        return 'Cadastro de Produtos';
+    }
+
+    protected function personCreateOverlayScreenTitle(): string
+    {
+        return 'Cadastro de Pessoas';
     }
 
     public function moverNfeSugestaoCliente(int $delta): void

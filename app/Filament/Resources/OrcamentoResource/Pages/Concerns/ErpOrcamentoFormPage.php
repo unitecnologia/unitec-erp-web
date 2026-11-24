@@ -382,6 +382,90 @@ trait ErpOrcamentoFormPage
         $this->applyOrcamentoShortcutReturnContext();
     }
 
+    /**
+     * Prefill do formulário de criação a partir de um orçamento existente.
+     * Não grava no banco: a numeração definitiva ocorre em persistOrcamento().
+     * Não copia cliente, pagamentos, faturamento nem vínculos financeiros.
+     */
+    protected function aplicarDuplicacaoSeSolicitada(): void
+    {
+        if ($this->isEditingOrcamento()) {
+            return;
+        }
+
+        $origemId = (int) request()->query('duplicar', 0);
+
+        if ($origemId <= 0) {
+            return;
+        }
+
+        $origem = Orcamento::query()
+            ->with(['itens.product', 'itens.grade'])
+            ->find($origemId);
+
+        if (! $origem) {
+            Notification::make()
+                ->title('Orçamento de origem não encontrado para duplicar.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // Mantém defaults de criação: data atual, ABERTO, próximo número (só display) e vendedor logado.
+        $this->data = [
+            'numero' => Orcamento::nextNumero(),
+            'data' => now()->format('Y-m-d'),
+            'status' => Orcamento::STATUS_ABERTO,
+        ];
+        $this->form->fill($this->data);
+
+        // Sem cliente — usuário escolhe outro.
+        $this->clienteId = null;
+        $this->clienteSearch = '';
+        $this->clienteAvulsoMode = false;
+        $this->applyClienteFields(null);
+
+        // Sem forma de pagamento / observações / equipamento do original.
+        $this->formaPagamento = '';
+        $this->validadeDias = '0';
+        $this->observacoes = '';
+        $this->osVeiculoId = null;
+        $this->numeroSerie = '';
+        $this->descricao = '';
+        $this->descricao2 = '';
+        $this->modelo = '';
+        $this->ano = '';
+        $this->placa = '';
+        $this->km = '';
+        $this->corVeiculo = '';
+        $this->chassiVeiculo = '';
+        $this->placaLocalResolvida = '';
+        $this->carregarExtrasVeiculoLocal();
+
+        $this->itens = $origem->itens
+            ->sortByDesc('item')
+            ->values()
+            ->map(function (OrcamentoItem $item): array {
+                $row = $this->mapItemToRow($item);
+                // IDs novos na gravação — não vincular ao orçamento original.
+                $row['id'] = null;
+                $row['key'] = ($row['is_separador'] ? 'sep-dup-' : 'item-dup-').(string) Str::uuid();
+
+                return $row;
+            })
+            ->all();
+
+        $this->marcarDivergenciaPrecoCadastro();
+
+        $this->syncTotaisDisplay(
+            (float) $origem->subtotal,
+            (float) $origem->desconto_valor,
+            (float) $origem->total,
+            (float) $origem->percentual_desconto,
+        );
+    }
+
     protected function loadOrcamentoFormFromRecord(Orcamento $orcamento): void
     {
         $orcamento->load(['cliente', 'itens.product', 'itens.grade']);
@@ -3064,12 +3148,12 @@ trait ErpOrcamentoFormPage
 
     public function getProductOverlayUrlProperty(): string
     {
-        return ProductResource::getUrl('create') . '?orcamento=1';
+        return ProductResource::getUrl('create') . '?orcamento=1&os_embed=1';
     }
 
     public function getPersonOverlayUrlProperty(): string
     {
-        return PersonResource::getUrl('create') . '?tipo=clientes&orcamento=1';
+        return PersonResource::getUrl('create') . '?tipo=clientes&orcamento=1&os_embed=1';
     }
 
     public function closeProductOverlay(): void

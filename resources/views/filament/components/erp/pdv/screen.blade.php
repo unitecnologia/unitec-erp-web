@@ -21,3 +21,8 @@
 </div>
 
 @include('filament.components.erp.form-scripts')
+@php
+    $pdvOverlayFitJsPath = public_path('js/erp-form-overlay-fit.js');
+    $pdvOverlayFitJsVersion = is_file($pdvOverlayFitJsPath) ? (string) filemtime($pdvOverlayFitJsPath) : (string) time();
+@endphp
+<script src="{{ asset('js/erp-form-overlay-fit.js') }}?v={{ $pdvOverlayFitJsVersion }}" defer></script>

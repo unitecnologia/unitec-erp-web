@@ -19,6 +19,7 @@ class CreateOrcamento extends CreateRecord
 
         ErpScreen::set('Lançamento de Orçamento');
         $this->initializeOrcamentoFormDefaults();
+        $this->aplicarDuplicacaoSeSolicitada();
 
         // Novo orçamento: cursor em Razão Social (exceto retorno de atalho já com cliente/produto).
         if ($this->clienteId === null

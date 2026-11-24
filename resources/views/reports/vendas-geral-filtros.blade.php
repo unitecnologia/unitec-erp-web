@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Relatório de Vendas Geral — Filtros</title>
-    <link rel="stylesheet" href="{{ asset('css/erp-relatorio-vendas-geral.css') }}?v=8">
+    <link rel="stylesheet" href="{{ asset('css/erp-relatorio-vendas-geral.css') }}?v=9">
 </head>
 <body class="erp-rvg-body-page">
 <div class="erp-rvg-page">
@@ -163,6 +163,7 @@
                                 <label class="erp-rvg-check"><input type="checkbox" name="exibir_formas" value="1" @checked($values['exibir_formas'])> Exibir formas de pagamento (por venda)</label>
                                 <label class="erp-rvg-check"><input type="checkbox" name="exibir_grafico" value="1" @checked($values['exibir_grafico'])> Análise gráfica diária</label>
                                 <label class="erp-rvg-check"><input type="checkbox" name="exibir_resumo_hora" value="1" @checked($values['exibir_resumo_hora'])> Exibir resumo por hora</label>
+                                <label class="erp-rvg-check"><input type="checkbox" name="exibir_pct_lucro" value="1" @checked($values['exibir_pct_lucro'])> Exibir % de lucro</label>
                             </div>
                         </div>
 

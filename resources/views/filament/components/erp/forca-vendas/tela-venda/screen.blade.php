@@ -61,11 +61,29 @@
         const obsClienteOpen = !!$wire.observacaoClienteModalOpen;
         const sairConfirmOpen = !!$wire.fvSairConfirmOpen;
         const imprimirPosVendaOpen = !!$wire.fvImprimirPosVendaOpen;
+        const produtoCadastroOpen = !!$wire.overlayProductOpen;
+        const pessoaCadastroOpen = !!$wire.overlayPersonOpen;
         const tecla = ($event.key || '');
 
         // F5: sempre bloqueado nesta tela (sem recarregar, sair ou mensagem).
         if (tecla === 'F5') {
             $event.preventDefault();
+            return;
+        }
+
+        if (produtoCadastroOpen || pessoaCadastroOpen) {
+            // Overlay do cadastro (iframe): isola atalhos da TV; Esc fecha.
+            if ($event.key === 'Escape') {
+                $event.preventDefault();
+                $event.stopPropagation();
+                if (produtoCadastroOpen) {
+                    $wire.closeProductOverlay();
+                } else {
+                    $wire.closePersonOverlay();
+                }
+            } else if (/^F\d{1,2}$/.test(tecla)) {
+                $event.preventDefault();
+            }
             return;
         }
 
@@ -326,8 +344,8 @@
                 }
                 return;
             }
-            // Atalhos Fx também com foco em input (F2/F3/F4…).
-            if ($event.key === 'F2' || $event.key === 'F3' || $event.key === 'F4') {
+            // Atalhos Fx também com foco em input (F2/F3/F4/F8…).
+            if ($event.key === 'F2' || $event.key === 'F3' || $event.key === 'F4' || $event.key === 'F8') {
                 $event.preventDefault();
             } else if (/^F\d{1,2}$/.test(tecla)) {
                 // F5 e demais Fx sem operação nesta etapa: só bloqueia (sem mensagem).
@@ -376,6 +394,11 @@
             } else {
                 $wire.irParaFinalizacao();
             }
+            return;
+        }
+        if ($event.key === 'F8') {
+            $event.preventDefault();
+            $wire.openProdutosCadastro();
             return;
         }
         // F5 e outras teclas de função sem operação prevista: bloquear silenciosamente.
@@ -547,13 +570,15 @@
                 || !!$wire.observacaoClienteModalOpen
                 || !!$wire.tabPrecoItemModalOpen
                 || !!$wire.fvSairConfirmOpen
+                || !!$wire.overlayProductOpen
+                || !!$wire.overlayPersonOpen
                 || !!(typeof $wire.boletoSucessoDetalhe === 'string' && $wire.boletoSucessoDetalhe)
         }"
     >
         @include('filament.components.erp.forca-vendas.tela-venda.venda')
     </div>
 
-    @unless ($this->boletoContaPickOpen || filled($this->boletoSucessoDetalhe))
+    @unless ($this->boletoContaPickOpen || filled($this->boletoSucessoDetalhe) || $this->overlayProductOpen || $this->overlayPersonOpen)
         @include('filament.components.erp.forca-vendas.tela-venda.action-bar')
     @endunless
 
@@ -572,6 +597,34 @@
     @include('filament.components.erp.forca-vendas.tela-venda.sair-confirm-modal')
     @include('filament.components.erp.forca-vendas.tela-venda.imprimir-pos-venda-modal')
     @include('filament.components.erp.boleto-pos-documento')
+
+    @if ($this->overlayProductOpen)
+        <div
+            class="erp-fv-tv-produto-overlay"
+            wire:key="fv-tv-overlay-produto"
+            x-init="$nextTick(() => window.erpFormOverlayFit?.($el))"
+        >
+            @include('filament.components.erp.form-overlay', [
+                'title' => 'Cadastro de Produtos',
+                'iframeUrl' => $this->productOverlayUrl,
+                'closeAction' => 'closeProductOverlay',
+            ])
+        </div>
+    @endif
+
+    @if ($this->overlayPersonOpen)
+        <div
+            class="erp-fv-tv-produto-overlay erp-person-create-overlay"
+            wire:key="fv-tv-overlay-pessoa"
+            x-init="$nextTick(() => window.erpFormOverlayFit?.($el))"
+        >
+            @include('filament.components.erp.form-overlay', [
+                'title' => 'Cadastro de Clientes',
+                'iframeUrl' => $this->personOverlayUrl,
+                'closeAction' => 'closePersonOverlay',
+            ])
+        </div>
+    @endif
 
     <div
         wire:ignore
@@ -1757,8 +1810,11 @@
     $fvEnterJsVersion = is_file($fvEnterJsPath) ? (string) filemtime($fvEnterJsPath) : '1';
     $fvDescontoJsPath = public_path('js/erp-desconto-item-modal.js');
     $fvDescontoJsVersion = is_file($fvDescontoJsPath) ? (string) filemtime($fvDescontoJsPath) : '1';
+    $fvOverlayFitJsPath = public_path('js/erp-form-overlay-fit.js');
+    $fvOverlayFitJsVersion = is_file($fvOverlayFitJsPath) ? (string) filemtime($fvOverlayFitJsPath) : '1';
 @endphp
 <script src="{{ asset('js/erp-desconto-item-modal.js') }}?v={{ $fvDescontoJsVersion }}"></script>
+<script src="{{ asset('js/erp-form-overlay-fit.js') }}?v={{ $fvOverlayFitJsVersion }}" defer></script>
 <script src="{{ asset('js/erp-fv-tela-venda-guard.js') }}?v={{ $fvGuardJsVersion }}" defer></script>
 <script src="{{ asset('js/erp-fv-tela-venda-enter.js') }}?v={{ $fvEnterJsVersion }}" defer></script>
 <script src="{{ asset('js/erp-fv-tela-venda-lookup.js') }}?v={{ $fvLookupJsVersion }}" defer></script>

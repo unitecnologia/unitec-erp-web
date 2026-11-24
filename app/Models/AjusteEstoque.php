@@ -12,9 +12,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'data',
     'product_id',
     'qtd_ajust',
+    'modo',
 ])]
 class AjusteEstoque extends Model
 {
+    public const MODO_SOMAR = 'somar';
+
+    public const MODO_SUBSTITUIR = 'substituir';
+
     protected $table = 'ajustes_estoque';
 
     public function product(): BelongsTo

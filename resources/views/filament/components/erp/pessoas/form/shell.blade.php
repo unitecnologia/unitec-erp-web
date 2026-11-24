@@ -14,19 +14,22 @@
         'creditos' => 'Créditos',
     ];
 
+    // Atendente/Técnico/Fabricantes ocultos na UI (colunas preservadas).
     $parametros = [
         'is_cliente' => 'Clientes',
         'is_fornecedor' => 'Fornecedores',
         'is_funcionario' => 'Funcionários',
-        'is_atendente' => 'Atendente',
-        'is_tecnico' => 'Técnico',
         'is_administradora' => 'Administradoras',
         'is_parceiro' => 'Parceiros',
-        'is_fabricante' => 'Fabricantes',
         'is_transportadora' => 'Transportadoras',
         'is_ccf_spc' => 'CCF/SPC',
         'ativo' => 'Ativo',
     ];
+
+    // Cadastro rápido (TV/Orçamento/OS): sem Funcionários.
+    if ($this->embedsInOrcamento) {
+        unset($parametros['is_funcionario']);
+    }
 @endphp
 
 <div class="erp-pcad">

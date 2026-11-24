@@ -64,11 +64,18 @@
     @endif
 
     @if ($this->overlayPersonOpen)
-        @include('filament.components.erp.form-overlay', [
-            'title' => 'Cadastro de Clientes',
-            'iframeUrl' => $this->personOverlayUrl,
-            'closeAction' => 'closePersonOverlay',
-        ])
+        <div
+            class="erp-person-create-overlay"
+            wire:key="orc-person-create-overlay"
+            x-data
+            x-init="$nextTick(() => window.erpFormOverlayFit?.($el))"
+        >
+            @include('filament.components.erp.form-overlay', [
+                'title' => 'Cadastro de Clientes',
+                'iframeUrl' => $this->personOverlayUrl,
+                'closeAction' => 'closePersonOverlay',
+            ])
+        </div>
     @endif
 
     @include('filament.components.erp.orcamentos.form.observacoes-modal')

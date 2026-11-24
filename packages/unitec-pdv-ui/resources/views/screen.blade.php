@@ -108,7 +108,12 @@
     @endif
 @endif
 
-@if ($this->overlayPersonOpen ?? false)
+@if (($this->personOverlayMode ?? 'list') === 'create' && ($this->overlayPersonOpen ?? false))
+    {{-- Cadastro rápido (+): overlay compartilhado; postMessage fica no erp-pdv.js (evita double-call). --}}
+    @include('filament.components.erp.shared.person-create-overlay', [
+        'listenMessage' => false,
+    ])
+@elseif ($this->overlayPersonOpen ?? false)
     @if (! empty($this->personOverlayUrl ?? null))
         @include('pdvui::overlays.iframe', [
             'title' => 'Cadastro de Clientes',

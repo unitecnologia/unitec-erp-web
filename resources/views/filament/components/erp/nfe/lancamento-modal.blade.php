@@ -43,6 +43,9 @@
         class="erp-lookup-modal erp-nfe-lancamento-modal"
         wire:keydown.escape.window="handleNfeModalEscape"
         wire:keydown.f6.prevent="importNfeModal"
+        @if ($this->nfeModalStatus === 'ABERTA')
+            wire:keydown.f8.window.prevent="openProdutosCadastro"
+        @endif
         x-on:erp-nfe-focus-cliente.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-cliente-busca'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
         x-on:erp-nfe-focus-item-produto.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-inclusao-produto'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
         x-on:erp-nfe-focus-item-codigo.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-inclusao-produto'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
@@ -711,6 +714,24 @@
 
                         <button
                             type="button"
+                            @if ($this->nfeModalStatus === 'ABERTA') wire:click="openProdutosCadastro" @endif
+                            class="erp-nfe-actions__btn"
+                            title="Cadastrar produto (mesmo cadastro rápido da OS)"
+                            data-erp-key="F8"
+                            @disabled($this->nfeModalStatus !== 'ABERTA')
+                        >
+                            <span class="erp-nfe-actions__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                    <path d="M3.27 6.96L12 12.01l8.73-5.05"/>
+                                    <path d="M12 22.08V12"/>
+                                </svg>
+                            </span>
+                            <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Produtos</span>
+                        </button>
+
+                        <button
+                            type="button"
                             class="erp-nfe-actions__btn erp-nfe-actions__btn--close"
                             wire:click="closeNfeModal"
                             title="Sair"
@@ -734,4 +755,12 @@
     @include('filament.components.erp.nfe.import-list-modal')
     @include('filament.components.erp.nfe.ajuste-tipo-modal')
     @include('filament.components.erp.nfe.ajuste-estorno-busca-modal')
+    @include('filament.components.erp.shared.person-create-overlay')
+    @include('filament.components.erp.shared.product-create-overlay')
 @endif
+
+@php
+    $nfeOverlayFitJsPath = public_path('js/erp-form-overlay-fit.js');
+    $nfeOverlayFitJsVersion = is_file($nfeOverlayFitJsPath) ? (string) filemtime($nfeOverlayFitJsPath) : '1';
+@endphp
+<script src="{{ asset('js/erp-form-overlay-fit.js') }}?v={{ $nfeOverlayFitJsVersion }}" defer></script>

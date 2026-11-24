@@ -14,6 +14,8 @@ use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\Reports\LucratividadePorVenda\LucratividadeVendaCustoResolver;
+use App\Support\Erp\Reports\LucratividadePorVenda\LucratividadeVendaMargemBatch;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use App\Support\Erp\Reports\Tabular\ChartableTabularReport;
 use App\Support\Erp\Reports\Tabular\Concerns\BuildsReportChartScope;
@@ -89,6 +91,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             'doc_fiscal' => 'DOC. FISCAL',
             'status' => 'STATUS',
             'total' => 'TOTAL',
+            'pct_lucro' => '% LUCRO',
             'grupo' => 'GRUPO',
             'qtd' => 'QTD',
             'dia' => 'DIA',
@@ -111,7 +114,33 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
 
     public function numericColumns(): array
     {
-        return ['total', 'qtd'];
+        return ['total', 'qtd', 'pct_lucro'];
+    }
+
+    public function columnWidthWeights(): array
+    {
+        return [
+            'numero' => 7,
+            'data' => 8,
+            'cliente' => 28,
+            'cidade' => 12,
+            'vendedor' => 14,
+            'forma' => 12,
+            'tipo' => 8,
+            'plataforma' => 8,
+            'doc_fiscal' => 10,
+            'status' => 8,
+            'total' => 10,
+            'pct_lucro' => 8,
+            'grupo' => 28,
+            'qtd' => 6,
+            'dia' => 10,
+        ];
+    }
+
+    public function nowrapColumns(): array
+    {
+        return ['numero', 'data', 'status', 'total', 'pct_lucro', 'plataforma', 'forma'];
     }
 
     public function filterFields(): array
@@ -232,6 +261,11 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
                 'label' => 'Exibir resumo por hora',
                 'type' => 'checkbox',
             ],
+            [
+                'key' => 'exibir_pct_lucro',
+                'label' => 'Exibir % de lucro',
+                'type' => 'checkbox',
+            ],
             ['key' => '_sec_group', 'label' => 'Agrupamento', 'type' => 'section'],
             [
                 'key' => 'agrupar',
@@ -329,6 +363,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
         $exibirFormas = $request->boolean('exibir_formas');
         $exibirGrafico = $request->boolean('exibir_grafico');
         $exibirResumoHora = $request->boolean('exibir_resumo_hora');
+        $exibirPctLucro = $request->boolean('exibir_pct_lucro') && $agrupar === 'nenhum' && ! $apenasResumo;
         $export = $request->boolean('pdf') || $request->boolean('csv');
 
         $base = $this->baseSalesQuery($request, $de->toDateString(), $ate->toDateString());
@@ -458,6 +493,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             $exibirProdutos,
             $exibirFormas,
             $exibirGrafico,
+            $exibirPctLucro,
             $export,
             $mostrarResumo,
             $sectionMeta,
@@ -543,11 +579,12 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
         bool $exibirProdutos,
         bool $exibirFormas,
         bool $exibirGrafico,
+        bool $exibirPctLucro,
         bool $export,
         bool $mostrarResumo,
         array $sectionMeta = [],
     ): array {
-        $columns = $this->resolveDetailColumns($request);
+        $columns = $this->resolveDetailColumns($request, $exibirPctLucro);
         $limit = self::DETAIL_LIMIT;
         $isCsv = $request->boolean('csv');
 
@@ -561,6 +598,10 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             if ($export) {
                 $summary[] = 'EXPORTAÇÃO PARCIAL — este arquivo não contém todas as vendas do filtro.';
             }
+        }
+
+        if ($exibirPctLucro) {
+            $summary[] = '% LUCRO: ((venda líquida − custo D2.6) / custo D2.6) × 100 — igual à Lucratividade por Venda; sem custo confiável = Indisponível';
         }
 
         $vendas = $vendaIds === []
@@ -591,6 +632,16 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             $pagamentosByVenda = $this->loadPagamentosByVendaIds($vendaIds);
         }
 
+        // Custo histórico só quando a flag está marcada (performance).
+        $pctLucroByVenda = [];
+        if ($exibirPctLucro && $vendaIds !== []) {
+            $totaisBrutos = [];
+            foreach ($vendas as $venda) {
+                $totaisBrutos[(int) $venda->id] = $venda->total ?? 0;
+            }
+            $pctLucroByVenda = LucratividadeVendaMargemBatch::rotulosPorVenda($totaisBrutos);
+        }
+
         $interactive = ! $export;
         $rows = [];
         foreach ($vendas as $venda) {
@@ -608,6 +659,11 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
                 'status' => Venda::statusLabels()[$venda->status] ?? (string) $venda->status,
                 'total' => static::formatMoney((float) $venda->total),
             ];
+
+            if ($exibirPctLucro) {
+                $row['pct_lucro'] = $pctLucroByVenda[$vid]
+                    ?? LucratividadeVendaCustoResolver::LABEL_INDISPONIVEL;
+            }
 
             if ($exibirProdutos && $interactive) {
                 $row['_expand'] = [
@@ -642,6 +698,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
         // Totais do rodapé = universo filtrado (não a página truncada).
         $footer = [];
         $labelPlaced = false;
+        $numericColumns = $exibirPctLucro ? ['total', 'pct_lucro'] : ['total'];
         foreach ($columns as $column) {
             if ($column === 'total') {
                 $footer[$column] = static::formatMoney($totals['total']);
@@ -649,6 +706,11 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             }
             if ($column === 'qtd') {
                 $footer[$column] = static::formatQuantity((float) $totals['qtd']);
+                continue;
+            }
+            if ($column === 'pct_lucro') {
+                // Margem não soma no rodapé (depende de custo por venda).
+                $footer[$column] = '';
                 continue;
             }
             $footer[$column] = $labelPlaced ? '' : ('TOTAL ('.$totals['qtd'].')');
@@ -661,7 +723,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             'summary' => $summary,
             'filters' => $filters,
             'columns' => $columns,
-            'numeric_columns' => ['total'],
+            'numeric_columns' => $numericColumns,
             'meta' => array_merge($sectionMeta, [
                 'show_chart' => $exibirGrafico,
                 'row_expand' => $exibirProdutos && $interactive,
@@ -1474,7 +1536,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
     /**
      * @return list<string>
      */
-    private function resolveDetailColumns(Request $request): array
+    private function resolveDetailColumns(Request $request, bool $exibirPctLucro = false): array
     {
         $columns = [
             'numero',
@@ -1496,6 +1558,10 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
         if ($docTipo !== 'todos' || $numeroQ !== '') {
             $idx = array_search('plataforma', $columns, true);
             array_splice($columns, $idx === false ? 5 : $idx + 1, 0, ['doc_fiscal']);
+        }
+
+        if ($exibirPctLucro) {
+            $columns[] = 'pct_lucro';
         }
 
         return $columns;
@@ -1946,6 +2012,7 @@ class HistoricoVendasReport extends AbstractTabularReport implements ChartableTa
             'exibir_formas' => $request->boolean('exibir_formas') ? '1' : '',
             'exibir_grafico' => $request->boolean('exibir_grafico') ? '1' : '',
             'exibir_resumo_hora' => $request->boolean('exibir_resumo_hora') ? '1' : '',
+            'exibir_pct_lucro' => $request->boolean('exibir_pct_lucro') ? '1' : '',
             'agrupar' => $this->agruparFromRequest($request),
             'gerar' => $request->boolean('gerar') ? '1' : '',
             'empresa_label' => $this->empresaAtualLabel(),

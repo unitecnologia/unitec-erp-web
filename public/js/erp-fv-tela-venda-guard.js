@@ -108,6 +108,45 @@
         // Fallback: se o componente não estiver disponível, só bloqueia.
     }
 
+    /**
+     * Mesmo postMessage do Orçamento (CreateProduct / CreatePerson ?orcamento=1).
+     * Só atua com a Tela de Venda ativa — não interfere no Orçamento.
+     */
+    function onProdutoCadastroMessage(event) {
+        if (event.data?.type !== 'erp-orcamento-overlay-close') {
+            return;
+        }
+
+        if (! telaVendaAtiva()) {
+            return;
+        }
+
+        const component = findTelaVendaWire();
+
+        if (! component || typeof component.call !== 'function') {
+            return;
+        }
+
+        const produtoCodigo = event.data.produtoCodigo;
+
+        if (typeof produtoCodigo === 'string' && produtoCodigo.trim() !== '') {
+            component.call('applyOverlayProdutoSaved', produtoCodigo);
+
+            return;
+        }
+
+        const clienteId = Number.parseInt(String(event.data.clienteId ?? ''), 10);
+
+        if (! Number.isNaN(clienteId) && clienteId > 0) {
+            component.call('applyOverlayPersonSaved', clienteId);
+
+            return;
+        }
+
+        component.call('closeProductOverlay');
+        component.call('closePersonOverlay');
+    }
+
     function bindListeners() {
         if (listenersBound) {
             return;
@@ -116,6 +155,8 @@
         listenersBound = true;
         // Sem beforeunload — sem aviso nativo do Chrome ao fechar/recarregar a aba.
         document.addEventListener('livewire:navigate', onLivewireNavigate);
+        window.addEventListener('message', onProdutoCadastroMessage);
+        // Sem morph.updated: inclusão de item não deve varrer overlay/fit.
     }
 
     function boot() {
@@ -156,4 +197,5 @@
     window.erpFvTvAllowLeave = markAllowLeave;
     window.erpFvTvBeginAuthorizedLeave = beginAuthorizedLeave;
     window.erpFvTvKeepGuard = keepGuard;
+    // Fit: public/js/erp-form-overlay-fit.js → window.erpFormOverlayFit / erpFvBindOverlayFit
 })();

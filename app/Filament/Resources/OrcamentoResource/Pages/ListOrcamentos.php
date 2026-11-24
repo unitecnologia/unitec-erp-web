@@ -331,6 +331,32 @@ class ListOrcamentos extends ListRecords
         $this->redirectErpAdmin(OrcamentoResource::getUrl('create'));
     }
 
+    public function duplicarOrcamento(): void
+    {
+        $recordId = $this->highlightedRecordIdOrNotify('duplicar');
+
+        if (! $recordId) {
+            return;
+        }
+
+        $orcamento = Orcamento::query()
+            ->select(['id'])
+            ->find($recordId);
+
+        if (! $orcamento) {
+            Notification::make()
+                ->title('Orçamento não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->redirectErpAdmin(
+            OrcamentoResource::getUrl('create').'?duplicar='.(int) $orcamento->id
+        );
+    }
+
     public function editOrcamento(int | string | null $recordId = null): void
     {
         if ($this->reabrirConfirmOrcamentoId !== null) {
@@ -633,6 +659,7 @@ class ListOrcamentos extends ListRecords
             'cancel' => 'um orçamento para cancelar',
             'print' => 'um orçamento para imprimir',
             'enviar' => 'um orçamento para enviar',
+            'duplicar' => 'um orçamento para duplicar',
             default => $this->defaultErpListSelectPrompt($action),
         };
     }

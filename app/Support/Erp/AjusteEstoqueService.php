@@ -43,11 +43,20 @@ final class AjusteEstoqueService
 
             $this->garantirEstoquePermitido($product, $qtdAjust, $depositoId);
 
-            $ajuste = AjusteEstoque::query()->create([
+            $modoNorm = $modo === 'substituir'
+                ? AjusteEstoque::MODO_SUBSTITUIR
+                : AjusteEstoque::MODO_SOMAR;
+
+            $payload = [
                 'data' => $data,
                 'product_id' => $productId,
                 'qtd_ajust' => $qtdAjust,
-            ]);
+            ];
+            if (ErpSchema::hasColumn((new AjusteEstoque)->getTable(), 'modo')) {
+                $payload['modo'] = $modoNorm;
+            }
+
+            $ajuste = AjusteEstoque::query()->create($payload);
 
             $this->aplicarDelta(
                 $productId,

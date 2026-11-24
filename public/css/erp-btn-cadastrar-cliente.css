@@ -1,0 +1,243 @@
+/* Botão + Cadastrar Cliente — compacto, padrão UNI (reuso TV/Orçamento/OS/NF-e/Receber/PDV) */
+.erp-btn-cadastrar-cliente.erp-fv-tv-btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    min-width: 0;
+    height: 2.15rem;
+    margin: 0 0.05rem;
+    padding: 0 0.55rem 0 0.35rem;
+    border-radius: 8px;
+    border-color: #4ade80;
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 45%, #bbf7d0 100%);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-btn-cadastrar-cliente .erp-fv-tv-btn__icon {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin: 0;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+    color: #fff;
+}
+
+.erp-btn-cadastrar-cliente .erp-fv-tv-btn__icon svg {
+    width: 0.78rem;
+    height: 0.78rem;
+}
+
+.erp-btn-cadastrar-cliente .erp-nfe-actions__label {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 750;
+    line-height: 1;
+    color: #14532d;
+}
+
+.erp-btn-cadastrar-cliente:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+}
+
+/* Overlay Pessoa/Produto — acima dos modais de lançamento (Receber 520, NFS-e 250, etc.); altura até o fit */
+.erp-person-create-overlay,
+.erp-product-create-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 650;
+    pointer-events: none;
+}
+
+.erp-person-create-overlay .erp-form-overlay,
+.erp-product-create-overlay .erp-form-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 650;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    pointer-events: auto;
+}
+
+.erp-person-create-overlay .erp-form-overlay__backdrop,
+.erp-product-create-overlay .erp-form-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+.erp-person-create-overlay .erp-form-overlay__panel,
+.erp-product-create-overlay .erp-form-overlay__panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(calc(1280px + 4cm), 98vw);
+    height: auto;
+    max-height: calc(100dvh - 0.6rem);
+    min-height: 0;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+}
+
+.erp-person-create-overlay .erp-form-overlay__iframe,
+.erp-product-create-overlay .erp-form-overlay__iframe {
+    flex: 0 0 auto;
+    width: 100%;
+    height: min(52rem, calc(100dvh - 0.6rem));
+    min-height: min(28rem, calc(100dvh - 0.6rem));
+    border: 0;
+    background: transparent;
+}
+
+@supports not (height: 100dvh) {
+    .erp-person-create-overlay .erp-form-overlay__panel,
+    .erp-product-create-overlay .erp-form-overlay__panel {
+        max-height: calc(100vh - 0.6rem);
+    }
+
+    .erp-person-create-overlay .erp-form-overlay__iframe,
+    .erp-product-create-overlay .erp-form-overlay__iframe {
+        height: min(52rem, calc(100vh - 0.6rem));
+        min-height: min(28rem, calc(100vh - 0.6rem));
+    }
+}
+
+/* Receber form: botão ao lado do lookup */
+.erp-receber-form-modal__cliente-with-btn {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.erp-receber-form-modal__cliente-with-btn .erp-receber-form-modal__cliente {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-receber-form-modal__cliente-with-btn .erp-btn-cadastrar-cliente {
+    align-self: flex-start;
+    margin-top: 0;
+    height: 2.35rem;
+}
+
+/* NF-e: botão na linha do cliente — sobrescreve altura/coluna de .erp-nfe-actions__btn */
+.erp-nfe-cliente__row--primary {
+    align-items: flex-end;
+}
+
+.erp-nfe-page .erp-nfe-cliente__row--primary .erp-btn-cadastrar-cliente.erp-fv-tv-btn,
+.erp-nfe-cliente__row--primary .erp-btn-cadastrar-cliente {
+    margin-bottom: 0;
+    flex-direction: row;
+    align-self: flex-end;
+    min-width: 0;
+    height: 2.15rem;
+    padding: 0 0.55rem 0 0.35rem;
+    pointer-events: auto;
+    opacity: 1;
+    cursor: pointer;
+    filter: none;
+    border-color: #4ade80;
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 45%, #bbf7d0 100%);
+    box-shadow: var(--erp-shadow-md, 0 1px 2px rgba(15, 23, 42, 0.12));
+}
+
+.erp-nfe-page .erp-nfe-cliente__row--primary .erp-btn-cadastrar-cliente:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+    pointer-events: none;
+}
+
+/* Overlay produto — mesmo fit/z-index do cadastro de pessoa */
+.erp-product-create-overlay .erp-form-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 650;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.erp-product-create-overlay .erp-form-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+.erp-product-create-overlay .erp-form-overlay__panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(calc(1280px + 4cm), 98vw);
+    height: auto;
+    max-height: calc(100dvh - 0.6rem);
+    min-height: 0;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+}
+
+.erp-product-create-overlay .erp-form-overlay__iframe {
+    flex: 0 0 auto;
+    width: 100%;
+    height: min(52rem, calc(100dvh - 0.6rem));
+    min-height: min(28rem, calc(100dvh - 0.6rem));
+    border: 0;
+    background: transparent;
+}
+
+@supports not (height: 100dvh) {
+    .erp-product-create-overlay .erp-form-overlay__panel {
+        max-height: calc(100vh - 0.6rem);
+    }
+
+    .erp-product-create-overlay .erp-form-overlay__iframe {
+        height: min(52rem, calc(100vh - 0.6rem));
+        min-height: min(28rem, calc(100vh - 0.6rem));
+    }
+}
+
+/* PDV finalizar */
+.erp-pdv-finalizar__cliente-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.35rem;
+}
+
+.erp-pdv-finalizar__cliente-row .erp-pdv-finalizar__field--cliente {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-pdv-finalizar__cliente-row .erp-btn-cadastrar-cliente {
+    height: 2.35rem;
+    border: 1px solid #4ade80;
+    opacity: 1;
+    filter: none;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.erp-pdv-finalizar__cliente-row .erp-btn-cadastrar-cliente:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+    pointer-events: none;
+}

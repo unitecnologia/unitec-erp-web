@@ -35,6 +35,9 @@
         <testsuite name="NfeOrdemServicoOperacaoFiscalDev">
             <file>tests/Feature/NfeOrdemServicoOperacaoFiscalDevTest.php</file>
         </testsuite>
+        <testsuite name="OrcamentoDuplicacao">
+            <file>tests/Feature/OrcamentoDuplicacaoTest.php</file>
+        </testsuite>
     </testsuites>
     <php>
         <env name="APP_ENV" value="testing" force="true"/>

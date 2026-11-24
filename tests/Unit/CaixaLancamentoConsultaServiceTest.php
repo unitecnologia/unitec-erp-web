@@ -91,6 +91,28 @@ class CaixaLancamentoConsultaServiceTest extends TestCase
         $this->assertContainsLabel($data['detalhes'], 'Origem', 'Lançamento manual');
         $this->assertContainsLabel($data['detalhes'], 'Valor do lançamento', '50,00');
         $this->assertSame('CAIXA', $data['conta']);
+        $this->assertSame('Não informado', $data['meio_pagamento']);
+    }
+
+    public function test_manual_com_forma_gravada_exibe_meio_pagamento(): void
+    {
+        $forma = \App\Models\FormaPagamento::query()->create([
+            'codigo' => 1,
+            'descricao' => 'PIX',
+            'ativo' => true,
+        ]);
+
+        $lanc = $this->criarLancamento($this->contaCaixa, [
+            'historico' => '[MANUAL] Recebimento avulso',
+            'entrada' => 20,
+            'saida' => 0,
+            'forma_pagamento_id' => $forma->id,
+        ]);
+
+        $data = app(CaixaLancamentoConsultaService::class)->montar($lanc);
+
+        $this->assertSame('PIX', $data['meio_pagamento']);
+        $this->assertContainsLabel($data['detalhes'], 'Forma de pagamento', 'PIX');
     }
 
     public function test_abertura_livro_na_conta_geral_abre_modal_padrao(): void
@@ -226,6 +248,7 @@ class CaixaLancamentoConsultaServiceTest extends TestCase
         $this->assertSame('CAIXA GERAL', $dataManual['conta']);
         $this->assertFalse($dataManual['pode_ver_itens']);
         $this->assertContainsLabel($dataManual['detalhes'], 'Origem', 'Lançamento manual');
+        $this->assertSame('Não informado', $dataManual['meio_pagamento']);
     }
 
     public function test_isola_empresa_em_abertura_e_lancamento(): void
@@ -492,6 +515,7 @@ class CaixaLancamentoConsultaServiceTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('empresa_id')->nullable();
             $table->unsignedBigInteger('caixa_conta_id')->nullable();
+            $table->unsignedBigInteger('forma_pagamento_id')->nullable();
             $table->unsignedInteger('codigo')->nullable();
             $table->date('emissao')->nullable();
             $table->string('documento')->nullable();
@@ -500,6 +524,14 @@ class CaixaLancamentoConsultaServiceTest extends TestCase
             $table->unsignedBigInteger('plano_conta_id')->nullable();
             $table->decimal('entrada', 15, 2)->default(0);
             $table->decimal('saida', 15, 2)->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('formas_pagamento', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedInteger('codigo')->nullable();
+            $table->string('descricao');
+            $table->boolean('ativo')->default(true);
             $table->timestamps();
         });
 

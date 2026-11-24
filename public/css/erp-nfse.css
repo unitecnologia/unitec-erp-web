@@ -696,6 +696,44 @@
     accent-color: #dc2626;
 }
 
+.erp-nfe-page .erp-nfse-cancelar-modal__label--justificativa {
+    margin-top: 0.65rem;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__justificativa {
+    display: block;
+    width: 100%;
+    min-height: 4.2rem;
+    margin: 0;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    resize: vertical;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__justificativa:focus {
+    outline: 2px solid #fecaca;
+    border-color: #dc2626;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__contador {
+    margin: 0.3rem 0 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__contador.is-warn {
+    color: #b45309;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__contador.is-ok {
+    color: #047857;
+}
+
 .erp-nfe-page .erp-nfse-cancelar-modal__aviso {
     margin: 0.75rem 0 0;
     font-size: 0.75rem;

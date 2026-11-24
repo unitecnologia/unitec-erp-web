@@ -253,7 +253,7 @@
                 >
             </label>
 
-            <label class="erp-fv-tv__field erp-fv-tv__field--grow erp-fv-tv__field--suggest">
+            <label class="erp-fv-tv__field erp-fv-tv__field--grow erp-fv-tv__field--suggest erp-fv-tv__field--cliente-nome">
                 <span>Razão social ou CNPJ</span>
                 <input
                     id="fv-tv-cliente-busca"
@@ -306,6 +306,10 @@
                     </ul>
                 @endif
             </label>
+
+            @include('filament.components.erp.shared.btn-cadastrar-cliente', [
+                'title' => 'Cadastrar cliente (mesmo cadastro rápido do Orçamento)',
+            ])
 
             @if (trim($this->clienteObservacoes) !== '' && ! \App\Models\Person::isCodigoConsumidorFinal($this->clienteCodigo))
                 <button type="button" class="erp-fv-tv__obs-cliente" wire:click="abrirObservacaoCliente" title="Observação do cliente">

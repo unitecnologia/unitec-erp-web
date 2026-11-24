@@ -560,6 +560,11 @@ class ErpMenu
                 static::link('Produtos menos vendidos', route('erp.reports.tabular', ['slug' => 'produtos-menos-vendidos']), permission: 'produtos.print', icon: 'heroicon-o-arrow-trending-down', iconColor: 'erp-menu-bar__icon--orange'),
                 static::link('Produtos mais vendidos', route('erp.reports.tabular', ['slug' => 'produtos-mais-vendidos']), permission: 'produtos.print', icon: 'heroicon-o-arrow-trending-up', iconColor: 'erp-menu-bar__icon--blue'),
                 static::link('Relatório de Produtos com Preço Alterado', route('erp.reports.tabular', ['slug' => 'preco-alterado']), permission: 'produtos.print', icon: 'heroicon-o-tag', iconColor: 'erp-menu-bar__icon--purple'),
+            ], icon: 'heroicon-o-cube', iconColor: 'erp-menu-bar__icon--amber'),
+            static::group('Estoque', [
+                static::link('Posição do Estoque', route('erp.reports.tabular', ['slug' => 'posicao-estoque']), permission: 'produtos.print', icon: 'heroicon-o-archive-box', iconColor: 'erp-menu-bar__icon--blue'),
+                static::link('Ajustes de Estoque', route('erp.reports.tabular', ['slug' => 'ajustes-estoque']), permission: 'produtos.print', icon: 'heroicon-o-arrows-up-down', iconColor: 'erp-menu-bar__icon--blue'),
+                static::sep(),
                 static::link('Relatório de Estoque - Composição', route('erp.reports.tabular', ['slug' => 'estoque-composicao']), permission: 'produtos.print', icon: 'heroicon-o-cube', iconColor: 'erp-menu-bar__icon--teal'),
                 static::link('Relatório de Estoque - Grade', route('erp.reports.tabular', ['slug' => 'estoque-grade']), permission: 'produtos.print', icon: 'heroicon-o-table-cells', iconColor: 'erp-menu-bar__icon--indigo'),
                 static::link('Relatório de Estoque - Mínimo', route('erp.reports.tabular', ['slug' => 'estoque-minimo']), permission: 'produtos.print', icon: 'heroicon-o-exclamation-triangle', iconColor: 'erp-menu-bar__icon--amber'),
@@ -568,7 +573,7 @@ class ErpMenu
                 static::link('Listagem - Conferência de Estoque', route('erp.reports.tabular', ['slug' => 'conferencia-estoque']), permission: 'produtos.print', icon: 'heroicon-o-clipboard-document-check', iconColor: 'erp-menu-bar__icon--green'),
                 static::link('Listagem - Validade de Produtos', route('erp.reports.tabular', ['slug' => 'validade-produtos']), permission: 'produtos.print', icon: 'heroicon-o-calendar-days', iconColor: 'erp-menu-bar__icon--amber'),
                 static::link('Listagem - Validade por Lote', route('erp.reports.tabular', ['slug' => 'validade-lotes']), permission: 'produtos.print', icon: 'heroicon-o-queue-list', iconColor: 'erp-menu-bar__icon--teal'),
-            ], icon: 'heroicon-o-cube', iconColor: 'erp-menu-bar__icon--amber'),
+            ], icon: 'heroicon-o-archive-box', iconColor: 'erp-menu-bar__icon--teal'),
             static::group('Vendas', [
                 static::link('Faturamento Mensal', FaturamentoMensalPage::getUrl(), permission: 'vendas.print', icon: 'heroicon-o-chart-bar', iconColor: 'erp-menu-bar__icon--blue'),
                 static::link('Relatório de Vendas Geral', route('erp.reports.vendas-geral.filtros'), permission: 'vendas.print', icon: 'heroicon-o-clock', iconColor: 'erp-menu-bar__icon--red'),

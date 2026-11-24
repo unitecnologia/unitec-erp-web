@@ -5,6 +5,7 @@ namespace App\Support\Erp\Financeiro;
 use App\Models\CaixaLancamento;
 use App\Models\CaixaLivroMovimento;
 use App\Models\ForcaVendasOrder;
+use App\Models\FormaPagamento;
 use App\Models\OrdemServico;
 use App\Models\PdvCaixaMovimento;
 use App\Models\PdvVenda;
@@ -15,6 +16,7 @@ use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\ErpContext;
 use App\Support\Pix\PixPdvLivroCaixaService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Monta a consulta somente leitura do lançamento de caixa (ícone do olho).
@@ -39,6 +41,7 @@ final class CaixaLancamentoConsultaService
      *     historico: string,
      *     plano_contas: string,
      *     conta: string,
+     *     meio_pagamento: string,
      *     entrada: string,
      *     saida: string,
      *     tem_detalhe: bool,
@@ -75,6 +78,8 @@ final class CaixaLancamentoConsultaService
             $linhas = $this->garantirLinhaValor($linhas, 'Valor do lançamento', $valorLanc);
         }
 
+        $meioPagamento = $this->resolverMeioPagamentoExibicao($lancamento, $linhas);
+
         return [
             'eh_grupo' => false,
             'codigo' => filled($lancamento->codigo) ? (string) $lancamento->codigo : '—',
@@ -89,6 +94,7 @@ final class CaixaLancamentoConsultaService
             ) ?: '—',
             'plano_contas' => mb_strtoupper((string) ($lancamento->plano_contas ?? ''), 'UTF-8') ?: '—',
             'conta' => mb_strtoupper($lancamento->conta?->nome ?? '—', 'UTF-8'),
+            'meio_pagamento' => $meioPagamento,
             'entrada' => number_format((float) $lancamento->entrada, 2, ',', '.'),
             'saida' => number_format((float) $lancamento->saida, 2, ',', '.'),
             'tem_detalhe' => $linhas !== [],
@@ -125,6 +131,8 @@ final class CaixaLancamentoConsultaService
             }
         }
 
+        $linhasOrigem = $origem['linhas'] ?? [];
+
         return [
             'eh_grupo' => true,
             'codigo' => count($membros).' lançamentos',
@@ -133,10 +141,11 @@ final class CaixaLancamentoConsultaService
             'historico' => (string) ($grupo->getAttribute('caixa_grupo_resumo') ?? '—'),
             'plano_contas' => $planos === [] ? '—' : implode(' · ', array_keys($planos)),
             'conta' => mb_strtoupper($primeiro->conta?->nome ?? '—', 'UTF-8'),
+            'meio_pagamento' => $this->resolverMeioPagamentoExibicao($primeiro, $linhasOrigem),
             'entrada' => number_format($sumEntrada, 2, ',', '.'),
             'saida' => number_format($sumSaida, 2, ',', '.'),
-            'tem_detalhe' => ($origem['linhas'] ?? []) !== [],
-            'detalhes' => $origem['linhas'] ?? [],
+            'tem_detalhe' => $linhasOrigem !== [],
+            'detalhes' => $linhasOrigem,
             'membros' => $membros,
             'pode_ver_itens' => $vinculo['pode'],
             'venda_id' => $vinculo['venda_id'],
@@ -193,6 +202,7 @@ final class CaixaLancamentoConsultaService
             'historico' => (string) ($linha->historico ?: '—'),
             'plano_contas' => 'CONFERÊNCIA',
             'conta' => mb_strtoupper($linha->conta?->nome ?? $mov->conta?->nome ?? '—', 'UTF-8'),
+            'meio_pagamento' => 'Não informado',
             'entrada' => number_format($troco, 2, ',', '.'),
             'saida' => '0,00',
             'tem_detalhe' => true,
@@ -507,6 +517,42 @@ final class CaixaLancamentoConsultaService
         );
 
         return $texto !== '' ? $texto : '—';
+    }
+
+    /**
+     * Forma realmente utilizada: coluna gravada (manual) ou detalhe já resolvido da origem.
+     * Sem presumir Dinheiro — antigos sem vínculo ficam "Não informado".
+     *
+     * @param  list<array{label?: string, value?: string}>  $linhas
+     */
+    private function resolverMeioPagamentoExibicao(CaixaLancamento $lancamento, array $linhas): string
+    {
+        if (Schema::hasColumn($lancamento->getTable(), 'forma_pagamento_id')) {
+            $formaId = (int) ($lancamento->forma_pagamento_id ?? 0);
+            if ($formaId > 0) {
+                $desc = trim((string) (
+                    $lancamento->formaPagamento?->descricao
+                    ?? FormaPagamento::query()->whereKey($formaId)->value('descricao')
+                    ?? ''
+                ));
+                if ($desc !== '') {
+                    return mb_strtoupper($desc, 'UTF-8');
+                }
+            }
+        }
+
+        foreach ($linhas as $linha) {
+            $label = mb_strtolower(trim((string) ($linha['label'] ?? '')), 'UTF-8');
+            if (! in_array($label, ['meio de pagamento', 'forma de pagamento'], true)) {
+                continue;
+            }
+            $valor = trim((string) ($linha['value'] ?? ''));
+            if ($valor !== '' && $valor !== '—') {
+                return mb_strtoupper($valor, 'UTF-8');
+            }
+        }
+
+        return 'Não informado';
     }
 
     private function origemBasica(CaixaLancamento $lancamento): string

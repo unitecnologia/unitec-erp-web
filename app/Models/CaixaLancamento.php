@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'plano_contas',
     'plano_conta_id',
     'caixa_conta_id',
+    'forma_pagamento_id',
     'entrada',
     'saida',
 ])]
@@ -42,12 +43,18 @@ class CaixaLancamento extends Model
         return $this->belongsTo(PlanoConta::class, 'plano_conta_id');
     }
 
+    public function formaPagamento(): BelongsTo
+    {
+        return $this->belongsTo(FormaPagamento::class, 'forma_pagamento_id');
+    }
+
     protected function casts(): array
     {
         return [
             'emissao' => 'date',
             'entrada' => 'decimal:2',
             'saida' => 'decimal:2',
+            'forma_pagamento_id' => 'integer',
         ];
     }
 }

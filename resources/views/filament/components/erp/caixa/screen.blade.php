@@ -7,6 +7,7 @@
         'conta' => 'CONTAS',
         'entrada' => 'ENTRADA',
         'saida' => 'SAÍDA',
+        'meio_pagamento' => 'MEIO DE PAGAMENTO',
     ];
 
     $activeFields = array_values(array_unique(array_filter(
@@ -25,23 +26,15 @@
         'conta' => 'DIGITE A CONTA',
         'entrada' => 'DIGITE O VALOR',
         'saida' => 'DIGITE O VALOR',
+        'meio_pagamento' => 'SELECIONE O MEIO',
     ];
+    $meioPagamentoOptions = $this->meioPagamentoFilterOptions;
 
     $pageSizeOptions = [25, 50, 100];
 @endphp
 
 <div class="erp-caixa" wire:ignore.self>
     @php $status = $this->caixaStatusBanner; @endphp
-    @if (! empty($status['visivel']))
-        <div
-            class="erp-caixa__status-banner {{ ! empty($status['aberto']) ? 'is-aberto' : 'is-fechado' }}"
-            role="status"
-            aria-live="polite"
-        >
-            <strong>{{ $status['titulo'] }}</strong>
-            <span>{{ $status['detalhe'] }}</span>
-        </div>
-    @endif
 
     <div class="erp-caixa__filter-block">
         <label class="erp-caixa__account-label">
@@ -104,16 +97,42 @@
             ])
             @foreach ($activeFields as $index => $column)
                 @php $model = $index === 0 ? 'localSearch' : 'localSearch2'; @endphp
-                <input
-                    type="text"
-                    wire:model.live.debounce.400ms="{{ $model }}"
-                    wire:key="caixa-local-search-{{ $model }}-{{ $column }}"
-                    class="erp-caixa__input erp-caixa__locate-input"
-                    placeholder="{{ $placeholders[$column] ?? 'DIGITE AQUI SUA PESQUISA' }}"
-                    autocomplete="off"
-                    @if (in_array($column, ['entrada', 'saida'], true)) inputmode="decimal" @endif
-                >
+                @if ($column === 'meio_pagamento')
+                    <select
+                        wire:model.live="{{ $model }}"
+                        wire:key="caixa-local-search-{{ $model }}-meio_pagamento"
+                        class="erp-caixa__select erp-caixa__locate-input"
+                        aria-label="Meio de pagamento"
+                    >
+                        <option value="">TODOS</option>
+                        @foreach ($meioPagamentoOptions as $opt)
+                            <option value="{{ $opt }}">{{ $opt }}</option>
+                        @endforeach
+                    </select>
+                @else
+                    <input
+                        type="text"
+                        wire:model.live.debounce.400ms="{{ $model }}"
+                        wire:key="caixa-local-search-{{ $model }}-{{ $column }}"
+                        class="erp-caixa__input erp-caixa__locate-input"
+                        placeholder="{{ $placeholders[$column] ?? 'DIGITE AQUI SUA PESQUISA' }}"
+                        autocomplete="off"
+                        @if (in_array($column, ['entrada', 'saida'], true)) inputmode="decimal" @endif
+                    >
+                @endif
             @endforeach
+        </div>
+
+        <div
+            class="erp-caixa__status-inline {{ ! empty($status['aberto']) ? 'is-aberto' : 'is-fechado' }}"
+            data-erp-caixa-status
+            role="status"
+            aria-live="polite"
+            title="{{ trim(($status['titulo'] ?? '').(! empty($status['detalhe']) ? ' — '.$status['detalhe'] : '')) }}"
+            @if (empty($status['visivel'])) hidden @endif
+        >
+            <strong data-erp-caixa-status-titulo>{{ $status['titulo'] ?? '' }}</strong>
+            <span data-erp-caixa-status-detalhe>{{ $status['detalhe'] ?? '' }}</span>
         </div>
 
         <div class="erp-caixa__page-size-group">

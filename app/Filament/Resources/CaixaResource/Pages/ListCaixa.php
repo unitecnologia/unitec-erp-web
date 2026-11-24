@@ -23,6 +23,7 @@ use App\Support\Erp\ErpScreen;
 use Illuminate\Support\Facades\DB;
 use App\Support\Erp\Financeiro\CaixaTransferencia;
 use App\Support\Erp\Pdv\PdvCaixaFechamentoService;
+use App\Support\Erp\Queries\CaixaLancamentoMeiosResumo;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use App\Support\Erp\Queries\CaixaPdvMovimentacaoQuery;
 use Filament\Notifications\Notification;
@@ -77,6 +78,9 @@ class ListCaixa extends ListRecords
     public array $caixaForm = [];
 
     public string $caixaFormAlert = '';
+
+    /** @var array<string, string> chave do campo => mensagem */
+    public array $caixaFormErrors = [];
 
     public bool $caixaDeleteConfirmOpen = false;
 
@@ -310,6 +314,7 @@ class ListCaixa extends ListRecords
                 View::make('filament.components.erp.caixa.screen'),
                 View::make('filament.components.erp.caixa.table-host')
                     ->columnSpanFull(),
+                View::make('filament.components.erp.caixa.meios-resumo'),
                 View::make('filament.components.erp.caixa.footer-summary'),
                 View::make('filament.components.erp.caixa.action-bar'),
                 View::make('filament.components.erp.caixa.view-modal'),
@@ -435,7 +440,39 @@ class ListCaixa extends ListRecords
      */
     protected function localSearchColumns(): array
     {
-        return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
+        return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida', 'meio_pagamento'];
+    }
+
+    /**
+     * Formas cadastradas (ativas) para o select LOCALIZAR → MEIO DE PAGAMENTO.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function meioPagamentoFilterOptions(): array
+    {
+        return \App\Support\Erp\Queries\CaixaLancamentoMeioPagamentoFiltro::opcoesSelect();
+    }
+
+    /**
+     * Resumo de recebimentos por meio (conta + período + Localizar).
+     *
+     * @return array{
+     *     linhas: list<array{forma: string, recebido: float, estorno: float, liquido: float}>,
+     *     total_recebido: float,
+     *     total_estorno: float,
+     *     total_liquido: float,
+     *     outras_saidas: float,
+     *     saldo_liquido: float,
+     *     total_entradas: float,
+     *     sem_meio: float,
+     *     visivel: bool
+     * }
+     */
+    #[Computed]
+    public function caixaMeiosResumo(): array
+    {
+        return (new CaixaLancamentoMeiosResumo)->build($this->listQueryBuilder()->scopedQuery());
     }
 
     /**
@@ -558,6 +595,7 @@ class ListCaixa extends ListRecords
         ];
         $this->caixaFormLancamentoId = null;
         $this->caixaFormAlert = '';
+        $this->caixaFormErrors = [];
         $this->caixaFormOpen = true;
     }
 
@@ -567,6 +605,7 @@ class ListCaixa extends ListRecords
         $this->caixaFormLancamentoId = null;
         $this->caixaForm = [];
         $this->caixaFormAlert = '';
+        $this->caixaFormErrors = [];
     }
 
     public function updatedCaixaFormFormaPagamentoId(): void
@@ -592,15 +631,72 @@ class ListCaixa extends ListRecords
             return;
         }
 
+        $this->caixaFormAlert = '';
+        $this->caixaFormErrors = [];
+
+        $emissao = trim((string) ($this->caixaForm['emissao'] ?? ''));
         $entrada = max(0, BrDecimal::parse($this->caixaForm['entrada'] ?? 0, 2));
         $saida = max(0, BrDecimal::parse($this->caixaForm['saida'] ?? 0, 2));
         $selecionada = (int) ($this->caixaForm['caixa_conta_id'] ?? 0);
         $formaId = (int) ($this->caixaForm['forma_pagamento_id'] ?? 0);
-        $destinoForma = $formaId > 0
-            ? (int) (FormaPagamento::query()->whereKey($formaId)->value('conta_destino_id') ?? 0)
-            : 0;
         $planoId = (int) ($this->caixaForm['plano_conta_id'] ?? 0);
         $historico = trim((string) ($this->caixaForm['historico'] ?? ''));
+        $documentoInformado = mb_substr(trim((string) ($this->caixaForm['documento'] ?? '')), 0, 40);
+
+        /** @var array<string, string> $errors */
+        $errors = [];
+
+        if ($emissao === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $emissao)) {
+            $errors['emissao'] = 'Informe a data de emissão.';
+        }
+
+        $plano = null;
+        if ($planoId <= 0) {
+            $errors['plano_conta_id'] = 'Selecione o plano de contas.';
+        } else {
+            $plano = PlanoConta::query()->whereKey($planoId)->where('ativo', true)->first();
+            if (! $plano) {
+                $errors['plano_conta_id'] = 'Plano de contas inválido ou inativo.';
+            }
+        }
+
+        if ($selecionada <= 0) {
+            $errors['caixa_conta_id'] = 'Selecione a conta.';
+        }
+
+        $formaValida = null;
+        if ($formaId <= 0) {
+            $errors['forma_pagamento_id'] = 'Selecione o meio de pagamento.';
+        } else {
+            $formaValida = FormaPagamento::query()
+                ->whereKey($formaId)
+                ->where('ativo', true)
+                ->value('id');
+            if (! $formaValida) {
+                $errors['forma_pagamento_id'] = 'Meio de pagamento inválido ou inativo.';
+            }
+        }
+
+        if ($historico === '') {
+            $errors['historico'] = 'Informe o histórico do lançamento.';
+        }
+
+        if ($entrada <= 0 && $saida <= 0) {
+            $errors['entrada'] = 'Informe um valor maior que zero em Entrada ou em Saída.';
+            $errors['saida'] = $errors['entrada'];
+        } elseif ($entrada > 0 && $saida > 0) {
+            $errors['entrada'] = 'Preencha somente Entrada ou somente Saída — a outra deve permanecer zerada.';
+            $errors['saida'] = $errors['entrada'];
+        }
+
+        if ($errors !== []) {
+            $this->caixaFormErrors = $errors;
+            $this->caixaFormAlert = (string) reset($errors);
+
+            return;
+        }
+
+        $destinoForma = (int) (FormaPagamento::query()->whereKey((int) $formaValida)->value('conta_destino_id') ?? 0);
 
         try {
             $contaId = CaixaConta::resolverDestinoLivroCaixa(
@@ -609,44 +705,30 @@ class ListCaixa extends ListRecords
             );
             app(CaixaLivroMovimentoService::class)->assertContaRetaguardaMutavel($contaId);
         } catch (\InvalidArgumentException $e) {
+            $this->caixaFormErrors = ['caixa_conta_id' => $e->getMessage()];
             $this->caixaFormAlert = $e->getMessage();
 
             return;
         }
 
-        if ($historico === '') {
-            $this->caixaFormAlert = 'Informe o histórico do lançamento.';
-            return;
-        }
-
-        if (($entrada <= 0 && $saida <= 0) || ($entrada > 0 && $saida > 0)) {
-            $this->caixaFormAlert = 'Informe um valor em Entrada ou em Saída, nunca nos dois campos ao mesmo tempo.';
-            return;
-        }
-
-        $documentoInformado = mb_substr(trim((string) ($this->caixaForm['documento'] ?? '')), 0, 40);
         if (CaixaTransferencia::isDocumentoTransferencia($documentoInformado)) {
-            $this->caixaFormAlert = 'O prefixo TRF- é reservado para transferências entre contas. Use F7 — Transferir.';
+            $this->caixaFormErrors = ['documento' => 'O prefixo TRF- é reservado para transferências entre contas. Use F7 — Transferir.'];
+            $this->caixaFormAlert = $this->caixaFormErrors['documento'];
 
             return;
         }
 
         try {
             app(CaixaLivroMovimentoService::class)->assertPodeOperarConta($contaId);
-            app(CaixaLivroMovimentoService::class)->assertPodeMutarLancamento(
-                $contaId,
-                (string) ($this->caixaForm['emissao'] ?? now()->toDateString()),
-            );
+            app(CaixaLivroMovimentoService::class)->assertPodeMutarLancamento($contaId, $emissao);
         } catch (\InvalidArgumentException $e) {
             $this->caixaFormAlert = $e->getMessage();
 
             return;
         }
 
-        $plano = $planoId ? PlanoConta::query()->whereKey($planoId)->where('ativo', true)->first() : null;
-
         $dados = [
-            'emissao' => $this->caixaForm['emissao'] ?? now()->toDateString(),
+            'emissao' => $emissao,
             'documento' => $documentoInformado !== '' ? $documentoInformado : null,
             'historico' => mb_substr(
                 str_starts_with(mb_strtoupper($historico, 'UTF-8'), '[MANUAL] ')
@@ -658,16 +740,24 @@ class ListCaixa extends ListRecords
             'plano_conta_id' => $plano?->id,
             'plano_contas' => $plano ? mb_substr(mb_strtoupper((string) $plano->descricao, 'UTF-8'), 0, 120) : null,
             'caixa_conta_id' => $contaId,
+            'forma_pagamento_id' => (int) $formaValida,
             'entrada' => $entrada,
             'saida' => $saida,
             'empresa_id' => ErpContext::currentEmpresaId(),
         ];
 
         if ($this->caixaFormLancamentoId) {
-            CaixaLancamento::query()
+            // Manuais são identificados pelo histórico [MANUAL], não por documento MANUAL-%.
+            $atualizados = CaixaLancamento::query()
                 ->whereKey($this->caixaFormLancamentoId)
-                ->where('documento', 'like', 'MANUAL-%')
+                ->whereRaw('UPPER(LEFT(TRIM(historico), 8)) = ?', ['[MANUAL]'])
                 ->update($dados);
+
+            if ($atualizados < 1) {
+                $this->caixaFormAlert = 'Não foi possível alterar este lançamento manual.';
+
+                return;
+            }
         } else {
             CaixaLancamento::query()->create([
                 'codigo' => CaixaLancamento::nextCodigo(),
@@ -677,7 +767,8 @@ class ListCaixa extends ListRecords
 
         $this->closeCaixaForm();
         $this->clearListSelection();
-        $this->resetTable();
+        // renderPage: true — senão skipRender mantém o modal aberto no DOM.
+        $this->pushCaixaListRefresh(renderPage: true);
         Notification::make()->title('Lançamento de caixa salvo.')->success()->send();
     }
 
@@ -740,12 +831,13 @@ class ListCaixa extends ListRecords
             'documento' => $lancamento->documento ?? '',
             'plano_conta_id' => (string) ($lancamento->plano_conta_id ?? ''),
             'caixa_conta_id' => (string) $lancamento->caixa_conta_id,
-            'forma_pagamento_id' => '',
+            'forma_pagamento_id' => (string) ($lancamento->forma_pagamento_id ?? ''),
             'historico' => preg_replace('/^\[MANUAL\]\s*/iu', '', (string) $lancamento->historico) ?? $lancamento->historico,
             'entrada' => number_format((float) $lancamento->entrada, 2, ',', '.'),
             'saida' => number_format((float) $lancamento->saida, 2, ',', '.'),
         ];
         $this->caixaFormAlert = '';
+        $this->caixaFormErrors = [];
         $this->caixaFormOpen = true;
     }
 
@@ -984,6 +1076,7 @@ class ListCaixa extends ListRecords
         $saldoAtual = $saldoAnterior + $totalEntrada - $totalSaida;
         unset(
             $this->caixaRodape,
+            $this->caixaMeiosResumo,
             $this->caixaStatusBanner,
             $this->caixaMovimentoAberto,
             $this->caixaF8Label,
@@ -1009,8 +1102,12 @@ class ListCaixa extends ListRecords
         }
 
         $rodape = $this->caixaRodape;
+        $meios = $this->caixaMeiosResumo;
+        $status = $this->caixaStatusBanner;
 
         $this->patchCaixaFooterTotals($saldoAnterior, $totalEntrada, $totalSaida, $saldoAtual, $rodape);
+        $this->patchCaixaMeiosResumo($meios);
+        $this->patchCaixaStatusInline($status);
     }
 
     /**
@@ -1143,5 +1240,126 @@ class ListCaixa extends ListRecords
             json_encode(number_format($totalSaida, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode(number_format($saldoAtual, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
         ));
+    }
+
+    /**
+     * @param  array{visivel?: bool, aberto?: bool, titulo?: string, detalhe?: string}  $status
+     */
+    protected function patchCaixaStatusInline(array $status): void
+    {
+        $payload = [
+            'visivel' => ! empty($status['visivel']),
+            'aberto' => ! empty($status['aberto']),
+            'titulo' => (string) ($status['titulo'] ?? ''),
+            'detalhe' => (string) ($status['detalhe'] ?? ''),
+        ];
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        $this->js(<<<JS
+            (() => {
+                const data = {$json};
+                const root = document.querySelector('.erp-caixa-page');
+                if (! root) return;
+                let el = root.querySelector('[data-erp-caixa-status]');
+                if (! data.visivel) {
+                    if (el) el.hidden = true;
+                    return;
+                }
+                if (! el) {
+                    const pageSize = root.querySelector('.erp-caixa__page-size-group');
+                    const block = root.querySelector('.erp-caixa__filter-block');
+                    if (! block || ! pageSize) return;
+                    el = document.createElement('div');
+                    el.className = 'erp-caixa__status-inline';
+                    el.setAttribute('data-erp-caixa-status', '');
+                    el.setAttribute('role', 'status');
+                    el.setAttribute('aria-live', 'polite');
+                    el.innerHTML = '<strong data-erp-caixa-status-titulo></strong><span data-erp-caixa-status-detalhe></span>';
+                    block.insertBefore(el, pageSize);
+                }
+                el.hidden = false;
+                el.classList.toggle('is-aberto', !!data.aberto);
+                el.classList.toggle('is-fechado', !data.aberto);
+                el.title = (data.titulo || '') + (data.detalhe ? (' — ' + data.detalhe) : '');
+                const t = el.querySelector('[data-erp-caixa-status-titulo]');
+                const d = el.querySelector('[data-erp-caixa-status-detalhe]');
+                if (t) t.textContent = data.titulo || '';
+                if (d) d.textContent = data.detalhe || '';
+            })()
+        JS);
+    }
+
+    /**
+     * @param  array{
+     *     linhas: list<array{forma: string, recebido: float, estorno: float, liquido: float}>,
+     *     total_recebido: float,
+     *     total_estorno: float,
+     *     total_liquido: float,
+     *     outras_saidas: float,
+     *     saldo_liquido: float,
+     *     total_entradas: float,
+     *     sem_meio: float,
+     *     visivel: bool
+     * }  $meios
+     */
+    protected function patchCaixaMeiosResumo(array $meios): void
+    {
+        $fmt = static fn (float $v): string => number_format($v, 2, ',', '.');
+        $fmtNeg = static fn (float $v): string => $v > 0.009 ? '−'.$fmt($v) : $fmt(0.0);
+        $itemsHtml = '';
+        foreach ($meios['linhas'] ?? [] as $linha) {
+            $forma = e((string) ($linha['forma'] ?? ''));
+            $valor = e($fmt((float) ($linha['recebido'] ?? 0)));
+            $extra = $forma === 'SEM MEIO' ? ' is-sem-meio' : '';
+            $itemsHtml .= '<span class="erp-caixa__meios-item'.$extra.'">'
+                .'<span class="erp-caixa__meios-forma">'.$forma.'</span>'
+                .'<strong class="erp-caixa__meios-valor">'.$valor.'</strong>'
+                .'</span>';
+        }
+        if ($itemsHtml === '') {
+            $itemsHtml = '<span class="erp-caixa__meios-item is-empty">—</span>';
+        }
+
+        $saldo = (float) ($meios['saldo_liquido'] ?? 0);
+
+        $payload = [
+            'visivel' => ! empty($meios['visivel']),
+            'itemsHtml' => $itemsHtml,
+            'entradas' => $fmt((float) ($meios['total_entradas'] ?? 0)),
+            'estorno' => $fmtNeg((float) ($meios['total_estorno'] ?? 0)),
+            'outras' => $fmtNeg((float) ($meios['outras_saidas'] ?? 0)),
+            'saldo' => $fmt($saldo),
+            'saldoNeg' => $saldo < -0.009,
+        ];
+
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        $this->js(<<<JS
+            (() => {
+                const data = {$json};
+                const root = document.querySelector('.erp-caixa-page');
+                if (! root) return;
+                let bar = root.querySelector('[data-erp-caixa-meios]');
+                if (! data.visivel) {
+                    if (bar) bar.hidden = true;
+                    return;
+                }
+                if (! bar) return;
+                bar.hidden = false;
+                const items = bar.querySelector('[data-erp-caixa-meios-items]');
+                if (items) items.innerHTML = data.itemsHtml;
+                const ent = bar.querySelector('[data-erp-caixa-meios-entradas]');
+                if (ent) ent.textContent = data.entradas;
+                const est = bar.querySelector('[data-erp-caixa-meios-estorno]');
+                if (est) est.textContent = data.estorno;
+                const out = bar.querySelector('[data-erp-caixa-meios-outras]');
+                if (out) out.textContent = data.outras;
+                const sal = bar.querySelector('[data-erp-caixa-meios-saldo]');
+                if (sal) {
+                    sal.textContent = data.saldo;
+                    sal.classList.toggle('is-negativo', !!data.saldoNeg);
+                }
+            })()
+        JS);
     }
 }

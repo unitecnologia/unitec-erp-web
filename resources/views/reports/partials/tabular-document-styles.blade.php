@@ -100,12 +100,15 @@
 
     .tabular-doc__table--compact th,
     .tabular-doc__table--compact td {
-        padding: 1mm 1mm;
-        font-size: 10px;
+        padding: 0.65mm 0.75mm;
+        font-size: 9.5px;
+        line-height: 1.25;
     }
 
-    .tabular-doc__table--compact .col-nowrap {
+    .tabular-doc__table--compact .col-nowrap,
+    .tabular-doc__table .col-nowrap {
         white-space: nowrap;
+        word-break: normal;
     }
 
     .tabular-doc__table thead th {

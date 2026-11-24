@@ -58,6 +58,7 @@ class VendasGeralFiltrosController extends Controller
             'exibir_formas' => $request->boolean('exibir_formas'),
             'exibir_grafico' => $request->boolean('exibir_grafico'),
             'exibir_resumo_hora' => $request->boolean('exibir_resumo_hora'),
+            'exibir_pct_lucro' => $request->boolean('exibir_pct_lucro'),
         ];
 
         return view('reports.vendas-geral-filtros', [

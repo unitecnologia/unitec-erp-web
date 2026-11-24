@@ -7,6 +7,15 @@
         <span class="erp-orcamentos-actions__icon">✎</span>
         <span class="erp-orcamentos-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>
+    <button
+        type="button"
+        wire:click="duplicarOrcamento"
+        class="erp-orcamentos-actions__btn"
+        title="Duplicar orçamento selecionado"
+    >
+        <span class="erp-orcamentos-actions__icon">⧉</span>
+        <span class="erp-orcamentos-actions__label">Duplicar</span>
+    </button>
     <button type="button" wire:click="cancelOrcamento" class="erp-orcamentos-actions__btn" data-erp-key="F4">
         <span class="erp-orcamentos-actions__icon erp-orcamentos-actions__icon--cancel">✕</span>
         <span class="erp-orcamentos-actions__label"><kbd>F4</kbd> | Cancelar</span>

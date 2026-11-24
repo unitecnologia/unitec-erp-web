@@ -38,6 +38,8 @@ class PlanoContasReportTest extends TestCase
         $this->assertSame('13,00', $paiBuilt['totals']['entradas']);
         $this->assertSame('6,00', $paiBuilt['totals']['saidas']);
         $this->assertSame('7,00', $paiBuilt['totals']['saldo']);
+        $this->assertSame('100,00%', $paiBuilt['totals']['pct_entradas']);
+        $this->assertSame('100,00%', $paiBuilt['totals']['pct_saidas']);
         $this->assertTrue(collect($paiBuilt['summary'])->contains(fn (string $linha): bool => str_contains($linha, 'inclui subplanos')));
 
         $filhoBuilt = $this->report()->build($this->request(['plano' => $filho->id]));
@@ -58,11 +60,42 @@ class PlanoContasReportTest extends TestCase
         $this->assertContains('OUTRO REL PC', $nomesTodos);
         $this->assertContains('PAI REL PC', $nomesTodos);
         $this->assertSame('', $todos['filters']['plano']);
+        $this->assertSame('codigo', $todos['filters']['ordem']);
 
         $inexistente = $this->report()->build($this->request(['plano' => 2147483000]));
 
         $this->assertSame([], $inexistente['rows']);
         $this->assertTrue(collect($inexistente['summary'])->contains('PLANO: não encontrado'));
+    }
+
+    public function test_percentuais_e_ordenacao_maior_entrada_saida(): void
+    {
+        $conta = CaixaConta::query()->create(['nome' => 'CAIXA REL PCT', 'ativo' => true]);
+        $a = $this->plano(982201, '9.01', null, 'PLANO A PCT');
+        $b = $this->plano(982202, '9.02', null, 'PLANO B PCT');
+        $c = $this->plano(982203, '9.03', null, 'PLANO C PCT');
+
+        $this->lancamento($conta, $a, '2099-03-10', 10, 40);
+        $this->lancamento($conta, $b, '2099-03-11', 30, 10);
+        $this->lancamento($conta, $c, '2099-03-12', 60, 50);
+
+        $porCodigo = $this->report()->build($this->request([]));
+        $this->assertSame(['PLANO A PCT', 'PLANO B PCT', 'PLANO C PCT'], $this->nomes($porCodigo));
+        $this->assertSame('10,00%', $porCodigo['rows'][0]['pct_entradas']);
+        $this->assertSame('30,00%', $porCodigo['rows'][1]['pct_entradas']);
+        $this->assertSame('60,00%', $porCodigo['rows'][2]['pct_entradas']);
+        $this->assertSame('40,00%', $porCodigo['rows'][0]['pct_saidas']);
+        $this->assertSame('100,00%', $porCodigo['totals']['pct_entradas']);
+        $this->assertSame('100,00%', $porCodigo['totals']['pct_saidas']);
+        $this->assertContains('pct_entradas', $this->report()->defaultColumns());
+        $this->assertContains('pct_saidas', $this->report()->defaultColumns());
+
+        $porEntrada = $this->report()->build($this->request(['ordem' => 'maior_entrada']));
+        $this->assertSame(['PLANO C PCT', 'PLANO B PCT', 'PLANO A PCT'], $this->nomes($porEntrada));
+        $this->assertSame('maior_entrada', $porEntrada['filters']['ordem']);
+
+        $porSaida = $this->report()->build($this->request(['ordem' => 'maior_saida']));
+        $this->assertSame(['PLANO C PCT', 'PLANO A PCT', 'PLANO B PCT'], $this->nomes($porSaida));
     }
 
     public function test_tela_traz_pesquisa_de_plano_com_padrao_todos(): void
@@ -72,9 +105,14 @@ class PlanoContasReportTest extends TestCase
 
         $campos = $this->report()->filterFields();
         $plano = collect($campos)->firstWhere('key', 'plano');
+        $ordem = collect($campos)->firstWhere('key', 'ordem');
 
         $this->assertSame('lookup', $plano['type'] ?? null);
         $this->assertSame('Todos os planos', $plano['placeholder'] ?? null);
+        $this->assertSame('select', $ordem['type'] ?? null);
+        $this->assertArrayHasKey('codigo', $ordem['options'] ?? []);
+        $this->assertArrayHasKey('maior_entrada', $ordem['options'] ?? []);
+        $this->assertArrayHasKey('maior_saida', $ordem['options'] ?? []);
         $this->assertSame('de', $campos[0]['key'] ?? null);
         $this->assertSame('ate', $campos[1]['key'] ?? null);
 
@@ -83,6 +121,9 @@ class PlanoContasReportTest extends TestCase
         $response->assertOk();
         $response->assertSee('Plano de Contas');
         $response->assertSee('Todos os planos');
+        $response->assertSee('Ordenar por');
+        $response->assertSee('% ENTRADAS');
+        $response->assertSee('% SAÍDAS');
         $response->assertSee('data-erp-lookup', false);
         $response->assertSee('Data de');
         $response->assertSee('Data até');

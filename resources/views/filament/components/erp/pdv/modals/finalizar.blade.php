@@ -31,18 +31,24 @@
             >
                 <div class="erp-pdv-finalizar__top">
                     <div class="erp-pdv-finalizar__cliente">
-                        <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--cliente">
-                            <span class="erp-pdv-finalizar__label"><u>F2</u> | Selecione o Cliente</span>
-                            <input
-                                id="erp-pdv-finalizar-cliente"
-                                type="text"
-                                wire:model.live.debounce.150ms="finalizarClienteSearch"
-                                wire:keydown.enter.prevent="confirmFinalizarCliente"
-                                class="erp-pdv-finalizar__input"
-                                data-erp-uppercase
-                                autocomplete="off"
-                            >
-                        </label>
+                        <div class="erp-pdv-finalizar__cliente-row">
+                            <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--cliente">
+                                <span class="erp-pdv-finalizar__label"><u>F2</u> | Selecione o Cliente</span>
+                                <input
+                                    id="erp-pdv-finalizar-cliente"
+                                    type="text"
+                                    wire:model.live.debounce.150ms="finalizarClienteSearch"
+                                    wire:keydown.enter.prevent="confirmFinalizarCliente"
+                                    class="erp-pdv-finalizar__input"
+                                    data-erp-uppercase
+                                    autocomplete="off"
+                                >
+                            </label>
+                            @include('filament.components.erp.shared.btn-cadastrar-cliente', [
+                                'title' => 'Cadastrar cliente',
+                                'disabled' => false,
+                            ])
+                        </div>
 
                         @if ($this->finalizarClienteEmConsulta)
                             <div class="erp-pdv-finalizar__cliente-list">

@@ -33,17 +33,29 @@ class VendasFormaPagamentoReport extends AbstractTabularReport
             'forma' => 'FORMA DE PAGAMENTO',
             'qtd' => 'QTD',
             'total' => 'TOTAL',
+            'participacao' => '% PARTICIPAÇÃO',
         ];
     }
 
     public function defaultColumns(): array
     {
-        return ['forma', 'qtd', 'total'];
+        return ['forma', 'qtd', 'total', 'participacao'];
     }
 
     public function numericColumns(): array
     {
-        return ['qtd', 'total'];
+        return ['qtd', 'total', 'participacao'];
+    }
+
+    public function columnWidthWeights(): array
+    {
+        return [
+            'empresa' => 18,
+            'forma' => 36,
+            'qtd' => 10,
+            'total' => 18,
+            'participacao' => 14,
+        ];
     }
 
     public function filterFields(): array
@@ -55,6 +67,12 @@ class VendasFormaPagamentoReport extends AbstractTabularReport
                 'label' => 'Forma de pagamento',
                 'type' => 'select',
                 'options' => $this->formaPagamentoFilterOptions(),
+            ],
+            [
+                'key' => 'ordem',
+                'label' => 'Ordenar por',
+                'type' => 'select',
+                'options' => $this->ordemOptions(),
             ],
         ]));
     }
@@ -70,10 +88,11 @@ class VendasFormaPagamentoReport extends AbstractTabularReport
         $multi = $this->isMultiEmpresaScope($request);
         $hasEmpresa = Schema::hasColumn((new Venda)->getTable(), 'empresa_id');
         $formaFiltro = $this->resolveFormaFiltro($request);
+        $ordem = $this->resolveOrdem($request->query('ordem'));
         $cadastro = VendasPorFormaPagamentoAggregator::formasCadastro();
         $empresaScope = $hasEmpresa ? ReportEmpresaScope::resolveIds($request) : null;
 
-        $aggregated = VendasPorFormaPagamentoAggregator::aggregate(
+        $detailed = VendasPorFormaPagamentoAggregator::aggregateDetailed(
             $de,
             $ate,
             $empresaScope,
@@ -81,69 +100,88 @@ class VendasFormaPagamentoReport extends AbstractTabularReport
             $multi && $hasEmpresa,
         );
 
+        $aggregated = $detailed['rows'];
+        $vendasUnicas = (int) $detailed['vendas_unicas'];
+        $totalGeral = (float) $detailed['total'];
         $labels = $multi ? ReportEmpresaScope::labelsById() : [];
 
-        $rows = collect($aggregated)
-            ->map(function (array $row) use ($multi, $labels): array {
-                $mapped = [
+        $mapped = collect($aggregated)
+            ->map(function (array $row) use ($multi, $labels, $totalGeral): array {
+                $total = (float) $row['total'];
+                $item = [
                     'forma' => $row['forma'],
-                    'qtd' => $row['qtd'],
-                    'total' => $row['total'],
+                    'qtd' => (float) $row['qtd'],
+                    'total' => $total,
+                    'participacao' => $totalGeral > 0.009
+                        ? round(($total / $totalGeral) * 100, 2)
+                        : 0.0,
                     '_codigo' => $row['codigo'],
                 ];
 
                 if ($multi) {
                     $empresaId = (int) ($row['empresa_id'] ?? 0);
-                    $mapped['empresa'] = $labels[$empresaId]
+                    $item['empresa'] = $labels[$empresaId]
                         ?? ReportEmpresaScope::labelEmpresa(null);
-                    $mapped['_empresa_id'] = $empresaId;
+                    $item['_empresa_id'] = $empresaId;
                 }
 
-                return $mapped;
-            })
-            ->sort(function (array $a, array $b) use ($multi): int {
-                if ($multi) {
-                    $empresaCmp = ($a['_empresa_id'] ?? 0) <=> ($b['_empresa_id'] ?? 0);
-                    if ($empresaCmp !== 0) {
-                        return $empresaCmp;
-                    }
-                }
-
-                $codigoA = $a['_codigo'] ?? PHP_INT_MAX;
-                $codigoB = $b['_codigo'] ?? PHP_INT_MAX;
-                if ($codigoA !== $codigoB) {
-                    return $codigoA <=> $codigoB;
-                }
-
-                return ($b['total'] ?? 0) <=> ($a['total'] ?? 0);
-            })
-            ->values()
-            ->map(function (array $row): array {
-                return array_filter([
-                    'empresa' => $row['empresa'] ?? null,
-                    'forma' => $row['forma'],
-                    'qtd' => static::formatQuantity((float) $row['qtd']),
-                    'total' => static::formatMoney((float) $row['total']),
-                ], fn ($v) => $v !== null);
+                return $item;
             })
             ->all();
 
-        $summary = ['PERÍODO: '.$this->periodLabel($de, $ate)];
+        $this->ordenarLinhas($mapped, $ordem, $multi);
+
+        $rows = array_map(static function (array $row) use ($multi): array {
+            $out = [
+                'forma' => $row['forma'],
+                'qtd' => static::formatQuantity((float) $row['qtd']),
+                'total' => static::formatMoney((float) $row['total']),
+                'participacao' => static::formatPercent((float) $row['participacao']),
+            ];
+
+            if ($multi) {
+                $out = ['empresa' => $row['empresa'] ?? ''] + $out;
+            }
+
+            return array_filter($out, static fn ($v) => $v !== null);
+        }, $mapped);
+
+        $summary = [
+            'PERÍODO: '.$this->periodLabel($de, $ate),
+            'FATURAMENTO por forma (inclui crédito em Contas a Receber); não é recebimento de caixa',
+            'QTD = participações por forma (venda mista conta em cada meio)',
+            'VENDAS ÚNICAS: '.static::formatQuantity((float) $vendasUnicas)
+                .' | TOTAL: '.static::formatMoney($totalGeral),
+            'ORDENAÇÃO: '.$this->rotuloOrdem($ordem),
+        ];
         if ($formaFiltro !== '') {
             $summary[] = 'FORMA: '.VendasPorFormaPagamentoAggregator::rotuloFormaCadastro($formaFiltro, $cadastro);
         }
 
-        return $this->result(
+        $built = $this->result(
             $this->withEmpresaFilterValue([
                 'de' => $de->toDateString(),
                 'ate' => $ate->toDateString(),
                 'forma' => $formaFiltro,
+                'ordem' => $ordem,
                 'cols' => $columns,
             ], $request),
             $columns,
             $rows,
             $this->withEmpresaSummary($summary, $request),
         );
+
+        // Totais: QTD = vendas únicas; % = 100% do faturamento listado.
+        if (isset($built['totals']['qtd'])) {
+            $built['totals']['qtd'] = static::formatQuantity((float) $vendasUnicas);
+        }
+        if (isset($built['totals']['participacao'])) {
+            $built['totals']['participacao'] = $totalGeral > 0.009
+                ? static::formatPercent(100.0)
+                : static::formatPercent(0.0);
+        }
+
+        return $built;
     }
 
     /**
@@ -167,5 +205,58 @@ class VendasFormaPagamentoReport extends AbstractTabularReport
     private function resolveFormaFiltro(Request $request): string
     {
         return mb_strtoupper(trim((string) $request->query('forma', '')), 'UTF-8');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function ordemOptions(): array
+    {
+        return [
+            'forma' => 'Forma de Pagamento',
+            'maior_valor' => 'Maior Valor',
+        ];
+    }
+
+    private function resolveOrdem(mixed $raw): string
+    {
+        $ordem = is_string($raw) ? trim($raw) : '';
+
+        return array_key_exists($ordem, $this->ordemOptions()) ? $ordem : 'forma';
+    }
+
+    private function rotuloOrdem(string $ordem): string
+    {
+        return $this->ordemOptions()[$ordem] ?? 'Forma de Pagamento';
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function ordenarLinhas(array &$rows, string $ordem, bool $multi): void
+    {
+        usort($rows, static function (array $a, array $b) use ($ordem, $multi): int {
+            if ($multi) {
+                $empresaCmp = ((int) ($a['_empresa_id'] ?? 0)) <=> ((int) ($b['_empresa_id'] ?? 0));
+                if ($empresaCmp !== 0) {
+                    return $empresaCmp;
+                }
+            }
+
+            if ($ordem === 'maior_valor') {
+                $byTotal = ((float) ($b['total'] ?? 0)) <=> ((float) ($a['total'] ?? 0));
+                if ($byTotal !== 0) {
+                    return $byTotal;
+                }
+            }
+
+            $codigoA = (int) ($a['_codigo'] ?? PHP_INT_MAX);
+            $codigoB = (int) ($b['_codigo'] ?? PHP_INT_MAX);
+            if ($codigoA !== $codigoB) {
+                return $codigoA <=> $codigoB;
+            }
+
+            return strcmp((string) ($a['forma'] ?? ''), (string) ($b['forma'] ?? ''));
+        });
     }
 }

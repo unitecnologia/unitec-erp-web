@@ -78,6 +78,13 @@
                 @endif
             </label>
 
+            @include('filament.components.erp.shared.btn-cadastrar-cliente', [
+                'disabled' => $this->nfeModalStatus !== 'ABERTA',
+                'title' => $this->nfeModalStatus === 'ABERTA'
+                    ? 'Cadastrar cliente'
+                    : 'NF-e não está aberta — cadastro de cliente bloqueado',
+            ])
+
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--doc">
                 <span>CPF/CNPJ</span>
                 <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeForm['cnpj'] ?? '' }}" data-erp-locked="1" readonly tabindex="-1" aria-readonly="true">

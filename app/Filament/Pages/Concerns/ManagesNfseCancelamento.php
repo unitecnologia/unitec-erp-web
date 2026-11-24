@@ -20,6 +20,8 @@ trait ManagesNfseCancelamento
 
     public string $nfseCancelarMotivo = '1';
 
+    public string $nfseCancelarJustificativa = '';
+
     public string $nfseCancelarProvedor = '';
 
     public function cancelarNfse(): void
@@ -89,7 +91,15 @@ trait ManagesNfseCancelamento
         $this->nfseCancelarId = (int) $nfse->id;
         $this->nfseCancelarProvedor = $ipm ? 'ipm' : 'nacional';
         $this->nfseCancelarMotivo = '1';
+        $this->nfseCancelarJustificativa = '';
         $this->nfseCancelarModalOpen = true;
+    }
+
+    public function updatedNfseCancelarMotivo(mixed $value): void
+    {
+        if ((string) $value !== '9') {
+            $this->nfseCancelarJustificativa = '';
+        }
     }
 
     public function fecharNfseCancelar(): void
@@ -97,6 +107,7 @@ trait ManagesNfseCancelamento
         $this->nfseCancelarModalOpen = false;
         $this->nfseCancelarId = null;
         $this->nfseCancelarProvedor = '';
+        $this->nfseCancelarJustificativa = '';
     }
 
     public function confirmarNfseCancelar(): void
@@ -123,10 +134,24 @@ trait ManagesNfseCancelamento
             : ($this->nfseProvedorIpm($nfse->empresa) ? 'ipm' : 'nacional');
         $rotuloProvedor = $provedor === 'ipm' ? 'IPM' : 'SEFIN Nacional';
 
+        if ($provedor === 'nacional' && trim($this->nfseCancelarMotivo) === '9') {
+            try {
+                NfseSefinEventoXmlGerador::normalizarXMotivo($this->nfseCancelarJustificativa, exigir: true);
+            } catch (NfseNaoTransmitida $exception) {
+                Notification::make()->title($exception->getMessage())->warning()->send();
+
+                return;
+            }
+        }
+
         try {
             $resultado = $provedor === 'ipm'
                 ? app(NfseIpmCancelarService::class)->cancelar($nfse, $this->nfseCancelarMotivo)
-                : app(NfseSefinCancelarService::class)->cancelar($nfse, $this->nfseCancelarMotivo);
+                : app(NfseSefinCancelarService::class)->cancelar(
+                    $nfse,
+                    $this->nfseCancelarMotivo,
+                    $this->nfseCancelarJustificativa !== '' ? $this->nfseCancelarJustificativa : null,
+                );
         } catch (NfseNaoTransmitida $exception) {
             $this->fecharNfseCancelar();
             $this->mostrarNfseFiscalErro('NÃO FOI POSSÍVEL CANCELAR A NFS-E', $exception->getMessage());

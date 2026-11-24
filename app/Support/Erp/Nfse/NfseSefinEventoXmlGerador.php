@@ -33,12 +33,17 @@ class NfseSefinEventoXmlGerador
         ];
     }
 
+    public const XMOTIVO_MIN = 15;
+
+    public const XMOTIVO_MAX = 255;
+
     /**
      * Converte o motivo da UI (ABRASF/IPM) para cMotivo + xMotivo do layout Nacional.
+     * Para cMotivo=9 (Outros), informe $xMotivoLivre (15–255) — E1944 / TSMotivo.
      *
      * @return array{codigo: string, descricao: string}
      */
-    public static function mapearMotivo(string $codigoUi): array
+    public static function mapearMotivo(string $codigoUi, ?string $xMotivoLivre = null): array
     {
         $codigo = trim($codigoUi);
 
@@ -53,25 +58,56 @@ class NfseSefinEventoXmlGerador
             ],
             '9' => [
                 'codigo' => '9',
-                'descricao' => 'Cancelamento da NFS-e por outros motivos.',
+                // POST exige $xMotivoLivre em gerarCancelamento; sync local aceita vazio.
+                'descricao' => self::normalizarXMotivo($xMotivoLivre, exigir: false),
             ],
             '3' => [
                 'codigo' => '9',
-                'descricao' => 'Cancelamento por erro de assinatura digital.',
+                'descricao' => self::normalizarXMotivo(
+                    $xMotivoLivre ?: 'Cancelamento por erro de assinatura digital.',
+                    exigir: false,
+                ),
             ],
             '4' => [
                 'codigo' => '9',
-                'descricao' => 'Cancelamento por duplicidade da NFS-e.',
+                'descricao' => self::normalizarXMotivo(
+                    $xMotivoLivre ?: 'Cancelamento por duplicidade da NFS-e.',
+                    exigir: false,
+                ),
             ],
             '5' => [
                 'codigo' => '9',
-                'descricao' => 'Cancelamento por erro de processamento.',
+                'descricao' => self::normalizarXMotivo(
+                    $xMotivoLivre ?: 'Cancelamento por erro de processamento.',
+                    exigir: false,
+                ),
             ],
             default => throw new NfseNaoTransmitida('Selecione o motivo do cancelamento.'),
         };
     }
 
-    public function gerarCancelamento(Nfse $nfse, string $codigoUi): string
+    /**
+     * TSMotivo / E1944: 15 a 255 caracteres quando cMotivo=9.
+     */
+    public static function normalizarXMotivo(?string $texto, bool $exigir = true): string
+    {
+        $limpo = trim(preg_replace('/\s+/u', ' ', (string) $texto) ?? '');
+        $tamanho = mb_strlen($limpo, 'UTF-8');
+
+        if ($limpo === '' || $tamanho < self::XMOTIVO_MIN || $tamanho > self::XMOTIVO_MAX) {
+            if (! $exigir && $limpo === '') {
+                return 'Cancelamento da NFS-e por outros motivos.';
+            }
+
+            throw new NfseNaoTransmitida(
+                'Informe a justificativa do cancelamento com '.self::XMOTIVO_MIN.' a '.self::XMOTIVO_MAX.' caracteres.'
+            );
+        }
+
+        return $limpo;
+    }
+
+    public function gerarCancelamento(Nfse $nfse, string $codigoUi, ?string $xMotivoLivre = null): string
     {
         $nfse->loadMissing('empresa');
         $empresa = $nfse->empresa;
@@ -92,8 +128,11 @@ class NfseSefinEventoXmlGerador
             throw new NfseNaoTransmitida('Informe o CNPJ da empresa.');
         }
 
-        $motivo = self::mapearMotivo($codigoUi);
-        $xMotivo = $this->garantirXMotivo($motivo['descricao']);
+        $motivo = self::mapearMotivo($codigoUi, $xMotivoLivre);
+        // E1944: Outros (9) exige justificativa informada pelo operador no POST.
+        $xMotivo = $motivo['codigo'] === '9'
+            ? self::normalizarXMotivo($xMotivoLivre, exigir: true)
+            : $this->garantirXMotivo($motivo['descricao']);
         $ambiente = NfseSefinAmbiente::daEmpresa($empresa->nfse_ambiente);
         $verAplic = mb_substr(trim((string) config('unitec.versao', 'UnitecERP')), 0, 20) ?: 'UnitecERP';
         $id = 'PRE'.$chave.self::TIPO_CANCELAMENTO;

@@ -267,7 +267,7 @@ trait ManagesCaixaViewModal
             return $lancamento;
         }
 
-        $query = CaixaLancamento::query()->with(['conta'])->whereKey($lancamentoId);
+        $query = CaixaLancamento::query()->with(['conta', 'formaPagamento:id,descricao'])->whereKey($lancamentoId);
 
         if ($empresaId && Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
             $query->where('empresa_id', $empresaId);

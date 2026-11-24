@@ -132,7 +132,7 @@
                                             @if ($itemsHaveCusto)
                                                 <th class="num">CUSTO HIST.</th>
                                                 <th class="num">LUCRO R$</th>
-                                                <th class="num">MARGEM %</th>
+                                                <th class="num">LUCRO %</th>
                                             @endif
                                         </tr>
                                     </thead>

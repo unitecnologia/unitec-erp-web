@@ -88,6 +88,23 @@
         <span class="erp-nfe-actions__label">Listar Vendas</span>
     </button>
 
+    <button
+        type="button"
+        wire:click="openProdutosCadastro"
+        class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--produto"
+        data-erp-key="F8"
+        title="Cadastrar produto (mesmo cadastro rápido do Orçamento)"
+    >
+        <span class="erp-fv-tv-btn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <path d="M3.27 6.96L12 12.01l8.73-5.05"/>
+                <path d="M12 22.08V12"/>
+            </svg>
+        </span>
+        <span class="erp-nfe-actions__label"><kbd>F8</kbd> Cadastrar Produto</span>
+    </button>
+
     <button type="button" wire:click="abrirObservacaoPedido" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--obs" title="Observação do pedido">
         <span class="erp-fv-tv-btn__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">

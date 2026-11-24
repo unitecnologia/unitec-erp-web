@@ -5,11 +5,26 @@ namespace App\Support\ForcaVendas;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Margem estimada da venda (Tela de Venda / Monitor).
- * Custo atual do cadastro — sem snapshot histórico.
+ * Margem da venda (Tela de Venda / Monitor / Relatório Geral).
+ * Fórmula única: margem % = (lucro ÷ venda_líquida) × 100.
+ * Na Tela/Monitor o custo vem do cadastro atual; no Relatório Geral, do snapshot D2.6.
  */
 final class ForcaVendasMargemVendaCalculator
 {
+    /**
+     * Mesma regra dos totais do modal “Margem da venda”.
+     */
+    public static function margemPercentual(float $vendaLiquida, float $custoTotal): float
+    {
+        $vendaLiquida = round($vendaLiquida, 2);
+        $custoTotal = round($custoTotal, 2);
+        $lucro = round($vendaLiquida - $custoTotal, 2);
+
+        return $vendaLiquida > 0
+            ? round(($lucro / $vendaLiquida) * 100, 2)
+            : 0.0;
+    }
+
     /**
      * Residual de cabeçalho: diferença entre soma dos líquidos das linhas e o total real do pedido.
      * Se o desconto/acréscimo já estiver nas linhas, retorna zeros.
@@ -202,7 +217,7 @@ final class ForcaVendasMargemVendaCalculator
             $custoUnit = (float) ($custosPorProductId[$productId] ?? 0);
             $custo = round($qtd * $custoUnit, 2);
             $lucro = round($liquido - $custo, 2);
-            $margem = $liquido > 0 ? round(($lucro / $liquido) * 100, 2) : 0.0;
+            $margem = self::margemPercentual($liquido, $custo);
 
             $codigo = trim((string) ($item['codigo'] ?? ''));
             $descricao = trim((string) ($item['descricao'] ?? ''));
@@ -227,9 +242,7 @@ final class ForcaVendasMargemVendaCalculator
         }
 
         $lucroTotal = round($vendaLiquida - $custoTotal, 2);
-        $margemTotal = $vendaLiquida > 0
-            ? round(($lucroTotal / $vendaLiquida) * 100, 2)
-            : 0.0;
+        $margemTotal = self::margemPercentual($vendaLiquida, $custoTotal);
 
         return [
             'linhas' => $linhas,

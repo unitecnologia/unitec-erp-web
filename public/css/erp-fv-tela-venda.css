@@ -1693,6 +1693,59 @@
     color: #fff;
 }
 
+/* Cadastrar Produto (mesmo overlay do Orçamento) */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--produto {
+    border-color: #2dd4bf;
+    background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 50%, #99f6e4 100%);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--produto .erp-fv-tv-btn__icon {
+    background: linear-gradient(180deg, #2dd4bf 0%, #0f766e 100%);
+    color: #fff;
+}
+
+/* Cadastrar Cliente — compacto na linha, mesmo padrão visual dos botões UNI da action bar */
+.erp-fv-tela-venda-page .erp-fv-tv__btn-cad-cliente.erp-fv-tv-btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    min-width: 0;
+    height: 2.15rem;
+    margin: 0 0.05rem;
+    padding: 0 0.55rem 0 0.35rem;
+    border-radius: 8px;
+    border-color: #4ade80;
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 45%, #bbf7d0 100%);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__btn-cad-cliente .erp-fv-tv-btn__icon {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin: 0;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+    color: #fff;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__btn-cad-cliente .erp-fv-tv-btn__icon svg {
+    width: 0.78rem;
+    height: 0.78rem;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__btn-cad-cliente .erp-nfe-actions__label {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 750;
+    line-height: 1;
+    color: #14532d;
+}
+
 .erp-fv-tela-venda-page .erp-fv-tv__obs-cliente {
     flex: 0 0 auto;
     align-self: flex-end;
@@ -1715,21 +1768,35 @@
     border-color: #60a5fa;
 }
 
-/* Com o botão de obs, quem cede espaço é a razão social. CPF/CNPJ fica inteiro. */
+/* Linha do cliente: razão social cresce; doc/fone/whats cedem espaço. */
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary {
+    flex-wrap: nowrap;
+    align-items: flex-end;
+}
+
 .erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--cod,
 .erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--doc,
-.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--fone {
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--fone,
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__btn-cad-cliente,
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__obs-cliente {
     flex-shrink: 0;
 }
 
 .erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--doc {
-    width: 11.75rem;
-    flex-basis: 11.75rem;
+    width: 9.4rem;
+    flex-basis: 9.4rem;
 }
 
-.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--grow {
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--fone {
+    width: 6.1rem;
+    flex-basis: 6.1rem;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--grow,
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--cliente-nome {
     flex: 1 1 0;
-    min-width: 6rem;
+    min-width: 10rem;
+    max-width: none;
 }
 
 .erp-fv-tela-venda-page #erp-fv-obs-pedido {
@@ -3161,6 +3228,63 @@
 }
 
 /* Impressão do Listar Vendas: overlay interno (sem aba ao lado). */
+/*
+ * Overlay cadastro rápido de produto/cliente.
+ * Altura acompanha o conteúdo (fit JS + os_embed); max = viewport.
+ * Mesmo padrão da OS (erp-form-overlay__panel--os-produto).
+ */
+.erp-fv-tela-venda-page .erp-fv-tv-produto-overlay .erp-form-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-produto-overlay .erp-form-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-produto-overlay .erp-form-overlay__panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(calc(1280px + 4cm), 98vw);
+    height: auto;
+    max-height: calc(100dvh - 0.6rem);
+    min-height: 0;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-produto-overlay .erp-form-overlay__iframe {
+    flex: 0 0 auto;
+    width: 100%;
+    /* Provisório até o fit JS (após formulário pronto). Evita faixa estreita no Pessoas. */
+    height: min(52rem, calc(100dvh - 0.6rem));
+    min-height: min(28rem, calc(100dvh - 0.6rem));
+    border: 0;
+    background: transparent;
+}
+
+@supports not (height: 100dvh) {
+    .erp-fv-tela-venda-page .erp-fv-tv-produto-overlay .erp-form-overlay__panel {
+        max-height: calc(100vh - 0.6rem);
+    }
+
+    .erp-fv-tela-venda-page .erp-fv-tv-produto-overlay .erp-form-overlay__iframe {
+        height: min(52rem, calc(100vh - 0.6rem));
+    }
+}
+
 .erp-fv-tela-venda-page .erp-fv-tv-listar-imprimir-overlay {
     position: fixed;
     inset: 0;

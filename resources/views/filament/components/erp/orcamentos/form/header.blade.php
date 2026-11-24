@@ -47,6 +47,11 @@
                 </div>
             </label>
 
+            @include('filament.components.erp.shared.btn-cadastrar-cliente', [
+                'disabled' => $readOnly,
+                'title' => 'Cadastrar cliente (F9)',
+            ])
+
             @if (trim($this->clienteObservacoes) !== '' && ! \App\Models\Person::isCodigoConsumidorFinal($this->clienteCodigo !== '' ? $this->clienteCodigo : null))
                 <button type="button" class="erp-fv-tv__obs-cliente" wire:click="abrirObservacaoCliente" title="Observação do cliente">
                     Obs. cliente

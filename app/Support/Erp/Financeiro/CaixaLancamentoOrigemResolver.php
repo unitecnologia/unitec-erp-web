@@ -9,6 +9,7 @@ use App\Models\ContaPagarPagamento;
 use App\Models\ContaReceber;
 use App\Models\ContaReceberPagamento;
 use App\Models\ForcaVendasOrder;
+use App\Models\FormaPagamento;
 use App\Models\OrdemServico;
 use App\Models\Person;
 use Illuminate\Support\Facades\Schema;
@@ -98,8 +99,22 @@ final class CaixaLancamentoOrigemResolver
         }
 
         if (str_starts_with(mb_strtoupper($historico, 'UTF-8'), '[MANUAL]')) {
+            $forma = null;
+            if (Schema::hasColumn($lancamento->getTable(), 'forma_pagamento_id')) {
+                $formaId = (int) ($lancamento->forma_pagamento_id ?? 0);
+                if ($formaId > 0) {
+                    $desc = trim((string) (
+                        $lancamento->formaPagamento?->descricao
+                        ?? FormaPagamento::query()->whereKey($formaId)->value('descricao')
+                        ?? ''
+                    ));
+                    $forma = $desc !== '' ? mb_strtoupper($desc, 'UTF-8') : null;
+                }
+            }
+
             return $this->linhas([
                 $this->linha('Origem', 'Lançamento manual'),
+                $this->linha('Forma de pagamento', $forma),
             ]);
         }
 

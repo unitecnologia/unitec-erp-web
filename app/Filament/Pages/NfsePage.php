@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\ManagesErpPersonCreateOverlay;
+use App\Filament\Concerns\ManagesErpProductCreateOverlay;
 use App\Filament\Resources\OrdemServicoResource\Pages\Concerns\ManagesEquipamentoVeiculo;
 use App\Filament\Resources\PersonResource;
 use App\Models\Empresa;
@@ -57,6 +59,8 @@ class NfsePage extends Page
     use Concerns\ManagesNfseEspelhoModal;
     use Concerns\ManagesNfseImportOs;
     use ManagesEquipamentoVeiculo;
+    use ManagesErpPersonCreateOverlay;
+    use ManagesErpProductCreateOverlay;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
@@ -1263,6 +1267,18 @@ class NfsePage extends Page
             return;
         }
 
+        if ($this->overlayProductOpen) {
+            $this->closeProductOverlay();
+
+            return;
+        }
+
+        if ($this->overlayPersonOpen) {
+            $this->closePersonOverlay();
+
+            return;
+        }
+
         $this->fecharNfseTomadorFiscalIncompleto();
         $this->nfseModalOpen = false;
         $this->resetNfseModalForm();
@@ -1457,6 +1473,107 @@ class NfsePage extends Page
         $this->nfseTomadorSugestoes = [];
         $this->nfseTomadorSugestoesOpen = false;
         $this->nfseTomadorSugestaoIndex = 0;
+    }
+
+    protected function canOpenPersonCreateOverlay(): bool
+    {
+        if (! $this->nfseModalOpen) {
+            $this->notifyPersonCreateBlocked('Abra o lançamento da NFS-e para cadastrar um tomador.');
+
+            return false;
+        }
+
+        if ($this->nfseSomenteLeitura()) {
+            $this->notifyPersonCreateBlocked('NFS-e já transmitida — tomador não pode ser alterado.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function applyPersonCreatedFromOverlay(int $clienteId): void
+    {
+        $person = Person::query()
+            ->whereKey($clienteId)
+            ->where('is_cliente', true)
+            ->first($this->nfseTomadorSelectColumns());
+
+        if (! $person) {
+            Notification::make()->title('Tomador não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->aplicarNfseTomadorSugestao($this->mapearNfseTomador($person));
+    }
+
+    protected function afterPersonOverlayClosed(): void
+    {
+        ErpScreen::set('NFS-e');
+        $this->nfseFocarCampo('nfse-tomador-busca');
+    }
+
+    protected function personCreateOverlayScreenTitle(): string
+    {
+        return 'Cadastro de Pessoas';
+    }
+
+    protected function canOpenProductCreateOverlay(): bool
+    {
+        if (! $this->nfseModalOpen) {
+            $this->notifyProductCreateBlocked('Abra o lançamento da NFS-e para cadastrar um serviço.');
+
+            return false;
+        }
+
+        if ($this->nfseSomenteLeitura()) {
+            $this->notifyProductCreateBlocked('NFS-e já transmitida — serviços não podem ser alterados.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function applyProductCreatedFromOverlay(string $codigo): void
+    {
+        $codigo = mb_strtoupper(trim($codigo), 'UTF-8');
+
+        if ($codigo === '') {
+            return;
+        }
+
+        $product = Product::query()
+            ->where('ativo', true)
+            ->where('is_servico', true)
+            ->whereRaw('UPPER(codigo) = ?', [$codigo])
+            ->first(['id', 'codigo', 'descricao', 'preco_venda', 'unidade', 'c_trib_nac']);
+
+        if (! $product) {
+            $this->nfseServicoBusca = $codigo;
+            Notification::make()
+                ->title('Produto gravado.')
+                ->body('Para incluir na NFS-e, marque como serviço e busque pelo código.')
+                ->warning()
+                ->send();
+            $this->nfseFocarCampo('nfse-servico-busca');
+
+            return;
+        }
+
+        $this->aplicarNfseServicoSugestao($this->mapearNfseServico($product));
+    }
+
+    protected function afterProductOverlayClosed(): void
+    {
+        ErpScreen::set('NFS-e');
+        $this->nfseFocarCampo('nfse-servico-busca');
+    }
+
+    protected function productCreateOverlayScreenTitle(): string
+    {
+        return 'Cadastro de Produtos';
     }
 
     protected function resetNfseModalForm(): void

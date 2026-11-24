@@ -32,7 +32,9 @@ class PlanoContasReport extends AbstractTabularReport
             'codigo' => 'CÓDIGO',
             'plano' => 'PLANO DE CONTAS',
             'entradas' => 'ENTRADAS',
+            'pct_entradas' => '% ENTRADAS',
             'saidas' => 'SAÍDAS',
+            'pct_saidas' => '% SAÍDAS',
             'saldo' => 'SALDO',
         ];
     }
@@ -44,7 +46,20 @@ class PlanoContasReport extends AbstractTabularReport
 
     public function numericColumns(): array
     {
-        return ['entradas', 'saidas', 'saldo'];
+        return ['entradas', 'pct_entradas', 'saidas', 'pct_saidas', 'saldo'];
+    }
+
+    public function columnWidthWeights(): array
+    {
+        return [
+            'codigo' => 8,
+            'plano' => 28,
+            'entradas' => 14,
+            'pct_entradas' => 10,
+            'saidas' => 14,
+            'pct_saidas' => 10,
+            'saldo' => 14,
+        ];
     }
 
     public function filterFields(): array
@@ -58,6 +73,16 @@ class PlanoContasReport extends AbstractTabularReport
                 'placeholder' => 'Todos os planos',
                 'options' => $this->planoOptions(),
             ],
+            [
+                'key' => 'ordem',
+                'label' => 'Ordenar por',
+                'type' => 'select',
+                'options' => [
+                    'codigo' => 'Código',
+                    'maior_entrada' => 'Maior Entrada',
+                    'maior_saida' => 'Maior Saída',
+                ],
+            ],
         ]);
     }
 
@@ -66,6 +91,7 @@ class PlanoContasReport extends AbstractTabularReport
         [$de, $ate] = $this->periodFromRequest($request);
         $columns = $this->resolveColumns($request->query('cols'));
         $planoId = (int) $request->query('plano', 0);
+        $ordem = $this->resolveOrdem($request->query('ordem'));
         $planoFiltro = $planoId > 0 ? $this->resolverPlanoComSubplanos($planoId) : null;
 
         $query = CaixaLancamento::query()
@@ -81,14 +107,14 @@ class PlanoContasReport extends AbstractTabularReport
             }
         }
 
-        $rows = $query
+        /** @var list<array{codigo: string, plano: string, entradas: float, saidas: float}> $raw */
+        $raw = $query
             ->groupBy(
                 'caixa_lancamentos.plano_conta_id',
                 'planos_contas.codigo',
                 'planos_contas.descricao',
                 'caixa_lancamentos.plano_contas',
             )
-            ->orderBy('planos_contas.codigo')
             ->limit(5000)
             ->get([
                 'planos_contas.codigo',
@@ -99,19 +125,51 @@ class PlanoContasReport extends AbstractTabularReport
                 DB::raw('SUM(' . static::sqlTable('caixa_lancamentos') . '.entrada) as entradas'),
                 DB::raw('SUM(' . static::sqlTable('caixa_lancamentos') . '.saida) as saidas'),
             ])
-            ->map(function ($row): array {
-                $entradas = (float) $row->entradas;
-                $saidas = (float) $row->saidas;
-
+            ->map(static function ($row): array {
                 return [
                     'codigo' => (string) ($row->codigo ?? ''),
                     'plano' => (string) $row->plano,
-                    'entradas' => static::formatMoney($entradas),
-                    'saidas' => static::formatMoney($saidas),
-                    'saldo' => static::formatMoney($entradas - $saidas),
+                    'entradas' => round((float) $row->entradas, 2),
+                    'saidas' => round((float) $row->saidas, 2),
                 ];
             })
             ->all();
+
+        $totalEntradas = round(array_sum(array_column($raw, 'entradas')), 2);
+        $totalSaidas = round(array_sum(array_column($raw, 'saidas')), 2);
+
+        $comPct = array_map(static function (array $row) use ($totalEntradas, $totalSaidas): array {
+            $entradas = (float) $row['entradas'];
+            $saidas = (float) $row['saidas'];
+
+            return [
+                'codigo' => $row['codigo'],
+                'plano' => $row['plano'],
+                'entradas' => $entradas,
+                'pct_entradas' => $totalEntradas > 0.009
+                    ? round(($entradas / $totalEntradas) * 100, 2)
+                    : 0.0,
+                'saidas' => $saidas,
+                'pct_saidas' => $totalSaidas > 0.009
+                    ? round(($saidas / $totalSaidas) * 100, 2)
+                    : 0.0,
+                'saldo' => round($entradas - $saidas, 2),
+            ];
+        }, $raw);
+
+        $this->ordenarLinhas($comPct, $ordem);
+
+        $rows = array_map(static function (array $row): array {
+            return [
+                'codigo' => $row['codigo'],
+                'plano' => $row['plano'],
+                'entradas' => static::formatMoney((float) $row['entradas']),
+                'pct_entradas' => static::formatPercent((float) $row['pct_entradas']),
+                'saidas' => static::formatMoney((float) $row['saidas']),
+                'pct_saidas' => static::formatPercent((float) $row['pct_saidas']),
+                'saldo' => static::formatMoney((float) $row['saldo']),
+            ];
+        }, $comPct);
 
         $summary = ['PERÍODO: ' . $this->periodLabel($de, $ate)];
 
@@ -128,17 +186,79 @@ class PlanoContasReport extends AbstractTabularReport
             }
         }
 
-        return $this->result(
+        $summary[] = 'ORDENAÇÃO: '.$this->rotuloOrdem($ordem);
+
+        $built = $this->result(
             [
                 'de' => $de->toDateString(),
                 'ate' => $ate->toDateString(),
                 'plano' => $planoId > 0 ? (string) $planoId : '',
+                'ordem' => $ordem,
                 'cols' => $columns,
             ],
             $columns,
             $rows,
             $summary,
         );
+
+        // Totais de % ficam em 100% (não a soma arredondada linha a linha).
+        if (isset($built['totals']['pct_entradas'])) {
+            $built['totals']['pct_entradas'] = $totalEntradas > 0.009
+                ? static::formatPercent(100.0)
+                : static::formatPercent(0.0);
+        }
+        if (isset($built['totals']['pct_saidas'])) {
+            $built['totals']['pct_saidas'] = $totalSaidas > 0.009
+                ? static::formatPercent(100.0)
+                : static::formatPercent(0.0);
+        }
+
+        return $built;
+    }
+
+    private function resolveOrdem(mixed $raw): string
+    {
+        $ordem = is_string($raw) ? trim($raw) : '';
+
+        return in_array($ordem, ['codigo', 'maior_entrada', 'maior_saida'], true)
+            ? $ordem
+            : 'codigo';
+    }
+
+    private function rotuloOrdem(string $ordem): string
+    {
+        return match ($ordem) {
+            'maior_entrada' => 'Maior Entrada',
+            'maior_saida' => 'Maior Saída',
+            default => 'Código',
+        };
+    }
+
+    /**
+     * @param  list<array{codigo: string, plano: string, entradas: float, pct_entradas: float, saidas: float, pct_saidas: float, saldo: float}>  $rows
+     */
+    private function ordenarLinhas(array &$rows, string $ordem): void
+    {
+        usort($rows, static function (array $a, array $b) use ($ordem): int {
+            if ($ordem === 'maior_entrada') {
+                $cmp = ((float) $b['entradas']) <=> ((float) $a['entradas']);
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+            } elseif ($ordem === 'maior_saida') {
+                $cmp = ((float) $b['saidas']) <=> ((float) $a['saidas']);
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+            }
+
+            $codigoCmp = strnatcasecmp((string) $a['codigo'], (string) $b['codigo']);
+            if ($codigoCmp !== 0) {
+                return $codigoCmp;
+            }
+
+            return strnatcasecmp((string) $a['plano'], (string) $b['plano']);
+        });
     }
 
     /**
